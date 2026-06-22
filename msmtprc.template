@@ -1,0 +1,21 @@
+# msmtp 配置模板
+# 使用方法: 复制此文件为 /etc/msmtprc 或挂载到容器内
+
+# 默认账户
+defaults
+auth           on
+tls            on
+tls_starttls   on
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+logfile        /var/log/msmtp.log
+
+# 阿里云邮件推送
+account        aliyun
+host           smtp.dm.aliyun.com
+port           465
+from           ${ALIYUN_FROM_EMAIL}
+user           ${ALIYUN_ACCESS_KEY}
+password       ${ALIYUN_ACCESS_SECRET}
+
+# 设置默认账户
+account default : aliyun
