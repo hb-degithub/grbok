@@ -1,0 +1,70 @@
+# ===========================
+# 本地测试环境 Caddy 配置
+# ===========================
+# ⚠️ 此文件仅用于本地测试，使用 HTTP (无 HTTPS)
+
+# 全局配置 - 禁用自动 HTTPS
+{
+    auto_https off
+    admin off
+}
+
+# 监听本地 80 端口
+:80 {
+    # 安全头 (与生产一致)
+    header {
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+        -X-Powered-By
+    }
+
+    # Rate Limit 配置 (本地测试)
+    rate_limit {
+        zone dynamic_limit {
+            key {remote_host}
+            events 100 per_second
+            window 1s
+        }
+    }
+
+    # Admin UI 路由 (本地测试全放行)
+    handle /_/admin* {
+        reverse_proxy pocketbase:8090 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # 静态资源缓存
+    @static {
+        path *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot
+    }
+
+    handle @static {
+        header Cache-Control "public, max-age=3600"
+        reverse_proxy pocketbase:8090
+    }
+
+    # API 路由
+    handle /api/* {
+        rate_limit {
+            zone dynamic_limit
+        }
+        reverse_proxy pocketbase:8090
+    }
+
+    # 默认路由
+    handle {
+        reverse_proxy pocketbase:8090
+    }
+
+    # 访问日志
+    log {
+        output stdout
+        format console
+    }
+}

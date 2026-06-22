@@ -1,0 +1,115 @@
+{$DOMAIN}
+
+# 全局配置
+{
+    # ACME 邮箱
+    email {$CADDY_ACME_EMAIL}
+
+    # OCSP Stapling (提高 TLS 握手性能)
+    ocsp_stapling on
+
+    # HTTP/3 支持
+    servers {
+        protocol {
+            experimental_http3
+        }
+    }
+}
+
+# 安全头 + 反向代理到 PocketBase
+header {
+    # HSTS (强制 HTTPS，有效期 1 年)
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+    # 防止点击劫持
+    X-Frame-Options "DENY"
+
+    # 防止 MIME 类型嗅探
+    X-Content-Type-Options "nosniff"
+
+    # XSS 保护
+    X-XSS-Protection "1; mode=block"
+
+    # 防止信息泄露
+    Referrer-Policy "strict-origin-when-cross-origin"
+
+    # 权限策略
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+
+    # 隐藏服务器信息
+    -Server
+    -X-Powered-By
+}
+
+# Rate Limit 配置 (全局)
+rate_limit {
+    zone dynamic_limit {
+        key {remote_host}
+        events {$RATE_LIMIT_PER_IP} per_second
+        window 1s
+    }
+}
+
+# PocketBase Admin UI - IP 白名单保护
+@admin_ips {
+    remote_ip {$ADMIN_IP}
+}
+
+# Admin UI 路由 - 仅允许白名单 IP
+handle /_/admin* {
+    @admin_ips {
+        remote_ip {$ADMIN_IP}
+    }
+    respond @admin_ips 403 "Forbidden: Admin access restricted"
+    reverse_proxy pocketbase:8090 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+
+# 静态资源缓存优化
+@static {
+    path *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot
+    path /assets/* /_app/immutable/*
+}
+
+handle @static {
+    header Cache-Control "public, max-age=31536000, immutable"
+    reverse_proxy pocketbase:8090 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+
+# API 路由
+handle /api/* {
+    rate_limit {
+        zone dynamic_limit
+    }
+    reverse_proxy pocketbase:8090 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+
+# 默认路由
+handle {
+    reverse_proxy pocketbase:8090 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
+
+# 访问日志
+log {
+    output file /data/access.log {
+        roll_size 50mb
+        roll_keep 10
+        roll_keep_for 720h
+    }
+    format json
+}
