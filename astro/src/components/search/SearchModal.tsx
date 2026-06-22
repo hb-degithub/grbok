@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import DOMPurify from 'dompurify';
 import { cn } from '../../lib/utils';
 
 /**
@@ -319,7 +320,7 @@ export function SearchModal() {
                       </div>
                       <div
                         className="line-clamp-2 text-sm text-gray-500 dark:text-gray-400"
-                        dangerouslySetInnerHTML={{ __html: result.excerpt }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(result.excerpt) }}
                       />
                       <div className="text-xs text-gray-400">
                         {result.url}

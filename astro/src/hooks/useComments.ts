@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { pb } from '../lib/pocketbase';
+import { getPocketBase } from '../lib/pocketbase';
 import type {
   Comment,
   NestedComment,
@@ -53,6 +53,7 @@ export function useComments(postId: string) {
   const fetchComments = useCallback(async () => {
     try {
       setLoading(true);
+      const pb = getPocketBase();
       const result = await pb.collection('comments').getFullList<Comment>({
         filter: `post_id = "${postId}" && status = "approved"`,
         sort: 'created',
@@ -127,6 +128,7 @@ export function useComments(postId: string) {
 
     const subscribe = async () => {
       try {
+        const pb = getPocketBase();
         unsubscribe = await pb
           .collection('comments')
           .subscribe('*', (e) => {
@@ -156,6 +158,7 @@ export function useComments(postId: string) {
   const submitComment = useCallback(
     async (data: CommentFormData): Promise<boolean> => {
       try {
+        const pb = getPocketBase();
         await pb.collection('comments').create({
           post_id: postId,
           author_name: data.author_name,

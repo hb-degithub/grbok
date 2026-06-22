@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { pb } from '../lib/pocketbase';
+import { getPocketBase } from '../lib/pocketbase';
 import type { Post, User, Comment, Tag } from '../types/pocketbase';
 
 /**
@@ -7,6 +7,8 @@ import type { Post, User, Comment, Tag } from '../types/pocketbase';
  * 提供常用的数据获取方法，支持加载状态和错误处理
  */
 export function usePocketBase() {
+  const pb = getPocketBase();
+
   return {
     pb,
     /**
@@ -24,7 +26,7 @@ export function usePocketBase() {
         console.error('获取文章列表失败:', err);
         return { data: null, error: err };
       }
-    }, []),
+    }, [pb]),
 
     /**
      * 获取单篇文章
@@ -40,7 +42,7 @@ export function usePocketBase() {
         console.error('获取文章失败:', err);
         return { data: null, error: err };
       }
-    }, []),
+    }, [pb]),
 
     /**
      * 获取文章的评论列表
@@ -56,7 +58,7 @@ export function usePocketBase() {
         console.error('获取评论失败:', err);
         return { data: null, error: err };
       }
-    }, []),
+    }, [pb]),
 
     /**
      * 用户登录（Magic Link）
@@ -69,7 +71,7 @@ export function usePocketBase() {
         console.error('发送 Magic Link 失败:', err);
         return { success: false, error: err };
       }
-    }, []),
+    }, [pb]),
 
     /**
      * 验证 Magic Link
@@ -82,7 +84,7 @@ export function usePocketBase() {
         console.error('验证 Magic Link 失败:', err);
         return { success: false, data: null, error: err };
       }
-    }, []),
+    }, [pb]),
   };
 }
 
@@ -96,6 +98,8 @@ export function usePosts(page = 1, perPage = 10) {
   const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
+    const pb = getPocketBase();
+
     const fetchPosts = async () => {
       setLoading(true);
       try {

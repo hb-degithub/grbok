@@ -44,8 +44,8 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
           <li><a href="/tags" class="hover:text-blue-600">标签</a></li>
           <li><a href="/about" class="hover:text-blue-600">关于</a></li>
           <li>
-            <!-- 全局搜索组件 - React 岛屿 -->
-            <SearchModal client:load />
+            <!-- 全局搜索组件 - React 岛屿（页面空闲时加载） -->
+            <SearchModal client:idle />
           </li>
         </ul>
       </nav>
