@@ -1,9 +1,10 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { PostList } from '../components/posts/PostList';
 ---
 
 <BaseLayout title="首页" description="欢迎来到我的个人博客">
-  <div class="space-y-8">
+  <div class="space-y-12">
     <!-- Hero 区域 -->
     <section class="py-12 text-center">
       <h1 class="mb-4 text-4xl font-bold">欢迎来到我的博客</h1>
@@ -12,29 +13,30 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       </p>
     </section>
 
-    <!-- 最新文章 -->
+    <!-- 最新文章 - React 岛屿组件 -->
     <section>
-      <h2 class="mb-6 text-2xl font-semibold">最新文章</h2>
-      <div class="grid gap-6">
-        <!-- 文章卡片将通过 PocketBase API 动态加载 -->
-        <p class="text-gray-500">文章加载中...</p>
-      </div>
+      <h2 class="mb-8 text-2xl font-semibold">最新文章</h2>
+      <PostList client:load perPage={6} />
     </section>
 
     <!-- 快速链接 -->
     <section class="grid gap-4 sm:grid-cols-2">
       <a
         href="/posts"
-        class="rounded-lg border border-gray-200 p-6 hover:border-blue-300 hover:shadow-md dark:border-gray-800"
+        class="group rounded-lg border border-gray-200 p-6 transition-all duration-300 hover:border-blue-300 hover:shadow-lg dark:border-gray-800"
       >
-        <h3 class="mb-2 font-semibold">所有文章</h3>
+        <h3 class="mb-2 font-semibold group-hover:text-blue-600 transition-colors">
+          所有文章
+        </h3>
         <p class="text-sm text-gray-500">浏览所有已发布的文章</p>
       </a>
       <a
         href="/tags"
-        class="rounded-lg border border-gray-200 p-6 hover:border-blue-300 hover:shadow-md dark:border-gray-800"
+        class="group rounded-lg border border-gray-200 p-6 transition-all duration-300 hover:border-blue-300 hover:shadow-lg dark:border-gray-800"
       >
-        <h3 class="mb-2 font-semibold">标签分类</h3>
+        <h3 class="mb-2 font-semibold group-hover:text-blue-600 transition-colors">
+          标签分类
+        </h3>
         <p class="text-sm text-gray-500">按标签筛选感兴趣的内容</p>
       </a>
     </section>
