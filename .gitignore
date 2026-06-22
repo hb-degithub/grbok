@@ -2,12 +2,12 @@
 # Git 忽略规则
 # ===========================
 
-# 敏感配置（仅忽略真实配置，保留模板）
+# 敏感配置（全部忽略，仅保留模板）
 .env
+.env.local
 .env.production
+.env.astro
 !.env.example
-!.env.local
-!.env.astro
 
 # Docker 数据卷（运行时生成）
 pb_data/
