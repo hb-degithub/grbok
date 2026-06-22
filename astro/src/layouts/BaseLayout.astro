@@ -1,4 +1,6 @@
 ---
+import { SearchModal } from '../components/search/SearchModal';
+
 interface Props {
   title: string;
   description?: string;
@@ -36,11 +38,15 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     <header class="border-b border-gray-200 dark:border-gray-800">
       <nav class="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
         <a href="/" class="text-xl font-bold">个人博客</a>
-        <ul class="flex gap-6">
+        <ul class="flex items-center gap-6">
           <li><a href="/" class="hover:text-blue-600">首页</a></li>
           <li><a href="/posts" class="hover:text-blue-600">文章</a></li>
           <li><a href="/tags" class="hover:text-blue-600">标签</a></li>
           <li><a href="/about" class="hover:text-blue-600">关于</a></li>
+          <li>
+            <!-- 全局搜索组件 - React 岛屿 -->
+            <SearchModal client:load />
+          </li>
         </ul>
       </nav>
     </header>
