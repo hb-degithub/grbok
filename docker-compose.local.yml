@@ -1,0 +1,49 @@
+# ===========================
+# 本地测试环境 Docker Compose 配置
+# ===========================
+# ⚠️ 此文件仅用于本地测试，禁止上传至服务器
+
+services:
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:0.22.21
+    container_name: blog-pocketbase-local
+    ports:
+      - "8090:8090"
+    volumes:
+      - pb_data:/pb/pb_data
+      - pb_migrations:/pb/pb_migrations
+      - pb_hooks:/pb/pb_hooks
+    environment:
+      - PB_ENCRYPTION_KEY=${PB_ENCRYPTION_KEY}
+      - TZ=${TZ:-Asia/Shanghai}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  caddy:
+    image: caddy:2.8.4-alpine
+    container_name: blog-caddy-local
+    ports:
+      - "80:80"
+    volumes:
+      - ./Caddyfile.local:/etc/caddy/Caddyfile:ro
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  pb_data:
+    name: blog_pb_data_local
+  pb_migrations:
+    name: blog_pb_migrations_local
+  pb_hooks:
+    name: blog_pb_hooks_local

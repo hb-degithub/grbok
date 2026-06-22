@@ -1,0 +1,94 @@
+version: "3.8"
+
+services:
+  caddy:
+    image: caddy:2.8.4-alpine
+    container_name: blog-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"  # HTTP/3 支持
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - DOMAIN=${DOMAIN}
+      - ADMIN_IP=${ADMIN_IP}
+      - CADDY_ACME_EMAIL=${CADDY_ACME_EMAIL}
+      - RATE_LIMIT_PER_IP=${RATE_LIMIT_PER_IP:-10}
+    networks:
+      - blog_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  pocketbase:
+    image: ghcr.io/muchobien/pocketbase:0.22.21
+    container_name: blog-pocketbase
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8090:8090"  # 仅本地访问，通过 Caddy 反代
+    volumes:
+      - pb_data:/pb/pb_data
+      - pb_migrations:/pb/pb_migrations
+      - pb_hooks:/pb/pb_hooks
+      - ./msmtprc:/root/.msmtprc:ro
+    environment:
+      - PB_ENCRYPTION_KEY=${PB_ENCRYPTION_KEY}
+      - TZ=${TZ:-Asia/Shanghai}
+    networks:
+      - blog_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.50"
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  caddy_data:
+    name: blog_caddy_data
+  caddy_config:
+    name: blog_caddy_config
+  pb_data:
+    name: blog_pb_data
+  pb_migrations:
+    name: blog_pb_migrations
+  pb_hooks:
+    name: blog_pb_hooks
+
+networks:
+  blog_network:
+    name: blog_network
+    driver: bridge
