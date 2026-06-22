@@ -1,0 +1,62 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+  image?: string;
+}
+
+const { title, description = '我的个人博客', image } = Astro.props;
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- SEO -->
+    <title>{title} | 个人博客</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalURL} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={Astro.url} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    {image && <meta property="og:image" content={new URL(image, Astro.url)} />}
+
+    <!-- Sitemap -->
+    <link rel="sitemap" href="/sitemap-index.xml" />
+  </head>
+  <body class="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+    <header class="border-b border-gray-200 dark:border-gray-800">
+      <nav class="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
+        <a href="/" class="text-xl font-bold">个人博客</a>
+        <ul class="flex gap-6">
+          <li><a href="/" class="hover:text-blue-600">首页</a></li>
+          <li><a href="/posts" class="hover:text-blue-600">文章</a></li>
+          <li><a href="/tags" class="hover:text-blue-600">标签</a></li>
+          <li><a href="/about" class="hover:text-blue-600">关于</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <main class="mx-auto max-w-4xl px-4 py-8">
+      <slot />
+    </main>
+
+    <footer class="border-t border-gray-200 dark:border-gray-800">
+      <div class="mx-auto max-w-4xl px-4 py-6 text-center text-sm text-gray-500">
+        &copy; {new Date().getFullYear()} 个人博客. All rights reserved.
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style>
+  @import '../styles/global.css';
+</style>

@@ -1,0 +1,68 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import type { Post, User, Tag } from '../types/pocketbase';
+
+interface Props {
+  post: Post;
+  author?: User;
+  tags?: Tag[];
+}
+
+const { post, author, tags = [] } = Astro.props;
+const formattedDate = new Date(post.published_at).toLocaleDateString('zh-CN', {
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+});
+---
+
+<BaseLayout title={post.title} description={post.excerpt} image={post.cover}>
+  <article class="prose prose-lg dark:prose-invert mx-auto">
+    <!-- 文章头部 -->
+    <header class="mb-8">
+      <h1 class="mb-4">{post.title}</h1>
+
+      <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+        {author && (
+          <span class="flex items-center gap-1">
+            <span class="font-medium text-gray-700 dark:text-gray-300">{author.name}</span>
+          </span>
+        )}
+        <time datetime={post.published_at}>{formattedDate}</time>
+        <span>{post.views} 次阅读</span>
+      </div>
+
+      {tags.length > 0 && (
+        <div class="mt-4 flex flex-wrap gap-2">
+          {tags.map((tag) => (
+            <a
+              href={`/tags/${tag.slug}`}
+              class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+            >
+              {tag.name}
+            </a>
+          ))}
+        </div>
+      )}
+
+      {post.cover && (
+        <img
+          src={post.cover}
+          alt={post.title}
+          class="mt-6 rounded-lg"
+          loading="lazy"
+        />
+      )}
+    </header>
+
+    <!-- 文章内容 -->
+    <div set:html={post.content} />
+
+    <!-- 文章底部 -->
+    <footer class="mt-12 border-t border-gray-200 pt-6 dark:border-gray-800">
+      <div class="flex justify-between">
+        <a href="/posts" class="text-blue-600 hover:underline">&larr; 返回文章列表</a>
+      </div>
+    </footer>
+  </article>
+</BaseLayout>
