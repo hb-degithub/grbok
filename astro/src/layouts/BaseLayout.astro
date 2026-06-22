@@ -33,31 +33,73 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
     <!-- Sitemap -->
     <link rel="sitemap" href="/sitemap-index.xml" />
+
+    <!-- 字体预加载 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   </head>
-  <body class="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
-    <header class="border-b border-gray-200 dark:border-gray-800">
-      <nav class="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
-        <a href="/" class="text-xl font-bold">个人博客</a>
-        <ul class="flex items-center gap-6">
-          <li><a href="/" class="hover:text-blue-600">首页</a></li>
-          <li><a href="/posts" class="hover:text-blue-600">文章</a></li>
-          <li><a href="/tags" class="hover:text-blue-600">标签</a></li>
-          <li><a href="/about" class="hover:text-blue-600">关于</a></li>
+  <body class="min-h-screen bg-white font-sans text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">
+    <!-- 导航栏 -->
+    <header class="sticky top-0 z-40 border-b border-gray-200/80 bg-white/80 backdrop-blur-lg dark:border-gray-800/80 dark:bg-gray-950/80">
+      <nav class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+        <!-- Logo -->
+        <a href="/" class="flex items-center gap-2 text-xl font-bold tracking-tight">
+          <span class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            个人博客
+          </span>
+        </a>
+
+        <!-- 导航链接 -->
+        <ul class="flex items-center gap-1">
           <li>
-            <!-- 全局搜索组件 - React 岛屿（页面空闲时加载） -->
+            <a href="/" class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white">
+              首页
+            </a>
+          </li>
+          <li>
+            <a href="/posts" class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white">
+              文章
+            </a>
+          </li>
+          <li>
+            <a href="/tags" class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white">
+              标签
+            </a>
+          </li>
+          <li>
+            <a href="/about" class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white">
+              关于
+            </a>
+          </li>
+          <li class="ml-2">
+            <!-- 全局搜索组件 -->
             <SearchModal client:idle />
           </li>
         </ul>
       </nav>
     </header>
 
-    <main class="mx-auto max-w-4xl px-4 py-8">
+    <!-- 主内容 -->
+    <main class="mx-auto max-w-5xl px-6 py-10">
       <slot />
     </main>
 
-    <footer class="border-t border-gray-200 dark:border-gray-800">
-      <div class="mx-auto max-w-4xl px-4 py-6 text-center text-sm text-gray-500">
-        &copy; {new Date().getFullYear()} 个人博客. All rights reserved.
+    <!-- 页脚 -->
+    <footer class="border-t border-gray-200/80 dark:border-gray-800/80">
+      <div class="mx-auto max-w-5xl px-6 py-8">
+        <div class="flex flex-col items-center justify-between gap-4 sm:flex-row">
+          <p class="text-sm text-gray-500 dark:text-gray-400">
+            &copy; {new Date().getFullYear()} 个人博客. All rights reserved.
+          </p>
+          <div class="flex items-center gap-4">
+            <a href="/rss.xml" class="text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z" />
+              </svg>
+            </a>
+          </div>
+        </div>
       </div>
     </footer>
   </body>

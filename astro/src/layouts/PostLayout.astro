@@ -14,54 +14,118 @@ const formattedDate = new Date(post.published_at).toLocaleDateString('zh-CN', {
   month: 'long',
   day: 'numeric',
 });
+
+// 计算阅读时间（假设每分钟 300 字）
+const wordCount = post.content?.length || 0;
+const readingTime = Math.max(1, Math.ceil(wordCount / 300));
 ---
 
 <BaseLayout title={post.title} description={post.excerpt} image={post.cover}>
-  <article class="prose prose-lg dark:prose-invert mx-auto">
+  <article class="mx-auto max-w-4xl px-4 py-8">
     <!-- 文章头部 -->
-    <header class="mb-8">
-      <h1 class="mb-4">{post.title}</h1>
+    <header class="mb-12">
+      <!-- 标题 -->
+      <h1 class="mb-6 text-4xl font-bold leading-tight tracking-tight text-gray-900 dark:text-white md:text-5xl">
+        {post.title}
+      </h1>
 
-      <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+      <!-- 文章元信息 -->
+      <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+        <!-- 作者 -->
         {author && (
-          <span class="flex items-center gap-1">
+          <div class="flex items-center gap-2">
+            <div class="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-500 text-xs font-semibold text-white">
+              {author.name.charAt(0)}
+            </div>
             <span class="font-medium text-gray-700 dark:text-gray-300">{author.name}</span>
-          </span>
+          </div>
         )}
-        <time datetime={post.published_at}>{formattedDate}</time>
-        <span>{post.views} 次阅读</span>
+
+        <!-- 分隔符 -->
+        <span class="text-gray-300 dark:text-gray-600">|</span>
+
+        <!-- 日期 -->
+        <time datetime={post.published_at} class="flex items-center gap-1">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          {formattedDate}
+        </time>
+
+        <!-- 阅读时间 -->
+        <span class="flex items-center gap-1">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {readingTime} 分钟阅读
+        </span>
+
+        <!-- 浏览次数 -->
+        <span class="flex items-center gap-1">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          {post.views} 次阅读
+        </span>
       </div>
 
+      <!-- 标签 -->
       {tags.length > 0 && (
-        <div class="mt-4 flex flex-wrap gap-2">
+        <div class="mt-6 flex flex-wrap gap-2">
           {tags.map((tag) => (
             <a
               href={`/tags/${tag.slug}`}
-              class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700"
+              class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
             >
+              <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
               {tag.name}
             </a>
           ))}
         </div>
       )}
 
+      <!-- 封面图 -->
       {post.cover && (
-        <img
-          src={post.cover}
-          alt={post.title}
-          class="mt-6 rounded-lg"
-          loading="lazy"
-        />
+        <div class="mt-8 overflow-hidden rounded-2xl shadow-xl">
+          <img
+            src={post.cover}
+            alt={post.title}
+            class="h-auto w-full object-cover"
+            loading="lazy"
+          />
+        </div>
       )}
     </header>
 
     <!-- 文章内容 -->
-    <div set:html={post.content} />
+    <div class="prose">
+      <div set:html={post.content} />
+    </div>
 
     <!-- 文章底部 -->
-    <footer class="mt-12 border-t border-gray-200 pt-6 dark:border-gray-800">
-      <div class="flex justify-between">
-        <a href="/posts" class="text-blue-600 hover:underline">&larr; 返回文章列表</a>
+    <footer class="mt-16 border-t border-gray-200 pt-8 dark:border-gray-800">
+      <div class="flex items-center justify-between">
+        <a
+          href="/posts"
+          class="group inline-flex items-center gap-2 text-sm text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white"
+        >
+          <svg class="h-4 w-4 transition-transform group-hover:-translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          返回文章列表
+        </a>
+
+        <!-- 分享按钮（预留） -->
+        <div class="flex items-center gap-2">
+          <button class="rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+          </button>
+        </div>
       </div>
     </footer>
   </article>

@@ -4,40 +4,83 @@ import { PostList } from '../components/posts/PostList';
 ---
 
 <BaseLayout title="首页" description="欢迎来到我的个人博客">
-  <div class="space-y-12">
+  <div class="space-y-16">
     <!-- Hero 区域 -->
-    <section class="py-12 text-center">
-      <h1 class="mb-4 text-4xl font-bold">欢迎来到我的博客</h1>
-      <p class="text-lg text-gray-600 dark:text-gray-400">
-        分享技术、思考与生活
-      </p>
+    <section class="relative py-16 text-center">
+      <!-- 装饰背景 -->
+      <div class="pointer-events-none absolute inset-0 -z-10">
+        <div class="absolute left-1/2 top-0 h-[400px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500/5 blur-3xl"></div>
+      </div>
+
+      <div class="mx-auto max-w-2xl">
+        <h1 class="mb-6 text-5xl font-bold tracking-tight text-gray-900 dark:text-white">
+          个人博客
+        </h1>
+        <p class="text-lg leading-relaxed text-gray-600 dark:text-gray-400">
+          分享技术、思考与生活
+        </p>
+      </div>
     </section>
 
     <!-- 最新文章 - React 岛屿组件 -->
     <section>
-      <h2 class="mb-8 text-2xl font-semibold">最新文章</h2>
-      <PostList client:load perPage={6} />
+      <div class="mb-8 flex items-center justify-between">
+        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">最新文章</h2>
+        <a
+          href="/posts"
+          class="group inline-flex items-center gap-1 text-sm font-medium text-blue-600 transition-all hover:gap-2 dark:text-blue-400"
+        >
+          查看全部
+          <svg class="h-4 w-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+        </a>
+      </div>
+      <PostList client:idle perPage={6} />
     </section>
 
     <!-- 快速链接 -->
-    <section class="grid gap-4 sm:grid-cols-2">
+    <section class="grid gap-6 sm:grid-cols-2">
       <a
         href="/posts"
-        class="group rounded-lg border border-gray-200 p-6 transition-all duration-300 hover:border-blue-300 hover:shadow-lg dark:border-gray-800"
+        class="group relative overflow-hidden rounded-2xl border border-gray-200/60 bg-gradient-to-br from-blue-50 to-indigo-50 p-8 transition-all duration-300 hover:border-blue-300 hover:shadow-xl dark:border-gray-800/60 dark:from-blue-950/30 dark:to-indigo-950/30 dark:hover:border-blue-700"
       >
-        <h3 class="mb-2 font-semibold group-hover:text-blue-600 transition-colors">
-          所有文章
-        </h3>
-        <p class="text-sm text-gray-500">浏览所有已发布的文章</p>
+        <div class="relative z-10">
+          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/40">
+            <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+            </svg>
+          </div>
+          <h3 class="mb-2 text-lg font-semibold text-gray-900 transition-colors group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">
+            所有文章
+          </h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400">
+            浏览所有已发布的文章
+          </p>
+        </div>
+        <!-- 装饰 -->
+        <div class="absolute -bottom-4 -right-4 h-24 w-24 rounded-full bg-blue-200/30 blur-2xl dark:bg-blue-800/20"></div>
       </a>
+
       <a
         href="/tags"
-        class="group rounded-lg border border-gray-200 p-6 transition-all duration-300 hover:border-blue-300 hover:shadow-lg dark:border-gray-800"
+        class="group relative overflow-hidden rounded-2xl border border-gray-200/60 bg-gradient-to-br from-purple-50 to-pink-50 p-8 transition-all duration-300 hover:border-purple-300 hover:shadow-xl dark:border-gray-800/60 dark:from-purple-950/30 dark:to-pink-950/30 dark:hover:border-purple-700"
       >
-        <h3 class="mb-2 font-semibold group-hover:text-blue-600 transition-colors">
-          标签分类
-        </h3>
-        <p class="text-sm text-gray-500">按标签筛选感兴趣的内容</p>
+        <div class="relative z-10">
+          <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-purple-100 dark:bg-purple-900/40">
+            <svg class="h-6 w-6 text-purple-600 dark:text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+          </div>
+          <h3 class="mb-2 text-lg font-semibold text-gray-900 transition-colors group-hover:text-purple-600 dark:text-white dark:group-hover:text-purple-400">
+            标签分类
+          </h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400">
+            按标签筛选感兴趣的内容
+          </p>
+        </div>
+        <!-- 装饰 -->
+        <div class="absolute -bottom-4 -right-4 h-24 w-24 rounded-full bg-purple-200/30 blur-2xl dark:bg-purple-800/20"></div>
       </a>
     </section>
   </div>
