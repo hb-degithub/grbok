@@ -1,0 +1,43 @@
+# ===========================
+# Git 忽略规则
+# ===========================
+
+# 敏感配置（仅忽略真实配置，保留模板）
+.env
+.env.production
+!.env.example
+!.env.local
+!.env.astro
+
+# Docker 数据卷（运行时生成）
+pb_data/
+pb_migrations/
+# pb_hooks 需要提交（包含自定义 hooks 代码）
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node.js
+node_modules/
+dist/
+.cache/
+
+# 日志
+*.log
+logs/
+
+# 备份文件
+backups/
+*.tar.gz
+*.zip
+
+# 临时文件
+tmp/
+temp/
