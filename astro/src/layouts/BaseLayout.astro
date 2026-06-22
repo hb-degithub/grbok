@@ -9,6 +9,13 @@ interface Props {
 
 const { title, description = '我的个人博客', image } = Astro.props;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+
+const navItems = [
+  { href: '/', label: '首页' },
+  { href: '/posts', label: '文章' },
+  { href: '/tags', label: '标签' },
+  { href: '/about', label: '关于' },
+];
 ---
 
 <!doctype html>
@@ -19,61 +26,48 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
 
-    <!-- SEO -->
     <title>{title} | 个人博客</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonicalURL} />
 
-    <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content={Astro.url} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     {image && <meta property="og:image" content={new URL(image, Astro.url)} />}
 
-    <!-- Sitemap -->
     <link rel="sitemap" href="/sitemap-index.xml" />
 
-    <!-- 字体预加载 -->
+    <!-- 字体 -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
-  <body class="min-h-screen bg-white font-sans text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">
+  <body class="min-h-screen bg-zinc-50 font-sans text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
     <!-- 导航栏 -->
-    <header class="sticky top-0 z-40 border-b border-gray-200/80 bg-white/80 backdrop-blur-lg dark:border-gray-800/80 dark:bg-gray-950/80">
-      <nav class="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+    <header class="sticky top-0 z-50 border-b border-zinc-200/80 bg-white/70 backdrop-blur-xl dark:border-zinc-800/80 dark:bg-zinc-950/70">
+      <nav class="mx-auto flex max-w-5xl items-center justify-between px-6 py-3.5">
         <!-- Logo -->
-        <a href="/" class="flex items-center gap-2 text-xl font-bold tracking-tight">
-          <span class="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            个人博客
-          </span>
+        <a href="/" class="flex items-center gap-2 text-base font-semibold tracking-tight text-zinc-900 transition-colors hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300">
+          <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-zinc-900 dark:bg-zinc-100">
+            <span class="text-xs font-bold text-white dark:text-zinc-900">B</span>
+          </div>
+          <span>博客</span>
         </a>
 
         <!-- 导航链接 -->
         <ul class="flex items-center gap-1">
-          <li>
-            <a href="/" class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white">
-              首页
-            </a>
-          </li>
-          <li>
-            <a href="/posts" class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white">
-              文章
-            </a>
-          </li>
-          <li>
-            <a href="/tags" class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white">
-              标签
-            </a>
-          </li>
-          <li>
-            <a href="/about" class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-white">
-              关于
-            </a>
-          </li>
+          {navItems.map((item) => (
+            <li>
+              <a
+                href={item.href}
+                class="rounded-lg px-3 py-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/50 dark:hover:text-zinc-100"
+              >
+                {item.label}
+              </a>
+            </li>
+          ))}
           <li class="ml-2">
-            <!-- 全局搜索组件 -->
             <SearchModal client:idle />
           </li>
         </ul>
@@ -86,19 +80,17 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     </main>
 
     <!-- 页脚 -->
-    <footer class="border-t border-gray-200/80 dark:border-gray-800/80">
-      <div class="mx-auto max-w-5xl px-6 py-8">
-        <div class="flex flex-col items-center justify-between gap-4 sm:flex-row">
-          <p class="text-sm text-gray-500 dark:text-gray-400">
-            &copy; {new Date().getFullYear()} 个人博客. All rights reserved.
-          </p>
-          <div class="flex items-center gap-4">
-            <a href="/rss.xml" class="text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
-              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z" />
-              </svg>
-            </a>
-          </div>
+    <footer class="mt-20 border-t border-zinc-200/80 dark:border-zinc-800/80">
+      <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-8">
+        <p class="text-xs text-zinc-400 dark:text-zinc-500">
+          &copy; {new Date().getFullYear()} 个人博客
+        </p>
+        <div class="flex items-center gap-4">
+          <a href="/rss.xml" class="text-zinc-400 transition-colors hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300">
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z" />
+            </svg>
+          </a>
         </div>
       </div>
     </footer>

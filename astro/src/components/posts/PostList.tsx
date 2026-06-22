@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { usePosts } from '../../hooks/usePocketBase';
 import { PostCard } from './PostCard';
-import { Button } from '../ui/Button';
 
 interface PostListProps {
   initialPage?: number;
@@ -10,8 +9,7 @@ interface PostListProps {
 }
 
 /**
- * 骨架屏卡片组件
- * 用于加载状态的占位符
+ * 骨架屏卡片
  */
 function SkeletonCard({ index }: { index: number }) {
   return (
@@ -19,21 +17,18 @@ function SkeletonCard({ index }: { index: number }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05, duration: 0.4 }}
-      className="overflow-hidden rounded-2xl border border-gray-200/60 bg-white dark:border-gray-800/60 dark:bg-gray-900"
+      className="overflow-hidden rounded-2xl border border-zinc-200/80 bg-white dark:border-zinc-800/80 dark:bg-zinc-900"
     >
-      {/* 图片骨架 */}
-      <div className="h-52 skeleton" />
-
-      {/* 内容骨架 */}
-      <div className="space-y-3 p-6">
-        <div className="h-6 w-3/4 skeleton" />
+      <div className="h-48 skeleton" />
+      <div className="space-y-3 p-5">
+        <div className="h-5 w-3/4 skeleton" />
         <div className="space-y-2">
-          <div className="h-4 w-full skeleton" />
-          <div className="h-4 w-2/3 skeleton" />
+          <div className="h-3.5 w-full skeleton" />
+          <div className="h-3.5 w-2/3 skeleton" />
         </div>
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center gap-3 pt-1">
+          <div className="h-3 w-12 skeleton" />
           <div className="h-3 w-16 skeleton" />
-          <div className="h-3 w-20 skeleton" />
         </div>
       </div>
     </motion.div>
@@ -42,14 +37,13 @@ function SkeletonCard({ index }: { index: number }) {
 
 /**
  * 文章列表组件
- * 实现卡片交错入场、加载状态和分页功能
  */
 export function PostList({ initialPage = 1, perPage = 6 }: PostListProps) {
   const [currentPage, setCurrentPage] = useState(initialPage);
   const { posts, loading, error, totalPages } = usePosts(currentPage, perPage);
 
   /**
-   * 容器动画配置
+   * 容器动画
    */
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -57,17 +51,17 @@ export function PostList({ initialPage = 1, perPage = 6 }: PostListProps) {
       opacity: 1,
       transition: {
         duration: 0.5,
-        staggerChildren: 0.1,
+        staggerChildren: 0.08,
       },
     },
   };
 
   /**
-   * 加载状态 - 优雅的骨架屏
+   * 加载状态 - 骨架屏
    */
   if (loading) {
     return (
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-2">
+      <div className="grid gap-5 sm:grid-cols-2">
         {Array.from({ length: perPage }).map((_, i) => (
           <SkeletonCard key={i} index={i} />
         ))}
@@ -76,59 +70,46 @@ export function PostList({ initialPage = 1, perPage = 6 }: PostListProps) {
   }
 
   /**
-   * 错误状态
+   * 错误状态 - 低调的提示
    */
   if (error) {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col items-center justify-center rounded-2xl border border-red-200 bg-red-50 p-12 text-center dark:border-red-800 dark:bg-red-900/20"
+        className="flex items-center justify-center gap-3 rounded-xl border border-zinc-200 bg-zinc-50 px-6 py-8 dark:border-zinc-800 dark:bg-zinc-900"
       >
-        {/* 错误图标 */}
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/40">
-          <svg className="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        <h3 className="mb-2 text-lg font-semibold text-red-800 dark:text-red-200">
-          加载失败
-        </h3>
-        <p className="mb-4 text-sm text-red-600 dark:text-red-400">
-          {error.message}
-        </p>
-        <Button
-          variant="outline"
+        <svg className="h-5 w-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+        </svg>
+        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+          加载失败，请稍后重试
+        </span>
+        <button
           onClick={() => window.location.reload()}
-          className="border-red-300 text-red-700 hover:bg-red-100 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-900/40"
+          className="ml-2 text-sm font-medium text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300"
         >
           重试
-        </Button>
+        </button>
       </motion.div>
     );
   }
 
   /**
-   * 空状态 - 优雅的提示
+   * 空状态
    */
   if (posts.length === 0) {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-gray-50 p-16 text-center dark:border-gray-800 dark:bg-gray-900"
+        className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-300 px-6 py-16 dark:border-zinc-700"
       >
-        {/* 空状态图标 */}
-        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
-          <svg className="h-10 w-10 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-          </svg>
-        </div>
-        <h3 className="mb-2 text-xl font-semibold text-gray-700 dark:text-gray-300">
+        <svg className="mb-4 h-12 w-12 text-zinc-300 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+        </svg>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
           暂无文章
-        </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          还没有发布任何文章，请稍后再来看看
         </p>
       </motion.div>
     );
@@ -141,67 +122,41 @@ export function PostList({ initialPage = 1, perPage = 6 }: PostListProps) {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="grid gap-8 sm:grid-cols-2"
+        className="grid gap-5 sm:grid-cols-2"
       >
         {posts.map((post, index) => (
           <PostCard key={post.id} post={post} index={index} />
         ))}
       </motion.div>
 
-      {/* 分页控件 */}
+      {/* 分页 */}
       {totalPages > 1 && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="flex items-center justify-center gap-3"
+          className="flex items-center justify-center gap-2"
         >
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="rounded-xl"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-            上一页
-          </Button>
-
-          <div className="flex items-center gap-1">
-            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-              const page = i + 1;
-              return (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-medium transition-all ${
-                    currentPage === page
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
-                      : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  {page}
-                </button>
-              );
-            })}
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-            className="rounded-xl"
-          >
-            下一页
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-            </svg>
-          </Button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+            <button
+              key={page}
+              onClick={() => setCurrentPage(page)}
+              className={cn(
+                'flex h-9 min-w-[36px] items-center justify-center rounded-lg px-3 text-sm font-medium transition-all',
+                currentPage === page
+                  ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
+                  : 'text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+              )}
+            >
+              {page}
+            </button>
+          ))}
         </motion.div>
       )}
     </div>
   );
+}
+
+function cn(...classes: (string | boolean | undefined)[]) {
+  return classes.filter(Boolean).join(' ');
 }
