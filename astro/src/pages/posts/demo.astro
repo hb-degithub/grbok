@@ -1,0 +1,37 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { CommentSection } from '../../components/comments/CommentSection';
+---
+
+<BaseLayout title="示例文章" description="评论系统演示">
+  <article class="prose prose-lg dark:prose-invert mx-auto">
+    <!-- 文章内容区域 -->
+    <header class="mb-8">
+      <h1 class="mb-4">示例文章标题</h1>
+      <div class="flex items-center gap-4 text-sm text-gray-500">
+        <time>2024 年 1 月 15 日</time>
+        <span>5 分钟阅读</span>
+      </div>
+    </header>
+
+    <div class="mb-12">
+      <p>
+        这是一篇示例文章，用于演示评论系统的功能。评论系统支持：
+      </p>
+      <ul>
+        <li>嵌套回复（最多 3 层）</li>
+        <li>Realtime 实时更新</li>
+        <li>平滑的动画效果</li>
+        <li>3D 倾斜和光晕效果</li>
+      </ul>
+      <p>
+        请在下方评论区体验完整的交互效果。
+      </p>
+    </div>
+
+    <!-- 评论区 - React 岛屿组件 -->
+    <div class="not-prose mt-12">
+      <CommentSection client:visible postId="example-post-id" />
+    </div>
+  </article>
+</BaseLayout>

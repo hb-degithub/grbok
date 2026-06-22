@@ -35,14 +35,17 @@ export interface Post {
   };
 }
 
-/** 评论 */
+/**
+ * 评论基础类型
+ * 包含 PocketBase 数据库中的原始字段
+ */
 export interface Comment {
   id: string;
   post_id: string;
   author_name: string;
   author_email: string;
   content: string;
-  parent_id: string;
+  parent_id: string | null;
   status: 'pending' | 'approved' | 'spam';
   ip_address: string;
   created: string;
@@ -51,6 +54,35 @@ export interface Comment {
     post_id?: Post;
     parent_id?: Comment;
   };
+}
+
+/**
+ * 嵌套评论类型
+ * 扩展 Comment 接口，添加递归的 children 结构
+ * 用于在前端构建评论树
+ */
+export interface NestedComment extends Comment {
+  /** 子评论列表（递归结构） */
+  children: NestedComment[];
+}
+
+/**
+ * Realtime 事件类型
+ * PocketBase Realtime API 推送的事件格式
+ */
+export interface CommentRealtimeEvent {
+  action: 'create' | 'update' | 'delete';
+  record: Comment;
+}
+
+/**
+ * 评论表单数据
+ */
+export interface CommentFormData {
+  author_name: string;
+  author_email: string;
+  content: string;
+  parent_id?: string | null;
 }
 
 /** 标签 */
