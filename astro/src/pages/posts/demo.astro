@@ -1,51 +1,46 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import Starfield from '../../components/effects/Starfield';
+import GridFloor from '../../components/effects/GridFloor.astro';
 import { CommentSection } from '../../components/comments/CommentSection';
 ---
 
-<BaseLayout title="示例文章" description="评论系统演示">
-  <!-- 文章容器：相对定位 + aurora 背景，让内部玻璃浮层有透感 -->
-  <div class="relative">
-    <div class="aurora" aria-hidden="true">
-      <div class="aurora__blob aurora__blob--indigo h-72 w-72 -left-10 top-0"></div>
-      <div class="aurora__blob aurora__blob--violet h-80 w-80 right-0 top-40"></div>
-    </div>
+<BaseLayout title="示例文章" description="一篇用于测试评论系统与科幻风格排版的示例文章">
+  <section class="relative -mx-6 -mt-12 min-h-screen overflow-hidden px-6 pt-24">
+    <Starfield client:load />
+    <GridFloor />
 
-    <article class="prose prose-lg dark:prose-invert relative z-10 mx-auto">
-      <!-- 文章头部 - 玻璃面板 -->
-      <header class="glass-strong not-prose mb-10 rounded-3xl p-8 sm:p-10">
+    <div class="pointer-events-none absolute left-[15%] top-[20%] h-64 w-64 rounded-full bg-cyan/10 blur-[100px] animate-float" aria-hidden="true"></div>
+    <div class="pointer-events-none absolute bottom-[25%] right-[15%] h-80 w-80 rounded-full bg-amber/10 blur-[120px] animate-float" style="animation-delay: -4s" aria-hidden="true"></div>
+
+    <article class="prose relative z-10 mx-auto">
+      <header class="holo-card not-prose mb-10 rounded-3xl p-8 sm:p-10">
         <div class="mb-4 flex items-center gap-2 text-xs">
-          <span class="rounded-full bg-indigo-50 px-2.5 py-0.5 font-medium text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">技术</span>
-          <span class="text-zinc-400" aria-hidden="true">·</span>
-          <time class="text-zinc-500 dark:text-zinc-400" datetime="2024-01-15">2024 年 1 月 15 日</time>
-          <span class="text-zinc-400" aria-hidden="true">·</span>
-          <span class="text-zinc-500 dark:text-zinc-400">5 分钟阅读</span>
+          <span class="rounded-full bg-cyan/10 px-2.5 py-0.5 font-medium text-cyan">示例</span>
+          <span class="text-muted" aria-hidden="true">·</span>
+          <time class="text-dim" datetime="2024-01-15">2024年1月15日</time>
+          <span class="text-muted" aria-hidden="true">·</span>
+          <span class="text-dim">5 分钟阅读</span>
         </div>
-        <h1 class="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white sm:text-4xl">
-          示例文章标题
+        <h1 class="font-display text-3xl font-black uppercase tracking-wide text-ink sm:text-4xl">
+          科幻风格博客示例文章
         </h1>
       </header>
 
-      <!-- 文章正文 -->
       <div class="mb-12">
-        <p>
-          这是一篇示例文章，用于演示评论系统的功能。评论系统支持：
-        </p>
+        <p>这是一篇用于演示科幻风格博客排版与评论系统的示例文章。整站采用深色太空主题、全息玻璃卡片与青色霓虹光效，旨在提供沉浸式的阅读体验。</p>
         <ul>
-          <li>嵌套回复（最多 3 层）</li>
-          <li>Realtime 实时更新</li>
-          <li>平滑的动画效果</li>
-          <li>3D 倾斜和光晕效果</li>
+          <li>深色太空背景与星空动效</li>
+          <li>全息玻璃卡片与扫描线动画</li>
+          <li>响应式网格布局与 3D 网格地面</li>
+          <li>支持评论与回复的交互系统</li>
         </ul>
-        <p>
-          请在下方评论区体验完整的交互效果。
-        </p>
+        <p>你可以在本页底部尝试发表评论，观察新评论的高亮、回复表单展开以及嵌套评论的层级展示效果。</p>
       </div>
 
-      <!-- 评论区 - React 岛屿组件 -->
       <div class="not-prose mt-12">
         <CommentSection client:visible postId="example-post-id" />
       </div>
     </article>
-  </div>
+  </section>
 </BaseLayout>

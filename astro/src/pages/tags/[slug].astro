@@ -1,0 +1,66 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostList from '../../components/posts/PostList';
+import ScrollReveal from '../../components/ui/ScrollReveal';
+
+export function getStaticPaths() {
+  return [];
+}
+
+const { slug } = Astro.params;
+
+const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
+
+interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+}
+
+async function fetchTag(tagSlug: string): Promise<Tag | null> {
+  try {
+    const res = await fetch(`${PB_URL}/api/collections/tags/records?filter=slug="${tagSlug}"`);
+    if (!res.ok) throw new Error(`${res.status}`);
+    const data = await res.json();
+    return data.items?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const tag = await fetchTag(slug ?? '');
+---
+
+<BaseLayout title={tag ? `标签: ${tag.name}` : '标签'} description={tag?.description || '按标签筛选文章'}>
+  <div class="mb-12">
+    <ScrollReveal client:visible>
+      <div class="flex items-center gap-3 mb-4">
+        <span class="h-px w-8 bg-amber"></span>
+        <span class="font-mono text-[10px] uppercase tracking-widest text-amber">Tag</span>
+      </div>
+      <h1 class="font-display text-4xl font-black uppercase tracking-wide text-ink">
+        {tag ? tag.name : '标签'}
+      </h1>
+      {tag?.description && (
+        <p class="mt-3 text-dim max-w-xl">
+          {tag.description}
+        </p>
+      )}
+    </ScrollReveal>
+  </div>
+
+  {tag ? (
+    <PostList client:visible perPage={12} />
+  ) : (
+    <div class="holo-card flex flex-col items-center justify-center py-20 text-center">
+      <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border border-line bg-space-light">
+        <svg class="h-8 w-8 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+        </svg>
+      </div>
+      <p class="text-dim">标签不存在</p>
+      <a href="/tags" class="btn-ghost mt-4">返回标签列表</a>
+    </div>
+  )}
+</BaseLayout>

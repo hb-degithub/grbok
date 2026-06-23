@@ -1,0 +1,24 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostList from '../../components/posts/PostList';
+import ScrollReveal from '../../components/ui/ScrollReveal';
+---
+
+<BaseLayout title="文章列表" description="浏览所有已发布的文章">
+  <div class="mb-12">
+    <ScrollReveal client:visible>
+      <div class="flex items-center gap-3 mb-4">
+        <span class="h-px w-8 bg-cyan"></span>
+        <span class="font-mono text-[10px] uppercase tracking-widest text-cyan">Articles</span>
+      </div>
+      <h1 class="font-display text-4xl font-black uppercase tracking-wide text-ink">
+        所有文章
+      </h1>
+      <p class="mt-3 text-dim max-w-xl">
+        浏览所有已发布的技术文章和思考
+      </p>
+    </ScrollReveal>
+  </div>
+
+  <PostList client:visible perPage={12} />
+</BaseLayout>

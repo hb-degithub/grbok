@@ -1,0 +1,130 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ScrollReveal from '../../components/ui/ScrollReveal';
+import { CommentSection } from '../../components/comments/CommentSection';
+
+export function getStaticPaths() {
+  return [];
+}
+
+const { slug } = Astro.params;
+
+const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
+
+interface Post {
+  id: string;
+  title: string;
+  slug: string;
+  content: string;
+  excerpt: string;
+  cover: string;
+  status: string;
+  published_at: string;
+  views: number;
+  expand?: {
+    author?: {
+      name: string;
+    };
+  };
+}
+
+async function fetchPost(postSlug: string): Promise<Post | null> {
+  try {
+    const res = await fetch(`${PB_URL}/api/collections/posts/records?filter=slug="${postSlug}"&expand=author`);
+    if (!res.ok) throw new Error(`${res.status}`);
+    const data = await res.json();
+    return data.items?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const post = await fetchPost(slug ?? '');
+
+const formattedDate = post?.published_at
+  ? new Date(post.published_at).toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
+  : '';
+
+const readingTime = post?.content
+  ? Math.max(1, Math.ceil(post.content.length / 300))
+  : 0;
+---
+
+<BaseLayout title={post?.title || '文章'} description={post?.excerpt || ''}>
+  {post ? (
+    <article class="max-w-4xl mx-auto">
+      <!-- 返回按钮 -->
+      <ScrollReveal client:visible>
+        <a href="/posts" class="inline-flex items-center gap-2 text-dim hover:text-cyan transition-colors mb-8">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          返回文章列表
+        </a>
+      </ScrollReveal>
+
+      <!-- 文章头部 -->
+      <ScrollReveal delay={0.1} client:visible>
+        <header class="mb-12">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="h-px w-8 bg-cyan"></span>
+            <span class="font-mono text-[10px] uppercase tracking-widest text-cyan">Article</span>
+          </div>
+
+          <h1 class="font-display text-4xl font-black uppercase tracking-wide text-ink mb-6">
+            {post.title}
+          </h1>
+
+          <div class="flex flex-wrap items-center gap-4 font-mono text-xs text-muted">
+            {post.expand?.author && (
+              <span class="flex items-center gap-2">
+                <span class="h-6 w-6 rounded-full bg-cyan/20 flex items-center justify-center text-cyan text-[10px]">
+                  {post.expand.author.name.charAt(0)}
+                </span>
+                {post.expand.author.name}
+              </span>
+            )}
+            <span>{formattedDate}</span>
+            <span>{readingTime} 分钟阅读</span>
+            <span>{post.views} 次浏览</span>
+          </div>
+
+          {post.cover && (
+            <div class="mt-8 rounded-xl overflow-hidden border border-line">
+              <img src={post.cover} alt={post.title} class="w-full h-auto" loading="lazy" />
+            </div>
+          )}
+        </header>
+      </ScrollReveal>
+
+      <!-- 文章内容 -->
+      <ScrollReveal delay={0.2} client:visible>
+        <div class="prose mb-16">
+          <div set:html={post.content} />
+        </div>
+      </ScrollReveal>
+
+      <!-- 评论区 -->
+      <ScrollReveal delay={0.3} client:visible>
+        <div class="border-t border-line pt-12">
+          <CommentSection postId={post.id} client:visible />
+        </div>
+      </ScrollReveal>
+    </article>
+  ) : (
+    <div class="flex flex-col items-center justify-center py-20 text-center">
+      <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border border-line bg-space-light">
+        <svg class="h-8 w-8 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <h2 class="font-display text-2xl font-bold text-ink mb-2">文章不存在</h2>
+      <p class="text-dim mb-6">请先在 PocketBase 中创建文章</p>
+      <a href="/posts" class="btn-primary">返回文章列表</a>
+    </div>
+  )}
+</BaseLayout>
