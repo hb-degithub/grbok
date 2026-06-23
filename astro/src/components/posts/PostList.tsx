@@ -44,14 +44,15 @@ export function PostList({ initialPage = 1, perPage = 6 }: PostListProps) {
 
   /**
    * 容器动画
+   * 通过 staggerChildren 实现子元素交错入场
    */
   const containerVariants = {
-    hidden: { opacity: 0 },
+    hidden: { opacity: 1 },
     visible: {
       opacity: 1,
       transition: {
-        duration: 0.5,
-        staggerChildren: 0.08,
+        staggerChildren: 0.06,
+        delayChildren: 0.1,
       },
     },
   };

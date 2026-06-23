@@ -55,6 +55,16 @@
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.04);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.06);
+
+  /* 动效系统 */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 300ms;
+  --duration-enter: 450ms;
+  --stagger-base: 60ms;
 }
 
 /* ===========================
@@ -442,6 +452,128 @@ a:hover {
 .animate-fade-in-up-delay-2 {
   animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
   opacity: 0;
+}
+
+/* ===========================
+   动效系统 - Motion System
+   =========================== */
+
+/* 入场动画 */
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 轻微入场 */
+@keyframes enter-subtle {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 下划线展开 */
+@keyframes underline-expand {
+  from {
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+  to {
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+
+/* 工具类 */
+.animate-enter {
+  animation: enter var(--duration-enter) var(--ease-out-expo) forwards;
+}
+
+.animate-enter-subtle {
+  animation: enter-subtle var(--duration-slow) var(--ease-out-expo) forwards;
+}
+
+/* 交错延迟 */
+.stagger-1 { animation-delay: calc(var(--stagger-base) * 1); }
+.stagger-2 { animation-delay: calc(var(--stagger-base) * 2); }
+.stagger-3 { animation-delay: calc(var(--stagger-base) * 3); }
+.stagger-4 { animation-delay: calc(var(--stagger-base) * 4); }
+.stagger-5 { animation-delay: calc(var(--stagger-base) * 5); }
+.stagger-6 { animation-delay: calc(var(--stagger-base) * 6); }
+
+/* 卡片物理悬停 */
+.card-lift {
+  transition: transform var(--duration-normal) var(--ease-out),
+              box-shadow var(--duration-normal) var(--ease-out),
+              border-color var(--duration-normal) var(--ease-out);
+  will-change: transform;
+}
+
+.card-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+
+.card-lift:active {
+  transform: translateY(-1px);
+}
+
+/* 链接下划线动画 */
+.link-underline {
+  position: relative;
+  text-decoration: none;
+}
+
+.link-underline::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 100%;
+  height: 1.5px;
+  background-color: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--duration-normal) var(--ease-out-expo);
+}
+
+.link-underline:hover::after {
+  transform: scaleX(1);
+}
+
+/* 减少动态效果 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-enter,
+  .animate-enter-subtle,
+  .animate-fade-in-up,
+  .animate-fade-in-up-delay-1,
+  .animate-fade-in-up-delay-2 {
+    opacity: 1;
+    transform: none;
+  }
+
+  .card-lift:hover {
+    transform: none;
+  }
 }
 
 /* ===========================
