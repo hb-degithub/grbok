@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { PostList } from '../components/posts/PostList';
+import PostList from '../components/posts/PostList';
 ---
 
 <BaseLayout title="首页" description="欢迎来到我的个人博客">
@@ -84,7 +84,7 @@ import { PostList } from '../components/posts/PostList';
       </a>
     </div>
 
-    <PostList client:idle perPage={6} />
+    <PostList client:visible perPage={6} />
   </section>
 
   <!-- 快速链接 -->

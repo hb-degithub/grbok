@@ -18,7 +18,7 @@ interface PagefindResult {
  * 搜索弹窗组件
  * 实现全局搜索功能，支持快捷键唤起和键盘导航
  */
-export function SearchModal() {
+export default function SearchModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<PagefindResult[]>([]);

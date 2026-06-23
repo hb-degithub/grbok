@@ -12,7 +12,7 @@ interface InputProps extends Omit<HTMLMotionProps<'input'>, 'ref'> {
  * 输入框组件
  * 使用 Framer Motion 实现聚焦时的微动画
  */
-export function Input({
+export default function Input({
   label,
   error,
   helperText,

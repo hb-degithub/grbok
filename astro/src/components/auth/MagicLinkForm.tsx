@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePocketBase } from '../../hooks/usePocketBase';
-import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
+import Button from '../ui/Button';
+import Input from '../ui/Input';
 
 /**
  * Magic Link 登录表单组件
  * 实现带 Framer Motion 状态切换的登录流程
  */
-export function MagicLinkForm() {
+export default function MagicLinkForm() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');

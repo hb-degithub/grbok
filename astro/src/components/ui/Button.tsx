@@ -43,7 +43,7 @@ const sizeStyles: Record<ButtonSize, string> = {
  * 支持多种变体、尺寸和加载状态
  * 使用 Framer Motion 实现悬停和点击动画
  */
-export function Button({
+export default function Button({
   variant = 'primary',
   size = 'md',
   loading = false,

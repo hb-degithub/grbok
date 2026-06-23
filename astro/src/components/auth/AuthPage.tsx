@@ -1,12 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { MagicLinkForm } from './MagicLinkForm';
+import MagicLinkForm from './MagicLinkForm';
 
 /**
  * 认证页面主组件
  * 使用 Framer Motion 实现页面加载时的平滑淡入和元素交错入场
  */
-export function AuthPage() {
+export default function AuthPage() {
   /**
    * 页面动画配置
    * 定义整个页面容器的入场动画

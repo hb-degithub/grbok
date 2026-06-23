@@ -12,7 +12,7 @@ const navItems = [
  * 导航栏组件
  * 滚动时自动隐藏/显示，带磨砂玻璃背景
  */
-export function Header() {
+export default function Header() {
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
   const { scrollY } = useScroll();

@@ -7,7 +7,7 @@ interface PostCardProps {
   index?: number;
 }
 
-export function PostCard({ post, index = 0 }: PostCardProps) {
+export default function PostCard({ post, index = 0 }: PostCardProps) {
   const formattedDate = new Date(post.published_at).toLocaleDateString('zh-CN', {
     year: 'numeric',
     month: 'short',

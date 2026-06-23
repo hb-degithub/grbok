@@ -1,7 +1,7 @@
 ---
 import { ClientRouter } from 'astro:transitions';
-import { Header } from '../components/layout/Header';
-import { SearchModal } from '../components/search/SearchModal';
+import Header from '../components/layout/Header';
+import SearchModal from '../components/search/SearchModal';
 
 interface Props {
   title: string;
@@ -43,10 +43,10 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
   </head>
   <body class="min-h-screen bg-zinc-50 pb-20 font-sans text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
     <!-- 导航栏 - React 岛屿组件 -->
-    <Header client:load />
+    <Header client:visible />
 
     <!-- 搜索组件 -->
-    <SearchModal client:idle />
+    <SearchModal client:visible />
 
     <!-- 主内容 -->
     <main class="mx-auto max-w-5xl px-6 pt-24">

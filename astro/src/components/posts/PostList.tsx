@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { usePosts } from '../../hooks/usePocketBase';
-import { PostCard } from './PostCard';
+import PostCard from './PostCard';
 
 interface PostListProps {
   initialPage?: number;
@@ -38,7 +38,7 @@ function SkeletonCard({ index }: { index: number }) {
 /**
  * 文章列表组件
  */
-export function PostList({ initialPage = 1, perPage = 6 }: PostListProps) {
+export default function PostList({ initialPage = 1, perPage = 6 }: PostListProps) {
   const [currentPage, setCurrentPage] = useState(initialPage);
   const { posts, loading, error, totalPages } = usePosts(currentPage, perPage);
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
+import Button from '../ui/Button';
+import Input from '../ui/Input';
 import type { CommentFormData } from '../../types/pocketbase';
 
 interface CommentFormProps {
