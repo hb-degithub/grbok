@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePocketBase } from '../../hooks/usePocketBase';
 import Button from '../ui/Button';
@@ -6,17 +6,24 @@ import Input from '../ui/Input';
 
 /**
  * Magic Link 登录表单组件
- * 实现带 Framer Motion 状态切换的登录流程
+ *
+ * 设计决策：
+ * 1. 状态机：idle → loading → sent | error。用 AnimatePresence mode="wait"
+ *    实现状态间平滑切换，避免硬切跳变。
+ * 2. 无障碍：错误信息用 role="alert" + aria-live，屏幕阅读器即时播报；
+ *    表单 label 通过 Input 组件已与 input 关联。
+ * 3. 邮箱格式校验在前端先做，减少无效请求。
  */
 export default function MagicLinkForm() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const { requestMagicLink } = usePocketBase();
+  const formRef = useRef<HTMLFormElement>(null);
 
-  /**
-   * 表单提交处理
-   */
+  /** 简易邮箱格式校验，避免发明显非法的请求 */
+  const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -25,8 +32,14 @@ export default function MagicLinkForm() {
       setErrorMessage('请输入邮箱地址');
       return;
     }
+    if (!isValidEmail(email)) {
+      setStatus('error');
+      setErrorMessage('邮箱格式不正确');
+      return;
+    }
 
     setStatus('loading');
+    setErrorMessage('');
 
     const { success, error } = await requestMagicLink(email);
 
@@ -34,38 +47,24 @@ export default function MagicLinkForm() {
       setStatus('sent');
     } else {
       setStatus('error');
-      setErrorMessage(error?.message || '发送失败，请重试');
+      setErrorMessage(error?.message || '发送失败，请稍后重试');
     }
   };
 
-  /**
-   * 动画变体配置
-   * 定义组件在不同状态下的动画效果
-   */
+  /** 容器动画：状态切换时整体淡入上浮 */
   const containerVariants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, y: 16 },
     visible: {
       opacity: 1,
       y: 0,
-      transition: {
-        duration: 0.5,
-        staggerChildren: 0.1, // 子元素交错入场延迟
-      },
+      transition: { duration: 0.45, staggerChildren: 0.08, ease: [0.16, 1, 0.3, 1] },
     },
-    exit: {
-      opacity: 0,
-      y: -20,
-      transition: { duration: 0.3 },
-    },
+    exit: { opacity: 0, y: -16, transition: { duration: 0.25 } },
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 15 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.4 },
-    },
+    hidden: { opacity: 0, y: 12 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
   };
 
   return (
@@ -79,20 +78,22 @@ export default function MagicLinkForm() {
           animate="visible"
           exit="exit"
           className="text-center"
+          role="status"
+          aria-live="polite"
         >
-          {/* 成功图标 */}
           <motion.div
             variants={itemVariants}
-            className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30"
+            className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30"
           >
             <motion.svg
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-              className="h-8 w-8 text-green-600 dark:text-green-400"
+              className="h-8 w-8 text-emerald-600 dark:text-emerald-400"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"
@@ -103,28 +104,23 @@ export default function MagicLinkForm() {
             </motion.svg>
           </motion.div>
 
-          {/* 提示文字 */}
           <motion.h3
             variants={itemVariants}
-            className="mb-2 text-xl font-semibold text-gray-900 dark:text-white"
+            className="mb-2 text-xl font-semibold text-zinc-900 dark:text-white"
           >
             查收邮件
           </motion.h3>
 
           <motion.p
             variants={itemVariants}
-            className="mb-6 text-gray-600 dark:text-gray-400"
+            className="mb-6 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400"
           >
-            我们已向 <span className="font-medium text-blue-600">{email}</span> 发送了登录链接
+            我们已向 <span className="font-medium text-indigo-600 dark:text-indigo-400">{email}</span>{' '}
+            发送了登录链接，有效期 15 分钟。
           </motion.p>
 
-          {/* 重新发送按钮 */}
           <motion.div variants={itemVariants}>
-            <Button
-              variant="ghost"
-              onClick={() => setStatus('idle')}
-              className="text-sm"
-            >
+            <Button variant="ghost" onClick={() => setStatus('idle')} className="text-sm">
               使用其他邮箱
             </Button>
           </motion.div>
@@ -133,38 +129,41 @@ export default function MagicLinkForm() {
         /* ==================== 邮箱输入状态 ==================== */
         <motion.form
           key="form"
+          ref={formRef}
           variants={containerVariants}
           initial="hidden"
           animate="visible"
           exit="exit"
           onSubmit={handleSubmit}
-          className="space-y-4"
+          className="space-y-5"
+          noValidate
         >
-          {/* 标题 */}
           <motion.div variants={itemVariants}>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
               登录 / 注册
             </h2>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            <p className="mt-1.5 text-sm text-zinc-600 dark:text-zinc-400">
               输入邮箱，我们将发送一个免密码登录链接
             </p>
           </motion.div>
 
-          {/* 邮箱输入框 */}
           <motion.div variants={itemVariants}>
             <Input
               label="邮箱地址"
               type="email"
               placeholder="your@email.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                // 用户修改时清除错误态，避免红色提示残留
+                if (status === 'error') setStatus('idle');
+              }}
               error={status === 'error' ? errorMessage : undefined}
               required
               autoComplete="email"
             />
           </motion.div>
 
-          {/* 提交按钮 */}
           <motion.div variants={itemVariants}>
             <Button
               type="submit"
@@ -173,14 +172,13 @@ export default function MagicLinkForm() {
               loading={status === 'loading'}
               className="w-full"
             >
-              发送登录链接
+              {status === 'loading' ? '发送中…' : '发送登录链接'}
             </Button>
           </motion.div>
 
-          {/* 说明文字 */}
           <motion.p
             variants={itemVariants}
-            className="text-center text-xs text-gray-500 dark:text-gray-400"
+            className="text-center text-xs text-zinc-500 dark:text-zinc-400"
           >
             无需密码，点击邮件中的链接即可登录
           </motion.p>

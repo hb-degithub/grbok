@@ -19,7 +19,11 @@ interface CommentItemProps {
 
 /**
  * 单条评论组件
- * 实现 3D 光晕效果、嵌套缩进和新评论高亮
+ *
+ * 设计决策：
+ * 1. 玻璃卡片承载评论，hover 时跟随鼠标的 indigo 径向光晕强化「玻璃透光」感。
+ * 2. 新评论用 indigo ring + 短暂背景渐隐高亮，3 秒后消退（由父组件控制 isNew）。
+ * 3. 回复按钮带 aria-expanded/aria-controls，屏幕阅读器可知展开状态。
  */
 export function CommentItem({
   comment,
@@ -32,20 +36,16 @@ export function CommentItem({
   const [isHovered, setIsHovered] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0.5, y: 0.5 });
 
-  /**
-   * 鼠标移动处理
-   * 用于边缘光晕效果
-   */
+  /** 鼠标移动 - 跟随光晕 */
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const y = (e.clientY - rect.top) / rect.height;
-    setMousePosition({ x, y });
+    setMousePosition({
+      x: (e.clientX - rect.left) / rect.width,
+      y: (e.clientY - rect.top) / rect.height,
+    });
   };
 
-  /**
-   * 格式化时间
-   */
+  /** 相对时间格式化 */
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr);
     const now = new Date();
@@ -58,77 +58,48 @@ export function CommentItem({
     if (minutes < 60) return `${minutes} 分钟前`;
     if (hours < 24) return `${hours} 小时前`;
     if (days < 7) return `${days} 天前`;
-
-    return date.toLocaleDateString('zh-CN', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+    return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
-  /**
-   * 生成头像（基于邮箱的首字母）
-   */
-  const getAvatarLetter = (name: string) => {
-    return name.charAt(0).toUpperCase();
-  };
+  const getAvatarLetter = (name: string) => name.charAt(0).toUpperCase();
 
-  /**
-   * 生成头像颜色（基于邮箱哈希）
-   */
+  /** 头像配色 - indigo/violet 系，与整体玻璃风格协调 */
   const getAvatarColor = (email: string) => {
     const colors = [
-      'bg-blue-500',
-      'bg-green-500',
+      'bg-indigo-500',
+      'bg-violet-500',
+      'bg-sky-500',
+      'bg-fuchsia-500',
       'bg-purple-500',
-      'bg-pink-500',
-      'bg-orange-500',
-      'bg-teal-500',
+      'bg-blue-500',
     ];
     const index = email.charCodeAt(0) % colors.length;
     return colors[index];
   };
 
-  /**
-   * 评论项动画配置
-   */
   const itemVariants = {
-    hidden: {
-      opacity: 0,
-      y: 20,
-      scale: 0.98,
-    },
+    hidden: { opacity: 0, y: 20, scale: 0.98 },
     visible: {
       opacity: 1,
       y: 0,
       scale: 1,
-      transition: {
-        duration: 0.4,
-        ease: [0.25, 0.46, 0.45, 0.94],
-      },
+      transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] },
     },
   };
 
-  /**
-   * 新评论高亮动画
-   */
+  /** 新评论高亮 - indigo 背景渐隐 */
   const highlightVariants = {
-    initial: {
-      backgroundColor: 'rgba(59, 130, 246, 0.2)',
-    },
+    initial: { backgroundColor: 'rgba(99, 102, 241, 0.18)' },
     animate: {
-      backgroundColor: 'rgba(59, 130, 246, 0)',
-      transition: {
-        duration: 2,
-        ease: 'easeOut',
-      },
+      backgroundColor: 'rgba(99, 102, 241, 0)',
+      transition: { duration: 2, ease: 'easeOut' },
     },
   };
 
   const canReply = depth < maxDepth;
 
   return (
-    <motion.div
+    <motion.article
       variants={itemVariants}
       initial="hidden"
       animate="visible"
@@ -139,54 +110,44 @@ export function CommentItem({
     >
       <motion.div
         className={cn(
-          'relative rounded-xl p-4',
-          'border border-gray-200 dark:border-gray-700',
-          'transition-all duration-300',
-          isNew && 'ring-2 ring-blue-500/50'
+          'glass relative overflow-hidden rounded-2xl p-5',
+          'transition-colors duration-300',
+          isNew && 'ring-2 ring-indigo-500/50'
         )}
-        // 新评论高亮效果
-        {...(isNew && {
-          initial: 'initial',
-          animate: 'animate',
-          variants: highlightVariants,
-        })}
+        {...(isNew && { initial: 'initial', animate: 'animate', variants: highlightVariants })}
       >
-        {/* 边缘光晕效果 */}
+        {/* 跟随鼠标的 indigo 光晕 */}
         <motion.div
-          className="pointer-events-none absolute inset-0 z-0 rounded-xl opacity-0 transition-opacity duration-300"
+          className="pointer-events-none absolute inset-0 z-0 rounded-2xl transition-opacity duration-300"
           style={{
-            background: `radial-gradient(300px circle at ${mousePosition.x * 100}% ${mousePosition.y * 100}%, rgba(59, 130, 246, 0.1), transparent 40%)`,
+            background: `radial-gradient(300px circle at ${mousePosition.x * 100}% ${mousePosition.y * 100}%, rgba(99, 102, 241, 0.12), transparent 40%)`,
             opacity: isHovered ? 1 : 0,
           }}
+          aria-hidden="true"
         />
 
-        {/* 评论内容 */}
         <div className="relative z-10">
           {/* 头部：头像 + 作者 + 时间 */}
           <div className="mb-3 flex items-center gap-3">
-            {/* 头像 */}
             <div
               className={cn(
-                'flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold text-white',
+                'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white shadow-sm',
                 getAvatarColor(comment.author_email)
               )}
+              aria-hidden="true"
             >
               {getAvatarLetter(comment.author_name)}
             </div>
-
-            {/* 作者信息 */}
             <div className="flex-1">
-              <p className="font-medium text-gray-900 dark:text-white">
-                {comment.author_name}
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {formatTime(comment.created)}
+              <p className="font-medium text-zinc-900 dark:text-white">{comment.author_name}</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                <time dateTime={comment.created}>{formatTime(comment.created)}</time>
               </p>
             </div>
           </div>
 
           {/* 评论内容 */}
-          <div className="mb-3 text-gray-700 dark:text-gray-300">
+          <div className="mb-3 whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
             {comment.content}
           </div>
 
@@ -194,20 +155,12 @@ export function CommentItem({
           {canReply && (
             <button
               onClick={() => setIsReplyOpen(!isReplyOpen)}
-              className="flex items-center gap-1 text-sm text-gray-500 transition-colors hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
+              aria-expanded={isReplyOpen}
+              aria-controls={`reply-form-${comment.id}`}
+              className="focus-ring flex items-center gap-1.5 rounded-md text-sm text-zinc-500 transition-colors hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400"
             >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                />
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
               </svg>
               回复
             </button>
@@ -223,9 +176,9 @@ export function CommentItem({
         />
       </motion.div>
 
-      {/* 子评论（递归渲染） */}
+      {/* 子评论（递归渲染） - indigo 竖线引导嵌套关系 */}
       {comment.children.length > 0 && (
-        <div className="mt-3 space-y-3 pl-6 border-l-2 border-gray-100 dark:border-gray-800">
+        <div className="mt-3 space-y-3 border-l-2 border-indigo-100 pl-6 dark:border-indigo-900/40">
           {comment.children.map((child) => (
             <CommentItem
               key={child.id}
@@ -237,6 +190,6 @@ export function CommentItem({
           ))}
         </div>
       )}
-    </motion.div>
+    </motion.article>
   );
 }

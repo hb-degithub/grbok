@@ -11,9 +11,15 @@ interface CommentFormProps {
   onSubmit: (data: CommentFormData) => Promise<boolean>;
 }
 
+/** 共享 textarea 样式 - 玻璃底 + indigo focus-visible */
+const textareaClass =
+  'w-full rounded-xl border border-zinc-200 bg-white/70 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 transition-all duration-200 ease-out outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500/30 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus-visible:border-indigo-400';
+
 /**
  * 主评论表单组件
- * 用于在文章底部提交新评论
+ *
+ * 设计决策：glass-strong 容器保证表单文字对比度；textarea 用 id 关联 label，
+ * 支持 `aria-describedby` 错误播报；成功态用 emerald 打勾动画。
  */
 export function CommentForm({ postId, onSubmit }: CommentFormProps) {
   const [formData, setFormData] = useState<CommentFormData>({
@@ -25,9 +31,6 @@ export function CommentForm({ postId, onSubmit }: CommentFormProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
-  /**
-   * 表单提交处理
-   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -38,22 +41,11 @@ export function CommentForm({ postId, onSubmit }: CommentFormProps) {
     }
 
     setStatus('loading');
-
-    const success = await onSubmit({
-      ...formData,
-      parent_id: null,
-    });
+    const success = await onSubmit({ ...formData, parent_id: null });
 
     if (success) {
       setStatus('success');
-      // 重置表单
-      setFormData({
-        author_name: '',
-        author_email: '',
-        content: '',
-        parent_id: null,
-      });
-      // 2 秒后重置状态
+      setFormData({ author_name: '', author_email: '', content: '', parent_id: null });
       setTimeout(() => setStatus('idle'), 2000);
     } else {
       setStatus('error');
@@ -61,43 +53,22 @@ export function CommentForm({ postId, onSubmit }: CommentFormProps) {
     }
   };
 
-  /**
-   * 容器动画
-   */
   const containerVariants = {
     hidden: { opacity: 0, y: 30 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        staggerChildren: 0.1,
-      },
-    },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5, staggerChildren: 0.1 } },
   };
 
   const itemVariants = {
     hidden: { opacity: 0, y: 15 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.4 },
-    },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
   };
 
-  /**
-   * 成功打勾动画
-   */
   const successVariants = {
     hidden: { scale: 0, opacity: 0 },
     visible: {
       scale: 1,
       opacity: 1,
-      transition: {
-        type: 'spring',
-        stiffness: 500,
-        damping: 15,
-      },
+      transition: { type: 'spring' as const, stiffness: 500, damping: 15 },
     },
   };
 
@@ -106,7 +77,7 @@ export function CommentForm({ postId, onSubmit }: CommentFormProps) {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900"
+      className="glass-strong rounded-2xl p-6 sm:p-7"
     >
       <AnimatePresence mode="wait">
         {status === 'success' ? (
@@ -118,19 +89,21 @@ export function CommentForm({ postId, onSubmit }: CommentFormProps) {
             animate="visible"
             exit="hidden"
             className="flex flex-col items-center gap-3 py-8"
+            role="status"
+            aria-live="polite"
           >
-            {/* 打勾动画 */}
             <motion.div
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30"
+              className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30"
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: 'spring', stiffness: 200, damping: 15 }}
             >
               <motion.svg
-                className="h-8 w-8 text-green-600"
+                className="h-8 w-8 text-emerald-600 dark:text-emerald-400"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
+                aria-hidden="true"
               >
                 <motion.path
                   strokeLinecap="round"
@@ -143,12 +116,11 @@ export function CommentForm({ postId, onSubmit }: CommentFormProps) {
                 />
               </motion.svg>
             </motion.div>
-
             <motion.p
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="text-lg font-medium text-green-600 dark:text-green-400"
+              className="text-lg font-medium text-emerald-600 dark:text-emerald-400"
             >
               评论提交成功！
             </motion.p>
@@ -163,53 +135,47 @@ export function CommentForm({ postId, onSubmit }: CommentFormProps) {
             exit="hidden"
             onSubmit={handleSubmit}
             className="space-y-4"
+            noValidate
           >
-            {/* 标题 */}
             <motion.div variants={itemVariants}>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                发表评论
-              </h3>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                你的邮箱不会被公开显示
-              </p>
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">发表评论</h3>
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">你的邮箱不会被公开显示</p>
             </motion.div>
 
-            {/* 昵称和邮箱 */}
             <motion.div variants={itemVariants} className="grid gap-4 sm:grid-cols-2">
               <Input
                 label="昵称"
                 placeholder="你的昵称"
                 value={formData.author_name}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, author_name: e.target.value }))
-                }
+                onChange={(e) => setFormData((prev) => ({ ...prev, author_name: e.target.value }))}
                 required
+                autoComplete="name"
               />
               <Input
                 label="邮箱"
                 type="email"
                 placeholder="your@email.com"
                 value={formData.author_email}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, author_email: e.target.value }))
-                }
+                onChange={(e) => setFormData((prev) => ({ ...prev, author_email: e.target.value }))}
                 required
+                autoComplete="email"
               />
             </motion.div>
 
-            {/* 评论内容 */}
             <motion.div variants={itemVariants}>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label htmlFor="comment-content" className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 评论内容
               </label>
               <textarea
+                id="comment-content"
                 value={formData.content}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, content: e.target.value }))
-                }
+                onChange={(e) => {
+                  setFormData((prev) => ({ ...prev, content: e.target.value }));
+                  if (status === 'error') setStatus('idle');
+                }}
                 placeholder="写下你的想法..."
                 rows={4}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 transition-all duration-200 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 dark:focus:border-blue-400"
+                className={textareaClass}
                 required
               />
             </motion.div>
@@ -217,23 +183,20 @@ export function CommentForm({ postId, onSubmit }: CommentFormProps) {
             {/* 错误提示 */}
             {status === 'error' && (
               <motion.p
+                role="alert"
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-sm text-red-500"
+                className="flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400"
               >
+                <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
                 {errorMessage}
               </motion.p>
             )}
 
-            {/* 提交按钮 */}
             <motion.div variants={itemVariants}>
-              <Button
-                type="submit"
-                variant="primary"
-                size="lg"
-                loading={status === 'loading'}
-                className="w-full sm:w-auto"
-              >
+              <Button type="submit" variant="primary" size="lg" loading={status === 'loading'} className="w-full sm:w-auto">
                 发表评论
               </Button>
             </motion.div>

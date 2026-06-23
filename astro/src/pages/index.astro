@@ -43,6 +43,7 @@ import PostList from '../components/posts/PostList';
               placeholder="搜索文章..."
               class="ml-3 flex-1 bg-transparent text-sm text-white placeholder-zinc-500 outline-none"
               id="hero-search"
+              aria-label="搜索文章"
             />
             <kbd class="hidden rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400 sm:inline-block">
               ⌘K
@@ -67,7 +68,13 @@ import PostList from '../components/posts/PostList';
   </section>
 
   <!-- 最新文章 -->
-  <section class="mt-16">
+  <section class="relative mt-16">
+    <!-- 文章区背景光晕：让玻璃卡片有内容可「透」 -->
+    <div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+      <div class="absolute -top-10 left-1/4 h-72 w-72 rounded-full bg-indigo-300/20 blur-[100px] dark:bg-indigo-600/10"></div>
+      <div class="absolute top-20 right-1/4 h-72 w-72 rounded-full bg-violet-300/20 blur-[100px] dark:bg-violet-600/10"></div>
+    </div>
+
     <div class="mb-8 flex items-end justify-between">
       <div>
         <h2 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">最新文章</h2>
@@ -91,7 +98,7 @@ import PostList from '../components/posts/PostList';
   <section class="mt-16 grid gap-4 sm:grid-cols-2">
     <a
       href="/posts"
-      class="group relative overflow-hidden rounded-2xl border border-zinc-200/60 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:border-zinc-300 hover:shadow-xl dark:border-zinc-800/60 dark:bg-zinc-900 dark:hover:border-zinc-700"
+      class="glass focus-ring group relative overflow-hidden rounded-2xl p-7 transition-all duration-300 hover:-translate-y-1 hover:border-white/70 dark:hover:border-white/20"
     >
       <div class="relative z-10 flex items-start gap-4">
         <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/30">
@@ -108,7 +115,7 @@ import PostList from '../components/posts/PostList';
 
     <a
       href="/tags"
-      class="group relative overflow-hidden rounded-2xl border border-zinc-200/60 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:border-zinc-300 hover:shadow-xl dark:border-zinc-800/60 dark:bg-zinc-900 dark:hover:border-zinc-700"
+      class="glass focus-ring group relative overflow-hidden rounded-2xl p-7 transition-all duration-300 hover:-translate-y-1 hover:border-white/70 dark:hover:border-white/20"
     >
       <div class="relative z-10 flex items-start gap-4">
         <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950/30">

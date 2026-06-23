@@ -20,13 +20,13 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
  */
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600',
+    'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30 hover:bg-indigo-700 active:bg-indigo-800 dark:bg-indigo-500 dark:hover:bg-indigo-600',
   secondary:
-    'bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700',
+    'bg-zinc-100 text-zinc-900 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700',
   ghost:
-    'bg-transparent text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800',
+    'bg-transparent text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800',
   outline:
-    'border-2 border-gray-300 bg-transparent text-gray-700 hover:border-gray-400 dark:border-gray-600 dark:text-gray-300 dark:hover:border-gray-500',
+    'border border-zinc-300 bg-transparent text-zinc-700 hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-800/50',
 };
 
 /**
@@ -62,9 +62,9 @@ export default function Button({
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
       className={cn(
         // 基础样式
-        'inline-flex items-center justify-center rounded-lg font-medium',
-        'transition-colors duration-200',
-        'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+        'inline-flex items-center justify-center rounded-xl font-medium',
+        'transition-colors duration-200 ease-out',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-900',
         'disabled:cursor-not-allowed disabled:opacity-50',
         // 变体样式
         variantStyles[variant],

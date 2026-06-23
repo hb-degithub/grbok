@@ -7,6 +7,16 @@ interface PostCardProps {
   index?: number;
 }
 
+/**
+ * 文章卡片组件
+ *
+ * 设计决策：
+ * 1. 玻璃拟态：半透明背景 + backdrop-blur + 内高光边框，让卡片「浮」在
+ *    页面 aurora 背景之上。hover 时边框提亮 + 上浮 + 阴影加深，三层反馈。
+ * 2. 信息层级：封面图 > 标题（lg semibold）> 摘要（sm 次要色）> 元信息（xs），
+ *    用户 3 秒内可抓取标题。
+ * 3. 整卡可点击（a 标签包裹），focus-visible 暴露焦点环，键盘可达。
+ */
 export default function PostCard({ post, index = 0 }: PostCardProps) {
   const formattedDate = new Date(post.published_at).toLocaleDateString('zh-CN', {
     year: 'numeric',
@@ -21,30 +31,28 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
     visible: {
       opacity: 1,
       y: 0,
-      transition: {
-        duration: 0.45,
-        delay: index * 0.06,
-        ease: [0.16, 1, 0.3, 1],
-      },
+      transition: { duration: 0.45, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] },
     },
   };
 
   return (
-    <motion.article
-      variants={cardVariants}
-      initial="hidden"
-      animate="visible"
-      className="group h-full"
-    >
-      <a href={`/posts/${post.slug}`} className="block h-full">
+    <motion.article variants={cardVariants} initial="hidden" animate="visible" className="group h-full">
+      <a
+        href={`/posts/${post.slug}`}
+        className="focus-ring block h-full rounded-2xl"
+        aria-label={`阅读文章：${post.title}`}
+      >
         <motion.div
-          className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white dark:border-zinc-800/80 dark:bg-zinc-900"
-          whileHover={{
-            y: -4,
-            boxShadow: '0 20px 40px -12px rgba(0, 0, 0, 0.15)',
-          }}
+          className="glass relative flex h-full flex-col overflow-hidden rounded-2xl transition-colors duration-300 group-hover:border-white/70 dark:group-hover:border-white/20"
+          whileHover={{ y: -4 }}
           transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}
         >
+          {/* 顶部高光线 */}
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent dark:via-white/15"
+            aria-hidden="true"
+          />
+
           {/* 封面图 */}
           {post.cover && (
             <div className="relative aspect-[16/10] overflow-hidden">
@@ -62,12 +70,11 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
 
           {/* 内容 */}
           <div className="flex flex-1 flex-col p-5">
-            {/* 分类/时间 */}
             <div className="mb-3 flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500">
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+              <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-medium text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">
                 技术
               </span>
-              <span>·</span>
+              <span aria-hidden="true">·</span>
               <time dateTime={post.published_at}>{formattedDate}</time>
             </div>
 
@@ -81,15 +88,12 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
               </p>
             )}
 
-            <div className="mt-auto flex items-center justify-between border-t border-zinc-100 pt-4 dark:border-zinc-800">
-              <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                {readingTime} 分钟阅读
-              </span>
-
+            <div className="mt-auto flex items-center justify-between border-t border-zinc-200/60 pt-4 dark:border-zinc-700/50">
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">{readingTime} 分钟阅读</span>
               <span className="flex items-center gap-1 text-xs font-medium text-indigo-600 transition-transform duration-200 group-hover:translate-x-1 dark:text-indigo-400">
                 阅读
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </span>
             </div>
