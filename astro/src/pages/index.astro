@@ -4,59 +4,78 @@ import { PostList } from '../components/posts/PostList';
 ---
 
 <BaseLayout title="首页" description="欢迎来到我的个人博客">
-  <!-- Hero 区域 -->
-  <section class="relative -mx-6 -mt-10 overflow-hidden px-6 pb-16 pt-24">
-    <!-- 背景装饰 -->
-    <div class="pointer-events-none absolute inset-0 -z-10">
-      <div class="absolute inset-0 bg-gradient-to-b from-indigo-50/60 via-zinc-50/40 to-transparent dark:from-indigo-950/20 dark:via-zinc-950/40"></div>
-      <div class="absolute inset-0 opacity-[0.025]" style="background-image: radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0); background-size: 40px 40px;"></div>
-      <div class="absolute left-1/2 top-0 h-[500px] w-[700px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-indigo-500/8 blur-[100px] dark:bg-indigo-500/5"></div>
+  <!-- Hero 区域 - 深色背景 + 渐变光晕 -->
+  <section class="relative -mx-6 -mt-16 overflow-hidden rounded-b-[2.5rem] bg-zinc-900 px-6 pb-20 pt-32 dark:bg-zinc-950">
+    <!-- 背景光晕 -->
+    <div class="pointer-events-none absolute inset-0">
+      <div class="absolute left-1/4 top-0 h-[600px] w-[600px] rounded-full bg-indigo-600/20 blur-[120px]"></div>
+      <div class="absolute right-1/4 top-1/4 h-[500px] w-[500px] rounded-full bg-violet-600/15 blur-[100px]"></div>
+      <div class="absolute inset-0 opacity-[0.035]" style="background-image: radial-gradient(circle at 1px 1px, white 1px, transparent 0); background-size: 32px 32px;"></div>
     </div>
 
-    <div class="mx-auto max-w-2xl text-center">
+    <div class="relative mx-auto max-w-3xl text-center">
+      <!-- 标签 -->
+      <div class="animate-enter inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-zinc-300 backdrop-blur-sm">
+        <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+        持续更新中
+      </div>
+
       <!-- 标题 -->
-      <h1 class="animate-enter mb-4 text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 md:text-5xl">
+      <h1 class="animate-enter stagger-1 mt-6 text-5xl font-bold tracking-tight text-white sm:text-6xl">
         个人博客
       </h1>
 
       <!-- 副标题 -->
-      <p class="animate-enter stagger-1 mb-10 text-lg text-zinc-500 dark:text-zinc-400">
+      <p class="animate-enter stagger-2 mt-5 text-lg text-zinc-400">
         分享技术、思考与生活
       </p>
 
       <!-- 搜索框 -->
-      <div class="animate-enter stagger-2 mx-auto max-w-md">
-        <div class="relative group">
-          <div class="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-indigo-500/15 to-violet-500/15 opacity-0 blur transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100"></div>
-          <div class="relative flex items-center rounded-xl border border-zinc-200/80 bg-white/90 px-4 py-3 shadow-sm backdrop-blur-sm transition-all duration-200 dark:border-zinc-800/80 dark:bg-zinc-900/90">
+      <div class="animate-enter stagger-3 mx-auto mt-10 max-w-lg">
+        <div class="group relative">
+          <div class="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-indigo-500/30 to-violet-500/30 opacity-50 blur transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100"></div>
+          <div class="relative flex items-center rounded-xl border border-white/10 bg-white/10 px-4 py-3.5 backdrop-blur-md transition-colors duration-200 focus-within:border-white/20 focus-within:bg-white/15">
             <svg class="h-5 w-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
             </svg>
             <input
               type="text"
               placeholder="搜索文章..."
-              class="ml-3 flex-1 bg-transparent text-sm text-zinc-900 placeholder-zinc-400 outline-none dark:text-zinc-100"
+              class="ml-3 flex-1 bg-transparent text-sm text-white placeholder-zinc-500 outline-none"
               id="hero-search"
             />
-            <kbd class="hidden rounded-md border border-zinc-200/80 bg-zinc-50 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400 sm:inline-block dark:border-zinc-700 dark:bg-zinc-900">
+            <kbd class="hidden rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400 sm:inline-block">
               ⌘K
             </kbd>
           </div>
+        </div>
+      </div>
+
+      <!-- 统计数据 -->
+      <div class="animate-enter stagger-4 mt-10 flex items-center justify-center gap-8 text-sm">
+        <div class="text-center">
+          <div class="text-xl font-semibold text-white">12+</div>
+          <div class="text-xs text-zinc-500">文章</div>
+        </div>
+        <div class="h-8 w-px bg-white/10"></div>
+        <div class="text-center">
+          <div class="text-xl font-semibold text-white">8+</div>
+          <div class="text-xs text-zinc-500">标签</div>
         </div>
       </div>
     </div>
   </section>
 
   <!-- 最新文章 -->
-  <section class="animate-enter-subtle stagger-3 mt-4">
+  <section class="mt-16">
     <div class="mb-8 flex items-end justify-between">
       <div>
-        <h2 class="text-xl font-semibold text-zinc-900 dark:text-zinc-100">最新文章</h2>
+        <h2 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">最新文章</h2>
         <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">最近发布的技术文章和思考</p>
       </div>
       <a
         href="/posts"
-        class="group inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+        class="group inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
       >
         查看全部
         <svg class="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -69,40 +88,39 @@ import { PostList } from '../components/posts/PostList';
   </section>
 
   <!-- 快速链接 -->
-  <section class="animate-enter-subtle stagger-4 mt-20 grid gap-4 sm:grid-cols-2">
-    <!-- 所有文章 -->
+  <section class="mt-16 grid gap-4 sm:grid-cols-2">
     <a
       href="/posts"
-      class="card-lift group relative overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-6 dark:border-zinc-800/80 dark:bg-zinc-900"
+      class="group relative overflow-hidden rounded-2xl border border-zinc-200/60 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:border-zinc-300 hover:shadow-xl dark:border-zinc-800/60 dark:bg-zinc-900 dark:hover:border-zinc-700"
     >
-      <div class="relative z-10">
-        <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100 transition-colors group-hover:bg-zinc-200 dark:bg-zinc-800 dark:group-hover:bg-zinc-700">
-          <svg class="h-5 w-5 text-zinc-600 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div class="relative z-10 flex items-start gap-4">
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/30">
+          <svg class="h-6 w-6 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
           </svg>
         </div>
-        <h3 class="mb-1 text-base font-semibold text-zinc-900 dark:text-zinc-100">所有文章</h3>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">浏览所有已发布的文章</p>
+        <div>
+          <h3 class="mb-1 text-base font-semibold text-zinc-900 dark:text-zinc-100">所有文章</h3>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400">浏览所有已发布的文章</p>
+        </div>
       </div>
-      <div class="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-zinc-100 opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100 dark:bg-zinc-800"></div>
     </a>
 
-    <!-- 标签分类 -->
     <a
       href="/tags"
-      class="card-lift group relative overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-6 dark:border-zinc-800/80 dark:bg-zinc-900"
+      class="group relative overflow-hidden rounded-2xl border border-zinc-200/60 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:border-zinc-300 hover:shadow-xl dark:border-zinc-800/60 dark:bg-zinc-900 dark:hover:border-zinc-700"
     >
-      <div class="relative z-10">
-        <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-100 transition-colors group-hover:bg-zinc-200 dark:bg-zinc-800 dark:group-hover:bg-zinc-700">
-          <svg class="h-5 w-5 text-zinc-600 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div class="relative z-10 flex items-start gap-4">
+        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950/30">
+          <svg class="h-6 w-6 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 6h.008v.008H6V6z" />
           </svg>
         </div>
-        <h3 class="mb-1 text-base font-semibold text-zinc-900 dark:text-zinc-100">标签分类</h3>
-        <p class="text-sm text-zinc-500 dark:text-zinc-400">按标签筛选感兴趣的内容</p>
+        <div>
+          <h3 class="mb-1 text-base font-semibold text-zinc-900 dark:text-zinc-100">标签分类</h3>
+          <p class="text-sm text-zinc-500 dark:text-zinc-400">按标签筛选感兴趣的内容</p>
+        </div>
       </div>
-      <div class="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-zinc-100 opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100 dark:bg-zinc-800"></div>
     </a>
   </section>
 </BaseLayout>
