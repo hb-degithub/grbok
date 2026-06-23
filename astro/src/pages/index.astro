@@ -1,91 +1,115 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PostList from '../components/posts/PostList';
+import Starfield from '../components/effects/Starfield';
+import GridFloor from '../components/effects/GridFloor.astro';
+import ScrollReveal from '../components/ui/ScrollReveal';
+import GlowCard from '../components/ui/GlowCard';
+import CursorGlow from '../components/effects/CursorGlow';
+
+const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
+
+async function fetchCount(collection: string, filter?: string): Promise<number> {
+  try {
+    const qs = filter ? `?filter=${encodeURIComponent(filter)}&perPage=1` : '?perPage=1';
+    const res = await fetch(`${PB_URL}/api/collections/${collection}/records${qs}`);
+    if (!res.ok) throw new Error(`${res.status}`);
+    const data = await res.json();
+    return data.totalItems ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+const [postsCount, tagsCount] = await Promise.all([
+  fetchCount('posts', 'status = "published"'),
+  fetchCount('tags'),
+]);
 ---
 
 <BaseLayout title="首页" description="欢迎来到我的个人博客">
-  <!-- Hero 区域 - 深色背景 + 渐变光晕 -->
-  <section class="relative -mx-6 -mt-16 overflow-hidden rounded-b-[2.5rem] bg-zinc-900 px-6 pb-20 pt-32 dark:bg-zinc-950">
-    <!-- 背景光晕 -->
-    <div class="pointer-events-none absolute inset-0">
-      <div class="absolute left-1/4 top-0 h-[600px] w-[600px] rounded-full bg-indigo-600/20 blur-[120px]"></div>
-      <div class="absolute right-1/4 top-1/4 h-[500px] w-[500px] rounded-full bg-violet-600/15 blur-[100px]"></div>
-      <div class="absolute inset-0 opacity-[0.035]" style="background-image: radial-gradient(circle at 1px 1px, white 1px, transparent 0); background-size: 32px 32px;"></div>
-    </div>
+  <!-- 鼠标跟随光标 -->
+  <CursorGlow client:idle />
 
-    <div class="relative mx-auto max-w-3xl text-center">
-      <!-- 标签 -->
-      <div class="animate-enter inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-zinc-300 backdrop-blur-sm">
-        <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-        持续更新中
+  <!-- Hero -->
+  <section class="relative -mx-6 -mt-12 flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pt-20">
+    <Starfield client:load />
+    <GridFloor />
+
+    <!-- floating orbs -->
+    <div class="pointer-events-none absolute left-[15%] top-[20%] h-64 w-64 rounded-full bg-cyan/10 blur-[100px] animate-float"></div>
+    <div class="pointer-events-none absolute bottom-[25%] right-[15%] h-80 w-80 rounded-full bg-amber/10 blur-[120px] animate-float" style="animation-delay: -4s"></div>
+
+    <div class="relative z-10 mx-auto max-w-5xl text-center">
+      <div class="animate-reveal stagger-1 mb-6 inline-flex items-center gap-2 rounded-full border border-line bg-space-light/60 px-4 py-1.5 font-mono text-[10px] uppercase tracking-[0.25em] text-cyan">
+        <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-cyan"></span>
+        PERSONAL LOG // 持续更新中
       </div>
 
-      <!-- 标题 -->
-      <h1 class="animate-enter stagger-1 mt-6 text-5xl font-bold tracking-tight text-white sm:text-6xl">
+      <h1 class="animate-reveal stagger-2 font-display text-7xl font-black tracking-tighter text-ink sm:text-8xl md:text-9xl">
         个人博客
       </h1>
 
-      <!-- 副标题 -->
-      <p class="animate-enter stagger-2 mt-5 text-lg text-zinc-400">
+      <div class="animate-reveal stagger-3 mt-4 font-display text-sm font-bold uppercase tracking-[0.35em] text-cyan animate-glitch sm:text-base">
+        THINKING ? TECH ? LIFE
+      </div>
+
+      <p class="animate-reveal stagger-4 mx-auto mt-6 max-w-xl text-dim">
         分享技术、思考与生活
       </p>
 
-      <!-- 搜索框 -->
-      <div class="animate-enter stagger-3 mx-auto mt-10 max-w-lg">
-        <div class="group relative">
-          <div class="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-indigo-500/30 to-violet-500/30 opacity-50 blur transition-opacity duration-300 group-hover:opacity-100 group-focus-within:opacity-100"></div>
-          <div class="relative flex items-center rounded-xl border border-white/10 bg-white/10 px-4 py-3.5 backdrop-blur-md transition-colors duration-200 focus-within:border-white/20 focus-within:bg-white/15">
-            <svg class="h-5 w-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="搜索文章..."
-              class="ml-3 flex-1 bg-transparent text-sm text-white placeholder-zinc-500 outline-none"
-              id="hero-search"
-              aria-label="搜索文章"
-            />
-            <kbd class="hidden rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-zinc-400 sm:inline-block">
-              ⌘K
-            </kbd>
+      <!-- Stats -->
+      <div class="mt-16 flex flex-col items-center [perspective:1200px]">
+        <div class="relative h-36 w-56 [transform-style:preserve-3d]">
+          <!-- 底层 Articles 卡片 -->
+          <div class="animate-stack-up stagger-5 holo-card absolute inset-x-0 bottom-0 z-10 rounded-xl border-cyan/20 px-8 py-5 text-center shadow-[0_10px_40px_rgba(34,211,238,0.12)] transition-all duration-300 hover:-translate-y-1">
+            <div class="font-display text-3xl font-bold text-cyan">{postsCount}</div>
+            <div class="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted">Articles</div>
+          </div>
+          <!-- 向上堆叠的 Tags 卡片 -->
+          <div class="animate-stack-up stagger-5 holo-card absolute inset-x-0 bottom-6 z-20 rounded-xl border-amber/20 px-8 py-5 text-center shadow-[0_10px_40px_rgba(251,191,36,0.15)] transition-all duration-300 hover:-translate-y-2" style="animation-delay: 0.7s">
+            <div class="font-display text-3xl font-bold text-amber">{tagsCount}</div>
+            <div class="mt-1 font-mono text-[10px] uppercase tracking-widest text-muted">Tags</div>
           </div>
         </div>
       </div>
 
-      <!-- 统计数据 -->
-      <div class="animate-enter stagger-4 mt-10 flex items-center justify-center gap-8 text-sm">
-        <div class="text-center">
-          <div class="text-xl font-semibold text-white">12+</div>
-          <div class="text-xs text-zinc-500">文章</div>
-        </div>
-        <div class="h-8 w-px bg-white/10"></div>
-        <div class="text-center">
-          <div class="text-xl font-semibold text-white">8+</div>
-          <div class="text-xs text-zinc-500">标签</div>
-        </div>
+      <!-- CTA -->
+      <div class="animate-reveal stagger-6 mt-12">
+        <a href="#latest" class="btn-primary inline-flex items-center gap-3">
+          浏览文章
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+        </a>
       </div>
+    </div>
+
+    <!-- scroll indicator -->
+    <div class="absolute bottom-8 left-1/2 -translate-x-1/2 text-dim animate-bounce">
+      <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+      </svg>
     </div>
   </section>
 
-  <!-- 最新文章 -->
-  <section class="relative mt-16">
-    <!-- 文章区背景光晕：让玻璃卡片有内容可「透」 -->
-    <div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
-      <div class="absolute -top-10 left-1/4 h-72 w-72 rounded-full bg-indigo-300/20 blur-[100px] dark:bg-indigo-600/10"></div>
-      <div class="absolute top-20 right-1/4 h-72 w-72 rounded-full bg-violet-300/20 blur-[100px] dark:bg-violet-600/10"></div>
-    </div>
-
-    <div class="mb-8 flex items-end justify-between">
+  <!-- Latest posts -->
+  <section id="latest" class="relative pt-24">
+    <div class="mb-10 flex items-end justify-between">
       <div>
-        <h2 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">最新文章</h2>
-        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">最近发布的技术文章和思考</p>
+        <div class="mb-2 flex items-center gap-2">
+          <span class="h-px w-8 bg-cyan"></span>
+          <span class="font-mono text-[10px] uppercase tracking-widest text-cyan">Latest</span>
+        </div>
+        <h2 class="font-display text-2xl font-black uppercase tracking-wide text-ink">最新文章</h2>
+        <p class="mt-1 text-sm text-dim">最近发布的技术文章和思考</p>
       </div>
       <a
         href="/posts"
-        class="group inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+        class="group hidden items-center gap-2 rounded-full border border-line bg-space-light px-4 py-2 font-mono text-xs uppercase tracking-widest text-dim transition-all hover:border-cyan hover:text-cyan sm:inline-flex"
       >
         查看全部
-        <svg class="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
         </svg>
       </a>
@@ -94,46 +118,39 @@ import PostList from '../components/posts/PostList';
     <PostList client:visible perPage={6} />
   </section>
 
-  <!-- 快速链接 -->
-  <section class="mt-16 grid gap-4 sm:grid-cols-2">
-    <a
-      href="/posts"
-      class="glass focus-ring group relative overflow-hidden rounded-2xl p-7 transition-all duration-300 hover:-translate-y-1 hover:border-white/70 dark:hover:border-white/20"
-    >
-      <div class="relative z-10 flex items-start gap-4">
-        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/30">
-          <svg class="h-6 w-6 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-          </svg>
-        </div>
-        <div>
-          <h3 class="mb-1 text-base font-semibold text-zinc-900 dark:text-zinc-100">所有文章</h3>
-          <p class="text-sm text-zinc-500 dark:text-zinc-400">浏览所有已发布的文章</p>
-        </div>
-      </div>
-    </a>
+  <!-- Quick links -->
+  <section class="mt-24 grid gap-5 sm:grid-cols-2">
+    <ScrollReveal delay={0.1} client:visible>
+      <GlowCard className="focus-ring holo-card group flex items-start gap-5 p-7 cursor-pointer" client:visible>
+        <a href="/posts" class="flex items-start gap-5">
+          <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-line bg-space-light text-cyan transition-colors group-hover:border-cyan group-hover:bg-cyan/10">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="font-display text-lg font-bold uppercase tracking-wide text-ink">所有文章</h3>
+            <p class="mt-1 text-sm text-dim">浏览所有已发布的文章</p>
+          </div>
+        </a>
+      </GlowCard>
+    </ScrollReveal>
 
-    <a
-      href="/tags"
-      class="glass focus-ring group relative overflow-hidden rounded-2xl p-7 transition-all duration-300 hover:-translate-y-1 hover:border-white/70 dark:hover:border-white/20"
-    >
-      <div class="relative z-10 flex items-start gap-4">
-        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-950/30">
-          <svg class="h-6 w-6 text-violet-600 dark:text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
-          </svg>
-        </div>
-        <div>
-          <h3 class="mb-1 text-base font-semibold text-zinc-900 dark:text-zinc-100">标签分类</h3>
-          <p class="text-sm text-zinc-500 dark:text-zinc-400">按标签筛选感兴趣的内容</p>
-        </div>
-      </div>
-    </a>
+    <ScrollReveal delay={0.2} client:visible>
+      <GlowCard className="focus-ring holo-card group flex items-start gap-5 p-7 cursor-pointer" glowColor="rgba(251, 191, 36, 0.12)" client:visible>
+        <a href="/tags" class="flex items-start gap-5">
+          <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-line bg-space-light text-amber transition-colors group-hover:border-amber group-hover:bg-amber/10">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 6h.008v.008H6V6z" />
+            </svg>
+          </div>
+          <div>
+            <h3 class="font-display text-lg font-bold uppercase tracking-wide text-ink">标签分类</h3>
+            <p class="mt-1 text-sm text-dim">按标签筛选感兴趣的内容</p>
+          </div>
+        </a>
+      </GlowCard>
+    </ScrollReveal>
   </section>
 </BaseLayout>
-
-<script>
-  document.getElementById('hero-search')?.addEventListener('focus', () => {
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
-  });
-</script>
