@@ -41,3 +41,13 @@ backups/
 # 临时文件
 tmp/
 temp/
+
+# Temporary debug files
+*.js
+*.bat
+*.vbs
+*.png
+*.jpg
+*.err
+*.log
+

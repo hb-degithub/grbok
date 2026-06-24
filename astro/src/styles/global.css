@@ -19,6 +19,19 @@
   --color-line: rgba(34, 211, 238, 0.12);
   --color-line-strong: rgba(34, 211, 238, 0.35);
 
+  /* Admin aliases */
+  --color-bg: #030305;
+  --color-bg-soft: #08090d;
+  --color-surface: rgba(8, 9, 13, 0.72);
+  --color-text: #f0f4f8;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #475569;
+  --color-accent: #22d3ee;
+  --color-border: rgba(34, 211, 238, 0.12);
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+
   --font-display: "Orbitron", "Noto Sans SC", sans-serif;
   --font-body: "Exo 2", "Noto Sans SC", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
