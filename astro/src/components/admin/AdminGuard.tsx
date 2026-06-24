@@ -9,7 +9,7 @@ export default function AdminGuard({ children, requiredRole = 'author' }: Props)
   if (isLoading) return (
     <div className="flex min-h-screen items-center justify-center bg-bg">
       <div className="card rounded-2xl p-10 text-center">
-        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-border border-t-cyan" />
+        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-border border-t-indigo-500" />
         <p className="font-mono text-xs uppercase tracking-widest text-text-secondary">Authenticating...</p>
       </div>
     </div>
