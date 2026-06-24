@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getPocketBase } from '../../lib/pocketbase';
+import { getPocketBase } from '../lib/pocketbase';
 import type { User } from '../../types/pocketbase';
 
 export type AdminRole = 'admin' | 'author';
@@ -14,7 +14,6 @@ export interface AdminAuthState {
 export function useAdminAuth(): AdminAuthState {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [connectionError, setConnectionError] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -22,10 +21,10 @@ export function useAdminAuth(): AdminAuthState {
 
     const checkAuth = async () => {
       try {
-        // 先测试连接
-        await pb.health.check();
+        // 测试连接
+        await pb.collection('_superusers').getList(1, 1);
       } catch {
-        if (mounted) setConnectionError(true);
+        // 连接失败不影响已有登录状态
       }
 
       if (pb.authStore.isValid && pb.authStore.record) {
