@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useComments } from '../../hooks/useComments';
-import { CommentItem } from './CommentItem';
-import { CommentForm } from './CommentForm';
+import CommentItem from './CommentItem';
+import CommentForm from './CommentForm';
 import type { CommentFormData } from '../../types/pocketbase';
 
 interface CommentSectionProps {

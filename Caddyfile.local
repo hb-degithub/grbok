@@ -17,6 +17,7 @@
         X-Content-Type-Options "nosniff"
         X-XSS-Protection "1; mode=block"
         Referrer-Policy "strict-origin-when-cross-origin"
+        Content-Security-Policy "default-src 'self' http: data: blob: 'unsafe-inline'; frame-ancestors 'none'; object-src 'none'"
         -Server
         -X-Powered-By
     }

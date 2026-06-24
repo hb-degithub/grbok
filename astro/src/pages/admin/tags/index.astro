@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import TagManager from '../../../components/admin/TagManager';
+---
+
+<AdminLayout title="Tags">
+  <TagManager client:only="react" />
+</AdminLayout>

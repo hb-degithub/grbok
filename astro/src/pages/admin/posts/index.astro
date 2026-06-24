@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import PostManager from '../../../components/admin/PostManager';
+---
+
+<AdminLayout title="Posts">
+  <PostManager client:only="react" />
+</AdminLayout>

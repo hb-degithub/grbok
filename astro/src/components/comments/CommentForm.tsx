@@ -21,7 +21,7 @@ const textareaClass =
  * 设计决策：glass-strong 容器保证表单文字对比度；textarea 用 id 关联 label，
  * 支持 `aria-describedby` 错误播报；成功态用 emerald 打勾动画。
  */
-export function CommentForm({ postId, onSubmit }: CommentFormProps) {
+export default function CommentForm({ postId, onSubmit }: CommentFormProps) {
   const [formData, setFormData] = useState<CommentFormData>({
     author_name: '',
     author_email: '',

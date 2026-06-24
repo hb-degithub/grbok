@@ -76,9 +76,13 @@
 ### 规则
 - **List rule**: `status = "approved" || @request.auth.role = "admin"`
 - **View rule**: `status = "approved" || @request.auth.role = "admin"`
-- **Create rule**: 任何人可评论（需填写昵称和邮箱）
+- **Create rule**: 任何人可评论（需填写昵称和邮箱；前端默认写入 `pending`）
 - **Update rule**: `@request.auth.role = "admin"`
 - **Delete rule**: `@request.auth.role = "admin"`
+
+### 隐私字段
+- `author_email`、`ip_address` 只能给后台管理员使用；匿名公开接口不得返回这两个字段。
+- 当前前端查询已使用 `fields` 只读取公开评论字段；生产环境仍应在 PocketBase 侧使用字段隐藏、公开只读 View collection 或服务端代理二次过滤，避免用户直接调用 API 读取敏感字段。
 
 ### 索引
 - `post_id` + `status` (复合索引)
@@ -171,7 +175,7 @@
 
 ## 📝 Admin UI 创建步骤
 
-1. 访问 http://localhost:80/_/admin
+1. 本地访问 http://localhost:80/_/admin；生产环境必须通过 HTTPS 域名访问
 2. 创建管理员账户
 3. 进入 Collections 页面
 4. 按上述结构依次创建每个 Collection

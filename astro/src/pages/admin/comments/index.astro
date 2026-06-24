@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import CommentModerator from '../../../components/admin/CommentModerator';
+---
+
+<AdminLayout title="Comments">
+  <CommentModerator client:only="react" />
+</AdminLayout>

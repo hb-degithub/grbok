@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import SecurityAudit from '../../../components/admin/SecurityAudit';
+---
+
+<AdminLayout title="Security Audit" requiredRole="admin">
+  <SecurityAudit client:only="react" />
+</AdminLayout>

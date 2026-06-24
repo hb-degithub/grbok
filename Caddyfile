@@ -36,6 +36,9 @@ header {
     # 权限策略
     Permissions-Policy "camera=(), microphone=(), geolocation=()"
 
+    # 内容安全策略：阻止混合内容，并限制可执行来源
+    Content-Security-Policy "default-src 'self' https: data: blob:; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:; upgrade-insecure-requests"
+
     # 隐藏服务器信息
     -Server
     -X-Powered-By
@@ -50,17 +53,12 @@ rate_limit {
     }
 }
 
-# PocketBase Admin UI - IP 白名单保护
-@admin_ips {
-    remote_ip {$ADMIN_IP}
-}
-
 # Admin UI 路由 - 仅允许白名单 IP
 handle /_/admin* {
-    @admin_ips {
-        remote_ip {$ADMIN_IP}
+    @not_admin_ips {
+        not remote_ip {$ADMIN_IP}
     }
-    respond @admin_ips 403 "Forbidden: Admin access restricted"
+    respond @not_admin_ips 403 "Forbidden: Admin access restricted to whitelisted IPs"
     reverse_proxy pocketbase:8090 {
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}

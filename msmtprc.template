@@ -5,17 +5,18 @@
 defaults
 auth           on
 tls            on
-tls_starttls   on
+# 465 使用 SMTPS，不使用 STARTTLS；如果改成 587，再将 tls_starttls 改为 on。
+tls_starttls   off
 tls_trust_file /etc/ssl/certs/ca-certificates.crt
 logfile        /var/log/msmtp.log
 
 # 阿里云邮件推送
 account        aliyun
-host           smtp.dm.aliyun.com
-port           465
+host           ${ALIYUN_SMTP_HOST}
+port           ${ALIYUN_SMTP_PORT}
 from           ${ALIYUN_FROM_EMAIL}
-user           ${ALIYUN_ACCESS_KEY}
-password       ${ALIYUN_ACCESS_SECRET}
+user           ${ALIYUN_SMTP_USER}
+password       ${ALIYUN_SMTP_PASSWORD}
 
 # 设置默认账户
 account default : aliyun

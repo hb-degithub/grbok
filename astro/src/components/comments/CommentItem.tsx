@@ -25,7 +25,7 @@ interface CommentItemProps {
  * 2. 新评论用 indigo ring + 短暂背景渐隐高亮，3 秒后消退（由父组件控制 isNew）。
  * 3. 回复按钮带 aria-expanded/aria-controls，屏幕阅读器可知展开状态。
  */
-export function CommentItem({
+export default function CommentItem({
   comment,
   depth = 0,
   maxDepth = 3,

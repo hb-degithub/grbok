@@ -1,0 +1,33 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import AdminSidebar from '../components/admin/AdminSidebar';
+import AdminGuard from '../components/admin/AdminGuard';
+
+interface Props {
+  title: string;
+  description?: string;
+  requiredRole?: 'admin' | 'author';
+}
+
+const { title, description = 'Blog admin panel', requiredRole = 'author' } = Astro.props;
+---
+
+<BaseLayout title={title + ' - Admin'} description={description} showChrome={false}>
+  <AdminGuard client:only="react" requiredRole={requiredRole}>
+    <div class="flex min-h-screen bg-bg">
+      <AdminSidebar client:only="react" />
+      <main class="ml-60 min-h-screen flex-1 p-8">
+        <div class="mx-auto max-w-6xl">
+          <div class="mb-8">
+            <div class="mb-2 flex items-center gap-2">
+              <span class="h-px w-8 bg-accent"></span>
+              <span class="font-mono text-[10px] uppercase tracking-widest text-accent">Admin</span>
+            </div>
+            <h1 class="font-display text-2xl font-black uppercase tracking-wide text-text">{title}</h1>
+          </div>
+          <slot />
+        </div>
+      </main>
+    </div>
+  </AdminGuard>
+</BaseLayout>
