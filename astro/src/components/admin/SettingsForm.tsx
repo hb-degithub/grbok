@@ -69,8 +69,8 @@ export default function SettingsForm() {
         <input type="text" value={settings.site_logo} onChange={(e) => setSettings({ ...settings, site_logo: e.target.value })} placeholder="https://..." className="w-full rounded-lg border border-border bg-bg-soft px-4 py-2.5 font-mono text-sm text-text outline-none focus:border-accent" />
         {settings.site_logo && <img src={settings.site_logo} alt="Logo preview" className="mt-3 h-16 w-16 rounded-lg border border-border object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}</div>
       <div className="flex flex-wrap gap-6">
-        <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={settings.enable_comments} onChange={(e) => setSettings({ ...settings, enable_comments: e.target.checked })} className="accent-cyan" /><span className="text-sm text-text">Enable Comments</span></label>
-        <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={settings.comment_moderation} onChange={(e) => setSettings({ ...settings, comment_moderation: e.target.checked })} className="accent-cyan" /><span className="text-sm text-text">Comment Moderation</span></label>
+        <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={settings.enable_comments} onChange={(e) => setSettings({ ...settings, enable_comments: e.target.checked })} className="accent-indigo-500" /><span className="text-sm text-text">Enable Comments</span></label>
+        <label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={settings.comment_moderation} onChange={(e) => setSettings({ ...settings, comment_moderation: e.target.checked })} className="accent-indigo-500" /><span className="text-sm text-text">Comment Moderation</span></label>
       </div>
       <button onClick={saveSettings} disabled={saving} className="btn-primary text-xs">{saving ? 'Saving...' : saved ? 'Saved!' : 'Save Settings'}</button>
     </motion.div>
