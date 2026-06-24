@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { getPocketBase } from '../lib/pocketbase';
-import type { User } from '../types/pocketbase';
+import React, { useState, useEffect } from 'react';
+import { getPocketBase } from '../../lib/pocketbase';
+import type { User } from '../../types/pocketbase';
 
 export type AdminRole = 'admin' | 'author';
 
@@ -14,21 +14,41 @@ export interface AdminAuthState {
 export function useAdminAuth(): AdminAuthState {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
     const pb = getPocketBase();
-    if (pb.authStore.isValid && pb.authStore.record) {
-      setUser(pb.authStore.record as unknown as User);
-    }
-    const unsubscribe = pb.authStore.onChange(() => {
-      if (pb.authStore.isValid && pb.authStore.record) {
-        setUser(pb.authStore.record as unknown as User);
-      } else {
-        setUser(null);
+
+    const checkAuth = async () => {
+      try {
+        // 先测试连接
+        await pb.health.check();
+      } catch {
+        if (mounted) setConnectionError(true);
       }
-    });
-    setIsLoading(false);
-    return () => { unsubscribe?.(); };
+
+      if (pb.authStore.isValid && pb.authStore.record) {
+        if (mounted) setUser(pb.authStore.record as unknown as User);
+      }
+
+      const unsubscribe = pb.authStore.onChange(() => {
+        if (mounted) {
+          if (pb.authStore.isValid && pb.authStore.record) {
+            setUser(pb.authStore.record as unknown as User);
+          } else {
+            setUser(null);
+          }
+        }
+      });
+
+      if (mounted) setIsLoading(false);
+      return () => { unsubscribe?.(); };
+    };
+
+    checkAuth();
+
+    return () => { mounted = false; };
   }, []);
 
   const hasPermission = (requiredRole: AdminRole): boolean => {
