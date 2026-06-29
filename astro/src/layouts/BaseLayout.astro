@@ -114,7 +114,28 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     </script>
 
     <ClientRouter />
-  </head>
+  <style is:global>
+  /* Astro view transitions */
+  html {
+    view-transition-name: none;
+  }
+  ::view-transition-old(root) {
+    animation: 0.25s ease-out both fade-out;
+  }
+  ::view-transition-new(root) {
+    animation: 0.3s ease-out both fade-in;
+  }
+  @keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+
+</head>
   <body class="min-h-[100svh] bg-white font-sans text-stone-900 antialiased dark:bg-stone-950 dark:text-stone-100">
     {showChrome && <Header client:load />}
     {showChrome && <SearchModal client:load />}
