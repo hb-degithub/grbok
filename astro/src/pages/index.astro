@@ -26,6 +26,7 @@ const [postsCount, tagsCount] = await Promise.all([
 ---
 
 <BaseLayout title="首页" description="欢迎来到胡巴的个人博客">
+  <aside class="floating-sidebar sidebar-left fixed left-6 top-28 z-30 hidden w-80 space-y-5 xl:block" aria-label="Fixed section sidebar">
     <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75">
       <h3 class="text-sm font-black tracking-tight text-stone-950 dark:text-stone-50">站内导航</h3>
       <nav class="mt-4 grid gap-2 text-sm" aria-label="Section navigation">
@@ -71,7 +72,7 @@ const [postsCount, tagsCount] = await Promise.all([
     </section>
   </aside>
 
-  <section class="journal-hero relative -mt-[var(--header-h,4rem)] min-h-[var(--vvh,100dvh)] w-full overflow-hidden border-b border-stone-200/70 px-[var(--page-pad,1rem)] pb-16 pt-[calc(var(--header-h,4rem)+1.5rem)] shadow-sm dark:border-stone-800/70 sm:px-6 lg:px-12 lg:pb-20 lg:pt-32 xl:px-[19rem] 2xl:px-[23rem]">
+  <section class="journal-hero relative -mt-[var(--header-offset,4rem)] min-h-[var(--hero-min-h,100svh)] w-full overflow-hidden border-b border-stone-200/70 px-[var(--page-pad,1rem)] pb-16 pt-[calc(var(--header-offset,4rem)+1.5rem)] shadow-sm dark:border-stone-800/70 sm:px-6 lg:px-12 lg:pb-20 lg:pt-32 xl:px-[19rem] 2xl:px-[23rem]">
 
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
       <div class="journal-paper absolute inset-0"></div>
@@ -84,7 +85,7 @@ const [postsCount, tagsCount] = await Promise.all([
       <ParticleField count={14} color="120, 113, 108" speed={0.18} className="absolute inset-0 z-0 opacity-70 dark:opacity-50" client:visible />
     </div>
 
-    <div class="relative z-10 flex min-h-[calc(var(--vvh,100dvh)-9rem)] items-center">
+    <div class="journal-hero-content relative z-10 flex min-h-[var(--hero-content-min-h,calc(100svh-9rem))] items-center">
       <div class="max-w-3xl xl:max-w-4xl">
         <div class="animate-enter inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white/75 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-stone-500 shadow-sm backdrop-blur dark:border-stone-700 dark:bg-stone-900/60 dark:text-stone-400">
           <span class="accent-dot"></span>
@@ -307,6 +308,11 @@ const [postsCount, tagsCount] = await Promise.all([
     transform: translateY(-2px);
   }
 
+
+@media (max-width: 767px) and (max-height: 520px) {
+  .journal-hero { padding-bottom: 2rem; }
+  .journal-hero-content { min-height: 0; align-items: flex-start; }
+}
 
 @media (max-width: 639px) {
   .journal-grid {

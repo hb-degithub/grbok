@@ -141,7 +141,7 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
             transition={DRAWER_TRANSITION}
             onClick={handleDrawerClick}
             onKeyDown={handleDrawerKeyDown}
-            className="fixed left-0 top-0 z-50 flex h-[var(--vvh,100dvh)] max-h-[var(--vvh,100dvh)] w-[min(288px,88vw)] flex-col overflow-hidden bg-white shadow-2xl outline-none dark:bg-stone-900"
+            className="fixed inset-y-0 left-0 z-50 flex h-auto max-h-none w-[min(288px,88dvw)] max-w-[calc(100dvw-env(safe-area-inset-right))] flex-col overflow-hidden bg-white shadow-2xl outline-none dark:bg-stone-900"
           >
             <div className="flex min-h-[56px] shrink-0 items-center justify-between gap-3 border-b border-stone-200 px-3 py-2 pt-[max(env(safe-area-inset-top),0.5rem)] dark:border-stone-800 sm:px-5">
               <a href="/" className="flex min-h-[40px] min-w-0 items-center gap-2.5">

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
 import { cn } from '../../lib/utils';
@@ -194,7 +194,7 @@ export default function PostManager() {
       <AnimatePresence>
         {editing && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-stretch justify-center overflow-y-auto glass-overlay p-0 sm:items-start sm:px-4 sm:pb-10 sm:pt-16" onClick={() => setEditing(null)}>
-            <motion.div initial={{ opacity: 0, y: 18, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 18, scale: 0.98 }} onClick={(e) => e.stopPropagation()} className="mobile-fullsheet card flex min-h-[100dvh] w-full max-w-4xl flex-col rounded-none p-4 shadow-xl sm:min-h-0 sm:rounded-md sm:p-5">
+            <motion.div initial={{ opacity: 0, y: 18, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 18, scale: 0.98 }} onClick={(e) => e.stopPropagation()} className="mobile-fullsheet card flex min-h-[var(--vvh,100dvh)] w-full max-w-4xl flex-col rounded-none p-4 shadow-xl sm:min-h-0 sm:rounded-md sm:p-5">
               <div className="mb-5 flex items-center justify-between gap-3 border-b border-border pb-3">
                 <div className="min-w-0">
                   <h2 className="break-words text-base font-black text-text">{editing.id ? '编辑文章' : '新建文章'}</h2>

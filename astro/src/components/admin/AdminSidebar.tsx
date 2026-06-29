@@ -205,7 +205,7 @@ export default function AdminSidebar() {
       <motion.aside
         animate={{ width }}
         transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed left-0 top-0 z-40 hidden h-screen flex-col border-r border-border bg-white/96 shadow-[10px_0_30px_rgba(28,25,23,0.045)] backdrop-blur-xl lg:flex"
+        className="fixed inset-y-0 left-0 z-40 hidden h-auto flex-col border-r border-border bg-white/96 shadow-[10px_0_30px_rgba(28,25,23,0.045)] backdrop-blur-xl lg:flex"
       >
         <div className="flex h-16 items-center justify-between border-b border-border px-3">
           {!collapsed && (
@@ -253,7 +253,7 @@ export default function AdminSidebar() {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-              className="fixed left-0 top-0 z-50 flex h-[var(--vvh,100dvh)] max-h-[var(--vvh,100dvh)] w-[min(20rem,88vw)] flex-col border-r border-border bg-white shadow-2xl outline-none lg:hidden"
+              className="fixed inset-y-0 left-0 z-50 flex h-auto max-h-none w-[min(20rem,88dvw)] max-w-[calc(100dvw-env(safe-area-inset-right))] flex-col border-r border-border bg-white shadow-2xl outline-none lg:hidden"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex min-h-16 items-center justify-between border-b border-border px-4 pt-[max(env(safe-area-inset-top),0.5rem)]">
