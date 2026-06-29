@@ -1022,3 +1022,44 @@ html { -webkit-text-size-adjust: 100%; }
     border-radius: var(--radius-md);
   }
 }
+
+
+/* Card hover refinement */
+.card {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.card:hover {
+  border-color: var(--color-stone-300, #d6d3d1);
+  box-shadow: 0 2px 12px rgba(120, 113, 108, 0.06);
+}
+
+/* Image loading placeholder */
+img:not([src]), img[src=''], img[src*='loading'] {
+  background: linear-gradient(110deg, var(--color-stone-100, #f5f5f4) 30%, var(--color-stone-200, #e7e5e4) 50%, var(--color-stone-100, #f5f5f4) 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  min-height: 2rem;
+}
+.dark img:not([src]), .dark img[src=''], .dark img[src*='loading'] {
+  background: linear-gradient(110deg, var(--color-stone-800, #292524) 30%, var(--color-stone-700, #44403c) 50%, var(--color-stone-800, #292524) 70%);
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Button micro-interactions */
+.btn-primary, .btn-ghost {
+  transition: all 0.18s ease;
+}
+.btn-primary:active, .btn-ghost:active {
+  transform: scale(0.97);
+}
+
+/* Focus ring refinement */
+*:focus-visible {
+  outline: 2px solid var(--color-stone-500, #78716c);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
