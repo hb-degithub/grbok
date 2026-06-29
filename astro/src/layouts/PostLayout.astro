@@ -1,5 +1,6 @@
 ---
 import BaseLayout from './BaseLayout.astro';
+import ReadingProgress from '../components/effects/ReadingProgress';
 import { sanitizeHtml } from '../lib/security';
 import type { Post, User, Tag } from '../types/pocketbase';
 
@@ -23,7 +24,8 @@ const safeContent = sanitizeHtml(post.content || '');
 ---
 
 <BaseLayout title={post.title} description={post.excerpt} image={post.cover}>
-  <article class="mx-auto w-full max-w-4xl px-[var(--page-pad,1rem)] py-6 sm:py-8">
+  <ReadingProgress client:load />
+<article class="mx-auto w-full max-w-4xl px-[var(--page-pad,1rem)] py-6 sm:py-8">
     <!-- 鏂囩珷澶撮儴 -->
     <header class="mb-8 sm:mb-12">
       <!-- 标题 -->
@@ -106,6 +108,18 @@ const safeContent = sanitizeHtml(post.content || '');
     <div class="prose">
       <div set:html={safeContent} />
     </div>
+
+<div class="mt-12 mb-8 rounded-md border border-stone-200 bg-stone-50 p-4 dark:border-stone-800 dark:bg-stone-900/50">
+  <div class="mb-2 font-mono text-[10px] uppercase tracking-widest text-stone-500">目录</div>
+  <nav class="toc text-sm space-y-1">
+    {post.content?.split('\n').filter(l => l.startsWith('<h2') || l.startsWith('<h3')).map((heading, i) => {
+      const level = heading.startsWith('<h3') ? 'ml-3' : '';
+      const text_match = heading.replace(/<\/?[^>]+>/g, '').trim();
+      const id = 'toc-' + i;
+      return '<div class="' + level + '"><a href="#' + id + '" class="text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100 no-underline">' + text_match + '</a></div>';
+    }).join('\n')}
+  </nav>
+</div>
 
     <!-- 鏂囩珷搴曢儴 -->
     <footer class="mt-12 border-t border-gray-200 pt-6 dark:border-gray-800 sm:mt-16 sm:pt-8">

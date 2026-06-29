@@ -117,6 +117,17 @@ const safeContent = post?.content ? sanitizeHtml(post.content) : '';
       <ScrollReveal delay={0.3} client:visible>
         <div class="border-t border-stone-200 pt-12 dark:border-stone-700">
           <CommentSection postId={post.id} client:visible />
+      <!-- prev/next navigation -->
+      <nav class="mt-8 grid gap-4 sm:grid-cols-2">
+        <a href="/posts" class="flex items-center gap-2 rounded-lg border border-stone-200 p-4 text-sm text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-900 dark:border-stone-800 dark:text-stone-400 dark:hover:border-stone-700 dark:hover:text-stone-200">
+          <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+          <span class="truncate">返回文章列表</span>
+        </a>
+        <a href="/" class="flex items-center gap-2 justify-end rounded-lg border border-stone-200 p-4 text-sm text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-900 dark:border-stone-800 dark:text-stone-400 dark:hover:border-stone-700 dark:hover:text-stone-200">
+          <span class="truncate">返回首页</span>
+          <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+        </a>
+      </nav>
         </div>
       </ScrollReveal>
     </article>
