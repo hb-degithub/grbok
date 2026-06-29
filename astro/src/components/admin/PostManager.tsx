@@ -38,6 +38,9 @@ export default function PostManager() {
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Post | PostDraft | null>(null);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const draftKey = useMemo(() => 'blog-draft-' + (editing?.id || '__new__'), [editing?.id]);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -54,6 +57,39 @@ export default function PostManager() {
   }, [filter]);
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
+
+  // Auto-save to localStorage when editing
+  useEffect(() => {
+    if (!editing) return;
+    const timer = setTimeout(() => {
+      try { localStorage.setItem(draftKey, JSON.stringify(editing)); } catch {}
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [editing, draftKey]);
+
+  // Beforeunload warning when there are unsaved changes
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
+
+  // Draft recovery on mount
+  useEffect(() => {
+    if (draftRestored || editing) return;
+    const savedNew = localStorage.getItem('blog-draft-__new__');
+    if (savedNew) {
+      try {
+        const parsed = JSON.parse(savedNew);
+        if (parsed.title) {
+          setEditing(parsed);
+          setDraftRestored(true);
+          setDirty(true);
+        }
+      } catch {}
+    }
+  }, [draftRestored, editing]);
 
   const counts = useMemo(() => ({
     all: posts.length,
@@ -91,8 +127,14 @@ export default function PostManager() {
     }
   };
 
-  const savePost = async () => {
+  const savePost = async (skipChecks = false) => {
     if (!editing) return;
+    if (!skipChecks && editing?.status === 'published') {
+      const warnings = qualityChecks(editing);
+      if (warnings.length > 0) {
+        if (!confirm(发布前检查发现以下问题:\n\n\n仍要发布吗？)) return;
+      }
+    }
     setSaving(true);
     const pb = getPocketBase();
     try {
@@ -109,6 +151,8 @@ export default function PostManager() {
       if (editing.id && editing.id.trim()) await pb.collection('posts').update(editing.id, data);
       else await pb.collection('posts').create({ ...data, author: pb.authStore.record?.id });
       setEditing(null);
+      clearSavedDraft();
+      setDirty(false);
       fetchPosts();
     } catch (err) {
       console.error('保存文章失败:', err);
@@ -118,6 +162,21 @@ export default function PostManager() {
     }
   };
 
+
+  const qualityChecks = (post: typeof editing) => {
+    if (!post) return [];
+    const warnings: string[] = [];
+    if (!post.title?.trim()) warnings.push('标题为空');
+    if (!post.slug?.trim()) warnings.push('Slug 为空');
+    if (post.title && post.title.length < 2) warnings.push('标题过短');
+    if (!post.content?.trim()) warnings.push('正文为空');
+    if (post.content && post.content.length < 50) warnings.push('正文过短（建议 50 字以上）');
+    return warnings;
+  };
+
+  const clearSavedDraft = () => {
+    try { localStorage.removeItem(draftKey); } catch {}
+  };
   const startCreate = () => setEditing({ id: '', title: '', slug: '', excerpt: '', content: '', cover: '', status: 'draft' });
 
   return (
@@ -207,7 +266,7 @@ export default function PostManager() {
               <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto md:grid-cols-[minmax(0,1fr)_280px]">
                 <div className="space-y-4">
                   <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">标题</label>
-                    <input type="text" value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value, slug: !editing.id ? e.target.value.toLowerCase().replace(/[^\w\u4e00-\u9fa5\s-]/g, '').replace(/[\s]+/g, '-').substring(0, 100) : editing.slug })} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" /></div>
+                    <input type="text" value={editing.title} onChange={(e) => { setDirty(true); setEditing({ ...editing, title: e.target.value, slug: !editing.id ? e.target.value.toLowerCase().replace(/[^\w\u4e00-\u9fa5\s-]/g, '').replace(/[\s]+/g, '-').substring(0, 100) : editing.slug })} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" /></div>
                   <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">摘要</label>
                     <textarea value={editing.excerpt || ''} onChange={(e) => setEditing({ ...editing, excerpt: e.target.value })} rows={3} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" /></div>
                   <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">正文（HTML）</label>
@@ -215,7 +274,7 @@ export default function PostManager() {
                 </div>
                 <aside className="space-y-4">
                   <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">Slug</label>
-                    <input type="text" value={editing.slug} onChange={(e) => setEditing({ ...editing, slug: e.target.value })} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-accent focus:bg-white" /></div>
+                    <input type="text" value={editing.slug} onChange={(e) => { setDirty(true); setEditing({ ...editing, slug: e.target.value }); }} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-accent focus:bg-white" /></div>
                   <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">状态</label>
                     <select value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value as Post['status'] })} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white">
                       <option value="draft">草稿</option><option value="published">已发布</option><option value="archived">已归档</option>
