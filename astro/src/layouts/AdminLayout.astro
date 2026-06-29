@@ -10,7 +10,7 @@ interface Props {
   requiredRole?: AdminRole;
 }
 
-const { title, description = '鍗氬鍚庡彴绠＄悊闈㈡澘', requiredRole = 'author' } = Astro.props;
+const { title, description = '博客后台管理面板', requiredRole = 'author' } = Astro.props;
 
 const requiredRoleLabel: Record<AdminRole, string> = {
   reader: '普通用户',
