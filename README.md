@@ -1,29 +1,46 @@
-# 涓汉鍗氬绯荤粺
+# 胡巴的博客
 
-鍩轰簬 Astro + PocketBase 鐨勮嚜鎵樼涓汉鍗氬绯荤粺銆?
-## 馃彈锔?鎶€鏈爤
+基于 Astro + PocketBase 的个人博客系统。
 
-- **鍓嶇 SSG**: Astro (Content Layer API)
-- **鍚庣 BaaS**: PocketBase (SQLite + Auth + API)
-- **Web Server**: Caddy (鑷姩 HTTPS + 鍙嶅悜浠ｇ悊)
-- **閭欢涓户**: msmtp + 闃块噷浜戦偖浠舵帹閫?- **閮ㄧ讲鏂瑰紡**: Docker Compose 缁熶竴缂栨帓
+## 技术栈
 
-## 馃搧 椤圭洰缁撴瀯
+- **前端框架**: Astro (SSG + React islands)
+- **后端/数据**: PocketBase (SQLite + Auth + API)
+- **Web 服务器**: Caddy (HTTPS + 反向代理)
+- **邮件通知**: msmtp
+- **安全部署**: Docker Compose
+
+## 目录结构
 
 ```
-涓汉鍗氬/
-鈹溾攢鈹€ docker-compose.local.yml    # 鏈湴娴嬭瘯 Docker 閰嶇疆
-鈹溾攢鈹€ Caddyfile.local             # 鏈湴娴嬭瘯 Caddy 閰嶇疆
-鈹溾攢鈹€ .env.local                  # PocketBase/Caddy 鐜鍙橀噺
-鈹溾攢鈹€ .env.astro                  # Astro 鐜鍙橀噺
-鈹溾攢鈹€ start-local.sh              # 鍚姩鑴氭湰 (Linux/macOS)
-鈹溾攢鈹€ start-local.bat             # 鍚姩鑴氭湰 (Windows)
-鈹溾攢鈹€ pb_hooks/                   # PocketBase Hooks
-鈹溾攢鈹€ docs/                       # 鏂囨。
-鈹斺攢鈹€ astro/                      # Astro 椤圭洰 (Phase 2)
+个人博客/
+├── docker-compose.yml       # 生产环境 Docker 配置
+├── docker-compose.local.yml # 本地开发 Docker 配置
+├── Caddyfile                # 生产 Caddy 配置
+├── Caddyfile.local          # 本地 Caddy 配置
+├── .env.local               # PocketBase/Caddy 环境变量
+├── .env.astro               # Astro 环境变量
+├── start-local.sh           # 本地启动脚本 (Linux/macOS)
+├── start-local.bat          # 本地启动脚本 (Windows)
+├── astro/                   # Astro 前端项目
+│   ├── src/                 # 源代码
+│   │   ├── components/      # React 组件 (admin, auth, comments, effects, layout, posts, search, sidebar, ui)
+│   │   ├── layouts/         # 布局 (BaseLayout, AdminLayout, AuthLayout, PostLayout)
+│   │   ├── hooks/           # 自定义 hooks (认证、设置、评论)
+│   │   ├── lib/             # 工具库 (安全清理、PocketBase 客户端)
+│   │   ├── pages/           # 页面路由
+│   │   ├── styles/          # 全局样式
+│   │   ├── types/           # 类型定义
+│   │   └── config/          # 站点配置
+│   └── package.json
+├── pb_hooks/                # PocketBase Hooks
+├── pb_migrations/           # PocketBase 迁移脚本
+├── docs/                    # 文档
+└── scripts/                 # 运维脚本
 ```
 
-## 馃殌 蹇€熷紑濮?
+## 本地开发
+
 ```bash
 # Windows
 start-local.bat
@@ -31,45 +48,50 @@ start-local.bat
 # Linux/macOS
 chmod +x start-local.sh && ./start-local.sh
 
-# 鎴栨墜鍔ㄥ惎鍔?docker compose -f docker-compose.local.yml --env-file .env.local up -d
+# 手动控制 Docker
+docker compose -f docker-compose.local.yml --env-file .env.local up -d
 ```
 
-璁块棶 http://localhost:80/_/admin 鍒涘缓绠＄悊鍛樿处鎴?
-## 馃摎 鏂囨。
+后台地址: http://localhost:8090/_/admin
 
-- [PocketBase 鏁版嵁妯″瀷璁捐](docs/pocketbase-schema.md)
-- [PocketBase 瀹夊叏瑙勫垯杩佺Щ](docs/apply_security_rules.pb.js) 鈥?棣栨閮ㄧ讲澶嶅埗鍒?`pb_migrations/`
-- [OpenResty 鐧诲綍鎺ュ彛闄愭祦](docs/openresty-login-rate-limit.conf) 鈥?鐢熶骇鍏綉鍏ュ彛鍚敤
-- [Phase 1 楠岃瘉娓呭崟](PHASE1_VERIFICATION.md)
+## 功能特性
 
-## 馃敀 瀹夊叏鍔犲浐
+### 前台
+- 文章列表、详情、归档
+- 标签云与标签筛选
+- 全文搜索 (Pagefind)
+- 响应式布局（桌面端 + 移动端适配）
+- 深色/浅色主题
+- 评论系统（需审核）
+- RSS / Sitemap
 
-鏈」鐩凡鍐呯疆澶氬眰瀹夊叏闃叉姢:
+### 后台
+- 仪表盘
+- 文章管理（编辑、发布、草稿、归档、批量操作）
+- 评论审核（待审、已通过、垃圾、批量操作）
+- 标签管理
+- 用户管理（角色权限分层）
+- 站点设置
+- 安全中心
+- 操作日志
 
-| 灞傜骇 | 闃叉姢 |
-|------|------|
-| **Caddy** | HSTS / CSP / X-Frame-Options 绛夊畨鍏ㄥご銆佺洰褰曟壂鎻忚矾寰?403銆丄dmin UI IP 鐧藉悕鍗曪紱鏍囧噯 `caddy:2.8.4-alpine` 涓嶅啓 `rate_limit` |
-| **OpenResty/1Panel** | 鍏綉鍏ュ彛闄愬埗 `/api/collections/users/auth-with-password`銆乣/api/admins/auth-with-password`銆佺敤鎴?OTP 璇锋眰/鏍￠獙鎺ュ彛 |
-| **PocketBase Hooks** | `login_security.pb.js` 淇濇寔绂佺敤锛岄伩鍏嶇櫥褰?400锛涜瘎璁烘湇鍔＄楠岃瘉 + IP 璁板綍銆佽瘎璁洪偖浠堕€氱煡 |
-| **鍓嶇** | 鐧诲綍娴忚鍣ㄦ寚绾广€佸鎴风 RateLimiter銆丄dminGuard 鏈嶅姟绔?token 鏍￠獙銆佽瘎璁哄瓧娈电櫧鍚嶅崟 (鎺掗櫎 email/IP) |
-| **閮ㄧ讲** | `./security-check.sh` 閮ㄧ讲鍓嶆牎楠屽瘑閽?IP/鍩熷悕閰嶇疆 |
+### 安全
+- Caddy 安全头（HSTS、CSP、X-Frame-Options）
+- 后台管理端 IP 白名单
+- 登录限流（OpenResty）
+- 评论 XSS 清理
+- 角色权限保护（PocketBase rules + hooks）
+- 敏感扫描路径拦截
+- 危险操作二次确认
 
-### 鐢熶骇閮ㄧ讲姝ラ
+## 文档
 
-```bash
-# 1. 鐢熸垚鍔犲瘑瀵嗛挜
-openssl rand -hex 32
+- [补全路线图](/docs/blog-completion-roadmap.md) — 项目开发计划
+- [移动端适配方案](/docs/mobile-adaptation-plan.md) — 移动端适配策略
+- [PocketBase 数据结构](/docs/pocketbase-schema.md) — 数据库表结构
+- [安全配置](/docs/pocketbase-security-rules.json) — PocketBase 安全规则
+- [迁移验证](/docs/migration-validation.md) — 数据库迁移验证
 
-# 2. 閰嶇疆 .env (澶嶅埗 .env.example 濉叆鐪熷疄鍊?
-cp .env.example .env
+## 许可
 
-# 3. 搴旂敤 PocketBase 瀹夊叏瑙勫垯
-cp docs/apply_security_rules.pb.js pb_migrations/
-
-# 4. 鍦ㄥ叕缃?OpenResty/1Panel 绔欑偣鍚敤鐧诲綍鎺ュ彛闄愭祦
-# 灏?docs/openresty-login-rate-limit.conf 鐨?limit_req_zone 鏀惧叆 http{}锛?# location 鏀惧叆绔欑偣 server{}锛屽苟鏀惧湪閫氱敤 proxy location 涔嬪墠銆?
-# 5. 閮ㄧ讲鍓嶅畨鍏ㄦ牎楠?./security-check.sh
-
-# 6. 鍚姩
-docker compose up -d
-```
+私有项目
