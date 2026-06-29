@@ -4,6 +4,7 @@ import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer.astro';
 import SearchModal from '../components/search/SearchModal';
 import DebugProtection from '../components/effects/DebugProtection';
+import ToastContainer from '../components/ui/Toast';
 import { SITE_CONFIG } from '../config/site';
 
 interface Props {
@@ -124,7 +125,8 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
     {showChrome && <Footer />}
     <DebugProtection client:load />
-  </body>
+  <ToastContainer client:load />
+</body>
 </html>
 
 <style>
