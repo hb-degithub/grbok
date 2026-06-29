@@ -132,7 +132,7 @@ export default function PostManager() {
     if (!skipChecks && editing?.status === 'published') {
       const warnings = qualityChecks(editing);
       if (warnings.length > 0) {
-        if (!confirm(发布前检查发现以下问题:\n\n\n仍要发布吗？)) return;
+        if (!confirm('发布前检查发现问题，仍要发布吗？')) return;
       }
     }
     setSaving(true);
@@ -266,7 +266,7 @@ export default function PostManager() {
               <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto md:grid-cols-[minmax(0,1fr)_280px]">
                 <div className="space-y-4">
                   <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">标题</label>
-                    <input type="text" value={editing.title} onChange={(e) => { setDirty(true); setEditing({ ...editing, title: e.target.value, slug: !editing.id ? e.target.value.toLowerCase().replace(/[^\w\u4e00-\u9fa5\s-]/g, '').replace(/[\s]+/g, '-').substring(0, 100) : editing.slug })} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" /></div>
+                    <input type="text" value={editing.title} onChange={(e) => { setDirty(true); setEditing({ ...editing, title: e.target.value, slug: !editing.id ? e.target.value.toLowerCase().replace(/[^\w\u4e00-\u9fa5\s-]/g, '').replace(/[\s]+/g, '-').substring(0, 100) : editing.slug })}} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" /></div>
                   <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">摘要</label>
                     <textarea value={editing.excerpt || ''} onChange={(e) => setEditing({ ...editing, excerpt: e.target.value })} rows={3} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" /></div>
                   <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">正文（HTML）</label>

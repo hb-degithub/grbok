@@ -134,7 +134,7 @@ export default function CommentModerator() {
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_120px]">
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="flex items-center gap-2"><input type="checkbox" checked={selectedIds.includes(comment.id)} onChange={() => toggleSelect(comment.id)} className="h-4 w-4 rounded border-border accent-accent" /> <span className="break-words text-sm font-semibold text-text [overflow-wrap:anywhere]">{comment.author_name}</span>
+                    <span className="flex items-center gap-2"><input type="checkbox" checked={selectedIds.includes(comment.id)} onChange={() => toggleSelect(comment.id)} className="h-4 w-4 rounded border-border accent-accent" /> <span className="break-words text-sm font-semibold text-text [overflow-wrap:anywhere]">{comment.author_name}</span></span>
                     <span className="break-all font-mono text-[10px] text-muted">{comment.author_email}</span>
                     <span className={'rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase ' + (statusColors[comment.status] || '')}>{statusLabels[comment.status] || comment.status}</span>
                             {riskHints(comment).map(hint => <span key={hint} className="rounded-md border border-warning/25 bg-warning/10 px-2 py-0.5 font-mono text-[10px] text-warning ml-1">{hint}</span>)}
