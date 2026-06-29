@@ -75,6 +75,15 @@ export default function AdminDashboard() {
     fetchStats();
   }, [role, canReadUsers]);
 
+  const [recentPosts, setRecentPosts] = useState<{id:string;title:string;status:string;updated:string}[]>([]);
+  const [recentComments, setRecentComments] = useState<{id:string;author_name:string;content:string;status:string;created:string}[]>([]);
+
+  useEffect(() => {
+    const pb = getPocketBase();
+    pb.collection("posts").getList(1, 5, { sort: "-updated", fields: "id,title,status,updated" }).then(r => setRecentPosts(r.items)).catch(() => {});
+    pb.collection("comments").getList(1, 5, { sort: "-created", fields: "id,author_name,content,status,created" }).then(r => setRecentComments(r.items)).catch(() => {});
+  }, []);
+
   const publishRate = stats && stats.totalPosts > 0 ? Math.round((stats.publishedPosts / stats.totalPosts) * 100) : 0;
   const reviewRate = stats && stats.totalComments > 0 ? Math.round(((stats.totalComments - stats.pendingComments) / stats.totalComments) * 100) : 100;
   const currentTime = new Date().toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', month: '2-digit', day: '2-digit' });
@@ -186,6 +195,43 @@ export default function AdminDashboard() {
           </div>
         </section>
       </div>
+
+      {/* Recent Activity */}
+      <section className="grid gap-4 lg:grid-cols-2">
+        <div className="card rounded-md p-4 shadow-xs">
+          <h3 className="mb-3 text-sm font-black text-text">最近文章</h3>
+          {recentPosts.length === 0 ? (
+            <p className="text-xs text-text-secondary">暂无文章</p>
+          ) : (
+            <div className="divide-y divide-border">
+              {recentPosts.map(post => (
+                <div key={post.id} className="flex items-center justify-between gap-3 py-2.5">
+                  <div className="min-w-0 flex-1 truncate text-sm font-medium text-text">{post.title}</div>
+                  <span className={'shrink-0 rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase ' + (post.status === 'published' ? 'border-success/25 bg-success/10 text-success' : post.status === 'draft' ? 'border-warning/25 bg-warning/10 text-warning' : 'border-border bg-bg-soft text-text-secondary')}>{post.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="card rounded-md p-4 shadow-xs">
+          <h3 className="mb-3 text-sm font-black text-text">最近评论</h3>
+          {recentComments.length === 0 ? (
+            <p className="text-xs text-text-secondary">暂无评论</p>
+          ) : (
+            <div className="divide-y divide-border">
+              {recentComments.map(c => (
+                <div key={c.id} className="py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-xs font-semibold text-text">{c.author_name}</span>
+                    <span className={'shrink-0 rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase ' + (c.status === 'approved' ? 'border-success/25 bg-success/10 text-success' : c.status === 'pending' ? 'border-warning/25 bg-warning/10 text-warning' : 'border-border bg-bg-soft text-text-secondary')}>{c.status}</span>
+                  </div>
+                  <p className="mt-1 truncate text-xs text-text-secondary">{c.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
     </motion.div>
   );
 }
