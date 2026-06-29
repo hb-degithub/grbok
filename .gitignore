@@ -11,12 +11,13 @@
 
 # Docker 数据卷（运行时生成）
 pb_data/
-pb_migrations/
+
 # pb_hooks 需要提交（包含自定义 hooks 代码）
 
 # IDE
 .vscode/
 .idea/
+.claude/settings.local.json
 *.swp
 *.swo
 
@@ -42,12 +43,12 @@ backups/
 tmp/
 temp/
 
-# Temporary debug files
-*.js
-*.bat
-*.vbs
-*.png
-*.jpg
-*.err
-*.log
+# 临时调试文件 (仅根目录, 不影响 pb_hooks/*.pb.js 和 src 下的 js)
+/*.js
+/*.bat
+/*.vbs
+/*.png
+/*.jpg
+/*.err
+/*.log
 

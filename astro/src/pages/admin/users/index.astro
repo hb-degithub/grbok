@@ -1,8 +1,8 @@
----
+﻿---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import UserManager from '../../../components/admin/UserManager';
 ---
 
-<AdminLayout title="Users" requiredRole="admin">
+<AdminLayout title="用户管理" requiredRole="super_admin">
   <UserManager client:only="react" />
 </AdminLayout>

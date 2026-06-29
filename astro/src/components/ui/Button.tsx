@@ -20,13 +20,13 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
  */
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-indigo-600 text-white shadow-sm shadow-indigo-500/30 hover:bg-indigo-700 active:bg-indigo-800 dark:bg-indigo-500 dark:hover:bg-indigo-600',
+    'bg-stone-700 text-white shadow-sm shadow-stone-700/30 hover:bg-stone-800 active:bg-stone-900 dark:bg-stone-600 dark:hover:bg-stone-700',
   secondary:
-    'bg-zinc-100 text-zinc-900 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700',
+    'bg-stone-100 text-stone-900 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-100 dark:hover:bg-stone-700',
   ghost:
-    'bg-transparent text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800',
+    'bg-transparent text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800',
   outline:
-    'border border-zinc-300 bg-transparent text-zinc-700 hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-800/50',
+    'border border-stone-300 bg-transparent text-stone-700 hover:border-stone-400 hover:bg-stone-50 dark:border-stone-600 dark:text-stone-300 dark:hover:border-stone-500 dark:hover:bg-stone-800/50',
 };
 
 /**
@@ -34,8 +34,8 @@ const variantStyles: Record<ButtonVariant, string> = {
  */
 const sizeStyles: Record<ButtonSize, string> = {
   sm: 'px-3 py-1.5 text-sm',
-  md: 'px-4 py-2 text-base',
-  lg: 'px-6 py-3 text-lg',
+  md: 'px-4 py-2 text-sm sm:text-base',
+  lg: 'px-4 py-2.5 text-base sm:px-6 sm:py-3 sm:text-lg',
 };
 
 /**
@@ -62,9 +62,10 @@ export default function Button({
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
       className={cn(
         // 基础样式
-        'inline-flex items-center justify-center rounded-xl font-medium',
+        'inline-flex min-h-[40px] min-w-[40px] max-w-full items-center justify-center rounded-xl font-medium',
+        'whitespace-normal break-words text-center leading-snug',
         'transition-colors duration-200 ease-out',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-900',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-stone-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-stone-900',
         'disabled:cursor-not-allowed disabled:opacity-50',
         // 变体样式
         variantStyles[variant],

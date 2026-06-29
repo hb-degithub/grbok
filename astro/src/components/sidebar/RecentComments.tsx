@@ -10,7 +10,7 @@ export default function RecentComments() {
   useEffect(() => {
     const pb = getPocketBase();
     pb.collection('comments')
-      .getList<Comment>(1, 5, { filter: 'status = "approved"', sort: '-created', fields: 'id,author_name,content,post_id,created' })
+      .getList<Comment>(1, 5, { filter: pb.filter('status = {:status}', { status: 'approved' }), sort: '-created', fields: 'id,author_name,content,post_id,created' })
       .then((res) => setComments(res.items))
       .catch((err) => console.error('加载评论失败:', err))
       .finally(() => setLoading(false));

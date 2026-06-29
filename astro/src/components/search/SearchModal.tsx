@@ -29,14 +29,17 @@ export default function SearchModal() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isPagefindLoaded, setIsPagefindLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const previousActiveElement = useRef<HTMLElement | null>(null);
 
   /** 动态加载 Pagefind */
   useEffect(() => {
     const loadPagefind = async () => {
       try {
+        setLoadError(false);
         if ((window as any).pagefind) {
           setIsPagefindLoaded(true);
           return;
@@ -48,9 +51,14 @@ export default function SearchModal() {
           (window as any).pagefind?.init();
           setIsPagefindLoaded(true);
         };
+        script.onerror = () => {
+          setLoadError(true);
+          setIsPagefindLoaded(false);
+        };
         document.body.appendChild(script);
       } catch (err) {
         console.error('Pagefind 加载失败:', err);
+        setLoadError(true);
       }
     };
     loadPagefind();
@@ -58,6 +66,7 @@ export default function SearchModal() {
 
   /** 全局快捷键：Ctrl/Cmd+K 唤起，Esc 关闭 */
   useEffect(() => {
+    const openSearch = () => setIsOpen(true);
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
@@ -65,21 +74,35 @@ export default function SearchModal() {
       }
       if (e.key === 'Escape') setIsOpen(false);
     };
+    window.addEventListener('blog-search-open', openSearch);
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('blog-search-open', openSearch);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
-  /** 打开时聚焦输入框 */
+  /** 打开时聚焦输入框，并在窄屏锁定页面滚动 */
   useEffect(() => {
     if (isOpen) {
+      previousActiveElement.current = document.activeElement as HTMLElement | null;
+      const originalOverflow = document.body.style.overflow;
+      const originalPaddingRight = document.body.style.paddingRight;
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = 'hidden';
+      if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
       const timer = setTimeout(() => inputRef.current?.focus(), 100);
-      return () => clearTimeout(timer);
-    } else {
-      // 关闭时重置状态
-      setQuery('');
-      setResults([]);
-      setSelectedIndex(0);
+      return () => {
+        clearTimeout(timer);
+        document.body.style.overflow = originalOverflow;
+        document.body.style.paddingRight = originalPaddingRight;
+      };
     }
+
+    setQuery('');
+    setResults([]);
+    setSelectedIndex(0);
+    previousActiveElement.current?.focus({ preventScroll: true });
   }, [isOpen]);
 
   /** 防抖搜索 */
@@ -165,26 +188,11 @@ export default function SearchModal() {
 
   return (
     <>
-      {/* ==================== 搜索触发按钮 ==================== */}
-      <button
-        onClick={() => setIsOpen(true)}
-        aria-label="搜索文章（快捷键 Ctrl 或 Command 加 K）"
-        className="focus-ring glass-dark flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-zinc-500 transition-colors hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-      >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-        <span className="hidden sm:inline">搜索...</span>
-        <kbd className="hidden rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-xs font-semibold text-zinc-400 sm:inline">
-          ⌘K
-        </kbd>
-      </button>
-
       {/* ==================== 搜索弹窗 ==================== */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]"
+            className="fixed inset-0 z-50 flex items-stretch justify-center overflow-hidden p-0 sm:items-start sm:px-4 sm:py-6 md:pt-[12vh]"
             initial="hidden"
             animate="visible"
             exit="hidden"
@@ -203,12 +211,12 @@ export default function SearchModal() {
               role="dialog"
               aria-modal="true"
               aria-label="搜索文章"
-              className="glass-strong relative z-10 mx-4 w-full max-w-2xl overflow-hidden rounded-2xl"
+              className="glass-strong relative z-10 flex h-[var(--vvh,100dvh)] max-h-[var(--vvh,100dvh)] w-full max-w-full flex-col overflow-hidden rounded-none sm:h-auto sm:max-h-[min(80vh,42rem)] sm:max-w-2xl sm:rounded-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* 搜索输入框 */}
-              <div className="flex items-center border-b border-zinc-200/60 px-4 dark:border-zinc-700/50">
-                <svg className="h-5 w-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <div className="flex min-h-[56px] shrink-0 items-center border-b border-stone-200/60 px-3 py-2 pt-[max(env(safe-area-inset-top),0.5rem)] dark:border-stone-700/50 sm:px-4 sm:pt-2">
+                <svg className="h-5 w-5 shrink-0 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
@@ -224,37 +232,43 @@ export default function SearchModal() {
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="搜索文章..."
-                  className="flex-1 bg-transparent px-4 py-4 text-zinc-900 placeholder-zinc-400 outline-none dark:text-zinc-100"
+                  className="min-w-0 flex-1 bg-transparent px-2 py-3 text-[16px] leading-snug text-stone-900 placeholder-stone-400 outline-none dark:text-stone-100 sm:px-4 sm:text-base"
                 />
                 {isLoading && (
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                    className="h-5 w-5 rounded-full border-2 border-zinc-300 border-t-indigo-500"
+                    className="h-5 w-5 shrink-0 rounded-full border-2 border-stone-300 border-t-stone-500"
                     aria-hidden="true"
                   />
                 )}
                 <button
                   onClick={() => setIsOpen(false)}
                   aria-label="关闭搜索"
-                  className="focus-ring ml-2 rounded-md px-2 py-1 text-xs text-zinc-500 transition-colors hover:bg-white/50 hover:text-zinc-700 dark:hover:bg-white/5 dark:hover:text-zinc-300"
+                  className="focus-ring ml-1 inline-flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] shrink-0 items-center justify-center rounded-lg text-stone-500 transition-colors hover:bg-white/50 hover:text-stone-700 dark:hover:bg-white/5 dark:hover:text-stone-300 sm:w-auto sm:px-2 sm:py-1 sm:text-xs"
                 >
-                  ESC
+                  <span className="hidden sm:inline">ESC</span>
+                  <svg className="h-5 w-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18 18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
 
               {/* 搜索结果 - listbox 模式 */}
-              <div ref={resultsRef} id={LISTBOX_ID} role="listbox" aria-label="搜索结果" className="max-h-[60vh] overflow-y-auto p-2">
+              <div ref={resultsRef} id={LISTBOX_ID} role="listbox" aria-label="搜索结果" className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:max-h-[60vh] sm:pb-2">
                 {/* 状态播报 - 对屏幕阅读器可见 */}
                 <div className="sr-only" aria-live="polite">
-                  {isLoading ? '正在搜索' : query && results.length === 0 ? '未找到相关结果' : results.length > 0 ? `找到 ${results.length} 条结果` : ''}
+                  {loadError ? '搜索索引暂时不可用' : isLoading ? '正在搜索' : query && results.length === 0 ? '未找到相关结果' : results.length > 0 ? `找到 ${results.length} 条结果` : ''}
                 </div>
 
-                {results.length === 0 && query && !isLoading && (
-                  <div className="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">未找到相关结果</div>
+                {loadError && (
+                  <div className="break-words px-4 py-8 text-center text-sm leading-snug text-stone-500 dark:text-stone-400">搜索索引暂时不可用，请稍后再试</div>
                 )}
-                {results.length === 0 && !query && (
-                  <div className="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">输入关键词开始搜索</div>
+                {!loadError && results.length === 0 && query && !isLoading && (
+                  <div className="break-words px-4 py-8 text-center text-sm leading-snug text-stone-500 dark:text-stone-400">未找到相关结果</div>
+                )}
+                {!loadError && results.length === 0 && !query && (
+                  <div className="break-words px-4 py-8 text-center text-sm leading-snug text-stone-500 dark:text-stone-400">输入关键词开始搜索</div>
                 )}
 
                 <motion.div variants={listVariants} initial="hidden" animate="visible">
@@ -268,26 +282,26 @@ export default function SearchModal() {
                       href={result.url}
                       onClick={() => setIsOpen(false)}
                       className={cn(
-                        'focus-ring flex flex-col gap-1 rounded-lg px-4 py-3 transition-colors',
+                        'focus-ring flex min-h-[44px] flex-col gap-1 rounded-lg px-3 py-3 transition-colors sm:px-4',
                         index === selectedIndex
-                          ? 'bg-indigo-50 dark:bg-indigo-950/40'
+                          ? 'bg-stone-100 dark:bg-stone-800/60'
                           : 'hover:bg-white/50 dark:hover:bg-white/5'
                       )}
                     >
-                      <div className="font-medium text-zinc-900 dark:text-white">{result.title || '无标题'}</div>
+                      <div className="break-words font-medium leading-snug text-stone-900 dark:text-white">{result.title || '无标题'}</div>
                       <div
-                        className="line-clamp-2 text-sm text-zinc-500 dark:text-zinc-400"
+                        className="line-clamp-2 break-words text-sm leading-snug text-stone-500 [overflow-wrap:anywhere] dark:text-stone-400"
                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(result.excerpt) }}
                       />
-                      <div className="text-xs text-zinc-400">{result.url}</div>
+                      <div className="break-all text-xs leading-snug text-stone-400">{result.url}</div>
                     </motion.a>
                   ))}
                 </motion.div>
               </div>
 
               {/* 底部提示 */}
-              <div className="border-t border-zinc-200/60 px-4 py-3 text-xs text-zinc-500 dark:border-zinc-700/50 dark:text-zinc-400">
-                <div className="flex items-center gap-4">
+              <div className="hidden border-t border-stone-200/60 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-xs text-stone-500 dark:border-stone-700/50 dark:text-stone-400 sm:flex sm:items-center sm:pb-3">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <span>↑↓ 导航</span>
                   <span>↵ 选择</span>
                   <span>ESC 关闭</span>

@@ -2,29 +2,56 @@
 import BaseLayout from './BaseLayout.astro';
 import AdminSidebar from '../components/admin/AdminSidebar';
 import AdminGuard from '../components/admin/AdminGuard';
+import type { AdminRole } from '../hooks/useAdminAuth';
 
 interface Props {
   title: string;
   description?: string;
-  requiredRole?: 'admin' | 'author';
+  requiredRole?: AdminRole;
 }
 
-const { title, description = 'Blog admin panel', requiredRole = 'author' } = Astro.props;
+const { title, description = '鍗氬鍚庡彴绠＄悊闈㈡澘', requiredRole = 'author' } = Astro.props;
+
+const requiredRoleLabel: Record<AdminRole, string> = {
+  reader: '普通用户',
+  author: '作者',
+  admin: '管理员',
+  super_admin: '超级管理员',
+};
 ---
 
-<BaseLayout title={title + ' - Admin'} description={description} showChrome={false}>
+<BaseLayout title={title + ' - 鍚庡彴'} description={description} showChrome={false} noindex>
   <AdminGuard client:only="react" requiredRole={requiredRole}>
-    <div class="flex min-h-screen bg-bg">
-      <AdminSidebar client:only="react" />
-      <main class="ml-60 min-h-screen flex-1 p-8">
-        <div class="mx-auto max-w-6xl">
-          <div class="mb-8">
-            <div class="mb-2 flex items-center gap-2">
-              <span class="h-px w-8 bg-accent"></span>
-              <span class="font-mono text-[10px] uppercase tracking-widest text-accent">Admin</span>
+    <div class="admin-shell min-h-screen bg-[#f6f6f3] text-text">
+     <AdminSidebar client:only="react" />
+     <main
+        class="min-h-screen flex-1 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-16 transition-[margin] duration-300 ease-out sm:px-5 lg:ml-[var(--admin-sidebar-width,15.5rem)] lg:px-6 lg:pt-4"
+     >
+       <div class="mx-auto w-full max-w-[1440px]">
+          <header class="admin-topbar sticky top-0 z-30 -mx-4 mb-5 border-b border-border/80 bg-[#f6f6f3]/92 px-4 py-3 pl-16 backdrop-blur-xl sm:-mx-5 sm:px-5 sm:pl-16 lg:-mx-6 lg:px-6">
+            <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div class="min-w-0">
+                <div class="mb-1 flex items-center gap-2 text-[11px]">
+                  <span class="h-2 w-2 rounded-full bg-success shadow-[0_0_0_4px_rgba(16,185,129,0.12)]"></span>
+                  <span class="font-mono uppercase text-muted">杩愯惀鎺у埗鍙?/span>
+                  <span class="text-muted">/</span>
+                  <span class="truncate font-mono uppercase text-text-secondary">{title}</span>
+                </div>
+                <h1 class="break-words text-xl font-black leading-tight text-text sm:text-2xl">{title}</h1>
+              </div>
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="min-h-9 rounded-md border border-border bg-white px-3 py-1.5 font-mono text-text-secondary shadow-xs">
+                  鏉冮檺: {requiredRoleLabel[requiredRole]}
+                </span>
+                <a
+                  href="/"
+                  class="inline-flex min-h-9 items-center rounded-md border border-border bg-white px-3 py-1.5 font-mono text-text-secondary shadow-xs transition-colors hover:border-border-hover hover:text-text"
+                >
+                  鏌ョ湅绔欑偣
+                </a>
+              </div>
             </div>
-            <h1 class="font-display text-2xl font-black uppercase tracking-wide text-text">{title}</h1>
-          </div>
+          </header>
           <slot />
         </div>
       </main>

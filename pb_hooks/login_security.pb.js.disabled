@@ -1,0 +1,104 @@
+const CONFIG = {
+  MAX_ATTEMPTS: 12,
+  WINDOW_MINUTES: 15,
+};
+
+const ipMap = new Map();
+const fpMap = new Map();
+
+function nowMs() {
+  return Date.now();
+}
+
+function getHeader(e, name) {
+  try {
+    return e.httpContext?.request()?.header?.get(name) || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function getClientIP(e) {
+  const forwarded = getHeader(e, 'X-Forwarded-For');
+  if (forwarded) return forwarded.split(',')[0].trim();
+  const real = getHeader(e, 'X-Real-IP');
+  if (real) return real.trim();
+  try {
+    return e.httpContext?.realIP?.() || 'unknown';
+  } catch (_) {
+    return 'unknown';
+  }
+}
+
+function getFingerprint(e) {
+  return getHeader(e, 'X-Browser-Fingerprint') || getHeader(e, 'X-Device-Fingerprint') || '';
+}
+
+function getEntry(map, key) {
+  const ts = nowMs();
+  let entry = map.get(key);
+  if (!entry) {
+    entry = { count: 0, first: ts, last: ts };
+    map.set(key, entry);
+  }
+  if (ts - entry.first > CONFIG.WINDOW_MINUTES * 60000) {
+    entry.count = 0;
+    entry.first = ts;
+  }
+  entry.last = ts;
+  return entry;
+}
+
+function touchAttempt(e) {
+  const ip = getClientIP(e);
+  const fp = getFingerprint(e);
+  const ipEntry = getEntry(ipMap, ip);
+  ipEntry.count += 1;
+
+  if (fp) {
+    const fpEntry = getEntry(fpMap, fp);
+    fpEntry.count += 1;
+    if (fpEntry.count > CONFIG.MAX_ATTEMPTS) {
+      console.log('[login-guard] high fingerprint attempts', fp.slice(0, 12));
+    }
+  }
+
+  if (ipEntry.count > CONFIG.MAX_ATTEMPTS) {
+    console.log('[login-guard] high ip attempts', ip);
+  }
+}
+
+function clearAttempt(e) {
+  const ip = getClientIP(e);
+  const fp = getFingerprint(e);
+  const ipEntry = getEntry(ipMap, ip);
+  ipEntry.count = 0;
+  if (fp) {
+    const fpEntry = getEntry(fpMap, fp);
+    fpEntry.count = 0;
+  }
+}
+
+function next(e) {
+  if (typeof e.next === 'function') e.next();
+}
+
+onRecordBeforeAuthWithPasswordRequest((e) => {
+  touchAttempt(e);
+  next(e);
+}, 'users');
+
+onRecordAfterAuthWithPasswordRequest((e) => {
+  clearAttempt(e);
+  next(e);
+}, 'users');
+
+onAdminBeforeAuthWithPasswordRequest((e) => {
+  touchAttempt(e);
+  next(e);
+});
+
+onAdminAfterAuthWithPasswordRequest((e) => {
+  clearAttempt(e);
+  next(e);
+});

@@ -1,0 +1,7 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /login/
+Disallow: /api/
+Disallow: /_/
+
+Sitemap: https://hlydwz.com/sitemap-index.xml

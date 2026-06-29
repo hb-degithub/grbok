@@ -1283,3 +1283,13 @@ docker compose logs --tail=100 pocketbase
 - 新增或调整路由时同步更新第 12.2 节页面清单。
 - 新增后台组件时同步更新第 6 章后台适配方案和自动化 smoke test。
 - 若新增 Playwright，需在 `astro/package.json` 增加固定脚本，例如 `test:mobile`，并在文档只引用该脚本，避免多人使用不同命令。
+
+### 自动化检测落地记录
+
+- 日期：2026-06-28
+- 落地内容：新增 `astro/scripts/mobile-viewport-check.mjs`，并在 `astro/package.json` 增加 `check:mobile` 本地命令。
+- 覆盖范围：`/`、`/posts`、`/login`、`/tags`，视口为 `320x568`、`360x740`、`390x844`、`430x932`、`768x1024`、`844x390`。
+- 检测规则：脚本读取 `document.documentElement.scrollWidth` 与 `document.body.scrollWidth` 的最大值，判断是否超过当前 `window.innerWidth`，并输出包含路由、视口、HTTP 状态、scrollWidth、viewport、溢出像素和疑似元素选择器的报告。
+- 使用方式：先启动本地 dev 或 preview 服务，再在 `astro` 目录运行 `npm run check:mobile -- --base-url http://127.0.0.1:4321`。
+- 依赖边界：当前项目未声明 Playwright；脚本不会自动下载依赖，缺少 `playwright` 或 `@playwright/test` 时只输出缺依赖提示并退出。
+- 本次轻量验证：已执行脚本语法检查；实际多视口浏览器验证需在补充 Playwright 并启动 dev/preview 服务后运行。

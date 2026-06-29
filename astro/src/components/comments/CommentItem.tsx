@@ -15,6 +15,8 @@ interface CommentItemProps {
   onSubmitReply: (data: CommentFormData) => Promise<boolean>;
   /** 是否为新评论（用于高亮效果） */
   isNew?: boolean;
+  /** 是否启用人工审核 */
+  moderationEnabled?: boolean;
 }
 
 /**
@@ -31,6 +33,7 @@ export default function CommentItem({
   maxDepth = 3,
   onSubmitReply,
   isNew = false,
+  moderationEnabled = true,
 }: CommentItemProps) {
   const [isReplyOpen, setIsReplyOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -64,16 +67,16 @@ export default function CommentItem({
   const getAvatarLetter = (name: string) => name.charAt(0).toUpperCase();
 
   /** 头像配色 - indigo/violet 系，与整体玻璃风格协调 */
-  const getAvatarColor = (email: string) => {
+  const getAvatarColor = (seed: string) => {
     const colors = [
-      'bg-indigo-500',
-      'bg-violet-500',
-      'bg-sky-500',
-      'bg-fuchsia-500',
-      'bg-purple-500',
-      'bg-blue-500',
+      'bg-stone-500',
+      'bg-stone-600',
+      'bg-stone-400',
+      'bg-stone-500',
+      'bg-stone-600',
+      'bg-stone-400',
     ];
-    const index = email.charCodeAt(0) % colors.length;
+    const index = seed.charCodeAt(0) % colors.length;
     return colors[index];
   };
 
@@ -87,11 +90,11 @@ export default function CommentItem({
     },
   };
 
-  /** 新评论高亮 - indigo 背景渐隐 */
+  /** 新评论高亮 - stone 背景渐隐 */
   const highlightVariants = {
-    initial: { backgroundColor: 'rgba(99, 102, 241, 0.18)' },
+    initial: { backgroundColor: 'rgba(120, 113, 108, 0.15)' },
     animate: {
-      backgroundColor: 'rgba(99, 102, 241, 0)',
+      backgroundColor: 'rgba(120, 113, 108, 0)',
       transition: { duration: 2, ease: 'easeOut' },
     },
   };
@@ -110,17 +113,17 @@ export default function CommentItem({
     >
       <motion.div
         className={cn(
-          'glass relative overflow-hidden rounded-2xl p-5',
+          'glass relative overflow-hidden rounded-2xl p-4 sm:p-5',
           'transition-colors duration-300',
-          isNew && 'ring-2 ring-indigo-500/50'
+          isNew && 'ring-2 ring-stone-400/50'
         )}
         {...(isNew && { initial: 'initial', animate: 'animate', variants: highlightVariants })}
       >
-        {/* 跟随鼠标的 indigo 光晕 */}
+        {/* 跟随鼠标的柔和光晕 */}
         <motion.div
           className="pointer-events-none absolute inset-0 z-0 rounded-2xl transition-opacity duration-300"
           style={{
-            background: `radial-gradient(300px circle at ${mousePosition.x * 100}% ${mousePosition.y * 100}%, rgba(99, 102, 241, 0.12), transparent 40%)`,
+            background: `radial-gradient(300px circle at ${mousePosition.x * 100}% ${mousePosition.y * 100}%, rgba(120, 113, 108, 0.10), transparent 40%)`,
             opacity: isHovered ? 1 : 0,
           }}
           aria-hidden="true"
@@ -128,26 +131,26 @@ export default function CommentItem({
 
         <div className="relative z-10">
           {/* 头部：头像 + 作者 + 时间 */}
-          <div className="mb-3 flex items-center gap-3">
+          <div className="mb-3 flex min-w-0 items-center gap-3">
             <div
               className={cn(
                 'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white shadow-sm',
-                getAvatarColor(comment.author_email)
+                getAvatarColor(comment.id || comment.author_name)
               )}
               aria-hidden="true"
             >
               {getAvatarLetter(comment.author_name)}
             </div>
-            <div className="flex-1">
-              <p className="font-medium text-zinc-900 dark:text-white">{comment.author_name}</p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <div className="min-w-0 flex-1">
+              <p className="break-words font-medium text-stone-900 dark:text-white">{comment.author_name}</p>
+              <p className="text-xs text-stone-500 dark:text-stone-400">
                 <time dateTime={comment.created}>{formatTime(comment.created)}</time>
               </p>
             </div>
           </div>
 
           {/* 评论内容 */}
-          <div className="mb-3 whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+          <div className="mb-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-stone-700 [overflow-wrap:anywhere] dark:text-stone-300">
             {comment.content}
           </div>
 
@@ -157,7 +160,7 @@ export default function CommentItem({
               onClick={() => setIsReplyOpen(!isReplyOpen)}
               aria-expanded={isReplyOpen}
               aria-controls={`reply-form-${comment.id}`}
-              className="focus-ring flex items-center gap-1.5 rounded-md text-sm text-zinc-500 transition-colors hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400"
+              className="focus-ring flex items-center gap-1.5 rounded-md text-sm text-stone-500 transition-colors hover:text-stone-600 dark:text-stone-400 dark:hover:text-stone-500"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -173,12 +176,13 @@ export default function CommentItem({
           onClose={() => setIsReplyOpen(false)}
           onSubmit={onSubmitReply}
           parentId={comment.id}
+          moderationEnabled={moderationEnabled}
         />
       </motion.div>
 
       {/* 子评论（递归渲染） - indigo 竖线引导嵌套关系 */}
       {comment.children.length > 0 && (
-        <div className="mt-3 space-y-3 border-l-2 border-indigo-100 pl-6 dark:border-indigo-900/40">
+        <div className="mt-3 space-y-3 border-l-2 border-stone-200 pl-3 dark:border-stone-800/60 sm:pl-6">
           {comment.children.map((child) => (
             <CommentItem
               key={child.id}
@@ -186,6 +190,7 @@ export default function CommentItem({
               depth={depth + 1}
               maxDepth={maxDepth}
               onSubmitReply={onSubmitReply}
+              moderationEnabled={moderationEnabled}
             />
           ))}
         </div>

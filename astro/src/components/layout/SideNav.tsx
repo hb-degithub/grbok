@@ -1,6 +1,7 @@
-﻿import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SITE_CONFIG } from '../../config/site';
+import { useAuthStatus } from '../../hooks/useAuthStatus';
 
 interface SideNavProps {
   id?: string;
@@ -16,10 +17,8 @@ const mainNavItems = [
   { href: '/about', label: '关于', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
 ];
 
-const secondaryNavItems = [
-  { href: '/admin', label: '管理后台', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
-  { href: '/login', label: '登录', icon: 'M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1' },
-];
+const adminNavItem = { href: '/admin', label: '管理后台', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' };
+const loginNavItem = { href: '/login', label: '登录', icon: 'M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1' };
 
 const DRAWER_TRANSITION = { type: 'spring', damping: 28, stiffness: 260 } as const;
 
@@ -30,6 +29,11 @@ function getScrollbarWidth() {
 export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavProps) {
   const drawerRef = useRef<HTMLElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+  const { isAuthenticated, isLoading, canAccessAdmin } = useAuthStatus();
+  const secondaryNavItems = [
+    canAccessAdmin ? adminNavItem : null,
+    !isLoading && !isAuthenticated ? loginNavItem : null,
+  ].filter((item): item is typeof adminNavItem => Boolean(item));
 
   const isActive = (href: string) => {
     if (href === '/') return currentPath === '/';
@@ -121,7 +125,7 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-hero/40 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-stone-900/20 backdrop-blur-sm"
             aria-hidden="true"
           />
           <motion.aside
@@ -137,19 +141,19 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
             transition={DRAWER_TRANSITION}
             onClick={handleDrawerClick}
             onKeyDown={handleDrawerKeyDown}
-            className="fixed left-0 top-0 z-50 h-full w-72 max-w-[85vw] bg-surface shadow-2xl outline-none"
+            className="fixed left-0 top-0 z-50 flex h-[var(--vvh,100dvh)] max-h-[var(--vvh,100dvh)] w-[min(288px,88vw)] flex-col overflow-hidden bg-white shadow-2xl outline-none dark:bg-stone-900"
           >
-            <div className="flex h-16 items-center justify-between border-b border-border px-5">
-              <a href="/" className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-lg font-bold text-white">
+            <div className="flex min-h-[56px] shrink-0 items-center justify-between gap-3 border-b border-stone-200 px-3 py-2 pt-[max(env(safe-area-inset-top),0.5rem)] dark:border-stone-800 sm:px-5">
+              <a href="/" className="flex min-h-[40px] min-w-0 items-center gap-2.5">
+                <div className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-xl bg-stone-500 text-lg font-bold text-white">
                   {SITE_CONFIG.logoText}
                 </div>
-                <span className="text-lg font-bold text-text">{SITE_CONFIG.name}</span>
+                <span className="min-w-0 break-words text-base font-bold leading-tight text-stone-900 dark:text-stone-100">{SITE_CONFIG.name}</span>
               </a>
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-text-secondary transition-colors hover:bg-bg-soft hover:text-text"
+                className="focus-ring flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] shrink-0 items-center justify-center rounded-lg text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
                 aria-label="关闭侧边导航"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -158,47 +162,47 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
               </button>
             </div>
 
-            <nav className="flex h-[calc(100%-4rem)] flex-col overflow-y-auto p-4">
+            <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-4">
               <div className="space-y-1">
-                <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-text-muted">主导航</p>
+                <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">主导航</p>
                 {mainNavItems.map((item) => (
                   <a
                     key={item.href}
                     href={item.href}
                     onClick={handleLinkClick}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors ${
+                    className={`flex min-h-[44px] min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium leading-snug transition-colors ${
                       isActive(item.href)
-                        ? 'bg-accent/10 text-accent'
-                        : 'text-text-secondary hover:bg-bg-soft hover:text-text'
+                        ? 'bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-100'
+                        : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100'
                     }`}
                     aria-current={isActive(item.href) ? 'page' : undefined}
                   >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
                     </svg>
-                    {item.label}
+                    <span className="min-w-0 break-words">{item.label}</span>
                   </a>
                 ))}
               </div>
 
               <div className="mt-6 space-y-1">
-                <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-text-muted">其他</p>
+                <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">其他</p>
                 {secondaryNavItems.map((item) => (
                   <a
                     key={item.href}
                     href={item.href}
                     onClick={handleLinkClick}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors ${
+                    className={`flex min-h-[44px] min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium leading-snug transition-colors ${
                       isActive(item.href)
-                        ? 'bg-accent/10 text-accent'
-                        : 'text-text-secondary hover:bg-bg-soft hover:text-text'
+                        ? 'bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-100'
+                        : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100'
                     }`}
                     aria-current={isActive(item.href) ? 'page' : undefined}
                   >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
                     </svg>
-                    {item.label}
+                    <span className="min-w-0 break-words">{item.label}</span>
                   </a>
                 ))}
               </div>

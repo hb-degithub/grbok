@@ -1,19 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getPocketBase } from '../lib/pocketbase';
-import type { Post, User, Comment, Tag } from '../types/pocketbase';
+import { normalizeAuthEmail, withAuthRequestHeaders } from '../lib/security';
+import type { Post, PublicComment, ReaderRegisterData, User } from '../types/pocketbase';
 
-/**
- * PocketBase React Hook
- * 提供常用的数据获取方法，支持加载状态和错误处理
- */
 export function usePocketBase() {
   const pb = getPocketBase();
 
   return {
     pb,
-    /**
-     * 获取已发布的文章列表
-     */
+
     getPosts: useCallback(async (page = 1, perPage = 10) => {
       try {
         const result = await pb.collection('posts').getList<Post>(page, perPage, {
@@ -28,13 +23,10 @@ export function usePocketBase() {
       }
     }, [pb]),
 
-    /**
-     * 获取单篇文章
-     */
     getPost: useCallback(async (slug: string) => {
       try {
         const result = await pb.collection('posts').getFirstListItem<Post>(
-          `slug = "${slug}" && status = "published"`,
+          pb.filter('slug = {:slug} && status = {:status}', { slug, status: 'published' }),
           { expand: 'author' }
         );
         return { data: result, error: null };
@@ -44,14 +36,12 @@ export function usePocketBase() {
       }
     }, [pb]),
 
-    /**
-     * 获取文章的评论列表
-     */
     getComments: useCallback(async (postId: string) => {
       try {
-        const result = await pb.collection('comments').getFullList<Comment>({
-          filter: `post_id = "${postId}" && status = "approved"`,
+        const result = await pb.collection('public_comments').getFullList<PublicComment>({
+          filter: pb.filter('post_id = {:postId}', { postId }),
           sort: '-created',
+          fields: 'id,post_id,author_name,content,parent_id,status,created,updated',
         });
         return { data: result, error: null };
       } catch (err) {
@@ -60,37 +50,47 @@ export function usePocketBase() {
       }
     }, [pb]),
 
-    /**
-     * 用户登录（Magic Link）
-     */
-    requestMagicLink: useCallback(async (email: string) => {
+    requestOTP: useCallback(async (email: string) => {
       try {
-        await pb.collection('users').requestVerification(email);
-        return { success: true, error: null };
+        const result = await withAuthRequestHeaders(pb, () => pb.collection('users').requestOTP(normalizeAuthEmail(email)));
+        return { data: result, error: null };
       } catch (err) {
-        console.error('发送 Magic Link 失败:', err);
-        return { success: false, error: err };
+        console.error('发送 OTP 验证码失败:', err);
+        return { data: null, error: err };
       }
     }, [pb]),
 
-    /**
-     * 验证 Magic Link
-     */
-    verifyMagicLink: useCallback(async (token: string) => {
+        authWithOTP: useCallback(async (otpId: string, code: string) => {
       try {
-        const result = await pb.collection('users').confirmVerification(token);
+        const result = await withAuthRequestHeaders(pb, () => pb.collection('users').authWithOTP<User>(otpId, code));
+        const role = result.record?.role;
+
+        if (role === 'author' || role === 'admin' || role === 'super_admin') {
+          pb.authStore.clear();
+          return { success: false, data: null, error: new Error('高权限账户请使用密码登录，并在密码校验后完成二次验证。') };
+        }
+
         return { success: true, data: result, error: null };
       } catch (err) {
-        console.error('验证 Magic Link 失败:', err);
+        console.error('OTP login failed:', err);
+        return { success: false, data: null, error: err };
+      }
+    }, [pb]),
+
+    registerReader: useCallback(async (data: Omit<ReaderRegisterData, 'role'>) => {
+      try {
+        const payload: ReaderRegisterData = { ...data, email: normalizeAuthEmail(data.email), role: 'reader' };
+        const record = await withAuthRequestHeaders(pb, () => pb.collection('users').create<User>(payload));
+        const auth = await withAuthRequestHeaders(pb, () => pb.collection('users').authWithPassword<User>(payload.email, data.password));
+        return { success: true, data: { record, auth }, error: null };
+      } catch (err) {
+        console.error('注册 reader 用户失败:', err);
         return { success: false, data: null, error: err };
       }
     }, [pb]),
   };
 }
 
-/**
- * 文章列表 Hook
- */
 export function usePosts(page = 1, perPage = 10) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);

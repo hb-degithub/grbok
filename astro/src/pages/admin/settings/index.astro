@@ -1,8 +1,8 @@
----
+﻿---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import SettingsForm from '../../../components/admin/SettingsForm';
 ---
 
-<AdminLayout title="Settings" requiredRole="admin">
+<AdminLayout title="站点设置" requiredRole="super_admin">
   <SettingsForm client:only="react" />
 </AdminLayout>

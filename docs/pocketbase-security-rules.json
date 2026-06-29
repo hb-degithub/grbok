@@ -1,0 +1,52 @@
+{
+  "users": {
+    "listRule": "id = @request.auth.id || @request.auth.role = \"super_admin\"",
+    "viewRule": "id = @request.auth.id || @request.auth.role = \"super_admin\"",
+    "createRule": "@request.auth.role = \"super_admin\" || @request.data.role = \"reader\" || @request.data.role = \"\"",
+    "updateRule": "id = @request.auth.id || @request.auth.role = \"super_admin\"",
+    "deleteRule": "@request.auth.role = \"super_admin\""
+  },
+  "posts": {
+    "listRule": "status = \"published\" || @request.auth.role = \"admin\" || @request.auth.role = \"super_admin\" || (@request.auth.role = \"author\" && author.id = @request.auth.id)",
+    "viewRule": "status = \"published\" || @request.auth.role = \"admin\" || @request.auth.role = \"super_admin\" || (@request.auth.role = \"author\" && author.id = @request.auth.id)",
+    "createRule": "@request.auth.role = \"admin\" || @request.auth.role = \"super_admin\" || (@request.auth.role = \"author\" && author.id = @request.auth.id)",
+    "updateRule": "@request.auth.role = \"admin\" || @request.auth.role = \"super_admin\" || (@request.auth.role = \"author\" && author.id = @request.auth.id)",
+    "deleteRule": "@request.auth.role = \"admin\" || @request.auth.role = \"super_admin\" || (@request.auth.role = \"author\" && author.id = @request.auth.id)"
+  },
+  "comments": {
+    "listRule": "@request.auth.role = \"admin\" || @request.auth.role = \"super_admin\" || (@request.auth.role = \"author\" && post_id.author.id = @request.auth.id)",
+    "viewRule": "@request.auth.role = \"admin\" || @request.auth.role = \"super_admin\" || (@request.auth.role = \"author\" && post_id.author.id = @request.auth.id)",
+    "createRule": "post_id.status = \"published\"",
+    "updateRule": "@request.auth.role = \"admin\" || @request.auth.role = \"super_admin\"",
+    "deleteRule": "@request.auth.role = \"admin\" || @request.auth.role = \"super_admin\""
+  },
+  "public_comments": {
+    "listRule": "",
+    "viewRule": "",
+    "createRule": null,
+    "updateRule": null,
+    "deleteRule": null,
+    "query": "SELECT id, post_id, author_name, content, parent_id, status, created, updated FROM comments WHERE status = \"approved\""
+  },
+  "tags": {
+    "listRule": "",
+    "viewRule": "",
+    "createRule": "@request.auth.role = \"author\" || @request.auth.role = \"admin\" || @request.auth.role = \"super_admin\"",
+    "updateRule": "@request.auth.role = \"author\" || @request.auth.role = \"admin\" || @request.auth.role = \"super_admin\"",
+    "deleteRule": "@request.auth.role = \"admin\" || @request.auth.role = \"super_admin\""
+  },
+  "post_tags": {
+    "listRule": "",
+    "viewRule": "",
+    "createRule": "@request.auth.role = \"admin\" || @request.auth.role = \"super_admin\" || (@request.auth.role = \"author\" && post_id.author.id = @request.auth.id)",
+    "updateRule": "@request.auth.role = \"admin\" || @request.auth.role = \"super_admin\" || (@request.auth.role = \"author\" && post_id.author.id = @request.auth.id)",
+    "deleteRule": "@request.auth.role = \"admin\" || @request.auth.role = \"super_admin\" || (@request.auth.role = \"author\" && post_id.author.id = @request.auth.id)"
+  },
+  "settings": {
+    "listRule": "(key = \"site_title\" || key = \"site_description\" || key = \"site_logo\" || key = \"posts_per_page\" || key = \"enable_comments\" || key = \"comment_moderation\" || key = \"debug_protection_enabled\") || @request.auth.role = \"super_admin\"",
+    "viewRule": "(key = \"site_title\" || key = \"site_description\" || key = \"site_logo\" || key = \"posts_per_page\" || key = \"enable_comments\" || key = \"comment_moderation\" || key = \"debug_protection_enabled\") || @request.auth.role = \"super_admin\"",
+    "createRule": "@request.auth.role = \"super_admin\"",
+    "updateRule": "@request.auth.role = \"super_admin\"",
+    "deleteRule": "@request.auth.role = \"super_admin\""
+  }
+}

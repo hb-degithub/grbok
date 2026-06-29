@@ -6,9 +6,11 @@ import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 import react from '@astrojs/react';
 
+const site = process.env.PUBLIC_SITE_URL || 'http://localhost:4321';
+
 // https://astro.build/config
 export default defineConfig({
-  site: 'http://localhost:4321',
+  site,
 
   vite: {
     plugins: [tailwindcss()],
@@ -16,7 +18,12 @@ export default defineConfig({
 
   integrations: [
     mdx(),
-    sitemap(),
-    react(), // 添加 React 支持
+    sitemap({
+      filter: (page) => {
+        const url = new URL(page);
+        return !['/admin/', '/login/', '/404/'].some((path) => url.pathname === path || url.pathname.startsWith(path));
+      },
+    }),
+    react(),
   ],
 });

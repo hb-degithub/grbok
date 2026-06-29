@@ -9,6 +9,7 @@
     "dev": "astro dev",
     "build": "astro build && pagefind --site dist",
     "preview": "astro preview",
+    "check:mobile": "node scripts/mobile-viewport-check.mjs",
     "astro": "astro"
   },
   "dependencies": {

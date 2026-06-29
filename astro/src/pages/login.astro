@@ -3,6 +3,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import AuthPage from '../components/auth/AuthPage';
 ---
 
-<BaseLayout title="登录" description="登录或注册博客账户">
-  <AuthPage client:visible />
+<BaseLayout title="登录" description="登录或注册博客账户" noindex>
+  <AuthPage client:load />
 </BaseLayout>

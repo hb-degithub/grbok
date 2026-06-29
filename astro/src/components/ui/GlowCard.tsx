@@ -14,7 +14,7 @@ interface GlowCardProps {
 export default function GlowCard({
   children,
   className = '',
-  glowColor = 'rgba(34, 211, 238, 0.15)',
+  glowColor = 'rgba(120, 113, 108, 0.10)',
 }: GlowCardProps) {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);

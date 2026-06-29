@@ -2,18 +2,23 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
+import { RateLimiter } from '../../lib/security';
 import type { CommentFormData } from '../../types/pocketbase';
+
+const commentLimiter = new RateLimiter(3, 1/12); // 每分钟最多3条
 
 interface CommentFormProps {
   /** 文章 ID */
   postId: string;
   /** 提交回调 */
   onSubmit: (data: CommentFormData) => Promise<boolean>;
+  /** 是否启用人工审核 */
+  moderationEnabled?: boolean;
 }
 
 /** 共享 textarea 样式 - 玻璃底 + indigo focus-visible */
 const textareaClass =
-  'w-full rounded-xl border border-zinc-200 bg-white/70 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 transition-all duration-200 ease-out outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500/30 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus-visible:border-indigo-400';
+  'w-full rounded-xl border border-stone-200 bg-white/70 px-4 py-3 text-sm text-stone-900 placeholder-stone-400 transition-all duration-200 ease-out outline-none focus-visible:border-stone-500 focus-visible:ring-2 focus-visible:ring-stone-500/30 dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-100 dark:placeholder-stone-500 dark:focus-visible:border-stone-400';
 
 /**
  * 主评论表单组件
@@ -21,7 +26,7 @@ const textareaClass =
  * 设计决策：glass-strong 容器保证表单文字对比度；textarea 用 id 关联 label，
  * 支持 `aria-describedby` 错误播报；成功态用 emerald 打勾动画。
  */
-export default function CommentForm({ postId, onSubmit }: CommentFormProps) {
+export default function CommentForm({ postId, onSubmit, moderationEnabled = true }: CommentFormProps) {
   const [formData, setFormData] = useState<CommentFormData>({
     author_name: '',
     author_email: '',
@@ -37,6 +42,12 @@ export default function CommentForm({ postId, onSubmit }: CommentFormProps) {
     if (!formData.author_name || !formData.author_email || !formData.content) {
       setStatus('error');
       setErrorMessage('请填写所有必填字段');
+      return;
+    }
+
+    if (!commentLimiter.tryConsume()) {
+      setStatus('error');
+      setErrorMessage('操作太频繁，请稍后再试');
       return;
     }
 
@@ -122,7 +133,7 @@ export default function CommentForm({ postId, onSubmit }: CommentFormProps) {
               transition={{ delay: 0.4 }}
               className="text-lg font-medium text-emerald-600 dark:text-emerald-400"
             >
-              评论提交成功！
+              {moderationEnabled ? '评论提交成功，审核后展示！' : '评论提交成功！'}
             </motion.p>
           </motion.div>
         ) : (
@@ -138,8 +149,10 @@ export default function CommentForm({ postId, onSubmit }: CommentFormProps) {
             noValidate
           >
             <motion.div variants={itemVariants}>
-              <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">发表评论</h3>
-              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">你的邮箱不会被公开显示</p>
+              <h3 className="text-lg font-semibold text-stone-900 dark:text-white">发表评论</h3>
+              <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
+                {moderationEnabled ? '你的邮箱不会被公开显示，评论审核后展示' : '你的邮箱不会被公开显示'}
+              </p>
             </motion.div>
 
             <motion.div variants={itemVariants} className="grid gap-4 sm:grid-cols-2">
@@ -163,7 +176,7 @@ export default function CommentForm({ postId, onSubmit }: CommentFormProps) {
             </motion.div>
 
             <motion.div variants={itemVariants}>
-              <label htmlFor="comment-content" className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <label htmlFor="comment-content" className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-stone-300">
                 评论内容
               </label>
               <textarea

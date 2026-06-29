@@ -1,21 +1,24 @@
-/**
- * PocketBase 数据类型定义
- * 基于 docs/pocketbase-schema.md 生成
- */
+export type UserRole = 'reader' | 'author' | 'admin' | 'super_admin';
 
-/** 用户 */
 export interface User {
   id: string;
   email: string;
   name: string;
   avatar: string;
-  role: 'admin' | 'author' | 'reader';
+  role: UserRole;
   bio: string;
   created: string;
   updated: string;
 }
 
-/** 文章 */
+export interface ReaderRegisterData {
+  email: string;
+  password: string;
+  passwordConfirm: string;
+  name?: string;
+  role: 'reader';
+}
+
 export interface Post {
   id: string;
   title: string;
@@ -35,49 +38,40 @@ export interface Post {
   };
 }
 
-/**
- * 评论基础类型
- * 包含 PocketBase 数据库中的原始字段
- */
-export interface Comment {
+export interface PublicComment {
   id: string;
   post_id: string;
   author_name: string;
-  author_email: string;
   content: string;
   parent_id: string | null;
   status: 'pending' | 'approved' | 'spam';
-  ip_address: string;
   created: string;
   updated: string;
+  expand?: {
+    post_id?: Post;
+    parent_id?: PublicComment;
+  };
+}
+
+export interface Comment extends PublicComment {
+  author_email: string;
+  status: 'pending' | 'approved' | 'spam';
+  ip_address: string;
   expand?: {
     post_id?: Post;
     parent_id?: Comment;
   };
 }
 
-/**
- * 嵌套评论类型
- * 扩展 Comment 接口，添加递归的 children 结构
- * 用于在前端构建评论树
- */
-export interface NestedComment extends Comment {
-  /** 子评论列表（递归结构） */
+export interface NestedComment extends PublicComment {
   children: NestedComment[];
 }
 
-/**
- * Realtime 事件类型
- * PocketBase Realtime API 推送的事件格式
- */
 export interface CommentRealtimeEvent {
   action: 'create' | 'update' | 'delete';
-  record: Comment;
+  record: PublicComment;
 }
 
-/**
- * 评论表单数据
- */
 export interface CommentFormData {
   author_name: string;
   author_email: string;
@@ -85,7 +79,6 @@ export interface CommentFormData {
   parent_id?: string | null;
 }
 
-/** 标签 */
 export interface Tag {
   id: string;
   name: string;
@@ -95,7 +88,6 @@ export interface Tag {
   updated: string;
 }
 
-/** 文章-标签关联 */
 export interface PostTag {
   id: string;
   post_id: string;
@@ -108,7 +100,6 @@ export interface PostTag {
   };
 }
 
-/** 站点设置 */
 export interface Setting {
   id: string;
   key: string;

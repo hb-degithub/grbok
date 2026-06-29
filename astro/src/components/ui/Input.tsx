@@ -35,7 +35,7 @@ export default function Input({
       {label && (
         <label
           htmlFor={inputId}
-          className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+          className="mb-1.5 block break-words text-sm font-medium leading-snug text-stone-700 dark:text-stone-300"
         >
           {label}
         </label>
@@ -47,14 +47,14 @@ export default function Input({
           aria-invalid={!!error}
           aria-describedby={error ? errorId : helperText ? helperId : undefined}
           className={cn(
-            'w-full rounded-xl border px-4 py-2.5 text-sm',
-            'bg-white/70 text-zinc-900 placeholder-zinc-400',
+            'min-h-[40px] w-full min-w-0 rounded-xl border px-3 py-2.5 text-[16px] leading-snug sm:px-4 sm:text-sm',
+            'bg-white/70 text-stone-900 placeholder-stone-400',
             'transition-all duration-200 ease-out',
             error
               ? 'border-red-400 focus-visible:border-red-500'
-              : 'border-zinc-200 focus-visible:border-indigo-500 dark:border-zinc-700 dark:focus-visible:border-indigo-400',
-            'outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-0',
-            'dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500',
+              : 'border-stone-200 focus-visible:border-stone-500 dark:border-stone-700 dark:focus-visible:border-stone-400',
+            'outline-none focus-visible:ring-2 focus-visible:ring-stone-500/40 focus-visible:ring-offset-0',
+            'dark:bg-stone-900/50 dark:text-stone-100 dark:placeholder-stone-500',
             'disabled:cursor-not-allowed disabled:opacity-50',
             className
           )}
@@ -69,7 +69,7 @@ export default function Input({
           role="alert"
           initial={{ opacity: 0, y: -4 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-1.5 flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400"
+          className="mt-1.5 flex items-start gap-1.5 break-words text-sm leading-snug text-red-600 dark:text-red-400"
         >
           <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -80,7 +80,7 @@ export default function Input({
 
       {/* 帮助文本 */}
       {helperText && !error && (
-        <p id={helperId} className="mt-1.5 text-sm text-zinc-500 dark:text-zinc-400">
+        <p id={helperId} className="mt-1.5 break-words text-sm leading-snug text-stone-500 dark:text-stone-400">
           {helperText}
         </p>
       )}

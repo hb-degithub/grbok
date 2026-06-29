@@ -70,27 +70,27 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
 
           {/* 内容 */}
           <div className="flex flex-1 flex-col p-5">
-            <div className="mb-3 flex items-center gap-2 text-xs text-zinc-400 dark:text-zinc-500">
-              <span className="rounded-full bg-indigo-50 px-2 py-0.5 font-medium text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400">
+            <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-400 dark:text-stone-500">
+              <span className="rounded-full bg-stone-100 px-2 py-0.5 font-medium text-stone-600 dark:bg-stone-800 dark:text-stone-300">
                 技术
               </span>
               <span aria-hidden="true">·</span>
               <time dateTime={post.published_at}>{formattedDate}</time>
             </div>
 
-            <h3 className="mb-2 flex-1 text-lg font-semibold leading-snug text-zinc-900 transition-colors duration-200 group-hover:text-indigo-600 dark:text-zinc-100 dark:group-hover:text-indigo-400">
+            <h3 className="mb-2 flex-1 break-words text-lg font-semibold leading-snug text-stone-900 transition-colors duration-200 [overflow-wrap:anywhere] group-hover:text-stone-600 dark:text-stone-100 dark:group-hover:text-stone-400">
               {post.title}
             </h3>
 
             {post.excerpt && (
-              <p className="mb-4 line-clamp-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="mb-4 line-clamp-2 break-words text-sm leading-relaxed text-stone-500 [overflow-wrap:anywhere] dark:text-stone-400">
                 {post.excerpt}
               </p>
             )}
 
-            <div className="mt-auto flex items-center justify-between border-t border-zinc-200/60 pt-4 dark:border-zinc-700/50">
-              <span className="text-xs text-zinc-400 dark:text-zinc-500">{readingTime} 分钟阅读</span>
-              <span className="flex items-center gap-1 text-xs font-medium text-indigo-600 transition-transform duration-200 group-hover:translate-x-1 dark:text-indigo-400">
+            <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-stone-200/60 pt-4 dark:border-stone-700/50">
+              <span className="text-xs text-stone-400 dark:text-stone-500">{readingTime} 分钟阅读</span>
+              <span className="flex items-center gap-1 text-xs font-medium text-stone-600 transition-transform duration-200 group-hover:translate-x-1 dark:text-stone-400">
                 阅读
                 <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

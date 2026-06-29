@@ -13,7 +13,7 @@ interface CursorGlowProps {
  */
 export default function CursorGlow({
   size = 300,
-  color = 'rgba(34, 211, 238, 0.08)',
+  color = 'rgba(120, 113, 108, 0.05)',
   className = '',
 }: CursorGlowProps) {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });

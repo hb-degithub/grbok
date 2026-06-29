@@ -1,4 +1,4 @@
-version: "3.8"
+﻿version: "3.8"
 
 services:
   caddy:
@@ -6,18 +6,14 @@ services:
     container_name: blog-caddy
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"  # HTTP/3 支持
+      - "${CADDY_HTTP_PORT:-18080}:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./astro/dist:/srv:ro
       - caddy_data:/data
       - caddy_config:/config
     environment:
-      - DOMAIN=${DOMAIN}
       - ADMIN_IP=${ADMIN_IP}
-      - CADDY_ACME_EMAIL=${CADDY_ACME_EMAIL}
-      - RATE_LIMIT_PER_IP=${RATE_LIMIT_PER_IP:-10}
     networks:
       - blog_network
     healthcheck:
@@ -44,13 +40,10 @@ services:
     image: ghcr.io/muchobien/pocketbase:0.22.21
     container_name: blog-pocketbase
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:8090:8090"  # 仅本地访问，通过 Caddy 反代
     volumes:
-      - pb_data:/pb/pb_data
-      - pb_migrations:/pb/pb_migrations
-      - pb_hooks:/pb/pb_hooks
-      - ./msmtprc:/root/.msmtprc:ro
+      - pb_data:/pb_data
+      - ./pb_migrations:/pb_migrations
+      - ./pb_hooks:/pb_hooks:ro
     environment:
       - PB_ENCRYPTION_KEY=${PB_ENCRYPTION_KEY}
       - TZ=${TZ:-Asia/Shanghai}
@@ -83,10 +76,6 @@ volumes:
     name: blog_caddy_config
   pb_data:
     name: blog_pb_data
-  pb_migrations:
-    name: blog_pb_migrations
-  pb_hooks:
-    name: blog_pb_hooks
 
 networks:
   blog_network:

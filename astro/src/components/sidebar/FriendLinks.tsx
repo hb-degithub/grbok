@@ -3,6 +3,8 @@ import { motion } from 'framer-motion';
 import { SITE_CONFIG } from '../../config/site';
 
 export default function FriendLinks() {
+  if (SITE_CONFIG.friendLinks.length === 0) return null;
+
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.4 }} className="widget">
       <div className="widget-title">友情链接</div>

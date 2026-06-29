@@ -1,7 +1,9 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PostList from '../components/posts/PostList';
-import ScrollReveal from '../components/ui/ScrollReveal';
+import ParticleField from '../components/effects/ParticleField';
+import Typewriter from '../components/ui/Typewriter';
+import HomeAuthQuickEntry from '../components/auth/HomeAuthQuickEntry';
 
 const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 
@@ -23,105 +25,322 @@ const [postsCount, tagsCount] = await Promise.all([
 ]);
 ---
 
-<BaseLayout title="首页" description="欢迎来到我的个人博客">
-  <!-- Hero 区域 -->
-  <section class="relative -mx-6 -mt-12 overflow-hidden bg-gradient-to-b from-indigo-50/60 via-white to-transparent px-6 pb-20 pt-24 dark:from-indigo-950/20 dark:via-zinc-950">
-    <!-- 背景装饰 -->
-    <div class="pointer-events-none absolute inset-0">
-      <div class="absolute left-1/2 top-0 h-[500px] w-[700px] -translate-x-1/2 -translate-y-1/3 rounded-full bg-indigo-500/8 blur-[100px] dark:bg-indigo-500/5"></div>
-      <div class="absolute inset-0 opacity-[0.025]" style="background-image: radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0); background-size: 40px 40px;"></div>
+<BaseLayout title="首页" description="欢迎来到胡巴的个人博客">
+    <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75">
+      <h3 class="text-sm font-black tracking-tight text-stone-950 dark:text-stone-50">站内导航</h3>
+      <nav class="mt-4 grid gap-2 text-sm" aria-label="Section navigation">
+        <a href="/" class="side-link flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3 font-semibold text-stone-700 no-underline transition-all hover:bg-stone-900 hover:text-white dark:bg-stone-950/50 dark:text-stone-300 dark:hover:bg-stone-100 dark:hover:text-stone-950"><span>棣栭〉</span><span>01</span></a>
+        <a href="#latest" class="side-link flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3 font-semibold text-stone-700 no-underline transition-all hover:bg-stone-900 hover:text-white dark:bg-stone-950/50 dark:text-stone-300 dark:hover:bg-stone-100 dark:hover:text-stone-950"><span>最新文章</span><span>02</span></a>
+        <a href="/posts" class="side-link flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3 font-semibold text-stone-700 no-underline transition-all hover:bg-stone-900 hover:text-white dark:bg-stone-950/50 dark:text-stone-300 dark:hover:bg-stone-100 dark:hover:text-stone-950"><span>全部文章</span><span>03</span></a>
+        <a href="/tags" class="side-link flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3 font-semibold text-stone-700 no-underline transition-all hover:bg-stone-900 hover:text-white dark:bg-stone-950/50 dark:text-stone-300 dark:hover:bg-stone-100 dark:hover:text-stone-950"><span>鏍囩绱㈠紩</span><span>04</span></a>
+      </nav>
+    </section>
+
+    <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75">
+      <h3 class="text-sm font-black tracking-tight text-stone-950 dark:text-stone-50">专题分类</h3>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <a href="/tags" class="topic-chip rounded-full bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 no-underline dark:bg-stone-800 dark:text-stone-300">技术记录</a>
+        <a href="/tags" class="topic-chip rounded-full bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 no-underline dark:bg-stone-800 dark:text-stone-300">生活随笔</a>
+        <a href="/tags" class="topic-chip rounded-full bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 no-underline dark:bg-stone-800 dark:text-stone-300">部署运维</a>
+      </div>
+    </section>
+  </aside>
+
+  <aside class="floating-sidebar sidebar-right fixed right-6 top-28 z-30 hidden w-80 space-y-5 xl:block" aria-label="Fixed profile sidebar">
+    <section class="side-panel overflow-hidden rounded-[1.5rem] border border-stone-200 bg-white/90 p-6 shadow-2xl shadow-stone-900/[0.06] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/80">
+      <div class="flex items-center gap-4">
+        <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-stone-900 text-xl font-black text-white shadow-lg shadow-stone-900/15 dark:bg-stone-100 dark:text-stone-950">B</div>
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-stone-400">个人侧边栏</p>
+          <h2 class="mt-1 text-lg font-black tracking-tight text-stone-950 dark:text-stone-50">胡巴的博客</h2>
+        </div>
+      </div>
+      <p class="mt-5 text-sm leading-7 text-stone-500 dark:text-stone-400">技术、生活和偶尔冒出来的奇思妙想。</p>
+      <div class="mt-5 grid gap-3 sm:grid-cols-2">
+        <div class="stat-tile rounded-2xl bg-stone-50 p-4 dark:bg-stone-950/50"><div class="text-2xl font-black text-stone-950 dark:text-stone-50">{postsCount}</div><div class="text-xs text-stone-500 dark:text-stone-400">已发布文章</div></div>
+        <div class="stat-tile rounded-2xl bg-stone-50 p-4 dark:bg-stone-950/50"><div class="text-2xl font-black text-stone-950 dark:text-stone-50">{tagsCount}</div><div class="text-xs text-stone-500 dark:text-stone-400">内容标签</div></div>
+      </div>
+    </section>
+
+    <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/90 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/80">
+      <h3 class="text-sm font-black tracking-tight text-stone-950 dark:text-stone-50">快速入口</h3>
+      <div class="mt-4 grid gap-2">
+        <HomeAuthQuickEntry client:visible />
+        <a href="/about" class="side-link group flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3 text-sm font-semibold text-stone-700 no-underline transition-all hover:bg-stone-900 hover:text-white dark:bg-stone-950/50 dark:text-stone-300 dark:hover:bg-stone-100 dark:hover:text-stone-950"><span>关于博主</span><svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></a>
+      </div>
+    </section>
+  </aside>
+
+  <section class="journal-hero relative -mt-[var(--header-h,4rem)] min-h-[var(--vvh,100dvh)] w-full overflow-hidden border-b border-stone-200/70 px-[var(--page-pad,1rem)] pb-16 pt-[calc(var(--header-h,4rem)+1.5rem)] shadow-sm dark:border-stone-800/70 sm:px-6 lg:px-12 lg:pb-20 lg:pt-32 xl:px-[19rem] 2xl:px-[23rem]">
+
+    <div class="pointer-events-none absolute inset-0 overflow-hidden">
+      <div class="journal-paper absolute inset-0"></div>
+      <div class="journal-grid absolute inset-0"></div>
+      <div class="journal-scan absolute inset-x-0 top-0 h-40"></div>
+      <div class="journal-corner journal-corner-a absolute left-6 top-28 h-28 w-28 sm:left-10"></div>
+      <div class="journal-corner journal-corner-b absolute bottom-12 right-6 h-32 w-32 sm:right-12"></div>
+      <div style="--note-rotate:-5deg" class="journal-note note-a absolute right-[8%] top-32 hidden rotate-[-5deg] rounded-xl border border-stone-300/70 bg-white/55 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500 shadow-xl shadow-stone-900/[0.04] backdrop-blur-md dark:border-stone-700/70 dark:bg-stone-900/45 dark:text-stone-400 lg:block">Deploy / Notes</div>
+      <div style="--note-rotate:4deg" class="journal-note note-b absolute bottom-28 left-[9%] hidden rotate-[4deg] rounded-xl border border-stone-300/70 bg-white/45 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500 shadow-xl shadow-stone-900/[0.04] backdrop-blur-md dark:border-stone-700/70 dark:bg-stone-900/40 dark:text-stone-400 lg:block">Code / Life</div>
+      <ParticleField count={14} color="120, 113, 108" speed={0.18} className="absolute inset-0 z-0 opacity-70 dark:opacity-50" client:visible />
     </div>
 
-    <div class="relative mx-auto max-w-3xl text-center">
-      <!-- 标签 -->
-      <div class="animate-enter inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/60 px-4 py-1.5 text-xs font-medium text-zinc-500 backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400">
-        <span class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
-        个人博客
-      </div>
-
-      <!-- 标题 -->
-      <h1 class="animate-enter mt-6 text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-6xl" style="animation-delay: 0.1s">
-        胡巴的博客
-      </h1>
-
-      <!-- 副标题 -->
-      <p class="animate-enter mx-auto mt-5 max-w-xl text-lg text-zinc-500 dark:text-zinc-400" style="animation-delay: 0.2s">
-        分享技术、思考与生活
-      </p>
-
-      <!-- 统计 -->
-      <div class="animate-enter mt-10 flex items-center justify-center gap-8" style="animation-delay: 0.3s">
-        <div class="text-center">
-          <div class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{postsCount}</div>
-          <div class="text-xs text-zinc-500 dark:text-zinc-400">文章</div>
+    <div class="relative z-10 flex min-h-[calc(var(--vvh,100dvh)-9rem)] items-center">
+      <div class="max-w-3xl xl:max-w-4xl">
+        <div class="animate-enter inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white/75 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-stone-500 shadow-sm backdrop-blur dark:border-stone-700 dark:bg-stone-900/60 dark:text-stone-400">
+          <span class="accent-dot"></span>
+          Personal Journal
         </div>
-        <div class="h-8 w-px bg-zinc-200 dark:bg-zinc-700"></div>
-        <div class="text-center">
-          <div class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{tagsCount}</div>
-          <div class="text-xs text-zinc-500 dark:text-zinc-400">标签</div>
+
+        <h1 class="animate-enter mt-6 sm:mt-8 break-words text-[clamp(2rem,9vw,4.5rem)] font-black tracking-normal text-stone-950 [overflow-wrap:anywhere] dark:text-stone-50" style="animation-delay: 0.1s">
+          胡巴的博客        </h1>
+
+        <div class="animate-enter mt-5 sm:mt-6 min-h-[3.5rem] sm:min-h-8 max-w-2xl text-base leading-7 text-stone-600 dark:text-stone-300 sm:text-lg sm:leading-8" style="animation-delay: 0.2s">
+          <Typewriter
+            text="分享技术、思考与生活。把折腾过的东西写清楚。"
+            speed={42}
+            delay={500}
+            className="text-stone-600 dark:text-stone-300"
+            cursorClassName="text-stone-500"
+            client:visible
+          />
+        </div>
+
+        <div class="animate-enter mt-8 sm:mt-10 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center" style="animation-delay: 0.3s">
+          <a href="#latest" class="inline-flex w-full flex-1 items-center justify-center gap-2 rounded-2xl bg-stone-900 px-6 py-3 text-sm font-semibold text-white no-underline shadow-xl shadow-stone-900/15 transition-all hover:-translate-y-0.5 hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-white sm:w-auto sm:flex-none">
+            浏览文章
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+          </a>
+          <a href="/about" class="inline-flex w-full flex-1 items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-6 py-3 text-sm font-semibold text-stone-700 no-underline backdrop-blur transition-all hover:-translate-y-0.5 hover:border-stone-300 hover:bg-white dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-200 dark:hover:bg-stone-900 sm:w-auto sm:flex-none">
+            了解我          </a>
         </div>
       </div>
+    </div>
+  </section>
 
-      <!-- CTA -->
-      <div class="animate-enter mt-10" style="animation-delay: 0.4s">
-        <a
-          href="#latest"
-          class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-lg shadow-indigo-500/20 transition-all hover:bg-indigo-700 hover:shadow-xl hover:-translate-y-0.5"
-        >
-          浏览文章
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-          </svg>
+  <section id="latest" class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-12 xl:px-[19rem] 2xl:px-[23rem]">
+    <div class="min-w-0">
+      <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="text-sm font-semibold uppercase tracking-[0.2em] text-stone-400">Latest Notes</p>
+          <h2 class="mt-2 text-3xl font-black tracking-tight text-stone-950 dark:text-stone-50">最新文章</h2>
+          <p class="mt-2 text-sm text-stone-500 dark:text-stone-400">最近发布的技术文章和思考。</p>
+        </div>
+        <a href="/posts" class="inline-flex min-h-10 w-fit items-center gap-1.5 rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700 no-underline transition-all hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700">
+          查看全部
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
         </a>
       </div>
+      <PostList client:visible perPage={6} />
     </div>
-  </section>
 
-  <!-- 最新文章 -->
-  <section id="latest" class="mt-16">
-    <div class="mb-8 flex items-end justify-between">
-      <div>
-        <h2 class="text-2xl font-bold text-zinc-900 dark:text-zinc-100">最新文章</h2>
-        <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">最近发布的技术文章和思考</p>
-      </div>
-      <a href="/posts" class="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 transition-all hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
-        查看全部
-        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-        </svg>
-      </a>
+    <div class="mt-8 grid gap-5 lg:grid-cols-2 xl:hidden">
+      <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75">
+        <h3 class="text-sm font-black tracking-tight text-stone-950 dark:text-stone-50">站内导航</h3>
+        <div class="mt-4 grid gap-2">
+          <HomeAuthQuickEntry client:visible />
+        </div>
+        <p class="mt-4 text-sm leading-7 text-stone-500 dark:text-stone-400">写作与代码，一起慢慢积累。</p>
+      </section>
+      <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75">
+        <h3 class="text-sm font-black tracking-tight text-stone-950 dark:text-stone-50">站点状态</h3>
+        <div class="mt-4 space-y-3 text-sm text-stone-500 dark:text-stone-400">
+          <div class="flex items-center justify-between"><span>正常运行</span><span class="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_16px_rgba(16,185,129,0.6)]"></span></div>
+          <div class="flex items-center justify-between"><span>内容积累</span><span>{postsCount} / {tagsCount}</span></div>
+        </div>
+      </section>
     </div>
-    <PostList client:visible perPage={6} />
-  </section>
-
-  <!-- 快速链接 -->
-  <section class="mt-20 grid gap-4 sm:grid-cols-2">
-    <a href="/posts" class="card-lift group relative overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-7 dark:border-zinc-800/80 dark:bg-zinc-900">
-      <div class="relative z-10 flex items-start gap-4">
-        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/30">
-          <svg class="h-6 w-6 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-          </svg>
-        </div>
-        <div>
-          <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">所有文章</h3>
-          <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">浏览所有已发布的文章</p>
-        </div>
-      </div>
-    </a>
-
-    <a href="/tags" class="card-lift group relative overflow-hidden rounded-2xl border border-zinc-200/80 bg-white p-7 dark:border-zinc-800/80 dark:bg-zinc-900">
-      <div class="relative z-10 flex items-start gap-4">
-        <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/30">
-          <svg class="h-6 w-6 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
-          </svg>
-        </div>
-        <div>
-          <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">标签分类</h3>
-          <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">按标签筛选感兴趣的内容</p>
-        </div>
-      </div>
-    </a>
   </section>
 </BaseLayout>
+
+<style>
+  .journal-hero {
+    background:
+      radial-gradient(circle at 18% 20%, rgba(120, 113, 108, 0.14), transparent 30%),
+      radial-gradient(circle at 76% 18%, rgba(14, 165, 233, 0.08), transparent 26%),
+      linear-gradient(135deg, #fafaf9 0%, #ffffff 42%, #f4f1eb 100%);
+  }
+
+  .dark .journal-hero {
+    background:
+      radial-gradient(circle at 18% 20%, rgba(168, 162, 158, 0.13), transparent 30%),
+      radial-gradient(circle at 76% 18%, rgba(45, 212, 191, 0.08), transparent 26%),
+      linear-gradient(135deg, #0c0a09 0%, #18181b 54%, #111827 100%);
+  }
+
+  .journal-paper {
+    opacity: 0.42;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(28, 25, 23, 0.12) 1px, transparent 0),
+      linear-gradient(115deg, transparent 0 43%, rgba(120, 113, 108, 0.08) 43% 44%, transparent 44% 100%);
+    background-size: 24px 24px, 180px 180px;
+    mask-image: linear-gradient(to bottom, black 0%, black 72%, transparent 100%);
+  }
+
+  .dark .journal-paper {
+    opacity: 0.34;
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(250, 250, 249, 0.16) 1px, transparent 0),
+      linear-gradient(115deg, transparent 0 43%, rgba(168, 162, 158, 0.12) 43% 44%, transparent 44% 100%);
+  }
+
+  .journal-grid {
+    opacity: 0.1;
+    background-image:
+      linear-gradient(currentColor 1px, transparent 1px),
+      linear-gradient(90deg, currentColor 1px, transparent 1px);
+    background-size: 46px 46px;
+    color: rgb(28 25 23);
+    transform: perspective(900px) rotateX(58deg) translateY(-8%);
+    transform-origin: top center;
+  }
+
+  .dark .journal-grid {
+    color: rgb(245 245 244);
+    opacity: 0.12;
+  }
+
+  .journal-scan {
+    background: linear-gradient(to bottom, rgba(255,255,255,0.5), transparent);
+    animation: journal-scan 7s ease-in-out infinite;
+  }
+
+  .dark .journal-scan {
+    background: linear-gradient(to bottom, rgba(255,255,255,0.08), transparent);
+  }
+
+  .journal-corner {
+    border: 1px solid rgba(120, 113, 108, 0.28);
+    border-right: 0;
+    border-bottom: 0;
+    opacity: 0.55;
+  }
+
+  .journal-corner-b {
+    border: 1px solid rgba(120, 113, 108, 0.28);
+    border-left: 0;
+    border-top: 0;
+  }
+
+  .dark .journal-corner,
+  .dark .journal-corner-b {
+    border-color: rgba(168, 162, 158, 0.28);
+  }
+
+  .journal-note {
+    animation: journal-float 7s ease-in-out infinite;
+  }
+
+  .note-b {
+    animation-delay: -2.5s;
+  }
+
+  @keyframes journal-float {
+    0%, 100% { transform: translateY(0) rotate(var(--note-rotate, 0deg)); }
+    50% { transform: translateY(-10px) rotate(var(--note-rotate, 0deg)); }
+  }
+
+  @keyframes journal-scan {
+    0%, 100% { opacity: 0.2; transform: translateY(-100%); }
+    45%, 55% { opacity: 0.55; transform: translateY(70vh); }
+  }
+  .floating-sidebar {
+    animation: sidebar-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    transform-origin: top center;
+  }
+
+  .sidebar-left { animation-delay: 120ms; }
+  .sidebar-right { animation-delay: 220ms; }
+
+  .side-panel {
+    position: relative;
+    overflow: hidden;
+    transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease, background-color 220ms ease;
+  }
+
+  .side-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.45) 42%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 650ms ease;
+  }
+
+  .side-panel:hover {
+    transform: translateY(-3px);
+    border-color: rgba(120, 113, 108, 0.28);
+    box-shadow: 0 22px 45px rgba(28, 25, 23, 0.09);
+  }
+
+  .side-panel:hover::before {
+    transform: translateX(120%);
+  }
+
+  .side-link {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .side-link:hover {
+    transform: translateX(4px);
+  }
+
+  .topic-chip {
+    display: inline-flex;
+    align-items: center;
+    transition: transform 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .topic-chip:hover {
+    transform: translateY(-2px);
+    background-color: rgb(28 25 23);
+    color: white;
+    box-shadow: 0 10px 24px rgba(28, 25, 23, 0.14);
+  }
+
+  .stat-tile {
+    transition: transform 180ms ease, background-color 180ms ease;
+  }
+
+  .stat-tile:hover {
+    transform: translateY(-2px);
+  }
+
+
+@media (max-width: 639px) {
+  .journal-grid {
+    transform: perspective(600px) rotateX(50deg) translateY(-4%);
+    opacity: 0.06;
+  }
+  .journal-paper { background-size: 18px 18px, 120px 120px; }
+  .journal-corner, .journal-corner-b { display: none; }
+}
+  @keyframes sidebar-rise {
+    from {
+      opacity: 0;
+      transform: translateY(18px) scale(0.98);
+      filter: blur(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      filter: blur(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .floating-sidebar,
+    .side-panel,
+    .side-link,
+    .topic-chip,
+    .stat-tile {
+      animation: none;
+      transition: none;
+    }
+    .journal-note,
+    .journal-scan {
+      animation: none;
+    }
+  }
+</style>

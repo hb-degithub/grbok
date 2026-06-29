@@ -1,15 +1,20 @@
 ---
 import { ClientRouter } from 'astro:transitions';
 import Header from '../components/layout/Header';
+import Footer from '../components/layout/Footer.astro';
 import SearchModal from '../components/search/SearchModal';
+import DebugProtection from '../components/effects/DebugProtection';
+import { SITE_CONFIG } from '../config/site';
 
 interface Props {
   title: string;
   description?: string;
   image?: string;
+  showChrome?: boolean;
+  noindex?: boolean;
 }
 
-const { title, description = '我的个人博客', image } = Astro.props;
+const { title, description = SITE_CONFIG.description, image, showChrome = true, noindex = false } = Astro.props;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 ---
 
@@ -17,12 +22,13 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
 
-    <title>{title} | 个人博客</title>
+    <title>{title} | {SITE_CONFIG.name}</title>
     <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex,nofollow,noarchive" />}
     <link rel="canonical" href={canonicalURL} />
 
     <meta property="og:type" content="website" />
@@ -33,41 +39,92 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
     <link rel="sitemap" href="/sitemap-index.xml" />
 
-    <!-- 字体 -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script is:inline>
+      (() => {
+        const storageKey = 'blog-theme-mode';
+        const validModes = new Set(['system', 'time', 'light', 'dark']);
+        const systemQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
-    <!-- Astro View Transitions -->
+        const readMode = () => {
+          const saved = window.localStorage.getItem(storageKey) || 'system';
+          return validModes.has(saved) ? saved : 'system';
+        };
+
+        const resolveTheme = (mode) => {
+          if (mode === 'light' || mode === 'dark') return mode;
+          if (mode === 'time') {
+            const hour = new Date().getHours();
+            return hour >= 19 || hour < 7 ? 'dark' : 'light';
+          }
+          return systemQuery.matches ? 'dark' : 'light';
+        };
+
+        const applyTheme = () => {
+          const mode = readMode();
+          const theme = resolveTheme(mode);
+          document.documentElement.classList.toggle('dark', theme === 'dark');
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.dataset.themeMode = mode;
+        };
+
+        window.__blogApplyTheme = applyTheme;
+        applyTheme();
+        systemQuery.addEventListener?.('change', applyTheme);
+        window.addEventListener('storage', (event) => {
+          if (event.key === storageKey) applyTheme();
+        });
+        window.setInterval(() => {
+          if (readMode() === 'time') applyTheme();
+        }, 60000);
+      })();
+    </script>
+    <script is:inline>
+      (() => {
+        const set = () => {
+          const vv = window.visualViewport || { width: window.innerWidth, height: window.innerHeight, scale: 1 };
+          const root = document.documentElement;
+          const vvw = Math.max(320, Math.round(vv.width));
+          const vvh = Math.max(480, Math.round(vv.height));
+          root.style.setProperty('--vvw', `${vvw}px`);
+          root.style.setProperty('--vvh', `${vvh}px`);
+          root.style.setProperty('--vv-scale', `${vv.scale || 1}`);
+
+          // Keep typography stable; adapt layout through viewport variables,
+          // safe-area aware spacing, and touch target sizes.
+          root.style.fontSize = '';
+          if (vvw < 768) {
+            root.style.setProperty('--header-h', vvh < 560 ? '3rem' : '3.5rem');
+            root.style.setProperty('--tap', vvw < 360 ? '2.5rem' : '2.75rem');
+            root.style.setProperty('--page-pad', vvw < 360 ? '0.75rem' : '1rem');
+          } else {
+            root.style.setProperty('--header-h', '4rem');
+            root.style.setProperty('--tap', '2.75rem');
+            root.style.setProperty('--page-pad', '1.5rem');
+          }
+        };
+        set();
+        window.visualViewport?.addEventListener('resize', set);
+        window.visualViewport?.addEventListener('scroll', set);
+        window.addEventListener('resize', set);
+        window.addEventListener('orientationchange', () => setTimeout(set, 50));
+      })();
+    </script>
+
     <ClientRouter />
   </head>
-  <body class="min-h-screen bg-zinc-50 pb-20 font-sans text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
-    <!-- 导航栏 - React 岛屿组件 -->
-    <Header client:visible />
+  <body class="min-h-screen bg-white pb-20 font-sans text-stone-900 antialiased dark:bg-stone-950 dark:text-stone-100">
+    {showChrome && <Header client:load />}
+    {showChrome && <SearchModal client:load />}
 
-    <!-- 搜索组件 -->
-    <SearchModal client:visible />
-
-    <!-- 主内容 -->
-    <main class="mx-auto max-w-5xl px-6 pt-24">
+    <main class="w-full overflow-x-clip pt-[var(--header-h,4rem)]">
       <slot />
     </main>
 
-    <!-- 页脚 -->
-    <footer class="mt-20 border-t border-zinc-200/80 dark:border-zinc-800/80">
-      <div class="mx-auto flex max-w-5xl items-center justify-between px-6 py-8">
-        <p class="text-xs text-zinc-400 dark:text-zinc-500">
-          &copy; {new Date().getFullYear()} 个人博客
-        </p>
-        <div class="flex items-center gap-4">
-          <a href="/rss.xml" class="text-zinc-400 transition-colors hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300">
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z" />
-            </svg>
-          </a>
-        </div>
-      </div>
-    </footer>
+    {showChrome && <Footer />}
+    <DebugProtection client:load />
   </body>
 </html>
 

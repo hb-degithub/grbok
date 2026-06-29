@@ -20,7 +20,7 @@ interface Tag {
 
 async function fetchTag(tagSlug: string): Promise<Tag | null> {
   try {
-    const res = await fetch(`${PB_URL}/api/collections/tags/records?filter=slug="${tagSlug}"`);
+    const res = await fetch(`${PB_URL}/api/collections/tags/records?filter=${encodeURIComponent('slug="' + tagSlug.replace(/["\\]/g, '') + '"')}`);
     if (!res.ok) throw new Error(`${res.status}`);
     const data = await res.json();
     return data.items?.[0] ?? null;
@@ -36,14 +36,14 @@ const tag = await fetchTag(slug ?? '');
   <div class="mb-12">
     <ScrollReveal client:visible>
       <div class="flex items-center gap-3 mb-4">
-        <span class="h-px w-8 bg-amber"></span>
-        <span class="font-mono text-[10px] uppercase tracking-widest text-amber">Tag</span>
+        <span class="h-px w-8 bg-stone-400 dark:bg-stone-500"></span>
+        <span class="font-mono text-[10px] uppercase tracking-widest text-stone-500 dark:text-stone-400">Tag</span>
       </div>
-      <h1 class="font-display text-4xl font-black uppercase tracking-wide text-ink">
+      <h1 class="font-display text-4xl font-black uppercase tracking-wide text-stone-900 dark:text-stone-100">
         {tag ? tag.name : '标签'}
       </h1>
       {tag?.description && (
-        <p class="mt-3 text-dim max-w-xl">
+        <p class="mt-3 text-stone-500 dark:text-stone-400 max-w-xl">
           {tag.description}
         </p>
       )}
@@ -53,13 +53,13 @@ const tag = await fetchTag(slug ?? '');
   {tag ? (
     <PostList client:visible perPage={12} />
   ) : (
-    <div class="holo-card flex flex-col items-center justify-center py-20 text-center">
-      <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border border-line bg-space-light">
-        <svg class="h-8 w-8 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div class="card flex flex-col items-center justify-center py-20 text-center rounded-2xl">
+      <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border border-stone-200 bg-stone-100 dark:border-stone-700 dark:bg-stone-800">
+        <svg class="h-8 w-8 text-stone-400 dark:text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
         </svg>
       </div>
-      <p class="text-dim">标签不存在</p>
+      <p class="text-stone-500 dark:text-stone-400">标签不存在</p>
       <a href="/tags" class="btn-ghost mt-4">返回标签列表</a>
     </div>
   )}

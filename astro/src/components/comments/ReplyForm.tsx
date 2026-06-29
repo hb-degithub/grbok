@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
+import { RateLimiter } from '../../lib/security';
 import type { CommentFormData } from '../../types/pocketbase';
+
+const replyLimiter = new RateLimiter(3, 1/12);
 
 interface ReplyFormProps {
   /** 是否显示回复框 */
@@ -13,11 +16,13 @@ interface ReplyFormProps {
   onSubmit: (data: CommentFormData) => Promise<boolean>;
   /** 父评论 ID */
   parentId?: string | null;
+  /** 是否启用人工审核 */
+  moderationEnabled?: boolean;
 }
 
 /** 共享 textarea 样式 - 玻璃底 + indigo focus-visible */
 const textareaClass =
-  'w-full rounded-xl border border-zinc-200 bg-white/70 px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 transition-all duration-200 ease-out outline-none focus-visible:border-indigo-500 focus-visible:ring-2 focus-visible:ring-indigo-500/30 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus-visible:border-indigo-400';
+  'w-full rounded-xl border border-stone-200 bg-white/70 px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 transition-all duration-200 ease-out outline-none focus-visible:border-stone-500 focus-visible:ring-2 focus-visible:ring-stone-500/30 dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-100 dark:placeholder-stone-500 dark:focus-visible:border-stone-400';
 
 /**
  * 回复表单组件
@@ -25,7 +30,7 @@ const textareaClass =
  * 设计决策：用 glass（比主表单的 glass-strong 更通透）表示「嵌套/次要」层级；
  * height:auto 过渡实现平滑展开收起；textarea 用 parentId 派生 id 关联 label。
  */
-export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null }: ReplyFormProps) {
+export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderationEnabled = true }: ReplyFormProps) {
   const [formData, setFormData] = useState<CommentFormData>({
     author_name: '',
     author_email: '',
@@ -41,6 +46,12 @@ export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null }: ReplyF
     if (!formData.author_name || !formData.author_email || !formData.content) {
       setStatus('error');
       setErrorMessage('请填写所有必填字段');
+      return;
+    }
+
+    if (!replyLimiter.tryConsume()) {
+      setStatus('error');
+      setErrorMessage('操作太频繁，请稍后再试');
       return;
     }
 
@@ -93,7 +104,7 @@ export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null }: ReplyF
           exit="exit"
           className="overflow-hidden"
         >
-          <form onSubmit={handleSubmit} className="glass rounded-xl p-4" noValidate>
+          <form onSubmit={handleSubmit} className="glass rounded-xl p-4 sm:p-5" noValidate>
             {status === 'success' ? (
               /* ==================== 成功状态 ==================== */
               <motion.div
@@ -114,12 +125,14 @@ export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null }: ReplyF
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </motion.div>
-                <p className="text-sm text-emerald-600 dark:text-emerald-400">评论已提交</p>
+                <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                  {moderationEnabled ? '回复已提交，审核后展示' : '回复已提交'}
+                </p>
               </motion.div>
             ) : (
               /* ==================== 表单状态 ==================== */
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3 sm:grid-cols-2">
                   <Input
                     label="昵称"
                     placeholder="你的昵称"
@@ -140,7 +153,7 @@ export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null }: ReplyF
                 </div>
 
                 <div>
-                  <label htmlFor={contentId} className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  <label htmlFor={contentId} className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-stone-300">
                     回复内容
                   </label>
                   <textarea
@@ -171,7 +184,7 @@ export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null }: ReplyF
                   </motion.p>
                 )}
 
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                   <Button variant="ghost" size="sm" onClick={onClose} type="button">
                     取消
                   </Button>

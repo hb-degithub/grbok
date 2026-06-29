@@ -1,113 +1,97 @@
-{$DOMAIN}
+:80 {
+    encode zstd gzip
+    root * /srv
 
-# 全局配置
-{
-    # ACME 邮箱
-    email {$CADDY_ACME_EMAIL}
+    header {
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        Cross-Origin-Opener-Policy "same-origin"
+        Cross-Origin-Resource-Policy "same-site"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://hlydwz.com wss://hlydwz.com"
+        -Server
+        -X-Powered-By
+    }
 
-    # OCSP Stapling (提高 TLS 握手性能)
-    ocsp_stapling on
+    @bad_paths {
+        path /.env* /.git* /.svn* /wp-* /xmlrpc* /vendor* /composer* /node_modules* /.htaccess* /.idea* /backup* /dump* /sql* /db* /config* /phpmyadmin* /mysql* /administrator* /shell* /cmd* /eval* /input* /server-status* /index.php* /info.php*
+        not path /_/* /api/*
+    }
+    handle @bad_paths {
+        respond "Forbidden" 403
+    }
 
-    # HTTP/3 支持
-    servers {
-        protocol {
-            experimental_http3
+    handle /api/admins/* {
+        header X-Robots-Tag "noindex, nofollow, noarchive"
+        @not_admin_api_ips {
+            not remote_ip {$ADMIN_IP}
+        }
+        respond @not_admin_api_ips "Forbidden: PocketBase admin API is restricted" 403
+        reverse_proxy pocketbase:8090 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
         }
     }
-}
 
-# 安全头 + 反向代理到 PocketBase
-header {
-    # HSTS (强制 HTTPS，有效期 1 年)
-    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-
-    # 防止点击劫持
-    X-Frame-Options "DENY"
-
-    # 防止 MIME 类型嗅探
-    X-Content-Type-Options "nosniff"
-
-    # XSS 保护
-    X-XSS-Protection "1; mode=block"
-
-    # 防止信息泄露
-    Referrer-Policy "strict-origin-when-cross-origin"
-
-    # 权限策略
-    Permissions-Policy "camera=(), microphone=(), geolocation=()"
-
-    # 内容安全策略：阻止混合内容，并限制可执行来源
-    Content-Security-Policy "default-src 'self' https: data: blob:; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https: wss:; upgrade-insecure-requests"
-
-    # 隐藏服务器信息
-    -Server
-    -X-Powered-By
-}
-
-# Rate Limit 配置 (全局)
-rate_limit {
-    zone dynamic_limit {
-        key {remote_host}
-        events {$RATE_LIMIT_PER_IP} per_second
-        window 1s
+    handle /api/* {
+        header X-Robots-Tag "noindex, nofollow, noarchive"
+        reverse_proxy pocketbase:8090 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
     }
-}
 
-# Admin UI 路由 - 仅允许白名单 IP
-handle /_/admin* {
-    @not_admin_ips {
-        not remote_ip {$ADMIN_IP}
+    handle /_/* {
+        header X-Robots-Tag "noindex, nofollow, noarchive"
+        @not_admin_ips {
+            not remote_ip {$ADMIN_IP}
+        }
+        respond @not_admin_ips "Forbidden: PocketBase admin access is restricted" 403
+        reverse_proxy pocketbase:8090 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
     }
-    respond @not_admin_ips 403 "Forbidden: Admin access restricted to whitelisted IPs"
-    reverse_proxy pocketbase:8090 {
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
-    }
-}
 
-# 静态资源缓存优化
-@static {
-    path *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot
-    path /assets/* /_app/immutable/*
-}
+    handle /admin* {
+        @not_admin_page_ips {
+            not remote_ip {$ADMIN_IP}
+        }
+        respond @not_admin_page_ips "Forbidden: admin pages are restricted" 403
+        header X-Robots-Tag "noindex, nofollow, noarchive"
+        try_files {path} {path}/ /index.html
+        file_server
+    }
 
-handle @static {
-    header Cache-Control "public, max-age=31536000, immutable"
-    reverse_proxy pocketbase:8090 {
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
+    handle /login* {
+        header X-Robots-Tag "noindex, nofollow, noarchive"
+        try_files {path} {path}/ /index.html
+        file_server
     }
-}
 
-# API 路由
-handle /api/* {
-    rate_limit {
-        zone dynamic_limit
+    @static {
+        path /_astro/* /pagefind/* *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.webp *.avif *.woff *.woff2 *.ttf *.eot
     }
-    reverse_proxy pocketbase:8090 {
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
+    handle @static {
+        file_server
     }
-}
 
-# 默认路由
-handle {
-    reverse_proxy pocketbase:8090 {
-        header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-For {remote_host}
-        header_up X-Forwarded-Proto {scheme}
+    handle {
+        try_files {path} {path}/ /index.html
+        file_server
     }
-}
 
-# 访问日志
-log {
-    output file /data/access.log {
-        roll_size 50mb
-        roll_keep 10
-        roll_keep_for 720h
+    log {
+        output file /data/access.log {
+            roll_size 50mb
+            roll_keep 10
+            roll_keep_for 720h
+        }
+        format json
     }
-    format json
 }

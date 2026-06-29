@@ -1,8 +1,8 @@
----
+﻿---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import CommentModerator from '../../../components/admin/CommentModerator';
 ---
 
-<AdminLayout title="Comments">
+<AdminLayout title="评论管理" requiredRole="admin">
   <CommentModerator client:only="react" />
 </AdminLayout>
