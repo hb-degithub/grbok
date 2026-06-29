@@ -41,6 +41,8 @@ export default function PostManager() {
   const [dirty, setDirty] = useState(false);
   const draftKey = useMemo(() => 'blog-draft-' + (editing?.id || '__new__'), [editing?.id]);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [allTags, setAllTags] = useState([]);
+  const [selectedTagIds, setSelectedTagIds] = useState([]);
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -74,6 +76,20 @@ export default function PostManager() {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [dirty]);
+
+  // Load available tags
+  useEffect(() => {
+    if (!editing) return;
+    const pb = getPocketBase();
+    pb.collection("tags").getList(1, 100).then(r => {
+      setAllTags(r.items.map((item) => ({ id: item.id, name: item.name, slug: item.slug })));
+    }).catch(() => {});
+    if (editing.id) {
+      pb.collection("post_tags").getList(1, 100).then(r => {
+        setSelectedTagIds(r.items.map((item) => item.tag_id));
+      }).catch(() => {});
+    } else setSelectedTagIds([]);
+  }, [editing?.id]);
 
   // Draft recovery on mount
   useEffect(() => {
@@ -154,6 +170,19 @@ export default function PostManager() {
       clearSavedDraft();
       setDirty(false);
       fetchPosts();
+      setSelectedTagIds([]);
+      // Sync tags via post_tags
+      try {
+        const savedPostId = editing.id?.trim() || pb.authStore.record?.id;
+        if (savedPostId) {
+          const existing = await pb.collection("post_tags").getList(1, 100, { filter: "post_id=\"" + editing.id + "\"" }).catch(() => ({ items: [] }));
+          const existingIds = existing.items.map(i => i.tag_id);
+          const toRemove = existing.items.filter(i => !selectedTagIds.includes(i.tag_id));
+          const toAdd = selectedTagIds.filter(id => !existingIds.includes(id)).filter(Boolean);
+          await Promise.all(toRemove.map(i => pb.collection("post_tags").delete(i.id)));
+          await Promise.all(toAdd.map(id => pb.collection("post_tags").create({ post_id: editing.id, tag_id: id })));
+        }
+      } catch (e) { console.error("Tag sync failed:", e); }
     } catch (err) {
       console.error('保存文章失败:', err);
       alert('保存失败，请检查 slug 是否唯一。');
@@ -282,6 +311,17 @@ export default function PostManager() {
                   <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">封面图片 URL</label>
                     <input type="text" value={editing.cover || ''} onChange={(e) => setEditing({ ...editing, cover: e.target.value })} placeholder="https://..." className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-accent focus:bg-white" />
                     {editing.cover && (() => { try { const u = new URL(editing.cover); if (u.protocol !== 'http:' && u.protocol !== 'https:') return null; } catch { return null; } return <img src={editing.cover} alt="封面预览" className="mt-3 aspect-video w-full rounded-md border border-border object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />; })()}
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">标签</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {allTags.length === 0 && <span className="text-xs text-text-secondary">无标签</span>}
+                      {allTags.map(tag => (
+                        <button key={tag.id} type="button" onClick={() => setSelectedTagIds(prev => prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id])} className={'rounded-md border px-2.5 py-1 text-xs font-medium transition-all ' + (selectedTagIds.includes(tag.id) ? 'border-accent/30 bg-accent/10 text-accent' : 'border-border bg-bg-soft text-text-secondary hover:border-border-hover hover:text-text')}>
+                          {tag.name}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div className="rounded-md border border-border bg-bg-soft p-3 text-xs text-text-secondary">
                     <div className="flex justify-between gap-3"><span>标题字数</span><span className="font-mono">{editing.title.length}</span></div>
