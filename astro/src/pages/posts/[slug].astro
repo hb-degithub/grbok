@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import ScrollReveal from '../../components/ui/ScrollReveal';
+import ShareButton from '../../components/ui/ShareButton';
 import { CommentSection } from '../../components/comments/CommentSection';
 import { sanitizeHtml } from '../../lib/security';
 
@@ -117,6 +118,7 @@ const safeContent = post?.content ? sanitizeHtml(post.content) : '';
       <ScrollReveal delay={0.3} client:visible>
         <div class="border-t border-stone-200 pt-12 dark:border-stone-700">
           <CommentSection postId={post.id} client:visible />
+      <div class="mt-6 flex justify-center"><ShareButton client:visible /></div>
       <!-- prev/next navigation -->
       <nav class="mt-8 grid gap-4 sm:grid-cols-2">
         <a href="/posts" class="flex items-center gap-2 rounded-lg border border-stone-200 p-4 text-sm text-stone-600 transition-colors hover:border-stone-300 hover:text-stone-900 dark:border-stone-800 dark:text-stone-400 dark:hover:border-stone-700 dark:hover:text-stone-200">

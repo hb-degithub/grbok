@@ -4,6 +4,10 @@ import PostList from '../components/posts/PostList';
 import ParticleField from '../components/effects/ParticleField';
 import Typewriter from '../components/ui/Typewriter';
 import HomeAuthQuickEntry from '../components/auth/HomeAuthQuickEntry';
+import ProfileCard from '../components/sidebar/ProfileCard';
+import HotArticles from '../components/sidebar/HotArticles';
+import RecentComments from '../components/sidebar/RecentComments';
+import FriendLinks from '../components/sidebar/FriendLinks';
 
 const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 
@@ -149,6 +153,19 @@ const [postsCount, tagsCount] = await Promise.all([
           <div class="flex items-center justify-between"><span>内容积累</span><span>{postsCount} / {tagsCount}</span></div>
         </div>
       </section>
+    </div>
+
+    <div class="mt-8 grid gap-5 lg:grid-cols-2 xl:hidden">
+      <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75">
+        <ProfileCard client:visible />
+      </section>
+      <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75">
+        <HotArticles client:visible />
+      </section>
+    </div>
+    <div class="mt-5 xl:hidden">
+      <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75"><RecentComments client:visible /></section>
+      <section class="side-panel mt-5 rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75"><FriendLinks client:visible /></section>
     </div>
   </section>
 </BaseLayout>

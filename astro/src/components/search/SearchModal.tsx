@@ -37,7 +37,20 @@ export default function SearchModal() {
 
   /** 动态加载 Pagefind */
   useEffect(() => {
-    const loadPagefind = async () => {
+    
+  // Keyboard shortcut: Cmd+K / Ctrl+K to open search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
+  const loadPagefind = async () => {
       try {
         setLoadError(false);
         if ((window as any).pagefind) {

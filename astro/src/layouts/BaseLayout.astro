@@ -25,6 +25,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.json" />
     <meta name="generator" content={Astro.generator} />
 
     <title>{title} | {SITE_CONFIG.name}</title>
@@ -135,6 +136,11 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
   }
 </style>
 
+<script is:inline>
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  }
+</script>
 </head>
   <body class="min-h-[100svh] bg-white font-sans text-stone-900 antialiased dark:bg-stone-950 dark:text-stone-100">
     {showChrome && <Header client:load />}
