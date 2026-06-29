@@ -3,6 +3,7 @@ migrate((db) => {
   const ADMIN_RULE = '@request.auth.role = "admin" || @request.auth.role = "super_admin"';
   const SUPER_ADMIN_RULE = '@request.auth.role = "super_admin"';
   const AUTHOR_RULE = '@request.auth.role = "author" || ' + ADMIN_RULE;
+  const OWNER_RULE = '@request.auth.role = "author" && uploader.id = @request.auth.id';
 
   function find(name) {
     try { return dao.findCollectionByNameOrId(name); } catch (_) { return null; }
@@ -29,14 +30,15 @@ migrate((db) => {
   }
   ensureField(media, { name: "file", type: "file", required: true, options: { maxSelect: 1, maxSize: 10485760, mimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"], thumbs: [], protected: false } });
   ensureField(media, { name: "alt", type: "text", required: false, options: { min: null, max: 500, pattern: "" } });
-  if (find("users")) ensureField(media, { name: "uploader", type: "relation", required: true, options: { collectionId: find("users").id, cascadeDelete: false, minSelect: null, maxSelect: 1, displayFields: ["name"] } });
+  const users = find("users");
+  if (users) ensureField(media, { name: "uploader", type: "relation", required: true, options: { collectionId: users.id, cascadeDelete: false, minSelect: null, maxSelect: 1, displayFields: ["name"] } });
   ensureField(media, { name: "size", type: "number", required: false, options: { min: 0, max: null, noDecimal: true } });
   ensureField(media, { name: "usage_count", type: "number", required: false, options: { min: 0, max: null, noDecimal: true } });
-  media.listRule = ADMIN_RULE + " || (@request.auth.role = "author" && uploader.id = @request.auth.id)";
-  media.viewRule = ADMIN_RULE + " || (@request.auth.role = "author" && uploader.id = @request.auth.id)";
+  media.listRule = ADMIN_RULE + " || (" + OWNER_RULE + ")";
+  media.viewRule = ADMIN_RULE + " || (" + OWNER_RULE + ")";
   media.createRule = AUTHOR_RULE;
-  media.updateRule = ADMIN_RULE + " || (@request.auth.role = "author" && uploader.id = @request.auth.id)";
-  media.deleteRule = SUPER_ADMIN_RULE + " || (@request.auth.role = "author" && uploader.id = @request.auth.id)";
+  media.updateRule = ADMIN_RULE + " || (" + OWNER_RULE + ")";
+  media.deleteRule = SUPER_ADMIN_RULE + " || (" + OWNER_RULE + ")";
   save(media);
 
 }, (db) => {

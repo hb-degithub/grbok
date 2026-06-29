@@ -27,14 +27,14 @@ migrate((db) => {
   if (!rxn) {
     rxn = new Collection({ name: "reactions", type: "base", system: false, schema: [] });
   }
-  if (find("posts")) ensureField(rxn, { name: "post_id", type: "relation", required: false, options: { collectionId: find("posts").id, cascadeDelete: true, minSelect: null, maxSelect: 1, displayFields: ["title"] } });
-  if (find("comments") && find("public_comments")) {
-    const pc = find("public_comments") || find("comments");
-    ensureField(rxn, { name: "comment_id", type: "relation", required: false, options: { collectionId: pc.id, cascadeDelete: true, minSelect: null, maxSelect: 1, displayFields: [] } });
-  }
+  const posts = find("posts");
+  const comments = find("comments");
+  if (posts) ensureField(rxn, { name: "post_id", type: "relation", required: false, options: { collectionId: posts.id, cascadeDelete: true, minSelect: null, maxSelect: 1, displayFields: ["title"] } });
+  if (comments) ensureField(rxn, { name: "comment_id", type: "relation", required: false, options: { collectionId: comments.id, cascadeDelete: true, minSelect: null, maxSelect: 1, displayFields: ["author_name"] } });
   ensureField(rxn, { name: "type", type: "select", required: true, options: { maxSelect: 1, values: ["like", "useful", "inspired"] } });
   ensureField(rxn, { name: "fingerprint", type: "text", required: false, options: { min: null, max: 128, pattern: "" } });
-  if (find("users")) ensureField(rxn, { name: "user_id", type: "relation", required: false, options: { collectionId: find("users").id, cascadeDelete: false, minSelect: null, maxSelect: 1, displayFields: ["name"] } });
+  const users = find("users");
+  if (users) ensureField(rxn, { name: "user_id", type: "relation", required: false, options: { collectionId: users.id, cascadeDelete: false, minSelect: null, maxSelect: 1, displayFields: ["name"] } });
   rxn.listRule = "";
   rxn.viewRule = "";
   rxn.createRule = "";

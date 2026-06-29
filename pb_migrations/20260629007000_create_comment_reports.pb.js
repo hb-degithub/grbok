@@ -27,10 +27,8 @@ migrate((db) => {
   if (!cr) {
     cr = new Collection({ name: "comment_reports", type: "base", system: false, schema: [] });
   }
-  if (find("comments") && find("public_comments")) {
-    const pc = find("public_comments") || find("comments");
-    ensureField(cr, { name: "comment_id", type: "relation", required: true, options: { collectionId: pc.id, cascadeDelete: true, minSelect: null, maxSelect: 1, displayFields: [] } });
-  }
+  const comments = find("comments");
+  if (comments) ensureField(cr, { name: "comment_id", type: "relation", required: true, options: { collectionId: comments.id, cascadeDelete: true, minSelect: null, maxSelect: 1, displayFields: ["author_name"] } });
   ensureField(cr, { name: "reason", type: "text", required: false, options: { min: null, max: 500, pattern: "" } });
   ensureField(cr, { name: "reporter_email", type: "text", required: false, options: { min: null, max: 255, pattern: "" } });
   ensureField(cr, { name: "status", type: "select", required: true, options: { maxSelect: 1, values: ["pending", "dismissed", "actioned"] } });
