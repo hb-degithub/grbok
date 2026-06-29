@@ -4,6 +4,7 @@ import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer.astro';
 import SearchModal from '../components/search/SearchModal';
 import DebugProtection from '../components/effects/DebugProtection';
+import ToastContainer from '../components/ui/Toast';
 import { SITE_CONFIG } from '../config/site';
 
 interface Props {
@@ -87,7 +88,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
           const vv = window.visualViewport || { width: window.innerWidth, height: window.innerHeight, scale: 1 };
           const root = document.documentElement;
           const vvw = Math.max(320, Math.round(vv.width));
-          const vvh = Math.max(480, Math.round(vv.height));
+          const vvh = Math.max(1, Math.round(vv.height || window.innerHeight || 0));
           root.style.setProperty('--vvw', `${vvw}px`);
           root.style.setProperty('--vvh', `${vvh}px`);
           root.style.setProperty('--vv-scale', `${vv.scale || 1}`);
@@ -107,7 +108,6 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
         };
         set();
         window.visualViewport?.addEventListener('resize', set);
-        window.visualViewport?.addEventListener('scroll', set);
         window.addEventListener('resize', set);
         window.addEventListener('orientationchange', () => setTimeout(set, 50));
       })();
@@ -115,17 +115,18 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
     <ClientRouter />
   </head>
-  <body class="min-h-screen bg-white pb-20 font-sans text-stone-900 antialiased dark:bg-stone-950 dark:text-stone-100">
+  <body class="min-h-[100svh] bg-white font-sans text-stone-900 antialiased dark:bg-stone-950 dark:text-stone-100">
     {showChrome && <Header client:load />}
     {showChrome && <SearchModal client:load />}
 
-    <main class="w-full overflow-x-clip pt-[var(--header-h,4rem)]">
+    <main class:list={["w-full overflow-x-clip", showChrome && "pt-[var(--header-offset,4rem)]"]}>
       <slot />
     </main>
 
     {showChrome && <Footer />}
     <DebugProtection client:load />
-  </body>
+  <ToastContainer client:load />
+</body>
 </html>
 
 <style>

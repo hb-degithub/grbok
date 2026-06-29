@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useAdminAuth, type AdminRole } from '../../hooks/useAdminAuth';
 
 interface Props { children: React.ReactNode; requiredRole?: AdminRole; }
@@ -19,7 +19,7 @@ export default function AdminGuard({ children, requiredRole = 'author' }: Props)
   const { isAuthenticated, isLoading, user, hasPermission } = useAdminAuth();
 
   if (isLoading) return (
-    <div className="flex min-h-screen items-center justify-center bg-bg">
+    <div className="flex min-h-[100svh] items-center justify-center bg-bg">
       <div className="card rounded-2xl p-10 text-center">
         <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-border border-t-stone-500" />
         <p className="font-mono text-xs uppercase tracking-widest text-text-secondary">正在验证身份...</p>
@@ -28,7 +28,7 @@ export default function AdminGuard({ children, requiredRole = 'author' }: Props)
   );
 
   if (!isAuthenticated) return (
-    <div className="flex min-h-screen items-center justify-center bg-bg">
+    <div className="flex min-h-[100svh] items-center justify-center bg-bg">
       <div className="card max-w-md rounded-2xl p-8 text-center">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-danger/15">
           <svg className="h-8 w-8 text-danger" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -46,7 +46,7 @@ export default function AdminGuard({ children, requiredRole = 'author' }: Props)
   );
 
   if (!hasPermission(requiredRole)) return (
-    <div className="flex min-h-screen items-center justify-center bg-bg">
+    <div className="flex min-h-[100svh] items-center justify-center bg-bg">
       <div className="card max-w-md rounded-2xl p-8 text-center">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-warning/15">
           <svg className="h-8 w-8 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">

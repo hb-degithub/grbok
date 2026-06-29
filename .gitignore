@@ -51,4 +51,17 @@ temp/
 /*.jpg
 /*.err
 /*.log
+# SSH 私钥（禁止提交）
+*_key
+*_ed25519
+*.pem
+*.key
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*.ppk
 
+# 部署临时文件
+deploy-*.tar.gz
+deploy-*.zip

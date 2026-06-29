@@ -211,7 +211,7 @@ export default function SearchModal() {
               role="dialog"
               aria-modal="true"
               aria-label="搜索文章"
-              className="glass-strong relative z-10 flex h-[var(--vvh,100dvh)] max-h-[var(--vvh,100dvh)] w-full max-w-full flex-col overflow-hidden rounded-none sm:h-auto sm:max-h-[min(80vh,42rem)] sm:max-w-2xl sm:rounded-2xl"
+              className="glass-strong relative z-10 flex h-[var(--vvh,100dvh)] max-h-[100dvh] w-full max-w-full flex-col overflow-hidden rounded-none sm:h-auto sm:max-h-[min(80dvh,42rem)] sm:max-w-2xl sm:rounded-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* 搜索输入框 */}

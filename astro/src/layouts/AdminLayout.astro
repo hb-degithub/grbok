@@ -2,6 +2,7 @@
 import BaseLayout from './BaseLayout.astro';
 import AdminSidebar from '../components/admin/AdminSidebar';
 import AdminGuard from '../components/admin/AdminGuard';
+import ToastContainer from '../components/ui/Toast';
 import type { AdminRole } from '../hooks/useAdminAuth';
 
 interface Props {
@@ -10,7 +11,7 @@ interface Props {
   requiredRole?: AdminRole;
 }
 
-const { title, description = '鍗氬鍚庡彴绠＄悊闈㈡澘', requiredRole = 'author' } = Astro.props;
+const { title, description = '博客后台管理面板', requiredRole = 'author' } = Astro.props;
 
 const requiredRoleLabel: Record<AdminRole, string> = {
   reader: '普通用户',
@@ -22,10 +23,10 @@ const requiredRoleLabel: Record<AdminRole, string> = {
 
 <BaseLayout title={title + ' - 鍚庡彴'} description={description} showChrome={false} noindex>
   <AdminGuard client:only="react" requiredRole={requiredRole}>
-    <div class="admin-shell min-h-screen bg-[#f6f6f3] text-text">
+    <div class="admin-shell min-h-[100svh] bg-[#f6f6f3] text-text">
      <AdminSidebar client:only="react" />
      <main
-        class="min-h-screen flex-1 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-16 transition-[margin] duration-300 ease-out sm:px-5 lg:ml-[var(--admin-sidebar-width,15.5rem)] lg:px-6 lg:pt-4"
+        class="min-h-[100svh] flex-1 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-16 transition-[margin] duration-300 ease-out sm:px-5 lg:ml-[var(--admin-sidebar-width,15.5rem)] lg:px-6 lg:pt-4"
      >
        <div class="mx-auto w-full max-w-[1440px]">
           <header class="admin-topbar sticky top-0 z-30 -mx-4 mb-5 border-b border-border/80 bg-[#f6f6f3]/92 px-4 py-3 pl-16 backdrop-blur-xl sm:-mx-5 sm:px-5 sm:pl-16 lg:-mx-6 lg:px-6">
@@ -56,5 +57,6 @@ const requiredRoleLabel: Record<AdminRole, string> = {
         </div>
       </main>
     </div>
-  </AdminGuard>
+  <ToastContainer client:load />
+</AdminGuard>
 </BaseLayout>
