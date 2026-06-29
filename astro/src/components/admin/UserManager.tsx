@@ -21,6 +21,7 @@ const roleLabels: Record<string, string> = {
 export default function UserManager() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
   const [updatingId, setUpdatingId] = useState('');
   const [error, setError] = useState('');
   const { user: currentUser } = useAdminAuth();
