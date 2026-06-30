@@ -32,7 +32,7 @@ export default function AuthPage() {
       variants={pageVariants}
       initial="hidden"
       animate="visible"
-      className="mobile-auth-shell relative flex min-h-[var(--content-vvh,calc(100dvh-4rem))] min-w-0 items-start justify-center overflow-x-clip px-3 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-4 sm:py-8 md:items-center md:py-12 lg:py-16"
+      className="mobile-auth-shell relative flex min-h-[var(--content-vvh,calc(100dvh-4rem))] min-h-[calc(100svh-4rem)] min-w-0 items-center justify-center overflow-x-clip px-3 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:px-4 sm:py-8 md:py-12 lg:py-16"
       aria-labelledby="auth-heading"
     >
       <div className="aurora" aria-hidden="true">
