@@ -157,7 +157,7 @@ export default function RegisterForm() {
         />
       </motion.div>
 
-      <motion.p variants={itemVariants} className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm leading-snug text-stone-600 dark:border-stone-700 dark:bg-stone-900/60 dark:text-stone-300 sm:px-4 sm:py-3">
+      <motion.p variants={itemVariants} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm leading-snug text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-300 sm:px-4 sm:py-3">
         注册后默认获得 reader 权限，后台权限需要超级管理员另行分配。
       </motion.p>
 

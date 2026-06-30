@@ -194,7 +194,7 @@ export default function AdminSidebar() {
         ref={triggerRef}
         type="button"
         onClick={() => setDrawerOpen(true)}
-        className="fixed left-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-50 flex h-11 w-11 items-center justify-center rounded-md border border-border bg-white/95 text-text shadow-md backdrop-blur lg:hidden"
+        className="fixed left-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-50 flex h-11 w-11 items-center justify-center rounded-md border border-border bg-white text-text shadow-md backdrop-blur lg:hidden"
         aria-label="鎵撳紑鍚庡彴鑿滃崟"
         aria-expanded={drawerOpen}
         aria-controls="admin-mobile-sidebar"
@@ -238,7 +238,7 @@ export default function AdminSidebar() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-stone-950/35 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-50 bg-zinc-950/35 backdrop-blur-sm lg:hidden"
               onClick={() => setDrawerOpen(false)}
               aria-hidden="true"
             />

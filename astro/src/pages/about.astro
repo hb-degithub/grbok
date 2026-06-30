@@ -25,13 +25,13 @@ const links = [
     <!-- 头部 -->
     <ScrollReveal client:visible>
       <div class="mb-16 text-center">
-        <div class="mb-6 inline-flex h-24 w-24 items-center justify-center rounded-full border-2 border-stone-200 bg-stone-100 dark:border-stone-700 dark:bg-stone-800">
-          <span class="font-display text-3xl font-black text-stone-500 dark:text-stone-400">B</span>
+        <div class="mb-6 inline-flex h-24 w-24 items-center justify-center rounded-full border-2 border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
+          <span class="font-display text-3xl font-black text-zinc-500 dark:text-zinc-400">B</span>
         </div>
-        <h1 class="font-display text-4xl font-black uppercase tracking-wide text-stone-900 dark:text-stone-100 mb-4">
+        <h1 class="font-display text-4xl font-black uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-4">
           关于博客
         </h1>
-        <div class="text-stone-500 dark:text-stone-400">
+        <div class="text-zinc-500 dark:text-zinc-400">
           <Typewriter
             text="一个分享技术、思考与生活的个人博客"
             client:visible
@@ -42,11 +42,11 @@ const links = [
 
     <!-- 介绍 -->
     <ScrollReveal delay={0.1} client:visible>
-      <div class="card rounded-2xl p-8 mb-8">
-        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-stone-900 dark:text-stone-100 mb-4">
+      <div class="card rounded-lg p-8 mb-8">
+        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-4">
           关于这个博客
         </h2>
-        <div class="space-y-4 text-stone-500 dark:text-stone-400">
+        <div class="space-y-4 text-zinc-500 dark:text-zinc-400">
           <p>
             这是一个使用现代技术栈构建的个人博客系统，旨在分享技术文章、学习笔记和个人思考。
           </p>
@@ -62,20 +62,20 @@ const links = [
 
     <!-- 技术栈 -->
     <ScrollReveal delay={0.2} client:visible>
-      <div class="card rounded-2xl p-8 mb-8">
-        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-stone-900 dark:text-stone-100 mb-6">
+      <div class="card rounded-lg p-8 mb-8">
+        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-6">
           技术栈
         </h2>
         <div class="space-y-4">
           {skills.map((skill) => (
             <div>
               <div class="flex items-center justify-between mb-2">
-                <span class="font-mono text-sm text-stone-900 dark:text-stone-100">{skill.name}</span>
-                <span class="font-mono text-xs text-stone-500 dark:text-stone-400">{skill.level}%</span>
+                <span class="font-mono text-sm text-zinc-900 dark:text-zinc-100">{skill.name}</span>
+                <span class="font-mono text-xs text-zinc-500 dark:text-zinc-400">{skill.level}%</span>
               </div>
-              <div class="h-2 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
+              <div class="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
                 <div
-                  class="h-full rounded-full bg-gradient-to-r from-stone-500 to-stone-400 transition-all duration-1000 ease-out"
+                  class="h-full rounded-full bg-gradient-to-r from-zinc-500 to-zinc-400 transition-all duration-1000 ease-out"
                   style={`width: ${skill.level}%`}
                 />
               </div>
@@ -87,8 +87,8 @@ const links = [
 
     <!-- 联系方式 -->
     <ScrollReveal delay={0.3} client:visible>
-      <div class="card rounded-2xl p-8">
-        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-stone-900 dark:text-stone-100 mb-6">
+      <div class="card rounded-lg p-8">
+        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-6">
           联系方式
         </h2>
         <div class="flex flex-wrap gap-4">

@@ -113,14 +113,14 @@ export default function Header() {
       initial={{ y: 0 }}
       animate={{ y: isVisible ? 0 : '-100%' }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className="fixed inset-x-0 top-0 z-50 border-b border-white/40 bg-white/70 backdrop-blur-xl backdrop-saturate-150 pt-[env(safe-area-inset-top)] dark:border-white/5 dark:bg-stone-950/70"
+      className="fixed inset-x-0 top-0 z-50 border-b border-white/40 bg-white/70 backdrop-blur-xl backdrop-saturate-150 pt-[env(safe-area-inset-top)] dark:border-white/5 dark:bg-zinc-950/70"
       style={{ willChange: 'transform' }}
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent dark:via-white/15" aria-hidden="true" />
 
       <nav className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2 overflow-x-clip px-[var(--page-pad,1rem)] py-1.5 sm:gap-2 sm:px-6 sm:py-3.5" aria-label="主导航">
-        <a href="/" className="focus-ring flex min-h-[40px] min-w-[40px] shrink-0 items-center gap-2 rounded-lg text-base font-semibold tracking-tight text-stone-900 transition-colors hover:text-stone-600 dark:text-stone-100 dark:hover:text-stone-400" aria-label="返回博客首页">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-stone-500 to-stone-600 shadow-sm transition-transform duration-200 hover:scale-105">
+        <a href="/" className="focus-ring flex min-h-[40px] min-w-[40px] shrink-0 items-center gap-2 rounded-lg text-base font-semibold tracking-tight text-zinc-900 transition-colors hover:text-zinc-600 dark:text-zinc-100 dark:hover:text-zinc-400" aria-label="返回博客首页">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-zinc-500 to-zinc-600 shadow-sm transition-transform duration-200 hover:scale-105">
             <span className="text-xs font-bold text-white">B</span>
           </div>
           <span className="hidden sm:inline">博客</span>
@@ -130,7 +130,7 @@ export default function Header() {
           <button
             type="button"
             onClick={() => setSideNavOpen(true)}
-            className="focus-ring inline-flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] items-center justify-center rounded-lg border border-stone-200 bg-white/70 text-stone-600 shadow-sm transition-colors hover:bg-stone-100 hover:text-stone-950 dark:border-stone-800 dark:bg-stone-900/70 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-white sm:hidden"
+            className="focus-ring inline-flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] items-center justify-center rounded-lg border border-zinc-200 bg-white/70 text-zinc-600 shadow-sm transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:hidden"
             aria-label="打开导航菜单"
             aria-controls="mobile-side-nav"
             aria-expanded={sideNavOpen}
@@ -151,8 +151,8 @@ export default function Header() {
                     className={cn(
                       'focus-ring relative block rounded-lg px-3 py-2 text-sm leading-none no-underline transition-colors duration-200',
                       active
-                        ? 'bg-stone-100 font-medium text-stone-900 shadow-sm dark:bg-white/10 dark:text-stone-100'
-                        : 'text-stone-500 hover:bg-white/50 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-white/5 dark:hover:text-stone-100'
+                        ? 'bg-zinc-100 font-medium text-zinc-900 shadow-sm dark:bg-white/10 dark:text-zinc-100'
+                        : 'text-zinc-500 hover:bg-white/50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-100'
                     )}
                   >
                     {item.label}
@@ -165,7 +165,7 @@ export default function Header() {
           <button
             type="button"
             onClick={openSearch}
-            className="focus-ring inline-flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] items-center justify-center rounded-lg border border-stone-200 bg-white/70 text-stone-600 shadow-sm transition-colors hover:bg-stone-100 hover:text-stone-950 dark:border-stone-800 dark:bg-stone-900/70 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-white sm:h-10 sm:w-auto sm:px-3"
+            className="focus-ring inline-flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] items-center justify-center rounded-lg border border-zinc-200 bg-white/70 text-zinc-600 shadow-sm transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:h-10 sm:w-auto sm:px-3"
             aria-label="搜索文章（快捷键 Ctrl 或 Command 加 K）"
           >
             <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -178,7 +178,7 @@ export default function Header() {
             <button
               type="button"
               onClick={() => setThemeMenuOpen((open) => !open)}
-              className="focus-ring inline-flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] items-center justify-center rounded-lg border border-stone-200 bg-white/70 text-stone-600 shadow-sm transition-colors hover:bg-stone-100 hover:text-stone-950 dark:border-stone-800 dark:bg-stone-900/70 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-white sm:h-10 sm:w-10"
+              className="focus-ring inline-flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] items-center justify-center rounded-lg border border-zinc-200 bg-white/70 text-zinc-600 shadow-sm transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:h-10 sm:w-10"
               aria-label={`主题切换：${activeThemeLabel}，当前${resolvedTheme === 'dark' ? '暗色' : '亮色'}`}
               aria-haspopup="menu"
               aria-expanded={themeMenuOpen}
@@ -189,7 +189,7 @@ export default function Header() {
             </button>
 
             {themeMenuOpen && (
-              <div className="absolute right-0 mt-2 w-[min(14rem,calc(100vw-var(--page-pad,1rem)*2))] overflow-hidden rounded-xl border border-stone-200 bg-white/95 p-1 shadow-xl shadow-stone-900/10 backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/95 sm:p-1.5" role="menu">
+              <div className="absolute right-0 mt-2 w-[min(14rem,calc(100vw-var(--page-pad,1rem)*2))] overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-xl shadow-zinc-900/10 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/95 sm:p-1.5" role="menu">
                 {themeOptions.map((item) => (
                   <button
                     key={item.mode}
@@ -198,8 +198,8 @@ export default function Header() {
                     className={cn(
                       'flex min-h-[40px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left leading-snug transition-colors sm:py-2.5',
                       themeMode === item.mode
-                        ? 'bg-stone-100 text-stone-950 dark:bg-stone-800 dark:text-white'
-                        : 'text-stone-600 hover:bg-stone-50 hover:text-stone-950 dark:text-stone-300 dark:hover:bg-stone-800/70 dark:hover:text-white'
+                        ? 'bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-white'
+                        : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-white'
                     )}
                     role="menuitemradio"
                     aria-checked={themeMode === item.mode}
@@ -209,7 +209,7 @@ export default function Header() {
                     </svg>
                     <span className="min-w-0 break-words">
                       <span className="block text-sm font-semibold leading-5">{item.label}</span>
-                      <span className="block text-xs leading-4 text-stone-400 dark:text-stone-500">{item.description}</span>
+                      <span className="block text-xs leading-4 text-zinc-400 dark:text-zinc-500">{item.description}</span>
                     </span>
                   </button>
                 ))}

@@ -344,7 +344,7 @@ export default function PostManager() {
                   </div>
                 </aside>
               </div>
-              <div className="sticky bottom-0 -mx-4 mt-5 flex flex-col-reverse gap-2 border-t border-border bg-white/95 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:static sm:mx-0 sm:flex-row sm:justify-end sm:bg-transparent sm:px-0 sm:pb-0">
+              <div className="sticky bottom-0 -mx-4 mt-5 flex flex-col-reverse gap-2 border-t border-border bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4 backdrop-blur sm:static sm:mx-0 sm:flex-row sm:justify-end sm:bg-transparent sm:px-0 sm:pb-0">
                 <button onClick={() => setEditing(null)} className="btn-ghost min-h-10 rounded-md text-xs">取消</button>
                 <button onClick={savePost} disabled={saving} className="btn-primary min-h-10 rounded-md text-xs disabled:cursor-not-allowed disabled:opacity-60">{saving ? '保存中...' : '保存文章'}</button>
               </div>

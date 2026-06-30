@@ -224,12 +224,12 @@ export default function SearchModal() {
               role="dialog"
               aria-modal="true"
               aria-label="搜索文章"
-              className="glass-strong relative z-10 flex h-[var(--vvh,100dvh)] max-h-[100dvh] w-full max-w-full flex-col overflow-hidden rounded-none sm:h-auto sm:max-h-[min(80dvh,42rem)] sm:max-w-2xl sm:rounded-2xl"
+              className="glass-strong relative z-10 flex h-[var(--vvh,100dvh)] max-h-[100dvh] w-full max-w-full flex-col overflow-hidden rounded-none sm:h-auto sm:max-h-[min(80dvh,42rem)] sm:max-w-2xl sm:rounded-lg"
               onClick={(e) => e.stopPropagation()}
             >
               {/* 搜索输入框 */}
-              <div className="flex min-h-[56px] shrink-0 items-center border-b border-stone-200/60 px-3 py-2 pt-[max(env(safe-area-inset-top),0.5rem)] dark:border-stone-700/50 sm:px-4 sm:pt-2">
-                <svg className="h-5 w-5 shrink-0 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <div className="flex min-h-[56px] shrink-0 items-center border-b border-zinc-200/60 px-3 py-2 pt-[max(env(safe-area-inset-top),0.5rem)] dark:border-zinc-700/50 sm:px-4 sm:pt-2">
+                <svg className="h-5 w-5 shrink-0 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
@@ -245,20 +245,20 @@ export default function SearchModal() {
                   onChange={(e) => setQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="搜索文章..."
-                  className="min-w-0 flex-1 bg-transparent px-2 py-3 text-[16px] leading-snug text-stone-900 placeholder-stone-400 outline-none dark:text-stone-100 sm:px-4 sm:text-base"
+                  className="min-w-0 flex-1 bg-transparent px-2 py-3 text-[16px] leading-snug text-zinc-900 placeholder-zinc-400 outline-none dark:text-zinc-100 sm:px-4 sm:text-base"
                 />
                 {isLoading && (
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                    className="h-5 w-5 shrink-0 rounded-full border-2 border-stone-300 border-t-stone-500"
+                    className="h-5 w-5 shrink-0 rounded-full border-2 border-zinc-300 border-t-zinc-500"
                     aria-hidden="true"
                   />
                 )}
                 <button
                   onClick={() => setIsOpen(false)}
                   aria-label="关闭搜索"
-                  className="focus-ring ml-1 inline-flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] shrink-0 items-center justify-center rounded-lg text-stone-500 transition-colors hover:bg-white/50 hover:text-stone-700 dark:hover:bg-white/5 dark:hover:text-stone-300 sm:w-auto sm:px-2 sm:py-1 sm:text-xs"
+                  className="focus-ring ml-1 inline-flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-white/50 hover:text-zinc-700 dark:hover:bg-white/5 dark:hover:text-zinc-300 sm:w-auto sm:px-2 sm:py-1 sm:text-xs"
                 >
                   <span className="hidden sm:inline">ESC</span>
                   <svg className="h-5 w-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -275,13 +275,13 @@ export default function SearchModal() {
                 </div>
 
                 {loadError && (
-                  <div className="break-words px-4 py-8 text-center text-sm leading-snug text-stone-500 dark:text-stone-400">搜索索引暂时不可用，请稍后再试</div>
+                  <div className="break-words px-4 py-8 text-center text-sm leading-snug text-zinc-500 dark:text-zinc-400">搜索索引暂时不可用，请稍后再试</div>
                 )}
                 {!loadError && results.length === 0 && query && !isLoading && (
-                  <div className="break-words px-4 py-8 text-center text-sm leading-snug text-stone-500 dark:text-stone-400">未找到相关结果</div>
+                  <div className="break-words px-4 py-8 text-center text-sm leading-snug text-zinc-500 dark:text-zinc-400">未找到相关结果</div>
                 )}
                 {!loadError && results.length === 0 && !query && (
-                  <div className="break-words px-4 py-8 text-center text-sm leading-snug text-stone-500 dark:text-stone-400">输入关键词开始搜索</div>
+                  <div className="break-words px-4 py-8 text-center text-sm leading-snug text-zinc-500 dark:text-zinc-400">输入关键词开始搜索</div>
                 )}
 
                 <motion.div variants={listVariants} initial="hidden" animate="visible">
@@ -297,23 +297,23 @@ export default function SearchModal() {
                       className={cn(
                         'focus-ring flex min-h-[44px] flex-col gap-1 rounded-lg px-3 py-3 transition-colors sm:px-4',
                         index === selectedIndex
-                          ? 'bg-stone-100 dark:bg-stone-800/60'
+                          ? 'bg-zinc-100 dark:bg-zinc-800/60'
                           : 'hover:bg-white/50 dark:hover:bg-white/5'
                       )}
                     >
-                      <div className="break-words font-medium leading-snug text-stone-900 dark:text-white">{result.title || '无标题'}</div>
+                      <div className="break-words font-medium leading-snug text-zinc-900 dark:text-white">{result.title || '无标题'}</div>
                       <div
-                        className="line-clamp-2 break-words text-sm leading-snug text-stone-500 [overflow-wrap:anywhere] dark:text-stone-400"
+                        className="line-clamp-2 break-words text-sm leading-snug text-zinc-500 [overflow-wrap:anywhere] dark:text-zinc-400"
                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(result.excerpt) }}
                       />
-                      <div className="break-all text-xs leading-snug text-stone-400">{result.url}</div>
+                      <div className="break-all text-xs leading-snug text-zinc-400">{result.url}</div>
                     </motion.a>
                   ))}
                 </motion.div>
               </div>
 
               {/* 底部提示 */}
-              <div className="hidden border-t border-stone-200/60 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-xs text-stone-500 dark:border-stone-700/50 dark:text-stone-400 sm:flex sm:items-center sm:pb-3">
+              <div className="hidden border-t border-zinc-200/60 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-xs text-zinc-500 dark:border-zinc-700/50 dark:text-zinc-400 sm:flex sm:items-center sm:pb-3">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                   <span>↑↓ 导航</span>
                   <span>↵ 选择</span>

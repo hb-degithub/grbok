@@ -125,7 +125,7 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-stone-900/20 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-zinc-900/20 backdrop-blur-sm"
             aria-hidden="true"
           />
           <motion.aside
@@ -141,19 +141,19 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
             transition={DRAWER_TRANSITION}
             onClick={handleDrawerClick}
             onKeyDown={handleDrawerKeyDown}
-            className="fixed inset-y-0 left-0 z-50 flex h-auto max-h-none w-[min(288px,88dvw)] max-w-[calc(100dvw-env(safe-area-inset-right))] flex-col overflow-hidden bg-white shadow-2xl outline-none dark:bg-stone-900"
+            className="fixed inset-y-0 left-0 z-50 flex h-auto max-h-none w-[min(288px,88dvw)] max-w-[calc(100dvw-env(safe-area-inset-right))] flex-col overflow-hidden bg-white shadow-2xl outline-none dark:bg-zinc-900"
           >
-            <div className="flex min-h-[56px] shrink-0 items-center justify-between gap-3 border-b border-stone-200 px-3 py-2 pt-[max(env(safe-area-inset-top),0.5rem)] dark:border-stone-800 sm:px-5">
+            <div className="flex min-h-[56px] shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-3 py-2 pt-[max(env(safe-area-inset-top),0.5rem)] dark:border-zinc-800 sm:px-5">
               <a href="/" className="flex min-h-[40px] min-w-0 items-center gap-2.5">
-                <div className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-xl bg-stone-500 text-lg font-bold text-white">
+                <div className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-xl bg-zinc-500 text-lg font-bold text-white">
                   {SITE_CONFIG.logoText}
                 </div>
-                <span className="min-w-0 break-words text-base font-bold leading-tight text-stone-900 dark:text-stone-100">{SITE_CONFIG.name}</span>
+                <span className="min-w-0 break-words text-base font-bold leading-tight text-zinc-900 dark:text-zinc-100">{SITE_CONFIG.name}</span>
               </a>
               <button
                 type="button"
                 onClick={onClose}
-                className="focus-ring flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] shrink-0 items-center justify-center rounded-lg text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+                className="focus-ring flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
                 aria-label="关闭侧边导航"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -164,7 +164,7 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
 
             <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-4">
               <div className="space-y-1">
-                <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">主导航</p>
+                <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">主导航</p>
                 {mainNavItems.map((item) => (
                   <a
                     key={item.href}
@@ -172,8 +172,8 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
                     onClick={handleLinkClick}
                     className={`flex min-h-[44px] min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium leading-snug transition-colors ${
                       isActive(item.href)
-                        ? 'bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-100'
-                        : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100'
+                        ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
+                        : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100'
                     }`}
                     aria-current={isActive(item.href) ? 'page' : undefined}
                   >
@@ -186,7 +186,7 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
               </div>
 
               <div className="mt-6 space-y-1">
-                <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">其他</p>
+                <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">其他</p>
                 {secondaryNavItems.map((item) => (
                   <a
                     key={item.href}
@@ -194,8 +194,8 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
                     onClick={handleLinkClick}
                     className={`flex min-h-[44px] min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium leading-snug transition-colors ${
                       isActive(item.href)
-                        ? 'bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-100'
-                        : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100'
+                        ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
+                        : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100'
                     }`}
                     aria-current={isActive(item.href) ? 'page' : undefined}
                   >

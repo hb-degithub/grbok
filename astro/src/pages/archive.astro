@@ -21,13 +21,13 @@ for (const post of posts) {
 <BaseLayout title="文章归档" description="按时间归档">
 <section class="mx-auto max-w-4xl px-5 py-16">
 <h1 class="text-3xl font-black">文章归档</h1>
-<p class="mt-2 text-stone-500">共{posts.length}篇</p>
+<p class="mt-2 text-zinc-500">共{posts.length}篇</p>
 {groups.map(y => <div key={y.year}>
   <h2 class="mt-8 text-2xl font-bold">{y.year}</h2>
   {y.months.map(m => <div key={m.month} class="ml-4 mt-4">
-    <h3 class="text-sm font-mono text-stone-400">{m.month}月</h3>
+    <h3 class="text-sm font-mono text-zinc-400">{m.month}月</h3>
     <div class="mt-2 space-y-1">
-      {m.posts.map(p => <a href={"/posts/" + p.slug} class="flex items-center gap-3 py-1.5 text-sm hover:text-stone-900">
+      {m.posts.map(p => <a href={"/posts/" + p.slug} class="flex items-center gap-3 py-1.5 text-sm hover:text-zinc-900">
         {new Date(p.published_at).toLocaleDateString("zh-CN",{month:"2-digit",day:"2-digit"})}
         <span>{p.title}</span>
       </a>)}

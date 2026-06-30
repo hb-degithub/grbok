@@ -19,7 +19,7 @@ export default function ShareButton() {
 
   return (
     <div className="flex items-center gap-2">
-      <button onClick={copyLink} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-stone-200 px-3 text-sm text-stone-500 transition-colors hover:border-stone-300 hover:text-stone-900 dark:border-stone-700 dark:text-stone-400 dark:hover:text-stone-200">
+      <button onClick={copyLink} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-zinc-200 px-3 text-sm text-zinc-500 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           {copied
             ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -29,7 +29,7 @@ export default function ShareButton() {
         <span>{copied ? '已复制' : '复制链接'}</span>
       </button>
       {canNative && (
-        <button onClick={nativeShare} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-stone-200 px-3 text-sm text-stone-500 transition-colors hover:border-stone-300 hover:text-stone-900 dark:border-stone-700 dark:text-stone-400 dark:hover:text-stone-200">
+        <button onClick={nativeShare} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-zinc-200 px-3 text-sm text-zinc-500 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
           <span>分享</span>
         </button>

@@ -35,7 +35,7 @@ export default function Input({
       {label && (
         <label
           htmlFor={inputId}
-          className="mb-1.5 block break-words text-sm font-medium leading-snug text-stone-700 dark:text-stone-300"
+          className="mb-1.5 block break-words text-sm font-medium leading-snug text-zinc-700 dark:text-zinc-300"
         >
           {label}
         </label>
@@ -48,13 +48,13 @@ export default function Input({
           aria-describedby={error ? errorId : helperText ? helperId : undefined}
           className={cn(
             'min-h-[40px] w-full min-w-0 rounded-xl border px-3 py-2.5 text-[16px] leading-snug sm:px-4 sm:text-sm',
-            'bg-white/70 text-stone-900 placeholder-stone-400',
+            'bg-white/70 text-zinc-900 placeholder-zinc-400',
             'transition-all duration-200 ease-out',
             error
               ? 'border-red-400 focus-visible:border-red-500'
-              : 'border-stone-200 focus-visible:border-stone-500 dark:border-stone-700 dark:focus-visible:border-stone-400',
-            'outline-none focus-visible:ring-2 focus-visible:ring-stone-500/40 focus-visible:ring-offset-0',
-            'dark:bg-stone-900/50 dark:text-stone-100 dark:placeholder-stone-500',
+              : 'border-zinc-200 focus-visible:border-zinc-500 dark:border-zinc-700 dark:focus-visible:border-zinc-400',
+            'outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/40 focus-visible:ring-offset-0',
+            'dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500',
             'disabled:cursor-not-allowed disabled:opacity-50',
             className
           )}
@@ -80,7 +80,7 @@ export default function Input({
 
       {/* 帮助文本 */}
       {helperText && !error && (
-        <p id={helperId} className="mt-1.5 break-words text-sm leading-snug text-stone-500 dark:text-stone-400">
+        <p id={helperId} className="mt-1.5 break-words text-sm leading-snug text-zinc-500 dark:text-zinc-400">
           {helperText}
         </p>
       )}

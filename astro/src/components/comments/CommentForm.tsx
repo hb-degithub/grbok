@@ -18,7 +18,7 @@ interface CommentFormProps {
 
 /** 共享 textarea 样式 - 玻璃底 + indigo focus-visible */
 const textareaClass =
-  'w-full rounded-xl border border-stone-200 bg-white/70 px-4 py-3 text-sm text-stone-900 placeholder-stone-400 transition-all duration-200 ease-out outline-none focus-visible:border-stone-500 focus-visible:ring-2 focus-visible:ring-stone-500/30 dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-100 dark:placeholder-stone-500 dark:focus-visible:border-stone-400';
+  'w-full rounded-xl border border-zinc-200 bg-white/70 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 transition-all duration-200 ease-out outline-none focus-visible:border-zinc-500 focus-visible:ring-2 focus-visible:ring-zinc-500/30 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus-visible:border-zinc-400';
 
 /**
  * 主评论表单组件
@@ -88,7 +88,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="glass-strong rounded-2xl p-6 sm:p-7"
+      className="glass-strong rounded-lg p-6 sm:p-7"
     >
       <AnimatePresence mode="wait">
         {status === 'success' ? (
@@ -149,8 +149,8 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
             noValidate
           >
             <motion.div variants={itemVariants}>
-              <h3 className="text-lg font-semibold text-stone-900 dark:text-white">发表评论</h3>
-              <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">发表评论</h3>
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                 {moderationEnabled ? '你的邮箱不会被公开显示，评论审核后展示' : '你的邮箱不会被公开显示'}
               </p>
             </motion.div>
@@ -176,7 +176,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
             </motion.div>
 
             <motion.div variants={itemVariants}>
-              <label htmlFor="comment-content" className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-stone-300">
+              <label htmlFor="comment-content" className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 评论内容
               </label>
               <textarea

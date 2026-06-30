@@ -11,8 +11,8 @@ export default function ReadingProgress() {
     return () => window.removeEventListener('scroll', handler);
   }, []);
   return (
-    <div className="fixed top-0 left-0 z-[60] h-0.5 w-full bg-stone-200/50 dark:bg-stone-800/50 pointer-events-none">
-      <div className="h-full bg-stone-900/70 dark:bg-stone-100/70 transition-[width] duration-100 ease-out" style={{ width: progress * 100 + '%' }} />
+    <div className="fixed top-0 left-0 z-[60] h-0.5 w-full bg-zinc-200/50 dark:bg-zinc-800/50 pointer-events-none">
+      <div className="h-full bg-zinc-900/70 dark:bg-zinc-100/70 transition-[width] duration-100 ease-out" style={{ width: progress * 100 + '%' }} />
     </div>
   );
 }

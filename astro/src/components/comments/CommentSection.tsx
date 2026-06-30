@@ -20,7 +20,7 @@ function SkeletonComment({ delay = 0 }: { delay?: number }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.4 }}
-      className="glass rounded-2xl p-6"
+      className="card rounded-lg p-6"
       aria-hidden="true"
     >
       <div className="flex items-start gap-4">
@@ -96,7 +96,7 @@ export function CommentSection({ postId }: CommentSectionProps) {
     return (
       <section className="space-y-8" aria-busy="true" aria-live="polite">
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-stone-900 dark:text-white">评论区</h2>
+          <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">评论区</h2>
         </div>
         <div className="space-y-4">
           <SkeletonComment delay={0} />
@@ -111,19 +111,19 @@ export function CommentSection({ postId }: CommentSectionProps) {
   if (!settings.enable_comments) {
     return (
       <section className="space-y-8">
-        <h2 className="text-2xl font-bold text-stone-900 dark:text-white">评论区</h2>
+        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">评论区</h2>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass flex flex-col items-center justify-center rounded-2xl p-12 text-center"
+          className="card flex flex-col items-center justify-center rounded-lg p-12 text-center"
         >
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800/60">
-            <svg className="h-7 w-7 text-stone-500 dark:text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800/60">
+            <svg className="h-7 w-7 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
             </svg>
           </div>
-          <h3 className="mb-2 text-lg font-semibold text-stone-700 dark:text-stone-300">评论已关闭</h3>
-          <p className="text-sm text-stone-500 dark:text-stone-400">站点管理员暂时关闭了评论功能。</p>
+          <h3 className="mb-2 text-lg font-semibold text-zinc-700 dark:text-zinc-300">评论已关闭</h3>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">站点管理员暂时关闭了评论功能。</p>
         </motion.div>
       </section>
     );
@@ -133,12 +133,12 @@ export function CommentSection({ postId }: CommentSectionProps) {
   if (error) {
     return (
       <section className="space-y-8">
-        <h2 className="text-2xl font-bold text-stone-900 dark:text-white">评论区</h2>
+        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">评论区</h2>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           role="alert"
-          className="glass flex flex-col items-center justify-center rounded-2xl p-12 text-center"
+          className="card flex flex-col items-center justify-center rounded-lg p-12 text-center"
         >
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/40">
             <svg className="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -146,10 +146,10 @@ export function CommentSection({ postId }: CommentSectionProps) {
             </svg>
           </div>
           <h3 className="mb-2 text-lg font-semibold text-red-700 dark:text-red-300">加载评论失败</h3>
-          <p className="mb-4 text-sm text-stone-600 dark:text-stone-400">{error.message}</p>
+          <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{error.message}</p>
           <button
             onClick={refresh}
-            className="focus-ring inline-flex items-center gap-2 rounded-xl bg-stone-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800"
+            className="focus-ring inline-flex items-center gap-2 rounded-xl bg-zinc-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -165,8 +165,8 @@ export function CommentSection({ postId }: CommentSectionProps) {
     <section className="space-y-8">
       {/* 评论区标题 */}
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-stone-900 dark:text-white">评论区</h2>
-        <span className="glass rounded-full px-3 py-1 text-sm text-stone-600 dark:text-stone-400">
+        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">评论区</h2>
+        <span className="card rounded-full px-3 py-1 text-sm text-zinc-600 dark:text-zinc-400">
           {totalComments} 条评论
         </span>
       </div>
@@ -180,15 +180,15 @@ export function CommentSection({ postId }: CommentSectionProps) {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass flex flex-col items-center justify-center rounded-2xl py-16 text-center"
+            className="card flex flex-col items-center justify-center rounded-lg py-16 text-center"
           >
-            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-stone-100 dark:bg-stone-800/60">
-              <svg className="h-10 w-10 text-stone-500 dark:text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800/60">
+              <svg className="h-10 w-10 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-stone-700 dark:text-stone-300">还没有评论</h3>
-            <p className="text-sm text-stone-500 dark:text-stone-400">来发表第一条吧！</p>
+            <h3 className="mb-2 text-lg font-semibold text-zinc-700 dark:text-zinc-300">还没有评论</h3>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">来发表第一条吧！</p>
           </motion.div>
         ) : (
           <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-4">

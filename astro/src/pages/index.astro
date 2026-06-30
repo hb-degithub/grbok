@@ -31,52 +31,52 @@ const [postsCount, tagsCount] = await Promise.all([
 
 <BaseLayout title="首页" description="欢迎来到胡巴的个人博客">
   <aside class="floating-sidebar sidebar-left fixed left-6 top-28 z-30 hidden w-80 space-y-5 xl:block" aria-label="Fixed section sidebar">
-    <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75">
-      <h3 class="text-sm font-black tracking-tight text-stone-950 dark:text-stone-50">站内导航</h3>
+    <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
+      <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">站内导航</h3>
       <nav class="mt-4 grid gap-2 text-sm" aria-label="Section navigation">
-        <a href="/" class="side-link flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3 font-semibold text-stone-700 no-underline transition-all hover:bg-stone-900 hover:text-white dark:bg-stone-950/50 dark:text-stone-300 dark:hover:bg-stone-100 dark:hover:text-stone-950"><span>棣栭〉</span><span>01</span></a>
-        <a href="#latest" class="side-link flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3 font-semibold text-stone-700 no-underline transition-all hover:bg-stone-900 hover:text-white dark:bg-stone-950/50 dark:text-stone-300 dark:hover:bg-stone-100 dark:hover:text-stone-950"><span>最新文章</span><span>02</span></a>
-        <a href="/posts" class="side-link flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3 font-semibold text-stone-700 no-underline transition-all hover:bg-stone-900 hover:text-white dark:bg-stone-950/50 dark:text-stone-300 dark:hover:bg-stone-100 dark:hover:text-stone-950"><span>全部文章</span><span>03</span></a>
-        <a href="/tags" class="side-link flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3 font-semibold text-stone-700 no-underline transition-all hover:bg-stone-900 hover:text-white dark:bg-stone-950/50 dark:text-stone-300 dark:hover:bg-stone-100 dark:hover:text-stone-950"><span>标签索引</span><span>04</span></a>
+        <a href="/" class="side-link flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>棣栭〉</span><span>01</span></a>
+        <a href="#latest" class="side-link flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>最新文章</span><span>02</span></a>
+        <a href="/posts" class="side-link flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>全部文章</span><span>03</span></a>
+        <a href="/tags" class="side-link flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>标签索引</span><span>04</span></a>
       </nav>
     </section>
 
-    <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75">
-      <h3 class="text-sm font-black tracking-tight text-stone-950 dark:text-stone-50">专题分类</h3>
+    <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
+      <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">专题分类</h3>
       <div class="mt-4 flex flex-wrap gap-2">
-        <a href="/tags" class="topic-chip rounded-full bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 no-underline dark:bg-stone-800 dark:text-stone-300">技术记录</a>
-        <a href="/tags" class="topic-chip rounded-full bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 no-underline dark:bg-stone-800 dark:text-stone-300">生活随笔</a>
-        <a href="/tags" class="topic-chip rounded-full bg-stone-100 px-3 py-1.5 text-xs font-semibold text-stone-600 no-underline dark:bg-stone-800 dark:text-stone-300">部署运维</a>
+        <a href="/tags" class="topic-chip rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600 no-underline dark:bg-zinc-800 dark:text-zinc-300">技术记录</a>
+        <a href="/tags" class="topic-chip rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600 no-underline dark:bg-zinc-800 dark:text-zinc-300">生活随笔</a>
+        <a href="/tags" class="topic-chip rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600 no-underline dark:bg-zinc-800 dark:text-zinc-300">部署运维</a>
       </div>
     </section>
   </aside>
 
   <aside class="floating-sidebar sidebar-right fixed right-6 top-28 z-30 hidden w-80 space-y-5 xl:block" aria-label="Fixed profile sidebar">
-    <section class="side-panel overflow-hidden rounded-[1.5rem] border border-stone-200 bg-white/90 p-6 shadow-2xl shadow-stone-900/[0.06] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/80">
+    <section class="side-panel overflow-hidden rounded-xl border border-zinc-200 bg-white p-6 shadow-2xl shadow-zinc-900/[0.06] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
       <div class="flex items-center gap-4">
-        <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-stone-900 text-xl font-black text-white shadow-lg shadow-stone-900/15 dark:bg-stone-100 dark:text-stone-950">B</div>
+        <div class="flex h-14 w-14 items-center justify-center rounded-lg bg-zinc-900 text-xl font-black text-white shadow-lg shadow-zinc-900/15 dark:bg-zinc-100 dark:text-zinc-950">B</div>
         <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-stone-400">个人侧边栏</p>
-          <h2 class="mt-1 text-lg font-black tracking-tight text-stone-950 dark:text-stone-50">胡巴的博客</h2>
+          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-400">个人侧边栏</p>
+          <h2 class="mt-1 text-lg font-black tracking-tight text-zinc-950 dark:text-zinc-50">胡巴的博客</h2>
         </div>
       </div>
-      <p class="mt-5 text-sm leading-7 text-stone-500 dark:text-stone-400">技术、生活和偶尔冒出来的奇思妙想。</p>
+      <p class="mt-5 text-sm leading-7 text-zinc-500 dark:text-zinc-400">技术、生活和偶尔冒出来的奇思妙想。</p>
       <div class="mt-5 grid gap-3 sm:grid-cols-2">
-        <div class="stat-tile rounded-2xl bg-stone-50 p-4 dark:bg-stone-950/50"><div class="text-2xl font-black text-stone-950 dark:text-stone-50">{postsCount}</div><div class="text-xs text-stone-500 dark:text-stone-400">已发布文章</div></div>
-        <div class="stat-tile rounded-2xl bg-stone-50 p-4 dark:bg-stone-950/50"><div class="text-2xl font-black text-stone-950 dark:text-stone-50">{tagsCount}</div><div class="text-xs text-stone-500 dark:text-stone-400">内容标签</div></div>
+        <div class="stat-tile rounded-lg bg-zinc-50 p-4 dark:bg-zinc-950/50"><div class="text-2xl font-black text-zinc-950 dark:text-zinc-50">{postsCount}</div><div class="text-xs text-zinc-500 dark:text-zinc-400">已发布文章</div></div>
+        <div class="stat-tile rounded-lg bg-zinc-50 p-4 dark:bg-zinc-950/50"><div class="text-2xl font-black text-zinc-950 dark:text-zinc-50">{tagsCount}</div><div class="text-xs text-zinc-500 dark:text-zinc-400">内容标签</div></div>
       </div>
     </section>
 
-    <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/90 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/80">
-      <h3 class="text-sm font-black tracking-tight text-stone-950 dark:text-stone-50">快速入口</h3>
+    <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
+      <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">快速入口</h3>
       <div class="mt-4 grid gap-2">
         <HomeAuthQuickEntry client:visible />
-        <a href="/about" class="side-link group flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3 text-sm font-semibold text-stone-700 no-underline transition-all hover:bg-stone-900 hover:text-white dark:bg-stone-950/50 dark:text-stone-300 dark:hover:bg-stone-100 dark:hover:text-stone-950"><span>关于博主</span><svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></a>
+        <a href="/about" class="side-link group flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 text-sm font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>关于博主</span><svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></a>
       </div>
     </section>
   </aside>
 
-  <section class="journal-hero relative -mt-[var(--header-offset,4rem)] min-h-[var(--hero-min-h,100svh)] w-full overflow-hidden border-b border-stone-200/70 px-[var(--page-pad,1rem)] pb-16 pt-[calc(var(--header-offset,4rem)+1.5rem)] shadow-sm dark:border-stone-800/70 sm:px-6 lg:px-12 lg:pb-20 lg:pt-32 xl:px-[19rem] 2xl:px-[23rem]">
+  <section class="journal-hero relative -mt-[var(--header-offset,4rem)] min-h-[var(--hero-min-h,100svh)] w-full overflow-hidden border-b border-zinc-200/70 px-[var(--page-pad,1rem)] pb-16 pt-[calc(var(--header-offset,4rem)+1.5rem)] shadow-sm dark:border-zinc-800/70 sm:px-6 lg:px-12 lg:pb-20 lg:pt-32 xl:px-[19rem] 2xl:px-[23rem]">
 
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
       <div class="journal-paper absolute inset-0"></div>
@@ -84,38 +84,38 @@ const [postsCount, tagsCount] = await Promise.all([
       <div class="journal-scan absolute inset-x-0 top-0 h-40"></div>
       <div class="journal-corner journal-corner-a absolute left-6 top-28 h-28 w-28 sm:left-10"></div>
       <div class="journal-corner journal-corner-b absolute bottom-12 right-6 h-32 w-32 sm:right-12"></div>
-      <div style="--note-rotate:-5deg" class="journal-note note-a absolute right-[8%] top-32 hidden rotate-[-5deg] rounded-xl border border-stone-300/70 bg-white/55 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500 shadow-xl shadow-stone-900/[0.04] backdrop-blur-md dark:border-stone-700/70 dark:bg-stone-900/45 dark:text-stone-400 lg:block">Deploy / Notes</div>
-      <div style="--note-rotate:4deg" class="journal-note note-b absolute bottom-28 left-[9%] hidden rotate-[4deg] rounded-xl border border-stone-300/70 bg-white/45 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-stone-500 shadow-xl shadow-stone-900/[0.04] backdrop-blur-md dark:border-stone-700/70 dark:bg-stone-900/40 dark:text-stone-400 lg:block">Code / Life</div>
+      <div style="--note-rotate:-5deg" class="journal-note note-a absolute right-[8%] top-32 hidden rotate-[-5deg] rounded-xl border border-zinc-300/70 bg-white/55 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-md dark:border-zinc-700/70 dark:bg-zinc-900/45 dark:text-zinc-400 lg:block">Deploy / Notes</div>
+      <div style="--note-rotate:4deg" class="journal-note note-b absolute bottom-28 left-[9%] hidden rotate-[4deg] rounded-xl border border-zinc-300/70 bg-white/45 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-md dark:border-zinc-700/70 dark:bg-zinc-900/40 dark:text-zinc-400 lg:block">Code / Life</div>
       <ParticleField count={14} color="120, 113, 108" speed={0.18} className="absolute inset-0 z-0 opacity-70 dark:opacity-50" client:visible />
     </div>
 
     <div class="journal-hero-content relative z-10 flex min-h-[var(--hero-content-min-h,calc(100svh-9rem))] items-center">
       <div class="max-w-3xl xl:max-w-4xl">
-        <div class="animate-enter inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white/75 px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-stone-500 shadow-sm backdrop-blur dark:border-stone-700 dark:bg-stone-900/60 dark:text-stone-400">
+        <div class="animate-enter inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400">
           <span class="accent-dot"></span>
           Personal Journal
         </div>
 
-        <h1 class="animate-enter mt-6 sm:mt-8 break-words text-[clamp(2rem,9vw,4.5rem)] font-black tracking-normal text-stone-950 [overflow-wrap:anywhere] dark:text-stone-50" style="animation-delay: 0.1s">
+        <h1 class="animate-enter mt-6 sm:mt-8 break-words text-[clamp(2rem,9vw,4.5rem)] font-black tracking-normal text-zinc-950 [overflow-wrap:anywhere] dark:text-zinc-50" style="animation-delay: 0.1s">
           胡巴的博客        </h1>
 
-        <div class="animate-enter mt-5 sm:mt-6 min-h-[3.5rem] sm:min-h-8 max-w-2xl text-base leading-7 text-stone-600 dark:text-stone-300 sm:text-lg sm:leading-8" style="animation-delay: 0.2s">
+        <div class="animate-enter mt-5 sm:mt-6 min-h-[3.5rem] sm:min-h-8 max-w-2xl text-base leading-7 text-zinc-600 dark:text-zinc-300 sm:text-lg sm:leading-8" style="animation-delay: 0.2s">
           <Typewriter
             text="分享技术、思考与生活。把折腾过的东西写清楚。"
             speed={42}
             delay={500}
-            className="text-stone-600 dark:text-stone-300"
-            cursorClassName="text-stone-500"
+            className="text-zinc-600 dark:text-zinc-300"
+            cursorClassName="text-zinc-500"
             client:visible
           />
         </div>
 
         <div class="animate-enter mt-8 sm:mt-10 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center" style="animation-delay: 0.3s">
-          <a href="#latest" class="inline-flex w-full flex-1 items-center justify-center gap-2 rounded-2xl bg-stone-900 px-6 py-3 text-sm font-semibold text-white no-underline shadow-xl shadow-stone-900/15 transition-all hover:-translate-y-0.5 hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-white sm:w-auto sm:flex-none">
+          <a href="#latest" class="inline-flex w-full flex-1 items-center justify-center gap-2 rounded-lg bg-zinc-900 px-6 py-3 text-sm font-semibold text-white no-underline shadow-xl shadow-zinc-900/15 transition-all hover:-translate-y-0.5 hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white sm:w-auto sm:flex-none">
             浏览文章
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
           </a>
-          <a href="/about" class="inline-flex w-full flex-1 items-center justify-center gap-2 rounded-2xl border border-stone-200 bg-white/70 px-6 py-3 text-sm font-semibold text-stone-700 no-underline backdrop-blur transition-all hover:-translate-y-0.5 hover:border-stone-300 hover:bg-white dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-200 dark:hover:bg-stone-900 sm:w-auto sm:flex-none">
+          <a href="/about" class="inline-flex w-full flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white/70 px-6 py-3 text-sm font-semibold text-zinc-700 no-underline backdrop-blur transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:bg-white dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-200 dark:hover:bg-zinc-900 sm:w-auto sm:flex-none">
             了解我          </a>
         </div>
       </div>
@@ -126,11 +126,11 @@ const [postsCount, tagsCount] = await Promise.all([
     <div class="min-w-0">
       <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p class="text-sm font-semibold uppercase tracking-[0.2em] text-stone-400">Latest Notes</p>
-          <h2 class="mt-2 text-3xl font-black tracking-tight text-stone-950 dark:text-stone-50">最新文章</h2>
-          <p class="mt-2 text-sm text-stone-500 dark:text-stone-400">最近发布的技术文章和思考。</p>
+          <p class="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-400">Latest Notes</p>
+          <h2 class="mt-2 text-3xl font-black tracking-tight text-zinc-950 dark:text-zinc-50">最新文章</h2>
+          <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">最近发布的技术文章和思考。</p>
         </div>
-        <a href="/posts" class="inline-flex min-h-10 w-fit items-center gap-1.5 rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700 no-underline transition-all hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700">
+        <a href="/posts" class="inline-flex min-h-10 w-fit items-center gap-1.5 rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 no-underline transition-all hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
           查看全部
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
         </a>
@@ -139,16 +139,16 @@ const [postsCount, tagsCount] = await Promise.all([
     </div>
 
     <div class="mt-8 grid gap-5 lg:grid-cols-2 xl:hidden">
-      <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75">
-        <h3 class="text-sm font-black tracking-tight text-stone-950 dark:text-stone-50">站内导航</h3>
+      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
+        <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">站内导航</h3>
         <div class="mt-4 grid gap-2">
           <HomeAuthQuickEntry client:visible />
         </div>
-        <p class="mt-4 text-sm leading-7 text-stone-500 dark:text-stone-400">写作与代码，一起慢慢积累。</p>
+        <p class="mt-4 text-sm leading-7 text-zinc-500 dark:text-zinc-400">写作与代码，一起慢慢积累。</p>
       </section>
-      <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75">
-        <h3 class="text-sm font-black tracking-tight text-stone-950 dark:text-stone-50">站点状态</h3>
-        <div class="mt-4 space-y-3 text-sm text-stone-500 dark:text-stone-400">
+      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
+        <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">站点状态</h3>
+        <div class="mt-4 space-y-3 text-sm text-zinc-500 dark:text-zinc-400">
           <div class="flex items-center justify-between"><span>正常运行</span><span class="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_16px_rgba(16,185,129,0.6)]"></span></div>
           <div class="flex items-center justify-between"><span>内容积累</span><span>{postsCount} / {tagsCount}</span></div>
         </div>
@@ -156,16 +156,16 @@ const [postsCount, tagsCount] = await Promise.all([
     </div>
 
     <div class="mt-8 grid gap-5 lg:grid-cols-2 xl:hidden">
-      <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75">
+      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
         <ProfileCard client:visible />
       </section>
-      <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75">
+      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
         <HotArticles client:visible />
       </section>
     </div>
     <div class="mt-5 xl:hidden">
-      <section class="side-panel rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75"><RecentComments client:visible /></section>
-      <section class="side-panel mt-5 rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-xl shadow-stone-900/[0.04] backdrop-blur-xl dark:border-stone-800 dark:bg-stone-900/75"><FriendLinks client:visible /></section>
+      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900"><RecentComments client:visible /></section>
+      <section class="side-panel mt-5 rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900"><FriendLinks client:visible /></section>
     </div>
   </section>
 </BaseLayout>

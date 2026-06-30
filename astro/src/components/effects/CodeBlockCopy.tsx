@@ -12,7 +12,7 @@ export default function CodeBlockWrapper({ children }: { children: React.ReactNo
   };
   return (
     <div className="relative group">
-      <button onClick={handleCopy} className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-md bg-stone-800/80 text-stone-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-stone-700 hover:text-stone-200" aria-label={copied ? "已复制" : "复制代码"}>
+      <button onClick={handleCopy} className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-md bg-zinc-800/80 text-zinc-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-zinc-700 hover:text-zinc-200" aria-label={copied ? "已复制" : "复制代码"}>
         {copied ? (
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
         ) : (

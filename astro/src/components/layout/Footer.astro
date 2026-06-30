@@ -3,17 +3,17 @@ import { SITE_CONFIG } from '../../config/site';
 const currentYear = new Date().getFullYear();
 ---
 
-<footer class="mt-24 border-t border-stone-200/70 bg-white/95 dark:border-stone-800/80 dark:bg-stone-950/95">
+<footer class="mt-24 border-t border-zinc-200/70 bg-white dark:border-zinc-800/80 dark:bg-zinc-950">
   <div class="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
     <div class="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
       <!-- 站点信息 -->
       <div class="flex flex-col items-center gap-2 text-center sm:items-start sm:text-left">
         <div class="flex items-center gap-2">
-          <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-900 text-sm font-bold text-white dark:bg-stone-100 dark:text-stone-900">B</span>
-          <span class="text-sm font-semibold text-stone-900 dark:text-stone-100">{SITE_CONFIG.name}</span>
+          <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-900">B</span>
+          <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{SITE_CONFIG.name}</span>
         </div>
-        <p class="text-xs text-stone-500 dark:text-stone-400 max-w-xs">{SITE_CONFIG.description}</p>
-        <p class="text-xs text-stone-400 dark:text-stone-500">&copy; {currentYear} {SITE_CONFIG.author}. All rights reserved.</p>
+        <p class="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs">{SITE_CONFIG.description}</p>
+        <p class="text-xs text-zinc-400 dark:text-zinc-500">&copy; {currentYear} {SITE_CONFIG.author}. All rights reserved.</p>
       </div>
 
       <!-- 社交链接 -->
@@ -24,7 +24,7 @@ const currentYear = new Date().getFullYear();
             href={link.url}
             target="_blank"
             rel="noopener noreferrer"
-            class="flex h-9 w-9 items-center justify-center rounded-lg border border-stone-200 text-stone-500 transition-colors hover:border-stone-300 hover:text-stone-900 dark:border-stone-700 dark:text-stone-400 dark:hover:border-stone-600 dark:hover:text-stone-200"
+            class="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-200"
             aria-label={link.name}
           >
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -38,7 +38,7 @@ const currentYear = new Date().getFullYear();
     </div>
 
     <!-- 备案链接 -->
-    <div class="mt-8 flex flex-col items-center gap-3 border-t border-stone-200/70 pt-6 dark:border-stone-800/70 sm:flex-row sm:justify-center sm:gap-6">
+    <div class="mt-8 flex flex-col items-center gap-3 border-t border-zinc-200/70 pt-6 dark:border-zinc-800/70 sm:flex-row sm:justify-center sm:gap-6">
       {SITE_CONFIG.icp.url && (
         <a href={SITE_CONFIG.icp.url} target="_blank" rel="noopener noreferrer" class="beian-link">
           <svg class="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -60,7 +60,7 @@ const currentYear = new Date().getFullYear();
       )}
     </div>
 
-    <p class="mt-4 text-center text-[10px] text-stone-400 dark:text-stone-600">Powered by Astro &amp; PocketBase</p>
+    <p class="mt-4 text-center text-[10px] text-zinc-400 dark:text-zinc-600">Powered by Astro &amp; PocketBase</p>
   </div>
 </footer>
 

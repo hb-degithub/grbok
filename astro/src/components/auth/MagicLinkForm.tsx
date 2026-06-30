@@ -129,8 +129,8 @@ export default function MagicLinkForm() {
       noValidate
     >
       <motion.div variants={itemVariants}>
-        <h2 className="break-words text-lg font-bold tracking-tight text-stone-900 dark:text-white sm:text-2xl">邮箱验证码登录</h2>
-        <p className="mt-1.5 break-words text-sm leading-snug text-stone-600 dark:text-stone-400">
+        <h2 className="break-words text-lg font-bold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">邮箱验证码登录</h2>
+        <p className="mt-1.5 break-words text-sm leading-snug text-zinc-600 dark:text-zinc-400">
           使用 PocketBase OTP 验证码完成免密登录，也可作为二次验证入口。
         </p>
       </motion.div>

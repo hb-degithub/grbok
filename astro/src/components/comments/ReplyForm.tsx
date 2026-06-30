@@ -22,7 +22,7 @@ interface ReplyFormProps {
 
 /** 共享 textarea 样式 - 玻璃底 + indigo focus-visible */
 const textareaClass =
-  'w-full rounded-xl border border-stone-200 bg-white/70 px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 transition-all duration-200 ease-out outline-none focus-visible:border-stone-500 focus-visible:ring-2 focus-visible:ring-stone-500/30 dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-100 dark:placeholder-stone-500 dark:focus-visible:border-stone-400';
+  'w-full rounded-xl border border-zinc-200 bg-white/70 px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 transition-all duration-200 ease-out outline-none focus-visible:border-zinc-500 focus-visible:ring-2 focus-visible:ring-zinc-500/30 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus-visible:border-zinc-400';
 
 /**
  * 回复表单组件
@@ -104,7 +104,7 @@ export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderati
           exit="exit"
           className="overflow-hidden"
         >
-          <form onSubmit={handleSubmit} className="glass rounded-xl p-4 sm:p-5" noValidate>
+          <form onSubmit={handleSubmit} className="card rounded-xl p-4 sm:p-5" noValidate>
             {status === 'success' ? (
               /* ==================== 成功状态 ==================== */
               <motion.div
@@ -153,7 +153,7 @@ export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderati
                 </div>
 
                 <div>
-                  <label htmlFor={contentId} className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-stone-300">
+                  <label htmlFor={contentId} className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     回复内容
                   </label>
                   <textarea
