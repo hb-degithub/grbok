@@ -30,6 +30,11 @@ export interface Post {
   author: string;
   published_at: string;
   views: number;
+  is_pinned?: boolean;
+  is_featured?: boolean;
+  seo_title?: string;
+  seo_description?: string;
+  seo_keywords?: string;
   created: string;
   updated: string;
   expand?: {
@@ -105,6 +110,31 @@ export interface Setting {
   key: string;
   value: unknown;
   description: string;
+  created: string;
+  updated: string;
+}
+
+
+export interface FriendLink {
+  id: string;
+  name: string;
+  url: string;
+  description?: string;
+  avatar?: string;
+  status: 'show' | 'hide';
+  sort_order?: number;
+  created: string;
+  updated: string;
+}
+
+export interface Announcement {
+  id: string;
+  title?: string;
+  content: string;
+  type: 'normal' | 'info' | 'warning' | 'important';
+  enabled?: boolean;
+  start_at?: string;
+  end_at?: string;
   created: string;
   updated: string;
 }

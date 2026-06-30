@@ -3,6 +3,7 @@ import { ClientRouter } from 'astro:transitions';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer.astro';
 import SearchModal from '../components/search/SearchModal';
+import AnnouncementBar from '../components/layout/AnnouncementBar';
 import DebugProtection from '../components/effects/DebugProtection';
 import ToastContainer from '../components/ui/Toast';
 import { SITE_CONFIG } from '../config/site';
@@ -145,6 +146,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
   <body class="min-h-[100svh] bg-white font-sans text-stone-900 antialiased dark:bg-stone-950 dark:text-stone-100">
     {showChrome && <Header client:load />}
     {showChrome && <SearchModal client:load />}
+    {showChrome && <AnnouncementBar client:load />}
 
     <main class:list={["w-full overflow-x-clip", showChrome && "pt-[var(--header-offset,4rem)]"]}>
       <slot />

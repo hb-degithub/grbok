@@ -161,6 +161,11 @@ export default function PostManager() {
         content: editing.content || '',
         cover: editing.cover || '',
         status: editing.status,
+        is_pinned: (editing as any).is_pinned ?? false,
+        is_featured: (editing as any).is_featured ?? false,
+        seo_title: (editing as any).seo_title || '',
+        seo_description: (editing as any).seo_description || '',
+        seo_keywords: (editing as any).seo_keywords || '',
       };
       const publishedAt = 'published_at' in editing ? editing.published_at : '';
       if (editing.status === 'published' && !publishedAt) data.published_at = new Date().toISOString();
@@ -326,12 +331,12 @@ export default function PostManager() {
                   <div className="rounded-md border border-border bg-bg-soft p-3 text-xs">
                     <div className="mb-2 font-mono text-[10px] uppercase text-text-secondary">SEO / </div>
                     <div className="flex flex-wrap gap-2 mb-2">
-                      <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary hover:text-text"><input type="checkbox" checked={(editing as any).is_pinned || false} onChange={(e) => setEditing({ ...editing, is_pinned: e.target.checked } as any)} className="h-3.5 w-3.5 rounded border-border accent-accent" /><span className="text-xs"></span></label>
-                      <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary hover:text-text"><input type="checkbox" checked={(editing as any).is_featured || false} onChange={(e) => setEditing({ ...editing, is_featured: e.target.checked } as any)} className="h-3.5 w-3.5 rounded border-border accent-accent" /><span className="text-xs"></span></label>
+                      <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary hover:text-text"><input type="checkbox" checked={(editing as any).is_pinned || false} onChange={(e) => setEditing({ ...editing, is_pinned: e.target.checked } as any)} className="h-3.5 w-3.5 rounded border-border accent-accent" /><span className="text-xs">置顶</span></label>
+                      <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary hover:text-text"><input type="checkbox" checked={(editing as any).is_featured || false} onChange={(e) => setEditing({ ...editing, is_featured: e.target.checked } as any)} className="h-3.5 w-3.5 rounded border-border accent-accent" /><span className="text-xs">精选</span></label>
                     </div>
-                    <input type="text" value={(editing as any).seo_title || ""} onChange={(e) => setEditing({ ...editing, seo_title: e.target.value } as any)} placeholder="SEO ..." className="mb-2 min-h-9 w-full rounded-md border border-border bg-white px-2.5 py-1.5 text-xs text-text outline-none focus:border-accent" />
-                    <input type="text" value={(editing as any).seo_description || ""} onChange={(e) => setEditing({ ...editing, seo_description: e.target.value } as any)} placeholder="SEO ..." className="mb-2 min-h-9 w-full rounded-md border border-border bg-white px-2.5 py-1.5 text-xs text-text outline-none focus:border-accent" />
-                    <input type="text" value={(editing as any).seo_keywords || ""} onChange={(e) => setEditing({ ...editing, seo_keywords: e.target.value } as any)} placeholder="SEO ..." className="min-h-9 w-full rounded-md border border-border bg-white px-2.5 py-1.5 text-xs text-text outline-none focus:border-accent" />
+                    <input type="text" value={(editing as any).seo_title || ""} onChange={(e) => setEditing({ ...editing, seo_title: e.target.value } as any)} placeholder="SEO 标题??????" className="mb-2 min-h-9 w-full rounded-md border border-border bg-white px-2.5 py-1.5 text-xs text-text outline-none focus:border-accent" />
+                    <input type="text" value={(editing as any).seo_description || ""} onChange={(e) => setEditing({ ...editing, seo_description: e.target.value } as any)} placeholder="SEO 描述" className="mb-2 min-h-9 w-full rounded-md border border-border bg-white px-2.5 py-1.5 text-xs text-text outline-none focus:border-accent" />
+                    <input type="text" value={(editing as any).seo_keywords || ""} onChange={(e) => setEditing({ ...editing, seo_keywords: e.target.value } as any)} placeholder="SEO 关键词，逗号分隔" className="min-h-9 w-full rounded-md border border-border bg-white px-2.5 py-1.5 text-xs text-text outline-none focus:border-accent" />
                   </div>
                   <div className="rounded-md border border-border bg-bg-soft p-3 text-xs text-text-secondary">
                     <div className="flex justify-between gap-3"><span>标题字数</span><span className="font-mono">{editing.title.length}</span></div>
