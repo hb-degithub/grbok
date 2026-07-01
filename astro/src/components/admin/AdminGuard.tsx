@@ -1,5 +1,8 @@
 import React from 'react';
 import { useAdminAuth, type AdminRole } from '../../hooks/useAdminAuth';
+import { useAdminVerification } from '../../hooks/useAdminVerification';
+import AdminPasskeyStep from '../auth/AdminPasskeyStep';
+import { useAdminLogout } from '../../hooks/useAdminAuth';
 
 interface Props { children: React.ReactNode; requiredRole?: AdminRole; }
 
@@ -17,6 +20,8 @@ const copy = {
 
 export default function AdminGuard({ children, requiredRole = 'author' }: Props) {
   const { isAuthenticated, isLoading, user, hasPermission } = useAdminAuth();
+  const { isChecking: isVerifying, isVerified } = useAdminVerification();
+  const { logout } = useAdminLogout();
 
   if (isLoading) return (
     <div className="flex min-h-[100svh] items-center justify-center bg-bg">
@@ -57,6 +62,23 @@ export default function AdminGuard({ children, requiredRole = 'author' }: Props)
         <p className="mb-2 text-sm text-text-secondary">{copy.deniedPrefix}{user?.role}{copy.deniedSuffix}</p>
         <p className="mb-6 text-xs text-text-muted">{copy.requiredPrefix}{requiredRole}{copy.requiredSuffix}</p>
         <a href="/" className="btn-ghost inline-block text-xs">{copy.homeLink}</a>
+      </div>
+    </div>
+  );
+
+  if (isVerifying) return (
+    <div className="flex min-h-[100svh] items-center justify-center bg-bg">
+      <div className="card rounded-lg p-10 text-center">
+        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-border border-t-zinc-500" />
+        <p className="font-mono text-xs uppercase tracking-widest text-text-secondary">正在验证管理员会话...</p>
+      </div>
+    </div>
+  );
+
+  if (!isVerified) return (
+    <div className="flex min-h-[100svh] items-center justify-center bg-bg">
+      <div className="card max-w-md rounded-lg p-8">
+        <AdminPasskeyStep onReturnToLogin={logout} />
       </div>
     </div>
   );

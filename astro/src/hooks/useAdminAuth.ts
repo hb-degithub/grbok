@@ -19,6 +19,7 @@ export interface AdminAuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   user: User | null;
+  role: AdminRole | null;
   hasPermission: (requiredRole: AdminRole) => boolean;
 }
 
@@ -80,7 +81,7 @@ export function useAdminAuth(): AdminAuthState {
     return ROLE_RANK[userRole] >= requiredRank;
   };
 
-  return { isAuthenticated: !!user, isLoading, user, hasPermission };
+  return { isAuthenticated: !!user, isLoading, user, role: normalizeRole(user?.role), hasPermission };
 }
 
 export function useAdminLogout() {
