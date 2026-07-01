@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { usePocketBase } from '../../hooks/usePocketBase';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
+import { RateLimiter } from '../../lib/security';
 
 type RegisterStatus = 'idle' | 'loading' | 'error';
 
@@ -14,6 +15,8 @@ export default function RegisterForm() {
   const [status, setStatus] = useState<RegisterStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const { registerReader } = usePocketBase();
+
+  const registerLimiter = new RateLimiter(5, 0.2);
 
   const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -45,6 +48,12 @@ export default function RegisterForm() {
     if (password.length < 8) {
       setStatus('error');
       setErrorMessage('密码至少需要 8 个字符');
+      return;
+    }
+
+    if (!registerLimiter.tryConsume()) {
+      setStatus('error');
+      setErrorMessage('Too many attempts, please try again later');
       return;
     }
 

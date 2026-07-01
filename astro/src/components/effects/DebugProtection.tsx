@@ -9,7 +9,7 @@ function isBlockedShortcut(event: KeyboardEvent) {
   const key = event.key.toLowerCase();
   if (BLOCKED_KEYS.has(event.key)) return true;
   if ((event.ctrlKey || event.metaKey) && event.shiftKey && ['i', 'j', 'c'].includes(key)) return true;
-  if ((event.ctrlKey || event.metaKey) && ['u', 's'].includes(key)) return true;
+  if ((event.ctrlKey || event.metaKey) && ['u'].includes(key)) return true;
   return false;
 }
 

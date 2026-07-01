@@ -150,6 +150,8 @@ const safeContent = sanitizeHtml(post.content || '');
   (() => {
     const copyLabel = "复制";
     const copiedLabel = "已复制";
+    function makeCopyIcon(){var s=document.createElementNS("http://www.w3.org/2000/svg","svg");s.setAttribute("class","h-4 w-4");s.setAttribute("fill","none");s.setAttribute("viewBox","0 0 24 24");s.setAttribute("stroke","currentColor");var p=document.createElementNS("http://www.w3.org/2000/svg","path");p.setAttribute("stroke-linecap","round");p.setAttribute("stroke-linejoin","round");p.setAttribute("stroke-width","2");p.setAttribute("d","M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z");s.appendChild(p);return s;}
+function makeCheckIcon(){var s=document.createElementNS("http://www.w3.org/2000/svg","svg");s.setAttribute("class","h-4 w-4");s.setAttribute("fill","none");s.setAttribute("viewBox","0 0 24 24");s.setAttribute("stroke","currentColor");var p=document.createElementNS("http://www.w3.org/2000/svg","path");p.setAttribute("stroke-linecap","round");p.setAttribute("stroke-linejoin","round");p.setAttribute("stroke-width","2");p.setAttribute("d","M5 13l4 4L19 7");s.appendChild(p);return s;}
     document.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll("pre").forEach(pre => {
         const code = pre.querySelector("code");
@@ -157,16 +159,16 @@ const safeContent = sanitizeHtml(post.content || '');
         const btn = document.createElement("button");
         btn.className = "copy-btn absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-md bg-zinc-800/80 text-zinc-400 opacity-0 transition-opacity hover:opacity-100 hover:bg-zinc-700 hover:text-zinc-200";
         btn.setAttribute("aria-label", copyLabel);
-        btn.innerHTML = "<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>";
+        btn.replaceChildren(makeCopyIcon());
         pre.style.position = "relative";
         pre.prepend(btn);
         pre.classList.add("group");
         btn.addEventListener("click", async () => {
           try {
             await navigator.clipboard.writeText(code.textContent || "");
-            btn.innerHTML = "<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>";
+            btn.replaceChildren(makeCheckIcon());
             setTimeout(() => {
-              btn.innerHTML = "<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>";
+              btn.replaceChildren(makeCopyIcon());
             }, 2000);
           } catch {}
         });

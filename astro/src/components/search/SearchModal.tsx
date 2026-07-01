@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import DOMPurify from 'dompurify';
+import { sanitizeHtml } from '../../lib/security';
 import { cn } from '../../lib/utils';
 
 interface PagefindResult {
@@ -304,7 +304,7 @@ export default function SearchModal() {
                       <div className="break-words font-medium leading-snug text-zinc-900 dark:text-white">{result.title || '无标题'}</div>
                       <div
                         className="line-clamp-2 break-words text-sm leading-snug text-zinc-500 [overflow-wrap:anywhere] dark:text-zinc-400"
-                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(result.excerpt) }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(result.excerpt) }}
                       />
                       <div className="break-all text-xs leading-snug text-zinc-400">{result.url}</div>
                     </motion.a>
