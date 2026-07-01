@@ -23,6 +23,18 @@ foreach ($pattern in $sensitivePatterns) {
     }
 }
 
+# 检查项 1b: 暂存区中的 admin auth 硬编码密钥（hex 格式视为真实密钥）
+$adminAuthStagedPatterns = @(
+    "ADMIN_AUTH_INTERNAL_SECRET\s*[:=]\s*['`"][a-f0-9]{40,}['`"]",
+    "ADMIN_AUTH_HASH_SECRET\s*[:=]\s*['`"][a-f0-9]{40,}['`"]",
+    "PB_ENCRYPTION_KEY\s*[:=]\s*['`"][a-f0-9]{40,}['`"]"
+)
+foreach ($pattern in $adminAuthStagedPatterns) {
+    if ($stagedDiff -match $pattern) {
+        $issues += "暂存区包含疑似硬编码 admin auth 密钥"
+    }
+}
+
 # 检查项 2: 未跟踪的敏感文件
 $untracked = git ls-files --others --exclude-standard 2>$null
 $dangerousFiles = $untracked | Where-Object {
@@ -41,6 +53,38 @@ if (Test-Path "$repoRoot\astro\dist") {
     $distItems = Get-ChildItem "$repoRoot\astro\dist" -ErrorAction SilentlyContinue
     if ($distItems.Count -gt 0) {
         $issues += "存在 astro/dist 构建产物未清理。部署前建议清理。"
+    }
+}
+
+# 检查项 4: 已提交文件中的 admin auth 硬编码密钥
+$committedFilesToCheck = @(
+    'docker-compose.yml',
+    'docker-compose.local.yml',
+    'admin-auth/src/config.mjs',
+    'admin-auth/src/server.mjs',
+    'admin-auth/src/session-policy.mjs',
+    'admin-auth/src/webauthn-service.mjs',
+    'pb_hooks/admin_webauthn.pb.js'
+)
+foreach ($file in $committedFilesToCheck) {
+    $fullPath = "$repoRoot\$file"
+    if (Test-Path -LiteralPath $fullPath -PathType Leaf) {
+        $content = Get-Content -LiteralPath $fullPath -Raw
+        if ($content -match "ADMIN_AUTH_INTERNAL_SECRET\s*[:=]\s*['`"][a-f0-9]{40,}['`"]") {
+            $issues += "文件 $file 可能存在硬编码的 ADMIN_AUTH_INTERNAL_SECRET"
+        }
+        if ($content -match "ADMIN_AUTH_HASH_SECRET\s*[:=]\s*['`"][a-f0-9]{40,}['`"]") {
+            $issues += "文件 $file 可能存在硬编码的 ADMIN_AUTH_HASH_SECRET"
+        }
+    }
+}
+
+# 检查项 5: 恢复脚本中是否包含硬编码恢复码示例
+$recoveryScript = "$PSScriptRoot\admin-recovery.ps1"
+if (Test-Path -LiteralPath $recoveryScript -PathType Leaf) {
+    $recoveryContent = Get-Content -LiteralPath $recoveryScript -Raw
+    if ($recoveryContent -match '"[a-f0-9]{32,}"') {
+        $issues += "admin-recovery.ps1 包含疑似硬编码恢复码的十六进制字符串"
     }
 }
 

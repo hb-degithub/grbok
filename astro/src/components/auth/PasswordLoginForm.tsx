@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
+import AdminPasskeyStep from './AdminPasskeyStep';
 import {
   RateLimiter,
   clearAuthFailures,
@@ -60,6 +61,7 @@ export default function PasswordLoginForm() {
   const [otpId, setOtpId] = useState('');
   const [mfaId, setMfaId] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'mfa-sending' | 'mfa-verifying' | 'error'>('idle');
+  const [passkeyStep, setPasskeyStep] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const isMfaStep = !!mfaId && !!otpId;
 
@@ -124,12 +126,21 @@ export default function PasswordLoginForm() {
       const pb = getPocketBase();
       const auth = await withAuthRequestHeaders(pb, () => pb.collection('users').authWithOTP(otpId, code, { mfaId }));
       clearAuthFailures(key);
-      window.location.href = getPostLoginRedirect(auth.record?.role);
+      handlePostLogin(auth.record?.role);
     } catch (err) {
       const lockSeconds = recordAuthFailure(key);
       setStatus('error');
       setErrorMessage(lockSeconds > 0 ? `验证码错误过多，请 ${formatAuthLock(lockSeconds)} 后再试` : '二次验证码无效或已过期');
     }
+  };
+
+  const handlePostLogin = (role: unknown) => {
+    if (adminRoles.has(String(role))) {
+      setPasskeyStep(true);
+      setStatus('idle');
+      return;
+    }
+    window.location.href = getPostLoginRedirect(role);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -170,7 +181,7 @@ export default function PasswordLoginForm() {
       const pb = getPocketBase();
       const auth = await withAuthRequestHeaders(pb, () => pb.collection('users').authWithPassword(normalizedEmail, password));
       clearAuthFailures(attemptKey);
-      window.location.href = getPostLoginRedirect(auth.record?.role);
+      handlePostLogin(auth.record?.role);
     } catch (err: unknown) {
       const nextMfaId = getMfaId(err);
       if (nextMfaId) {
@@ -199,6 +210,17 @@ export default function PasswordLoginForm() {
     hidden: { opacity: 0, y: 12 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
   };
+
+  if (passkeyStep) {
+    return (
+      <AdminPasskeyStep
+        onReturnToLogin={() => {
+          setPasskeyStep(false);
+          setStatus('idle');
+        }}
+      />
+    );
+  }
 
   return (
     <motion.form key="password-form" variants={containerVariants} initial="hidden" animate="visible" exit="exit" onSubmit={handleSubmit} className="space-y-3 sm:space-y-4" noValidate>

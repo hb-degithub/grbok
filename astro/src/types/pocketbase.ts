@@ -138,3 +138,19 @@ export interface Announcement {
   created: string;
   updated: string;
 }
+
+
+export interface AdminPasskey {
+  id: string;
+  owner: string;
+  label: string;
+  credential_id: string;
+  public_key: string;
+  counter: number;
+  revoked_at: string | null;
+  created: string;
+  updated: string;
+  expand?: {
+    owner?: User;
+  };
+}
