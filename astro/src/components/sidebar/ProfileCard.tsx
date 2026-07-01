@@ -52,9 +52,10 @@ export default function ProfileCard() {
         ))}
       </div>
       <div className="mt-6 flex gap-2">
-        <a href="/admin" className="btn-primary flex-1 text-xs">发布文章</a>
+        <a href="/login" className="btn-primary flex-1 text-xs">发布文章</a>
         <a href="/about" className="btn-ghost flex-1 text-xs">用户中心</a>
       </div>
     </motion.div>
   );
 }
+

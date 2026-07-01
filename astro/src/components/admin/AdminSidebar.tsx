@@ -195,7 +195,7 @@ export default function AdminSidebar() {
         type="button"
         onClick={() => setDrawerOpen(true)}
         className="fixed left-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-50 flex h-11 w-11 items-center justify-center rounded-md border border-border bg-white text-text shadow-md backdrop-blur lg:hidden"
-        aria-label="鎵撳紑鍚庡彴鑿滃崟"
+        aria-label="打开后台菜单"
         aria-expanded={drawerOpen}
         aria-controls="admin-mobile-sidebar"
       >
@@ -209,7 +209,7 @@ export default function AdminSidebar() {
       >
         <div className="flex h-16 items-center justify-between border-b border-border px-3">
           {!collapsed && (
-            <a href="/admin" className="min-w-0 text-text hover:text-text" aria-label="鍚庡彴棣栭〉">
+            <a href="/admin" className="min-w-0 text-text hover:text-text" aria-label="后台首页">
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-md bg-text text-sm font-black text-white">B</span>
                 <div className="min-w-0">
@@ -248,7 +248,7 @@ export default function AdminSidebar() {
               tabIndex={-1}
               role="dialog"
               aria-modal="true"
-              aria-label="鍚庡彴鑿滃崟"
+              aria-label="后台菜单"
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
@@ -257,7 +257,7 @@ export default function AdminSidebar() {
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex min-h-16 items-center justify-between border-b border-border px-4 pt-[max(env(safe-area-inset-top),0.5rem)]">
-                <a href="/admin" onClick={() => setDrawerOpen(false)} className="min-w-0 text-text hover:text-text" aria-label="鍚庡彴棣栭〉">
+                <a href="/admin" onClick={() => setDrawerOpen(false)} className="min-w-0 text-text hover:text-text" aria-label="后台首页">
                   <div className="flex items-center gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-md bg-text text-sm font-black text-white">B</span>
                     <div className="min-w-0">
@@ -270,7 +270,7 @@ export default function AdminSidebar() {
                   type="button"
                   onClick={() => setDrawerOpen(false)}
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-bg-soft hover:text-text"
-                  aria-label="鍏抽棴鍚庡彴鑿滃崟"
+                  aria-label="关闭后台菜单"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>

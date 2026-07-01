@@ -58,13 +58,13 @@
 
     handle /admin* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
-        try_files {path} {path}/ /index.html
+        try_files {path} {path}/ /404.html
         file_server
     }
 
     handle /login* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
-        try_files {path} {path}/ /index.html
+        try_files {path} {path}/ /404.html
         file_server
     }
 
@@ -76,7 +76,7 @@
     }
 
     handle {
-        try_files {path} {path}/ /index.html
+        try_files {path} {path}/ /404.html
         file_server
     }
 
