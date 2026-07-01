@@ -36,6 +36,41 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  admin-auth:
+    build:
+      context: ./admin-auth
+    container_name: blog-admin-auth
+    restart: unless-stopped
+    expose:
+      - "8787"
+    environment:
+      - ADMIN_AUTH_INTERNAL_SECRET=${ADMIN_AUTH_INTERNAL_SECRET}
+      - ADMIN_AUTH_HASH_SECRET=${ADMIN_AUTH_HASH_SECRET}
+      - ADMIN_AUTH_RP_ID=${ADMIN_AUTH_RP_ID:-hlydwz.com}
+      - ADMIN_AUTH_ORIGIN=${ADMIN_AUTH_ORIGIN:-https://hlydwz.com}
+      - ADMIN_AUTH_SESSION_TTL_SECONDS=${ADMIN_AUTH_SESSION_TTL_SECONDS:-900}
+    networks:
+      - blog_network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8787/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   pocketbase:
     image: ghcr.io/muchobien/pocketbase:0.22.21
     container_name: blog-pocketbase
@@ -47,6 +82,9 @@ services:
     environment:
       - PB_ENCRYPTION_KEY=${PB_ENCRYPTION_KEY}
       - TZ=${TZ:-Asia/Shanghai}
+      - ADMIN_AUTH_INTERNAL_URL=http://admin-auth:8787
+      - ADMIN_AUTH_INTERNAL_SECRET=${ADMIN_AUTH_INTERNAL_SECRET}
+      - ADMIN_AUTH_HASH_SECRET=${ADMIN_AUTH_HASH_SECRET}
     networks:
       - blog_network
     healthcheck:

@@ -41,6 +41,27 @@ foreach ($file in $files) {
     }
 }
 
+
+$envFile = '.env.example'
+$requiredEnv = @(
+    'ADMIN_AUTH_INTERNAL_SECRET',
+    'ADMIN_AUTH_HASH_SECRET',
+    'ADMIN_AUTH_RP_ID',
+    'ADMIN_AUTH_ORIGIN',
+    'ADMIN_AUTH_SESSION_TTL_SECONDS'
+)
+
+if (-not (Test-Path -LiteralPath $envFile -PathType Leaf)) {
+    $failures += "Missing file: $envFile"
+} else {
+    $envContent = Get-Content -LiteralPath $envFile -Raw
+    foreach ($name in $requiredEnv) {
+        if ($envContent -notmatch [regex]::Escape($name)) {
+            $failures += "$envFile : missing $name"
+        }
+    }
+}
+
 if ($failures.Count -gt 0) {
     Write-Host "FAIL: Admin route protection checks failed" -ForegroundColor Red
     foreach ($failure in $failures) {

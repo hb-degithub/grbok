@@ -4,6 +4,25 @@
 # ⚠️ 此文件仅用于本地测试，禁止上传至服务器
 
 services:
+  admin-auth:
+    build:
+      context: ./admin-auth
+    container_name: blog-admin-auth-local
+    expose:
+      - "8787"
+    environment:
+      - ADMIN_AUTH_INTERNAL_SECRET=${ADMIN_AUTH_INTERNAL_SECRET}
+      - ADMIN_AUTH_HASH_SECRET=${ADMIN_AUTH_HASH_SECRET}
+      - ADMIN_AUTH_RP_ID=${ADMIN_AUTH_RP_ID:-localhost}
+      - ADMIN_AUTH_ORIGIN=${ADMIN_AUTH_ORIGIN:-http://localhost}
+      - ADMIN_AUTH_SESSION_TTL_SECONDS=${ADMIN_AUTH_SESSION_TTL_SECONDS:-900}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8787/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
   pocketbase:
     image: ghcr.io/muchobien/pocketbase:0.22.21
     container_name: blog-pocketbase-local
@@ -16,6 +35,9 @@ services:
     environment:
       - PB_ENCRYPTION_KEY=${PB_ENCRYPTION_KEY}
       - TZ=${TZ:-Asia/Shanghai}
+      - ADMIN_AUTH_INTERNAL_URL=http://admin-auth:8787
+      - ADMIN_AUTH_INTERNAL_SECRET=${ADMIN_AUTH_INTERNAL_SECRET}
+      - ADMIN_AUTH_HASH_SECRET=${ADMIN_AUTH_HASH_SECRET}
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/api/health"]
       interval: 5s
