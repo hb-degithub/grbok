@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import { motion } from 'framer-motion';
+import PasskeyManager from './PasskeyManager';
 
 interface AuditItem { name: string; status: 'pass' | 'warn' | 'fail'; description: string; recommendation: string; }
 
@@ -10,6 +11,7 @@ const auditItems: AuditItem[] = [
   { name: 'PocketBase 管理端访问', status: 'pass', description: '/_/admin 由 Caddy 按 ADMIN_IP 白名单限制访问。', recommendation: '' },
   { name: '角色权限保护', status: 'pass', description: '后台菜单、页面守卫和 PocketBase 规则按作者、管理员、超级管理员分层控制。', recommendation: '' },
   { name: '用户角色写入保护', status: 'pass', description: 'guard_user_role.pb.js 强制普通注册只能成为普通用户，只有超级管理员可以提升角色。', recommendation: '' },
+  { name: '管理员 Passkey', status: 'pass', description: '管理后台访问已启用 Passkey 二次验证，仅超级管理员可注册或撤销 Passkey。', recommendation: '' },
   { name: '评论审核', status: 'pass', description: '新评论默认进入待审核状态，前台仅读取已通过评论。', recommendation: '' },
   { name: '评论 XSS 防护', status: 'pass', description: '评论 hook 会去除 HTML 标签，前端展示评论时不使用 HTML 注入。', recommendation: '' },
   { name: '扫描路径拦截', status: 'pass', description: 'Caddy 拦截 .env、.git、wp-*、phpmyadmin、shell、config 等常见扫描路径。', recommendation: '' },
@@ -31,6 +33,7 @@ export default function SecurityAudit() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-w-0 space-y-6">
+      <PasskeyManager />
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="card min-w-0 rounded-xl p-4 text-center"><p className="font-display text-2xl font-black text-success">{passCount}</p><p className="break-words font-mono text-[10px] uppercase tracking-widest text-muted [overflow-wrap:anywhere]">通过</p></div>
         <div className="card min-w-0 rounded-xl p-4 text-center"><p className="font-display text-2xl font-black text-warning">{warnCount}</p><p className="break-words font-mono text-[10px] uppercase tracking-widest text-muted [overflow-wrap:anywhere]">警告</p></div>
