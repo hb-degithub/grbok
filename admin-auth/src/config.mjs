@@ -14,6 +14,7 @@ export function createConfig() {
   return {
     internalSecret: secret,
     hashSecret,
+    rpName: env.ADMIN_AUTH_RP_NAME || '个人博客',
     rpId: env.ADMIN_AUTH_RP_ID || 'localhost',
     origin: env.ADMIN_AUTH_ORIGIN || 'http://localhost',
     sessionTtlSeconds: parseInt(env.ADMIN_AUTH_SESSION_TTL_SECONDS || '900', 10),

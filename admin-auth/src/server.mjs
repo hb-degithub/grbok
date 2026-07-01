@@ -1,5 +1,10 @@
 import { createServer as createHttpServer } from 'node:http';
+import { argv, env } from 'node:process';
+import { pathToFileURL } from 'node:url';
+import * as simpleWebAuthnAdapter from '@simplewebauthn/server';
+import { createConfig } from './config.mjs';
 import { createVerifiedSessionRecord, isVerifiedSessionValid } from './session-policy.mjs';
+import { createWebAuthnService } from './webauthn-service.mjs';
 
 export function createServer({ config, webauthnService }) {
   return createHttpServer(async (req, res) => {
@@ -93,4 +98,24 @@ function sendJson(res, status, body) {
     'Content-Length': Buffer.byteLength(data),
   });
   res.end(data);
+}
+
+export function startServer({
+  config = createConfig(),
+  adapter = simpleWebAuthnAdapter,
+  host = env.HOST || '0.0.0.0',
+  port = parseInt(env.PORT || '8787', 10),
+} = {}) {
+  const webauthnService = createWebAuthnService(adapter, config);
+  const server = createServer({ config, webauthnService });
+
+  server.listen(port, host, () => {
+    console.log(`admin-auth listening on ${host}:${port}`);
+  });
+
+  return server;
+}
+
+if (argv[1] && import.meta.url === pathToFileURL(argv[1]).href) {
+  startServer();
 }
