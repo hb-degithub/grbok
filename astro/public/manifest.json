@@ -4,8 +4,8 @@
   "description": "胡巴的个人博客，记录技术、思考与生活。",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#fafaf9",
-  "theme_color": "#1c1917",
+  "background_color": "#ffffff",
+  "theme_color": "#0a0a0b",
   "icons": [
     { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" },
     { "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" }
