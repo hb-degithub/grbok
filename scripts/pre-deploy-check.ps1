@@ -1,7 +1,7 @@
 ﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-    部署前检查：构建、敏感文件、迁移验证、admin auth schema
+    部署前检查：构建、敏感文件、迁移验证、admin auth schema、恢复脚本
 #>
 
 $ErrorActionPreference = 'Stop'
@@ -11,7 +11,7 @@ $failures = @()
 Write-Host "=== 部署前检查 ===" -ForegroundColor Cyan
 
 # 1. Git 状态检查
-Write-Host "[1/6] Git 状态检查" -ForegroundColor Cyan
+Write-Host "[1/7] Git 状态检查" -ForegroundColor Cyan
 $status = git status --porcelain
 if ($status) {
     Write-Host "  暂存区/工作区有未提交改动:" -ForegroundColor Yellow
@@ -24,7 +24,7 @@ else {
 }
 
 # 2. 敏感文件检查
-Write-Host "[2/6] 敏感文件检查" -ForegroundColor Cyan
+Write-Host "[2/7] 敏感文件检查" -ForegroundColor Cyan
 $sensitive = & "$PSScriptRoot\sensitive-check.ps1" 2>&1
 if ($LASTEXITCODE -ne 0) {
     $failures += "敏感文件检查未通过"
@@ -35,7 +35,7 @@ else {
 }
 
 # 3. Astro 构建验证
-Write-Host "[3/6] Astro 构建验证" -ForegroundColor Cyan
+Write-Host "[3/7] Astro 构建验证" -ForegroundColor Cyan
 Push-Location "$repoRoot\astro"
 try {
     $buildResult = npm run build 2>&1
@@ -53,7 +53,7 @@ finally {
 }
 
 # 4. 迁移验证 (Linux 环境)
-Write-Host "[4/6] 迁移验证 (Linux)" -ForegroundColor Cyan
+Write-Host "[4/7] 迁移验证 (Linux)" -ForegroundColor Cyan
 if ($IsLinux -or $IsMacOS) {
     $migrateResult = bash "$repoRoot\scripts\verify-pocketbase-migrations-linux.sh" 2>&1
     if ($LASTEXITCODE -ne 0) {
@@ -70,19 +70,29 @@ else {
 }
 
 # 5. Admin auth schema 检查
-Write-Host "[5/6] Admin auth schema 检查" -ForegroundColor Cyan
+Write-Host "[5/7] Admin auth schema 检查" -ForegroundColor Cyan
 $pbAdminAuthResult = & "$PSScriptRoot\check-pb-admin-auth.ps1" 2>&1
 if ($LASTEXITCODE -ne 0) {
     $failures += "Admin auth schema 检查未通过"
-    Write-Host "  FAIL" -ForegroundColor Red
     Write-Host "  $pbAdminAuthResult" -ForegroundColor Red
 }
 else {
     Write-Host "  OK" -ForegroundColor Green
 }
 
-# 6. .env 文件检查
-Write-Host "[6/6] .env 文件检查" -ForegroundColor Cyan
+# 6. Admin recovery 脚本检查
+Write-Host "[6/7] Admin recovery 脚本检查" -ForegroundColor Cyan
+$recoveryCheckResult = & "$PSScriptRoot\check-admin-recovery.ps1" 2>&1
+if ($LASTEXITCODE -ne 0) {
+    $failures += "Admin recovery 检查未通过"
+    Write-Host "  $recoveryCheckResult" -ForegroundColor Red
+}
+else {
+    Write-Host "  OK" -ForegroundColor Green
+}
+
+# 7. .env 文件检查
+Write-Host "[7/7] .env 文件检查" -ForegroundColor Cyan
 $requiredEnvFiles = @('.env.example')
 $missingEnv = $requiredEnvFiles | Where-Object { -not (Test-Path "$repoRoot\$_") }
 if ($missingEnv) {
@@ -105,4 +115,3 @@ else {
     Write-Host "请修复后重新运行 pre-deploy-check" -ForegroundColor Red
     exit 1
 }
-
