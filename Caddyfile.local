@@ -18,6 +18,12 @@
         -X-Powered-By
     }
 
+    @blocked_admin_access {
+        path /admin* /_/* /api/admins/* /api/blog-admin/webauthn/*
+        not remote_ip {$ADMIN_IP}
+    }
+    respond @blocked_admin_access "Forbidden" 403
+
     @bad_paths {
         path /.env* /.git* /.svn* /wp-* /xmlrpc* /vendor* /node_modules* /.htaccess* /backup* /sql* /config* /phpmyadmin* /mysql* /shell* /cmd* /eval* /input* /index.php* /info.php*
         not path /_/*

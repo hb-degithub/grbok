@@ -2,6 +2,12 @@
     encode zstd gzip
     root * /srv
 
+    @blocked_admin_access {
+        path /admin* /_/* /api/admins/* /api/blog-admin/webauthn/*
+        not remote_ip {$ADMIN_IP}
+    }
+    respond @blocked_admin_access "Forbidden" 403
+
     header {
         X-Frame-Options "DENY"
         X-Content-Type-Options "nosniff"
@@ -25,10 +31,6 @@
 
     handle /api/admins/* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
-        @not_admin_api_ips {
-            not remote_ip {$ADMIN_IP}
-        }
-        respond @not_admin_api_ips "Forbidden: PocketBase admin API is restricted" 403
         reverse_proxy pocketbase:8090 {
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
@@ -47,10 +49,6 @@
 
     handle /_/* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
-        @not_admin_ips {
-            not remote_ip {$ADMIN_IP}
-        }
-        respond @not_admin_ips "Forbidden: PocketBase admin access is restricted" 403
         reverse_proxy pocketbase:8090 {
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
@@ -59,10 +57,6 @@
     }
 
     handle /admin* {
-        @not_admin_page_ips {
-            not remote_ip {$ADMIN_IP}
-        }
-        respond @not_admin_page_ips "Forbidden: admin pages are restricted" 403
         header X-Robots-Tag "noindex, nofollow, noarchive"
         try_files {path} {path}/ /index.html
         file_server
