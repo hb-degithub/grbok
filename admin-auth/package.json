@@ -1,0 +1,16 @@
+﻿{
+  "name": "admin-auth",
+  "version": "1.0.0",
+  "description": "Internal admin authentication and WebAuthn service",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "^11.0.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}
