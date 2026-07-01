@@ -5,7 +5,7 @@
 #>
 
 $ErrorActionPreference = 'Stop'
-$repoRoot = Split-Path -Parent $PSScriptRoot | Split-Path -Parent
+$repoRoot = Split-Path -Parent $PSScriptRoot
 $failures = @()
 
 Write-Host "=== 部署前检查 ===" -ForegroundColor Cyan
