@@ -1,4 +1,4 @@
-:80 {
+﻿:80 {
     encode zstd gzip
     root * /srv
 
@@ -6,7 +6,9 @@
         path /admin* /_/* /api/admins/* /api/blog-admin/webauthn/*
         not remote_ip {$ADMIN_IP}
     }
-    respond @blocked_admin_access "Forbidden" 403
+    handle @blocked_admin_access {
+        respond "Forbidden" 403
+    }
 
     header {
         X-Frame-Options "DENY"
@@ -58,13 +60,13 @@
 
     handle /admin* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
-        try_files {path} {path}/ /404.html
+        try_files {path} {path}/ =404
         file_server
     }
 
     handle /login* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
-        try_files {path} {path}/ /404.html
+        try_files {path} {path}/ =404
         file_server
     }
 
@@ -76,7 +78,12 @@
     }
 
     handle {
-        try_files {path} {path}/ /404.html
+        try_files {path} {path}/ =404
+        file_server
+    }
+
+    handle_errors {
+        rewrite * /{http.error.status_code}.html
         file_server
     }
 
