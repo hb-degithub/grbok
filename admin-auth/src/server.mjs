@@ -1,5 +1,5 @@
-﻿import { createServer as createHttpServer } from 'node:http';
-import { createVerifiedSessionRecord } from './session-policy.mjs';
+import { createServer as createHttpServer } from 'node:http';
+import { createVerifiedSessionRecord, isVerifiedSessionValid } from './session-policy.mjs';
 
 export function createServer({ config, webauthnService }) {
   return createHttpServer(async (req, res) => {
@@ -45,6 +45,12 @@ export function createServer({ config, webauthnService }) {
           const { challenge, allowCredentials } = body;
           result = await webauthnService.authenticationOptions({ challenge, allowCredentials });
           break;
+        }
+        case '/internal/session/verify': {
+          const { record, token, fingerprint, ip, userAgent } = body;
+          const valid = isVerifiedSessionValid(record, { token, fingerprint, ip, userAgent }, config.hashSecret);
+          sendJson(res, 200, { verified: valid });
+          return;
         }
         case '/internal/webauthn/authentication/verify': {
           const { response, expectedChallenge, authenticator, userId, token, fingerprint, ip, userAgent } = body;

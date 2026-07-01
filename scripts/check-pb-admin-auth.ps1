@@ -30,6 +30,26 @@ if (-not $migration) {
     }
 }
 
+
+$hookFile = 'pb_hooks/admin_webauthn.pb.js'
+if (-not (Test-Path -LiteralPath $hookFile -PathType Leaf)) {
+    $failures += "Missing hook file: $hookFile"
+} else {
+    $hookContent = Get-Content -LiteralPath $hookFile -Raw
+    $requiredRoutes = @(
+        '/api/blog-admin/webauthn/register/options',
+        '/api/blog-admin/webauthn/register/verify',
+        '/api/blog-admin/webauthn/authenticate/options',
+        '/api/blog-admin/webauthn/authenticate/verify',
+        '/api/blog-admin/webauthn/session'
+    )
+    foreach ($route in $requiredRoutes) {
+        if ($hookContent -notmatch [regex]::Escape($route)) {
+            $failures += "$hookFile : missing route $route"
+        }
+    }
+}
+
 if ($failures.Count -gt 0) {
     Write-Host 'FAIL: PocketBase admin auth checks failed' -ForegroundColor Red
     foreach ($failure in $failures) {

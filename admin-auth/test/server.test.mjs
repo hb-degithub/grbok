@@ -108,4 +108,44 @@ describe('server', () => {
     assert.equal(typeof body.session.fingerprint_hash, 'string');
     assert.equal(calls[0].method, 'verifyAuthentication');
   });
+  it('POST /internal/session/verify validates binding hashes', async () => {
+    calls.length = 0;
+    const res = await fetch(`${baseUrl}/internal/session/verify`, {
+      method: 'POST',
+      headers: { 'X-Internal-Secret': config.internalSecret, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        record: {
+          token_hash: 'wrong',
+          fingerprint_hash: 'wrong',
+          ip_hash: 'wrong',
+          user_agent_hash: 'wrong',
+          expires_at: new Date(Date.now() + 10000).toISOString(),
+          revoked_at: null,
+        },
+        token: 'tok',
+        fingerprint: 'fp',
+        ip: '127.0.0.1',
+        userAgent: 'UA',
+      }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.verified, false);
+  });
+
+  it('POST /internal/session/verify accepts valid bindings', async () => {
+    calls.length = 0;
+    const { createVerifiedSessionRecord } = await import('../src/session-policy.mjs');
+    const inputs = { userId: 'u1', token: 'tok', fingerprint: 'fp', ip: '127.0.0.1', userAgent: 'UA' };
+    const record = createVerifiedSessionRecord(inputs, { hashSecret: config.hashSecret, sessionTtlSeconds: 900 });
+    const res = await fetch(`${baseUrl}/internal/session/verify`, {
+      method: 'POST',
+      headers: { 'X-Internal-Secret': config.internalSecret, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ record, ...inputs }),
+    });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.verified, true);
+  });
+
 });

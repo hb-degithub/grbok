@@ -48,13 +48,14 @@ describe('webauthn-service', () => {
   it('verifyRegistration forwards response and expected values', async () => {
     calls.length = 0;
     const response = { id: 'cred-id', rawId: 'raw', response: {} };
-    await service.verifyRegistration({ response, expectedChallenge: 'challenge-123' });
+    const result = await service.verifyRegistration({ response, expectedChallenge: 'challenge-123' });
     assert.equal(calls[0].method, 'verifyRegistrationResponse');
     assert.equal(calls[0].opts.response, response);
     assert.equal(calls[0].opts.expectedChallenge, 'challenge-123');
     assert.equal(calls[0].opts.expectedOrigin, 'https://hlydwz.com');
     assert.equal(calls[0].opts.expectedRPID, 'hlydwz.com');
     assert.equal(calls[0].opts.requireUserVerification, true);
+    assert.equal(result.registrationInfo.credential.publicKey, 'AQID');
   });
 
   it('authenticationOptions passes challenge, allowCredentials, and required user verification', async () => {
@@ -80,6 +81,16 @@ describe('webauthn-service', () => {
     assert.equal(calls[0].opts.expectedRPID, 'hlydwz.com');
     assert.equal(calls[0].opts.authenticator, authenticator);
     assert.equal(calls[0].opts.requireUserVerification, true);
+  });
+
+  it('verifyAuthentication decodes base64 credentialPublicKey', async () => {
+    calls.length = 0;
+    const response = { id: 'cred-id', rawId: 'raw', response: {} };
+    const authenticator = { credentialID: 'cred-id', credentialPublicKey: 'AQID', counter: 0 };
+    await service.verifyAuthentication({ response, expectedChallenge: 'auth-challenge', authenticator });
+    assert.equal(calls[0].method, 'verifyAuthenticationResponse');
+    assert.ok(calls[0].opts.authenticator.credentialPublicKey instanceof Buffer);
+    assert.deepEqual([...calls[0].opts.authenticator.credentialPublicKey], [1, 2, 3]);
   });
 });
 
