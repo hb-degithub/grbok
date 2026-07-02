@@ -1,9 +1,9 @@
-ï»¿@import "tailwindcss";
+@import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ===========================
-   Design System â€” Batch 1
+   Design System ¡ª Batch 1
    Zinc-Slate cold tech + teal accent
    =========================== */
 
@@ -113,11 +113,11 @@ button, a, input, select, textarea {
 }
 
 /* ===========================
-   Theme tokens â€” Zinc + Teal
+   Theme tokens ¡ª Zinc + Teal
    =========================== */
 
 @theme {
-  /* Light palette â€” zinc cool grays */
+  /* Light palette ¡ª zinc cool grays */
   --color-bg-primary: #ffffff;
   --color-bg-secondary: #f4f4f5;
   --color-bg-tertiary: #e4e4e7;
@@ -131,11 +131,11 @@ button, a, input, select, textarea {
   --color-border-hover: #d4d4d8;
   --color-surface: #ffffff;
 
-  /* Glow â€” tinted teal */
+  /* Glow ¡ª tinted teal */
   --color-glow: rgba(20, 184, 166, 0.06);
   --color-glow-accent: rgba(20, 184, 166, 0.12);
 
-  /* Dark palette â€” off-black zinc */
+  /* Dark palette ¡ª off-black zinc */
   --color-dark-bg-primary: #0a0a0b;
   --color-dark-bg-secondary: #18181b;
   --color-dark-bg-tertiary: #27272a;
@@ -161,14 +161,14 @@ button, a, input, select, textarea {
   --leading-relaxed: 1.75;
   --leading-loose: 2;
 
-  /* Radius â€” tight */
+  /* Radius ¡ª tight */
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
   --radius-2xl: 1rem;
 
-  /* Shadows â€” zinc-tinted */
+  /* Shadows ¡ª zinc-tinted */
   --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.05);
   --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.07), 0 1px 2px rgb(0 0 0 / 0.04);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
@@ -248,14 +248,14 @@ a:focus { text-decoration: none !important; }
 /* Header navigation reset */
 header ul, header li { list-style: none; margin: 0; padding: 0; }
 
-/* Focus ring â€” teal tinted */
+/* Focus ring ¡ª teal tinted */
 .focus-ring { outline: none; }
 .focus-ring:focus-visible {
   box-shadow: 0 0 0 3px rgb(20 184 166 / 0.32);
 }
 
 /* ===========================
-   Prose â€” article content
+   Prose ¡ª article content
    =========================== */
 
 @media (max-width: 639px) {
@@ -278,7 +278,6 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
     -webkit-overflow-scrolling: touch; white-space: nowrap;
   }
   .card { border-radius: var(--radius-lg); }
-  .btn, .btn-primary, .btn-ghost { min-height: 2.75rem; }
 }
 
 .prose {
@@ -367,7 +366,7 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
   color: var(--color-dark-accent);
 }
 
-/* Code blocks â€” Catppuccin-inspired dark */
+/* Code blocks ¡ª Catppuccin-inspired dark */
 .prose pre {
   position: relative;
   background-color: #1e1e2e;
@@ -420,17 +419,21 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
 }
 
 /* ===========================
-   Buttons â€” teal primary
+   Buttons ¡ª teal primary
    =========================== */
 
-.btn {
+.btn,
+.btn-primary,
+.btn-ghost {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
   padding: 0.625rem 1.25rem; font-size: 0.875rem; font-weight: 500;
   border-radius: var(--radius-md); transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer; border: 1px solid transparent; outline: none;
 }
 
-.btn:focus-visible {
+.btn:focus-visible,
+.btn-primary:focus-visible,
+.btn-ghost:focus-visible {
   outline: 2px solid var(--color-accent); outline-offset: 2px;
 }
 
@@ -543,7 +546,7 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
 .transition-base { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
 
 /* ===========================
-   Card â€” solid surfaces
+   Card ¡ª solid surfaces
    =========================== */
 
 .card {
@@ -680,7 +683,7 @@ img:not([src]), img[src=''], img[src*='loading'] {
 .btn-primary, .btn-ghost { transition: all 0.18s ease; }
 .btn-primary:active, .btn-ghost:active { transform: scale(0.97); }
 
-/* Focus ring â€” teal */
+/* Focus ring ¡ª teal */
 *:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
