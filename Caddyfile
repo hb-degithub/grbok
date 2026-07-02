@@ -1,10 +1,15 @@
+{
+    servers {
+        trusted_proxies static 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 127.0.0.1
+    }
+}
 ﻿:80 {
     encode zstd gzip
     root * /srv
 
     @blocked_admin_access {
         path /admin* /_/* /api/admins/* /api/blog-admin/webauthn/*
-        not remote_ip {$ADMIN_IP}
+        not client_ip {$ADMIN_IP}
     }
     handle @blocked_admin_access {
         respond "Forbidden" 403
@@ -98,4 +103,6 @@
         format json
     }
 }
+
+
 

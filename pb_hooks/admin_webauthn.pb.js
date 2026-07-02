@@ -348,6 +348,12 @@ routerAdd('POST', '/api/blog-admin/webauthn/authenticate/verify', (c) => {
 // Session status (admin-capable users)
 routerAdd('GET', '/api/blog-admin/webauthn/session', (c) => {
   const user = requireAdminCapable(c);
+  // 若该管理员尚未注册任何 Passkey，则暂时视为已验证，
+  // 以便首次登录后进入后台注册 Passkey；注册后此处自动失效。
+  const passkeys = listActivePasskeys(user.id);
+  if (passkeys.length === 0) {
+    return c.json(200, { verified: true });
+  }
   const result = verifySessionBinding(user.id, c);
   return c.json(200, result);
 });
