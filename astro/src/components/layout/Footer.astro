@@ -41,20 +41,18 @@ const currentYear = new Date().getFullYear();
     <div class="mt-8 flex flex-col items-center gap-3 border-t border-zinc-200/70 pt-6 dark:border-zinc-800/70 sm:flex-row sm:justify-center sm:gap-6">
       {SITE_CONFIG.icp.url && (
         <a href={SITE_CONFIG.icp.url} target="_blank" rel="noopener noreferrer" class="beian-link">
-          <svg class="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M7 3.75h7.35L18.25 7.7v12.55H7V3.75Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
-            <path d="M14.25 4v4h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M9.7 12h5.8M9.7 15.25h5.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
-          </svg>
           <span>{SITE_CONFIG.icp.text}</span>
         </a>
       )}
       {SITE_CONFIG.police.url && (
         <a href={SITE_CONFIG.police.url} target="_blank" rel="noopener noreferrer" class="beian-link">
-          <svg class="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-            <path d="M10 2L2 5v4c0 5.25 3.5 10.15 8 11 4.5-.85 8-5.75 8-11V5l-8-3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" />
-            <path d="M7.5 10.5L9.5 12.5L12.5 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
+          <img
+            src="https://www.beian.gov.cn/img/ghs.png"
+            alt=""
+            class="h-4 w-4 flex-shrink-0"
+            loading="lazy"
+            decoding="async"
+          />
           <span>{SITE_CONFIG.police.text}</span>
         </a>
       )}
