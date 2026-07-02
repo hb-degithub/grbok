@@ -41,7 +41,9 @@
         path /_astro/* /pagefind/* *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.webp *.avif *.woff *.woff2 *.ttf *.eot
     }
     handle @static {
-        header Cache-Control "public, max-age=31536000, immutable"
+        header Cache-Control "no-cache, no-store, must-revalidate"
+        header Surrogate-Control "no-store"
+        header Pragma "no-cache"
         file_server
     }
 

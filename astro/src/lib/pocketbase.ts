@@ -1,10 +1,11 @@
-import PocketBase from 'pocketbase';
+﻿import PocketBase from 'pocketbase';
 
 /**
  * PocketBase 工厂函数
  * 解决 SSR 环境下模块级单例的状态污染问题
  */
 
+const __BUILD_VER = '20260702160418';
 const POCKETBASE_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 
 /**
@@ -45,5 +46,6 @@ export const pb = typeof window !== 'undefined'
   ? getPocketBase()
   : createPocketBase();
 
+// Build: 20260702155634
 // 导出类型
 export type { RecordModel, ListResult } from 'pocketbase';

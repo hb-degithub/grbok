@@ -22,6 +22,11 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
+  // Do not intercept cross-origin requests - let the browser handle them directly
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   // Never cache API requests - always network-first
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(fetch(e.request).catch(() => caches.match('/offline/')));
