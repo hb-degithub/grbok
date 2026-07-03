@@ -1,0 +1,148 @@
+/* ---- PixelButton: override PixelCard card defaults for button use ---- */
+
+.pixel-btn {
+  width: 100%;
+  height: auto;
+  aspect-ratio: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  cursor: pointer;
+}
+
+.pixel-btn .pixel-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Dark overlay on hover - lighter for button context */
+.pixel-btn::before {
+  background: radial-gradient(circle, rgba(15, 23, 42, 0.35), transparent 80%);
+}
+
+/* ---- Primary variant: solid white background for clear visibility ---- */
+.pixel-btn--primary {
+  border-color: rgba(56, 189, 248, 0.5);
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ---- Secondary variant ---- */
+.pixel-btn--secondary {
+  border-color: rgba(148, 163, 184, 0.4);
+  background: #f1f5f9;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.pixel-btn--secondary::before {
+  background: radial-gradient(circle, rgba(15, 23, 42, 0.2), transparent 80%);
+}
+
+/* ---- Inner button ---- */
+.pixel-btn__inner {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.625rem 1rem;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: rgb(24, 24, 27);
+  cursor: pointer;
+  user-select: none;
+  transition: color 200ms ease;
+  outline: none;
+}
+
+.pixel-btn--primary .pixel-btn__inner {
+  color: #0c4a6e;
+}
+
+.pixel-btn--secondary .pixel-btn__inner {
+  color: rgb(63, 63, 70);
+}
+
+.pixel-btn:hover .pixel-btn__inner {
+  color: #fff;
+}
+
+.pixel-btn--secondary:hover .pixel-btn__inner {
+  color: rgb(244, 244, 245);
+}
+
+/* ---- Disabled state ---- */
+.pixel-btn--disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pixel-btn--disabled .pixel-btn__inner {
+  cursor: not-allowed;
+}
+
+/* ---- Dark mode: solid dark background for clear visibility ---- */
+.dark .pixel-btn {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.dark .pixel-btn--primary {
+  border-color: rgba(34, 211, 238, 0.4);
+  background: #0f172a;
+  box-shadow: 0 2px 8px rgba(34, 211, 238, 0.15), 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.dark .pixel-btn--secondary {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #18181b;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+.dark .pixel-btn--primary .pixel-btn__inner {
+  color: #e0f2fe;
+}
+
+.dark .pixel-btn--secondary .pixel-btn__inner {
+  color: rgb(212, 212, 216);
+}
+
+.dark .pixel-btn:hover .pixel-btn__inner {
+  color: #fff;
+}
+
+.dark .pixel-btn--secondary:hover .pixel-btn__inner {
+  color: rgb(244, 244, 245);
+}
+
+.dark .pixel-btn::before {
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.5), transparent 80%);
+}
+
+/* ---- Spinner ---- */
+.pixel-btn__spinner {
+  height: 1rem;
+  width: 1rem;
+  animation: pixel-btn-spin 0.8s linear infinite;
+}
+
+@keyframes pixel-btn-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ---- Focus ring ---- */
+.pixel-btn__inner:focus-visible {
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4);
+  border-radius: 12px;
+}
+
+.dark .pixel-btn__inner:focus-visible {
+  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.4);
+}

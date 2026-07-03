@@ -65,3 +65,13 @@ id_ed25519
 # 部署临时文件
 deploy-*.tar.gz
 deploy-*.zip
+
+# Local PocketBase data
+pb_local/
+
+# Superpowers local config
+.superpowers/
+
+# Playwright screenshots
+astro/screenshot-*.png
+astro/pw-screenshot.cjs
