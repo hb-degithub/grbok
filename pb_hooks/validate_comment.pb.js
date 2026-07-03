@@ -1,3 +1,5 @@
+const MAX_NESTING_DEPTH = 5;
+
 onRecordBeforeCreateRequest((e) => {
   const stripTags = (value) => String(value || '').replace(/<[^>]*>/g, '').trim();
   const commentRateBuckets = globalThis.commentRateBuckets || (globalThis.commentRateBuckets = {});
@@ -92,6 +94,18 @@ onRecordBeforeCreateRequest((e) => {
     const parent = findRecord('comments', parentId);
     if (!parent || parent.get('post_id') !== postId || parent.get('status') !== 'approved') {
       throw new BadRequestError('Replies must target an approved comment on the same post.');
+    }
+
+    let depth = 1;
+    let ancestorId = parent.get('parent_id');
+    while (ancestorId) {
+      depth++;
+      if (depth > MAX_NESTING_DEPTH) break;
+      const ancestor = findRecord('comments', ancestorId);
+      ancestorId = ancestor ? ancestor.get('parent_id') : null;
+    }
+    if (depth > MAX_NESTING_DEPTH) {
+      throw new BadRequestError('评论嵌套深度不能超过5层');
     }
   }
 

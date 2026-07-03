@@ -24,7 +24,10 @@
         Cross-Origin-Resource-Policy "same-site"
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
-        Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://hlydwz.com wss://hlydwz.com https://www.beian.gov.cn"
+        # CSP: style-src omits 'unsafe-inline' — TailwindCSS 4 + Astro emit scoped external CSS, no inline <style> needed.
+        # script-src retains 'unsafe-inline' — Astro islands (client:load/visible) and is:inline scripts require it;
+        # removing it would break React hydration and theme/viewport init scripts.
+        Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: https:; style-src 'self' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://hlydwz.com wss://hlydwz.com https://www.beian.gov.cn"
         -Server
         -X-Powered-By
     }
