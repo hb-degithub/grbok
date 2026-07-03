@@ -60,6 +60,11 @@
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
             header_up X-Forwarded-Proto {scheme}
+
+            header_down Access-Control-Allow-Origin "https://hlydwz.com"
+            header_down Access-Control-Allow-Methods "GET, POST, PATCH, DELETE, OPTIONS"
+            header_down Access-Control-Allow-Headers "Content-Type, Authorization, X-Browser-Fingerprint"
+            header_down Access-Control-Max-Age "86400"
         }
     }
 

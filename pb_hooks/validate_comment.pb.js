@@ -104,7 +104,7 @@ onRecordBeforeCreateRequest((e) => {
   record.set('author_email', authorEmail);
   record.set('content', content);
   record.set('status', boolSetting('comment_moderation', true) ? 'pending' : 'approved');
-  if (ip) record.set('ip_address', ip);
+  record.set('ip_address', ip || '');
 
   if (typeof e.next === 'function') e.next();
 }, 'comments');

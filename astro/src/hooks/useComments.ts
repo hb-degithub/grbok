@@ -14,6 +14,7 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
   const [comments, setComments] = useState<NestedComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const buildCommentTree = useCallback((flatComments: PublicComment[]): NestedComment[] => {
     const commentMap = new Map<string, NestedComment>();
@@ -112,8 +113,10 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
 
   const submitComment = useCallback(
     async (data: CommentFormData): Promise<boolean> => {
+      if (isSubmitting) return false;
       try {
         if (!enabled) return false;
+        setIsSubmitting(true);
         const pb = getPocketBase();
         await pb.collection('comments').create({
           post_id: postId,
@@ -127,15 +130,18 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
       } catch (err) {
         console.error('Failed to submit comment:', err);
         return false;
+      } finally {
+        setIsSubmitting(false);
       }
     },
-    [postId, enabled]
+    [postId, enabled, isSubmitting]
   );
 
   return {
     comments,
     loading,
     error,
+    isSubmitting,
     submitComment,
     refresh: fetchComments,
   };

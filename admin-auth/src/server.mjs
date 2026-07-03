@@ -22,7 +22,10 @@ export function createServer({ config, webauthnService }) {
       }
 
       const secret = req.headers['x-internal-secret'];
-      if (secret !== config.internalSecret) {
+      const { timingSafeEqual } = await import('node:crypto');
+      const expected = Buffer.from(config.internalSecret, 'utf8');
+      const provided = Buffer.from(secret || '', 'utf8');
+      if (expected.length !== provided.length || !timingSafeEqual(expected, provided)) {
         sendJson(res, 403, { error: 'Forbidden' });
         return;
       }

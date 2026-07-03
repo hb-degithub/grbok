@@ -121,6 +121,9 @@ function saveChallenge(userId, challenge, purpose) {
 }
 
 function consumeChallenge(userId, purpose) {
+  if (!userId || !/^[a-zA-Z0-9]{15}$/.test(userId)) {
+    throw new BadRequestError('Invalid user ID format');
+  }
   const now = new Date().toISOString();
   const filter = `user = '${userId}' && purpose = '${purpose}' && expires_at > '${now}'`;
   const records = $app.dao().findRecordsByFilter('webauthn_challenges', filter, '-created', 1);
@@ -148,12 +151,18 @@ function saveVerifiedSession(session) {
 }
 
 function findPasskeyByCredentialId(credentialId) {
+  if (!credentialId || !/^[A-Za-z0-9_-]+$/.test(credentialId)) {
+    throw new BadRequestError('Invalid credential ID format');
+  }
   const filter = `credential_id = '${credentialId}' && revoked_at = null`;
   const records = $app.dao().findRecordsByFilter('admin_passkeys', filter, '-created', 1);
   return records.length > 0 ? records[0] : null;
 }
 
 function listActivePasskeys(userId) {
+  if (!userId || !/^[a-zA-Z0-9]{15}$/.test(userId)) {
+    throw new BadRequestError('Invalid user ID format');
+  }
   const filter = `owner = '${userId}' && revoked_at = null`;
   return $app.dao().findRecordsByFilter('admin_passkeys', filter, '-created', 100);
 }
@@ -168,8 +177,11 @@ function buildAllowCredentials(userId) {
 }
 
 function verifySessionBinding(userId, c) {
+  if (!userId || !/^[a-zA-Z0-9]{15}$/.test(userId)) {
+    return { verified: false };
+  }
   const token = getAuthToken(c);
-  const fingerprint = getHeader(c, 'X-Admin-Fingerprint');
+  const fingerprint = getHeader(c, 'X-Browser-Fingerprint');
   const ip = getClientIP(c);
   const userAgent = getHeader(c, 'User-Agent');
 
@@ -314,7 +326,7 @@ routerAdd('POST', '/api/blog-admin/webauthn/authenticate/verify', (c) => {
     authenticator,
     userId,
     token: getAuthToken(c),
-    fingerprint: getHeader(c, 'X-Admin-Fingerprint'),
+    fingerprint: getHeader(c, 'X-Browser-Fingerprint'),
     ip: getClientIP(c),
     userAgent: getHeader(c, 'User-Agent'),
   });
@@ -348,11 +360,11 @@ routerAdd('POST', '/api/blog-admin/webauthn/authenticate/verify', (c) => {
 // Session status (admin-capable users)
 routerAdd('GET', '/api/blog-admin/webauthn/session', (c) => {
   const user = requireAdminCapable(c);
-  // 若该管理员尚未注册任何 Passkey，则暂时视为已验证，
-  // 以便首次登录后进入后台注册 Passkey；注册后此处自动失效。
+  // 若该管理员尚未注册任何 Passkey，则拒绝验证，
+  // 引导其先注册 Passkey 后再完成二次验证。
   const passkeys = listActivePasskeys(user.id);
   if (passkeys.length === 0) {
-    return c.json(200, { verified: true });
+    return c.json(200, { verified: false, reason: 'no_passkey_registered' });
   }
   const result = verifySessionBinding(user.id, c);
   return c.json(200, result);
