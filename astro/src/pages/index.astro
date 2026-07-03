@@ -1,13 +1,14 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PostList from '../components/posts/PostList';
-import ParticleField from '../components/effects/ParticleField';
+import HomeParticlesBackground from '../components/effects/HomeParticlesBackground';
 import Typewriter from '../components/ui/Typewriter';
 import HomeAuthQuickEntry from '../components/auth/HomeAuthQuickEntry';
 import ProfileCard from '../components/sidebar/ProfileCard';
 import HotArticles from '../components/sidebar/HotArticles';
 import RecentComments from '../components/sidebar/RecentComments';
 import FriendLinks from '../components/sidebar/FriendLinks';
+import MagicBento from '../components/reactbits/MagicBento';
 
 const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 
@@ -29,12 +30,12 @@ const [postsCount, tagsCount] = await Promise.all([
 ]);
 ---
 
-<BaseLayout title="首页" description="欢迎来到胡巴的个人博客">
-  <aside class="floating-sidebar sidebar-left fixed left-6 top-28 z-30 hidden w-80 space-y-5 xl:block" aria-label="Fixed section sidebar">
+<BaseLayout title="首页" description="欢迎来到胡巴的个人博客" mainClass="pt-0 sm:pt-0 sm:pb-8">
+  <aside class="floating-sidebar sidebar-left fixed left-6 top-28 z-30 hidden w-80 space-y-5 2xl:block" aria-label="固定分区导航">
     <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
       <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">站内导航</h3>
-      <nav class="mt-4 grid gap-2 text-sm" aria-label="Section navigation">
-        <a href="/" class="side-link flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>棣栭〉</span><span>01</span></a>
+      <nav class="mt-4 grid gap-2 text-sm" aria-label="分区导航">
+        <a href="/" class="side-link flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>首页</span><span>01</span></a>
         <a href="#latest" class="side-link flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>最新文章</span><span>02</span></a>
         <a href="/posts" class="side-link flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>全部文章</span><span>03</span></a>
         <a href="/tags" class="side-link flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>标签索引</span><span>04</span></a>
@@ -51,7 +52,7 @@ const [postsCount, tagsCount] = await Promise.all([
     </section>
   </aside>
 
-  <aside class="floating-sidebar sidebar-right fixed right-6 top-28 z-30 hidden w-80 space-y-5 xl:block" aria-label="Fixed profile sidebar">
+  <aside class="floating-sidebar sidebar-right fixed right-6 top-28 z-30 hidden w-80 space-y-5 2xl:block" aria-label="固定资料侧栏">
     <section class="side-panel overflow-hidden rounded-xl border border-zinc-200 bg-white p-6 shadow-2xl shadow-zinc-900/[0.06] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
       <div class="flex items-center gap-4">
         <div class="flex h-14 w-14 items-center justify-center rounded-lg bg-zinc-900 text-xl font-black text-white shadow-lg shadow-zinc-900/15 dark:bg-zinc-100 dark:text-zinc-950">B</div>
@@ -76,17 +77,11 @@ const [postsCount, tagsCount] = await Promise.all([
     </section>
   </aside>
 
-  <section class="journal-hero relative -mt-[var(--header-offset,4rem)] min-h-[var(--hero-min-h,100svh)] w-full overflow-hidden border-b border-zinc-200/70 px-[var(--page-pad,1rem)] pb-16 pt-[calc(var(--header-offset,4rem)+1.5rem)] shadow-sm dark:border-zinc-800/70 sm:px-6 lg:px-12 lg:pb-20 lg:pt-32 xl:px-[19rem] 2xl:px-[23rem]">
+  <section class="journal-hero relative min-h-[var(--hero-min-h,100svh)] w-full overflow-hidden border-b border-zinc-200/70 px-[var(--page-pad,1rem)] pb-16 pt-[calc(var(--header-offset,4rem)+1.5rem)] shadow-sm dark:border-zinc-800/70 sm:px-6 lg:px-12 lg:pb-20 lg:pt-24 xl:px-16 2xl:px-[23rem]">
 
-    <div class="pointer-events-none absolute inset-0 overflow-hidden">
-      <div class="journal-paper absolute inset-0"></div>
-      <div class="journal-grid absolute inset-0"></div>
-      <div class="journal-scan absolute inset-x-0 top-0 h-40"></div>
-      <div class="journal-corner journal-corner-a absolute left-6 top-28 h-28 w-28 sm:left-10"></div>
-      <div class="journal-corner journal-corner-b absolute bottom-12 right-6 h-32 w-32 sm:right-12"></div>
-      <div style="--note-rotate:-5deg" class="journal-note note-a absolute right-[8%] top-32 hidden rotate-[-5deg] rounded-xl border border-zinc-300/70 bg-white/55 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-md dark:border-zinc-700/70 dark:bg-zinc-900/45 dark:text-zinc-400 lg:block">Deploy / Notes</div>
-      <div style="--note-rotate:4deg" class="journal-note note-b absolute bottom-28 left-[9%] hidden rotate-[4deg] rounded-xl border border-zinc-300/70 bg-white/45 px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-md dark:border-zinc-700/70 dark:bg-zinc-900/40 dark:text-zinc-400 lg:block">Code / Life</div>
-      <ParticleField count={14} color="120, 113, 108" speed={0.18} className="absolute inset-0 z-0 opacity-70 dark:opacity-50" client:visible />
+    <div class="absolute inset-0 overflow-hidden">
+
+      <HomeParticlesBackground client:only="react" />
     </div>
 
     <div class="journal-hero-content relative z-10 flex min-h-[var(--hero-content-min-h,calc(100svh-9rem))] items-center">
@@ -122,7 +117,7 @@ const [postsCount, tagsCount] = await Promise.all([
     </div>
   </section>
 
-  <section id="latest" class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-12 xl:px-[19rem] 2xl:px-[23rem]">
+  <section id="latest" class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-12 xl:px-16 2xl:px-[23rem]">
     <div class="min-w-0">
       <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -138,7 +133,7 @@ const [postsCount, tagsCount] = await Promise.all([
       <PostList client:visible perPage={6} />
     </div>
 
-    <div class="mt-8 grid gap-5 lg:grid-cols-2 xl:hidden">
+    <div class="mt-8 grid gap-5 lg:grid-cols-2 2xl:hidden">
       <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
         <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">站内导航</h3>
         <div class="mt-4 grid gap-2">
@@ -155,7 +150,7 @@ const [postsCount, tagsCount] = await Promise.all([
       </section>
     </div>
 
-    <div class="mt-8 grid gap-5 lg:grid-cols-2 xl:hidden">
+    <div class="mt-8 grid gap-5 lg:grid-cols-2 2xl:hidden">
       <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
         <ProfileCard client:visible />
       </section>
@@ -163,9 +158,32 @@ const [postsCount, tagsCount] = await Promise.all([
         <HotArticles client:visible />
       </section>
     </div>
-    <div class="mt-5 xl:hidden">
+    <div class="mt-5 2xl:hidden">
       <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900"><RecentComments client:visible /></section>
       <section class="side-panel mt-5 rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900"><FriendLinks client:visible /></section>
+    </div>
+  </section>
+
+  <section class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-12 xl:px-16 2xl:px-[23rem]">
+    <div class="mb-8">
+      <p class="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-400">探索</p>
+      <h2 class="mt-2 text-3xl font-black tracking-tight text-zinc-950 dark:text-zinc-50">探索更多</h2>
+      <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">发现博客的更多功能和内容。</p>
+    </div>
+    <div class="bento-wrapper">
+      <MagicBento
+        textAutoHide={true}
+        enableStars={true}
+        enableSpotlight={true}
+        enableBorderGlow={true}
+        enableTilt={true}
+        enableMagnetism={true}
+        clickEffect={true}
+        spotlightRadius={300}
+        particleCount={12}
+        glowColor="56, 189, 248"
+        client:only="react"
+      />
     </div>
   </section>
 </BaseLayout>
@@ -365,5 +383,59 @@ const [postsCount, tagsCount] = await Promise.all([
     .journal-scan {
       animation: none;
     }
+  }
+
+  /* ---- Particles background ---- */
+  .home-particles-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: auto;
+  }
+
+  .home-particles-bg .particles-container {
+    position: absolute;
+    inset: 0;
+  }
+  /* ---- Bento section ---- */
+  .bento-wrapper {
+    display: flex;
+    justify-content: center;
+  }
+
+  .bento-wrapper .magic-bento-grid {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  /* Light theme overrides for bento cards */
+  :root:not(.dark) .magic-bento-card {
+    background: #fafaf9;
+    border-color: rgba(0, 0, 0, 0.08);
+  }
+
+  :root:not(.dark) .magic-bento-card__header,
+  :root:not(.dark) .magic-bento-card__content {
+    color: #18181b;
+  }
+
+  :root:not(.dark) .magic-bento-card__label {
+    color: #71717a;
+  }
+
+  :root:not(.dark) .magic-bento-card__title {
+    color: #09090b;
+  }
+
+  :root:not(.dark) .magic-bento-card__description {
+    color: #52525b;
+  }
+
+  :root:not(.dark) .magic-bento-card:hover {
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  }
+
+  :root:not(.dark) .magic-bento-particle-container:hover {
+    box-shadow: 0 4px 20px rgba(56, 189, 248, 0.1), 0 0 30px rgba(56, 189, 248, 0.08);
   }
 </style>

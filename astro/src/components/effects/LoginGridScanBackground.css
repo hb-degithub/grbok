@@ -1,0 +1,93 @@
+.login-gridscan-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: layout paint size;
+  z-index: 0;
+}
+
+.login-gridscan-bg .gridscan {
+  position: absolute;
+  inset: 0;
+}
+
+/*
+ * Day (light) theme
+ * Subtle purple tint overlay only at edges; let the WebGL scan show through.
+ */
+.login-gridscan-bg--day .gridscan::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 22%, rgb(56 189 248 / 0.07), transparent 45%),
+    radial-gradient(circle at 82% 28%, rgb(14 165 233 / 0.05), transparent 40%);
+}
+
+.login-gridscan-bg--day .gridscan::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.22) 0%, transparent 18%, transparent 82%, rgb(255 255 255 / 0.18) 100%);
+}
+
+/*
+ * Night (dark) theme
+ * Deep vignette with faint cyan/indigo glow at corners.
+ */
+.login-gridscan-bg--night .gridscan::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 18% 22%, rgb(34 211 238 / 0.08), transparent 45%),
+    radial-gradient(circle at 82% 28%, rgb(129 140 248 / 0.06), transparent 40%);
+}
+
+.login-gridscan-bg--night .gridscan::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgb(9 9 11 / 0.32) 0%, transparent 20%, transparent 80%, rgb(9 9 11 / 0.28) 100%),
+    radial-gradient(ellipse at 50% 50%, transparent 55%, rgb(9 9 11 / 0.2) 100%);
+}
+
+/* ---- Mobile: stronger edge vignette for readability ---- */
+@media (max-width: 640px) {
+  .login-gridscan-bg--day .gridscan::after {
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.32) 0%, transparent 22%, transparent 78%, rgb(255 255 255 / 0.28) 100%);
+  }
+
+  .login-gridscan-bg--night .gridscan::after {
+    background:
+      linear-gradient(180deg, rgb(9 9 11 / 0.42) 0%, transparent 22%, transparent 78%, rgb(9 9 11 / 0.36) 100%),
+      radial-gradient(ellipse at 50% 45%, transparent 50%, rgb(9 9 11 / 0.26) 100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-gridscan-bg {
+    opacity: 0.5;
+  }
+}
+/* ---- Scan hint ---- */
+.auth-scan-hint {
+  text-shadow: 0 1px 4px rgb(0 0 0 / 0.15);
+}
+
+.auth-scan-dot {
+  animation: auth-scan-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes auth-scan-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}

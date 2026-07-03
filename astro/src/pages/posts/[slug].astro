@@ -5,13 +5,24 @@ import ShareButton from '../../components/ui/ShareButton';
 import { CommentSection } from '../../components/comments/CommentSection';
 import { sanitizeHtml } from '../../lib/security';
 
-export function getStaticPaths() {
-  return [];
+const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
+
+export async function getStaticPaths() {
+  try {
+    const pbUrl = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
+    const filter = encodeURIComponent('status="published"');
+    const res = await fetch(`${pbUrl}/api/collections/posts/records?filter=${filter}&fields=slug&perPage=200`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.items || [])
+      .filter((post: { slug?: string }) => post.slug)
+      .map((post: { slug: string }) => ({ params: { slug: post.slug } }));
+  } catch {
+    return [];
+  }
 }
 
 const { slug } = Astro.params;
-
-const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 
 interface Post {
   id: string;
@@ -53,27 +64,22 @@ const formattedDate = post?.published_at
     })
   : '';
 
-const readingTime = post?.content
-  ? Math.max(1, Math.ceil(post.content.length / 300))
-  : 0;
-
+const readingTime = post?.content ? Math.max(1, Math.ceil(post.content.length / 300)) : 0;
 const safeContent = post?.content ? sanitizeHtml(post.content) : '';
 ---
 
-<BaseLayout title={post?.title || '文章'} description={post?.excerpt || ''}>
+<BaseLayout title={post?.title || '文章'} description={post?.excerpt || ''} image={post?.cover}>
   {post ? (
-    <article class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-0">
-      <!-- 返回按钮 -->
+    <article class="mx-auto w-full max-w-4xl px-[var(--page-pad,1rem)] py-8 sm:py-10">
       <ScrollReveal client:visible>
         <a href="/posts" class="mb-8 inline-flex min-h-11 items-center gap-2 rounded-lg text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
           </svg>
           返回文章列表
         </a>
       </ScrollReveal>
 
-      <!-- 文章头部 -->
       <ScrollReveal delay={0.1} client:visible>
         <header class="mb-12">
           <div class="mb-4 flex min-w-0 items-center gap-3">
@@ -81,67 +87,72 @@ const safeContent = post?.content ? sanitizeHtml(post.content) : '';
             <span class="font-mono text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Article</span>
           </div>
 
-          <h1 class="mb-6 break-words font-display text-3xl font-black uppercase leading-tight tracking-wide text-zinc-900 [overflow-wrap:anywhere] dark:text-zinc-100 sm:text-4xl">
+          <h1 class="mb-6 break-words text-3xl font-black leading-tight tracking-normal text-zinc-900 [overflow-wrap:anywhere] dark:text-zinc-100 sm:text-4xl md:text-5xl">
             {post.title}
           </h1>
 
-          <div class="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-xs text-zinc-400 dark:text-zinc-500">
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-zinc-500 dark:text-zinc-400">
             {post.expand?.author && (
               <span class="flex items-center gap-2">
-                <span class="h-6 w-6 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-zinc-600 dark:text-zinc-300 text-[10px]">
+                <span class="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
                   {post.expand.author.name.charAt(0)}
                 </span>
                 {post.expand.author.name}
               </span>
             )}
-            <span>{formattedDate}</span>
+            {formattedDate && <time datetime={post.published_at}>{formattedDate}</time>}
             <span>{readingTime} 分钟阅读</span>
             <span>{post.views} 次浏览</span>
           </div>
 
           {post.cover && (
-            <div class="mt-8 rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-700">
-              <img src={post.cover} alt={post.title} class="w-full h-auto" loading="lazy" />
+            <div class="mt-8 overflow-hidden rounded-xl border border-zinc-200 shadow-xl shadow-zinc-900/[0.04] dark:border-zinc-800">
+              <img src={post.cover} alt={post.title} class="h-auto w-full object-cover" loading="lazy" />
             </div>
           )}
         </header>
       </ScrollReveal>
 
-      <!-- 文章内容 -->
       <ScrollReveal delay={0.2} client:visible>
         <div class="prose mb-16 max-w-full break-words [overflow-wrap:anywhere]">
           <div set:html={safeContent} />
         </div>
       </ScrollReveal>
 
-      <!-- 评论区 -->
       <ScrollReveal delay={0.3} client:visible>
-        <div class="border-t border-zinc-200 pt-12 dark:border-zinc-700">
-          <CommentSection postId={post.id} client:visible />
-      <div class="mt-6 flex justify-center"><ShareButton client:visible /></div>
-      <!-- prev/next navigation -->
-      <nav class="mt-8 grid gap-4 sm:grid-cols-2">
-        <a href="/posts" class="flex items-center gap-2 rounded-lg border border-zinc-200 p-4 text-sm text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-200">
-          <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
-          <span class="truncate">返回文章列表</span>
-        </a>
-        <a href="/" class="flex items-center gap-2 justify-end rounded-lg border border-zinc-200 p-4 text-sm text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-200">
-          <span class="truncate">返回首页</span>
-          <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-        </a>
-      </nav>
-        </div>
+        <footer class="border-t border-zinc-200 pt-10 dark:border-zinc-800">
+          <div class="flex flex-col gap-6">
+            <CommentSection postId={post.id} client:visible />
+            <div class="flex justify-center">
+              <ShareButton client:visible />
+            </div>
+            <nav class="grid gap-4 sm:grid-cols-2" aria-label="文章导航">
+              <a href="/posts" class="flex items-center gap-2 rounded-lg border border-zinc-200 p-4 text-sm text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-200">
+                <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                <span class="truncate">返回文章列表</span>
+              </a>
+              <a href="/" class="flex items-center justify-end gap-2 rounded-lg border border-zinc-200 p-4 text-sm text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-200">
+                <span class="truncate">返回首页</span>
+                <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </a>
+            </nav>
+          </div>
+        </footer>
       </ScrollReveal>
     </article>
   ) : (
     <div class="flex flex-col items-center justify-center px-4 py-20 text-center">
       <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
-        <svg class="h-8 w-8 text-zinc-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg class="h-8 w-8 text-zinc-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       </div>
-      <h2 class="font-display text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">文章不存在</h2>
-      <p class="text-zinc-500 dark:text-zinc-400 mb-6">请先在 PocketBase 中创建文章</p>
+      <h2 class="mb-2 text-2xl font-bold text-zinc-900 dark:text-zinc-100">文章不存在</h2>
+      <p class="mb-6 text-zinc-500 dark:text-zinc-400">请先在 PocketBase 中创建文章。</p>
       <a href="/posts" class="btn-primary">返回文章列表</a>
     </div>
   )}

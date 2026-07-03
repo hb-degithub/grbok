@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePocketBase } from '../../hooks/usePocketBase';
-import Button from '../ui/Button';
+import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
 
 type OTPStatus = 'idle' | 'requesting' | 'verifying' | 'error';
@@ -177,20 +177,16 @@ export default function MagicLinkForm() {
       </AnimatePresence>
 
       <motion.div variants={itemVariants} className="space-y-3">
-        <Button type="submit" variant="primary" size="lg" loading={isBusy} className="w-full">
+        <PixelButton type="submit" loading={isBusy} variant="primary">
           {step === 'email'
             ? status === 'requesting' ? '发送中...' : '发送验证码'
             : status === 'verifying' ? '验证中...' : '验证并登录'}
-        </Button>
+        </PixelButton>
 
         {step === 'code' && (
           <div className="grid gap-3 sm:grid-cols-2">
-            <Button type="button" variant="outline" onClick={requestCode} disabled={isBusy} className="w-full text-sm">
-              重新发送
-            </Button>
-            <Button type="button" variant="ghost" onClick={goBackToEmail} disabled={isBusy} className="w-full text-sm">
-              更换邮箱
-            </Button>
+            <PixelButton type="button" onClick={requestCode} disabled={isBusy} variant="secondary">重新发送</PixelButton>
+            <PixelButton type="button" onClick={goBackToEmail} disabled={isBusy} variant="secondary">更换邮箱</PixelButton>
           </div>
         )}
       </motion.div>

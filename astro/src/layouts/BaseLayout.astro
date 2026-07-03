@@ -23,10 +23,18 @@ interface Props {
   description?: string;
   image?: string;
   showChrome?: boolean;
+  mainClass?: string;
   noindex?: boolean;
 }
 
-const { title, description = SITE_CONFIG.description, image, showChrome = true, noindex = false } = Astro.props;
+const {
+  title,
+  description = SITE_CONFIG.description,
+  image,
+  showChrome = true,
+  mainClass = showChrome ? 'pt-4 sm:pt-20 sm:pb-8' : '',
+  noindex = false,
+} = Astro.props;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 ---
 
@@ -106,11 +114,13 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
           // safe-area aware spacing, and touch target sizes.
           root.style.fontSize = '';
           if (vvw < 768) {
-            root.style.setProperty('--header-h', vvh < 560 ? '3rem' : '3.5rem');
+            root.style.setProperty('--header-h', vvh < 560 ? '3.5rem' : '4rem');
+            root.style.setProperty('--header-offset', vvh < 560 ? '3.5rem' : '4rem');
             root.style.setProperty('--tap', vvw < 360 ? '2.5rem' : '2.75rem');
             root.style.setProperty('--page-pad', vvw < 360 ? '0.75rem' : '1rem');
           } else {
-            root.style.setProperty('--header-h', '4rem');
+            root.style.setProperty('--header-h', '5rem');
+            root.style.setProperty('--header-offset', '5rem');
             root.style.setProperty('--tap', '2.75rem');
             root.style.setProperty('--page-pad', '1.5rem');
           }
@@ -155,7 +165,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     {showChrome && <SearchModal client:load />}
     {showChrome && <AnnouncementBar client:load />}
 
-    <main class:list={["w-full overflow-x-clip", showChrome && "pt-[var(--header-offset,4rem)]"]}>
+    <main class:list={["w-full overflow-x-clip", mainClass]}>
       <slot />
     </main>
 

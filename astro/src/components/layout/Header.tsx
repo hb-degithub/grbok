@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, useScroll, useMotionValueEvent } from 'framer-motion';
-import AuthStatusControl from '../auth/AuthStatusControl';
+import { motion, useScroll, useMotionValueEvent, AnimatePresence } from 'framer-motion';
+import Dock from '../reactbits/Dock';
 import SideNav from './SideNav';
+import { useAuthStatus } from '../../hooks/useAuthStatus';
+import { getUserDisplayName, getUserInitial } from '../../hooks/useAuthStatus';
 import { cn } from '../../lib/utils';
 
 type ThemeMode = 'system' | 'time' | 'light' | 'dark';
@@ -9,11 +11,11 @@ type ThemeMode = 'system' | 'time' | 'light' | 'dark';
 const THEME_STORAGE_KEY = 'blog-theme-mode';
 
 const navItems = [
-  { href: '/', label: '首页' },
-  { href: '/posts', label: '文章' },
-  { href: '/tags', label: '标签' },
-  { href: '/archive', label: '归档' },
-  { href: '/about', label: '关于' },
+  { href: '/', label: '首页', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+  { href: '/posts', label: '文章', icon: 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z' },
+  { href: '/tags', label: '标签', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z' },
+  { href: '/archive', label: '归档', icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4' },
+  { href: '/about', label: '关于', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
 ];
 
 const themeOptions: Array<{ mode: ThemeMode; label: string; description: string; icon: string }> = [
@@ -34,6 +36,14 @@ function readResolvedTheme(): 'light' | 'dark' {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 }
 
+function Icon({ d, size = 22 }: { d: string; size?: number }) {
+  return (
+    <svg width={size} height={size} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d={d} />
+    </svg>
+  );
+}
+
 export default function Header() {
   const [isVisible, setIsVisible] = useState(true);
   const [currentPath, setCurrentPath] = useState<string>('');
@@ -44,6 +54,7 @@ export default function Header() {
   const lastScrollY = useRef(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
+  const { user, isAuthenticated, isLoading } = useAuthStatus();
 
   useEffect(() => {
     const syncTheme = () => {
@@ -108,122 +119,129 @@ export default function Header() {
     return currentPath.startsWith(href);
   };
 
+  // Build dock items: nav links + search + theme + auth
+  const dockItems = [
+    ...navItems.map((item) => ({
+      icon: <Icon d={item.icon} />,
+      label: item.label,
+      href: item.href,
+      active: isActive(item.href),
+    })),
+    {
+      icon: <Icon d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />,
+      label: '搜索',
+      onClick: openSearch,
+      active: false,
+    },
+    {
+      icon: <Icon d={resolvedTheme === 'dark' ? 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z' : 'M12 3v2m0 14v2m7.071-16.071-1.414 1.414M6.343 17.657l-1.414 1.414M21 12h-2M5 12H3m16.071 7.071-1.414-1.414M6.343 6.343 4.929 4.929M16 12a4 4 0 11-8 0 4 4 0 018 0z'} />,
+      label: `主题：${activeThemeLabel}`,
+      onClick: () => setThemeMenuOpen((open) => !open),
+      hasPopup: 'menu',
+      expanded: themeMenuOpen,
+      active: false,
+    },
+  ];
+
+  // Add auth item
+  if (!isLoading) {
+    if (isAuthenticated) {
+      const displayName = getUserDisplayName(user);
+      const initial = getUserInitial(user);
+      dockItems.push({
+        icon: (
+          <div className="flex items-center justify-center rounded-full bg-zinc-700 text-xs font-bold text-white dark:bg-zinc-200 dark:text-zinc-900" style={{ width: 22, height: 22 }}>
+            {initial}
+          </div>
+        ),
+        label: displayName,
+        href: '/admin',
+        active: currentPath.startsWith('/admin'),
+      });
+    } else {
+      dockItems.push({
+        icon: <Icon d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />,
+        label: '登录',
+        href: '/login',
+        active: currentPath.startsWith('/login'),
+      });
+    }
+  }
+
   return (
-    <motion.header
-      initial={{ y: 0 }}
-      animate={{ y: isVisible ? 0 : '-100%' }}
-      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className="fixed inset-x-0 top-0 z-50 border-b border-white/40 bg-white/70 backdrop-blur-xl backdrop-saturate-150 pt-[env(safe-area-inset-top)] dark:border-white/5 dark:bg-zinc-950/70"
-      style={{ willChange: 'transform' }}
-    >
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent dark:via-white/15" aria-hidden="true" />
+    <>
+      {/* Mobile: hamburger + SideNav (hidden on desktop) */}
+      <button
+        type="button"
+        onClick={() => setSideNavOpen(true)}
+        className="focus-ring fixed left-3 top-3 z-50 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-xl transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:hidden"
+        aria-label="打开导航菜单"
+        aria-controls="mobile-side-nav"
+        aria-expanded={sideNavOpen}
+      >
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+      </button>
 
-      <nav className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2 overflow-x-clip px-[var(--page-pad,1rem)] py-1.5 sm:gap-2 sm:px-6 sm:py-3.5" aria-label="主导航">
-        <a href="/" className="focus-ring flex min-h-[40px] min-w-[40px] shrink-0 items-center gap-2 rounded-lg text-base font-semibold tracking-tight text-zinc-900 transition-colors hover:text-zinc-600 dark:text-zinc-100 dark:hover:text-zinc-400" aria-label="返回博客首页">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-zinc-500 to-zinc-600 shadow-sm transition-transform duration-200 hover:scale-105">
-            <span className="text-xs font-bold text-white">B</span>
-          </div>
-          <span className="hidden sm:inline">博客</span>
-        </a>
+      {/* Desktop: top Dock (hidden on mobile) */}
+      <motion.div
+        initial={{ y: -100 }}
+        animate={{ y: isVisible ? 0 : -120 }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        className="pointer-events-none fixed inset-x-0 top-0 z-50 hidden sm:block"
+        style={{ willChange: 'transform' }}
+      >
+        <Dock
+          items={dockItems}
+          panelHeight={64}
+          baseItemSize={46}
+          magnification={62}
+          distance={180}
+        />
 
-        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-          <button
-            type="button"
-            onClick={() => setSideNavOpen(true)}
-            className="focus-ring inline-flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] items-center justify-center rounded-lg border border-zinc-200 bg-white/70 text-zinc-600 shadow-sm transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:hidden"
-            aria-label="打开导航菜单"
-            aria-controls="mobile-side-nav"
-            aria-expanded={sideNavOpen}
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7h16M4 12h16M4 17h16" />
-            </svg>
-          </button>
-
-          <ul className="m-0 hidden list-none items-center gap-1 p-0 sm:flex">
-            {navItems.map((item) => {
-              const active = isActive(item.href);
-              return (
-                <li key={item.href} className="m-0 list-none p-0">
-                  <a
-                    href={item.href}
-                    aria-current={active ? 'page' : undefined}
-                    className={cn(
-                      'focus-ring relative block rounded-lg px-3 py-2 text-sm leading-none no-underline transition-colors duration-200',
-                      active
-                        ? 'bg-zinc-100 font-medium text-zinc-900 shadow-sm dark:bg-white/10 dark:text-zinc-100'
-                        : 'text-zinc-500 hover:bg-white/50 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-100'
-                    )}
-                  >
-                    {item.label}
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
-
-          <button
-            type="button"
-            onClick={openSearch}
-            className="focus-ring inline-flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] items-center justify-center rounded-lg border border-zinc-200 bg-white/70 text-zinc-600 shadow-sm transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:h-10 sm:w-auto sm:px-3"
-            aria-label="搜索文章（快捷键 Ctrl 或 Command 加 K）"
-          >
-            <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <span className="ml-2 hidden text-sm font-semibold sm:inline">搜索</span>
-          </button>
-
-          <div ref={menuRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setThemeMenuOpen((open) => !open)}
-              className="focus-ring inline-flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] items-center justify-center rounded-lg border border-zinc-200 bg-white/70 text-zinc-600 shadow-sm transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900/70 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:h-10 sm:w-10"
-              aria-label={`主题切换：${activeThemeLabel}，当前${resolvedTheme === 'dark' ? '暗色' : '亮色'}`}
-              aria-haspopup="menu"
-              aria-expanded={themeMenuOpen}
+        {/* Theme dropdown */}
+        <AnimatePresence>
+          {themeMenuOpen && (
+            <motion.div
+              ref={menuRef}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="pointer-events-auto fixed top-20 left-1/2 -translate-x-1/2 w-[min(14rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-zinc-200 bg-white p-1.5 shadow-xl shadow-zinc-900/10 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/95"
+              role="menu"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={resolvedTheme === 'dark' ? 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z' : 'M12 3v2m0 14v2m7.071-16.071-1.414 1.414M6.343 17.657l-1.414 1.414M21 12h-2M5 12H3m16.071 7.071-1.414-1.414M6.343 6.343 4.929 4.929M16 12a4 4 0 11-8 0 4 4 0 018 0z'} />
-              </svg>
-            </button>
+              {themeOptions.map((item) => (
+                <button
+                  key={item.mode}
+                  type="button"
+                  onClick={() => setMode(item.mode)}
+                  className={cn(
+                    'flex min-h-[40px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left leading-snug transition-colors',
+                    themeMode === item.mode
+                      ? 'bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-white'
+                      : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-white'
+                  )}
+                  role="menuitemradio"
+                  aria-checked={themeMode === item.mode}
+                >
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d={item.icon} />
+                  </svg>
+                  <span className="min-w-0 break-words">
+                    <span className="block text-sm font-semibold leading-5">{item.label}</span>
+                    <span className="block text-xs leading-4 text-zinc-400 dark:text-zinc-500">{item.description}</span>
+                  </span>
+                </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            {themeMenuOpen && (
-              <div className="absolute right-0 mt-2 w-[min(14rem,calc(100vw-var(--page-pad,1rem)*2))] overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-xl shadow-zinc-900/10 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/95 sm:p-1.5" role="menu">
-                {themeOptions.map((item) => (
-                  <button
-                    key={item.mode}
-                    type="button"
-                    onClick={() => setMode(item.mode)}
-                    className={cn(
-                      'flex min-h-[40px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left leading-snug transition-colors sm:py-2.5',
-                      themeMode === item.mode
-                        ? 'bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-white'
-                        : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-white'
-                    )}
-                    role="menuitemradio"
-                    aria-checked={themeMode === item.mode}
-                  >
-                    <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d={item.icon} />
-                    </svg>
-                    <span className="min-w-0 break-words">
-                      <span className="block text-sm font-semibold leading-5">{item.label}</span>
-                      <span className="block text-xs leading-4 text-zinc-400 dark:text-zinc-500">{item.description}</span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="shrink-0 [&_a]:min-h-[40px] [&_a]:min-w-[40px] [&_button]:min-h-[40px] [&_button]:min-w-[40px]">
-            <AuthStatusControl />
-          </div>
-        </div>
-      </nav>
+      </motion.div>
 
       <SideNav id="mobile-side-nav" isOpen={sideNavOpen} onClose={() => setSideNavOpen(false)} currentPath={currentPath} />
-    </motion.header>
+    </>
   );
 }

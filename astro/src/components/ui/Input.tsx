@@ -48,7 +48,7 @@ export default function Input({
           aria-describedby={error ? errorId : helperText ? helperId : undefined}
           className={cn(
             'min-h-[40px] w-full min-w-0 rounded-xl border px-3 py-2.5 text-[16px] leading-snug sm:px-4 sm:text-sm',
-            'bg-white/70 text-zinc-900 placeholder-zinc-400',
+            'bg-white/90 text-zinc-900 placeholder-zinc-400',
             'transition-all duration-200 ease-out',
             error
               ? 'border-red-400 focus-visible:border-red-500'

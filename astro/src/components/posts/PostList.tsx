@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { usePosts } from '../../hooks/usePocketBase';
 import PostCard from './PostCard';

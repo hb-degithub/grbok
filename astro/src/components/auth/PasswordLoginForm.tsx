@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
-import Button from '../ui/Button';
+import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
 import AdminPasskeyStep from './AdminPasskeyStep';
 import {
@@ -239,16 +239,16 @@ export default function PasswordLoginForm() {
           </div>
           <Input label="二次验证码" type="text" inputMode="numeric" placeholder="输入邮箱验证码" value={otpCode} onChange={(e) => { setOtpCode(e.target.value); if (status === 'error') setStatus('idle'); }} error={status === 'error' ? errorMessage : undefined} required autoComplete="one-time-code" />
           <div className="grid gap-3 sm:grid-cols-2">
-            <Button type="button" variant="outline" onClick={() => requestMfaCode()} disabled={status === 'mfa-sending' || status === 'mfa-verifying'} className="w-full text-sm">{status === 'mfa-sending' ? '发送中...' : '重新发送'}</Button>
-            <Button type="button" variant="ghost" onClick={resetMfa} disabled={status === 'mfa-verifying'} className="w-full text-sm">返回密码</Button>
+            <PixelButton type="button" onClick={() => requestMfaCode()} disabled={status === 'mfa-sending' || status === 'mfa-verifying'} variant="secondary">{status === 'mfa-sending' ? '发送中...' : '重新发送'}</PixelButton>
+            <PixelButton type="button" onClick={resetMfa} disabled={status === 'mfa-verifying'} variant="secondary">返回密码</PixelButton>
           </div>
         </motion.div>
       )}
 
       <motion.div variants={itemVariants}>
-        <Button type="submit" variant="primary" size="lg" loading={status === 'loading' || status === 'mfa-verifying'} className="w-full">
+        <PixelButton type="submit" loading={status === 'loading' || status === 'mfa-verifying'} variant="primary">
           {isMfaStep ? status === 'mfa-verifying' ? '验证中...' : '验证并登录' : status === 'loading' ? '登录中...' : '登录'}
-        </Button>
+        </PixelButton>
       </motion.div>
     </motion.form>
   );

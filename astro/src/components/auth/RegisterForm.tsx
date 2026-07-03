@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { usePocketBase } from '../../hooks/usePocketBase';
-import Button from '../ui/Button';
+import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
 import { RateLimiter } from '../../lib/security';
 
@@ -171,9 +171,9 @@ export default function RegisterForm() {
       </motion.p>
 
       <motion.div variants={itemVariants}>
-        <Button type="submit" variant="primary" size="lg" loading={status === 'loading'} className="w-full">
+        <PixelButton type="submit" loading={status === 'loading'} variant="primary">
           {status === 'loading' ? '注册中...' : '注册并登录'}
-        </Button>
+        </PixelButton>
       </motion.div>
     </motion.form>
   );

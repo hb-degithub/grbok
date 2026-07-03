@@ -1,4 +1,4 @@
-﻿import PocketBase from 'pocketbase';
+import PocketBase from 'pocketbase';
 
 /**
  * PocketBase 工厂函数

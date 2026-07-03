@@ -1,4 +1,4 @@
-﻿import type { APIRoute } from 'astro';
+import type { APIRoute } from 'astro';
 
 export const GET: APIRoute = async ({ site }) => {
   const siteUrl = (site?.toString() || 'http://localhost:4321').replace(/\/$/, '');

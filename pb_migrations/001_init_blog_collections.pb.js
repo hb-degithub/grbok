@@ -42,7 +42,7 @@ migrate((db) => {
     posts = new Collection({ name: 'posts', type: 'base', system: false, schema: [] });
   }
   ensureField(posts, { name: 'title', type: 'text', required: true, options: { min: 1, max: 160, pattern: '' } });
-  ensureField(posts, { name: 'slug', type: 'text', required: true, options: { min: 1, max: 160, pattern: '^[a-zA-Z0-9\\u4e00-\\u9fa5][a-zA-Z0-9\\u4e00-\\u9fa5_-]*$' } });
+  ensureField(posts, { name: 'slug', type: 'text', required: true, options: { min: 1, max: 160, pattern: '^[a-zA-Z0-9\\p{Han}][a-zA-Z0-9\\p{Han}_-]*$' } });
   ensureField(posts, { name: 'content', type: 'editor', required: true, options: { convertUrls: false } });
   ensureField(posts, { name: 'excerpt', type: 'text', required: false, options: { min: null, max: 500, pattern: '' } });
   ensureField(posts, { name: 'cover', type: 'text', required: false, options: { min: null, max: 500, pattern: '' } });
@@ -92,7 +92,7 @@ migrate((db) => {
   let tags = find('tags');
   if (!tags) tags = new Collection({ name: 'tags', type: 'base', system: false, schema: [] });
   ensureField(tags, { name: 'name', type: 'text', required: true, options: { min: 1, max: 80, pattern: '' } });
-  ensureField(tags, { name: 'slug', type: 'text', required: true, options: { min: 1, max: 100, pattern: '^[a-zA-Z0-9\\u4e00-\\u9fa5][a-zA-Z0-9\\u4e00-\\u9fa5_-]*$' } });
+  ensureField(tags, { name: 'slug', type: 'text', required: true, options: { min: 1, max: 100, pattern: '^[a-zA-Z0-9\\p{Han}][a-zA-Z0-9\\p{Han}_-]*$' } });
   ensureField(tags, { name: 'description', type: 'text', required: false, options: { min: null, max: 300, pattern: '' } });
   tags.listRule = '';
   tags.viewRule = '';

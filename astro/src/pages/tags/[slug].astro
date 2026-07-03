@@ -3,13 +3,23 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostList from '../../components/posts/PostList';
 import ScrollReveal from '../../components/ui/ScrollReveal';
 
-export function getStaticPaths() {
-  return [];
+const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
+
+export async function getStaticPaths() {
+  try {
+    const pbUrl = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
+    const res = await fetch(`${pbUrl}/api/collections/tags/records?fields=slug&perPage=200`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.items || [])
+      .filter((tag: { slug?: string }) => tag.slug)
+      .map((tag: { slug: string }) => ({ params: { slug: tag.slug } }));
+  } catch {
+    return [];
+  }
 }
 
 const { slug } = Astro.params;
-
-const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 
 interface Tag {
   id: string;
