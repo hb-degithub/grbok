@@ -47,7 +47,7 @@ function SkeletonComment({ delay = 0 }: { delay?: number }) {
  * 设计决策：加载/错误/空三态统一玻璃风格，与正常态一致；
  * 错误态用 role="alert"，加载态用 aria-live，保证屏幕阅读器可感知。
  */
-export function CommentSection({ postId }: CommentSectionProps) {
+export default function CommentSection({ postId }: CommentSectionProps) {
   const { settings, loading: settingsLoading } = useSiteSettings();
   const commentsEnabled = !settingsLoading && settings.enable_comments;
   const { comments, loading, error, submitComment, refresh } = useComments(postId, { enabled: commentsEnabled });

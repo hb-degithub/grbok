@@ -53,7 +53,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     <link rel="canonical" href={canonicalURL} />
 
     <meta property="og:type" content="website" />
-    <meta property="og:url" content={Astro.url} />
+    <meta property="og:url" content={canonicalURL} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     {image && <meta property="og:image" content={new URL(image, Astro.url)} />}
@@ -161,11 +161,12 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 </script>
 </head>
   <body class="min-h-[100svh] bg-white font-sans text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-50">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-indigo-600 focus:text-white focus:rounded-md">跳转到主要内容</a>
     {showChrome && <Header client:load />}
     {showChrome && <SearchModal client:load />}
     {showChrome && <AnnouncementBar client:load />}
 
-    <main class:list={["w-full overflow-x-clip", mainClass]}>
+    <main id="main-content" class:list={["w-full overflow-x-clip", mainClass]}>
       <slot />
     </main>
 

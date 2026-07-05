@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
+import { sanitizeText } from '../../lib/security';
 import type { Comment } from '../../types/pocketbase';
 
 export default function RecentComments() {
@@ -35,7 +36,7 @@ export default function RecentComments() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-text">{comment.author_name}</p>
-                  <p className="line-clamp-2 text-xs text-text-secondary">{comment.content}</p>
+                  <p className="line-clamp-2 text-xs text-text-secondary">{sanitizeText(comment.content)}</p>
                 </div>
               </div>
             ))

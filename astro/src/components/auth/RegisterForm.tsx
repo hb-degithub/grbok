@@ -5,6 +5,8 @@ import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
 import { RateLimiter } from '../../lib/security';
 
+const registerLimiter = new RateLimiter(5, 0.2);
+
 type RegisterStatus = 'idle' | 'loading' | 'error';
 
 export default function RegisterForm() {
@@ -15,8 +17,6 @@ export default function RegisterForm() {
   const [status, setStatus] = useState<RegisterStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const { registerReader } = usePocketBase();
-
-  const registerLimiter = new RateLimiter(5, 0.2);
 
   const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 

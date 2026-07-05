@@ -357,6 +357,28 @@ routerAdd('POST', '/api/blog-admin/webauthn/authenticate/verify', (c) => {
   });
 });
 
+// Prevent modification of credential_id and public_key on admin_passkeys update.
+// These fields must only be set during WebAuthn registration; allowing direct
+// API modification would bypass the registration ceremony.
+onRecordBeforeUpdateRequest((e) => {
+  const record = e.record;
+  const PROTECTED_FIELDS = ['credential_id', 'public_key'];
+
+  // Fetch the stored record to compare against pre-update values
+  let stored;
+  try {
+    stored = $app.dao().findRecordById('admin_passkeys', record.id);
+  } catch (_) {
+    return; // record not found — let PocketBase handle the error
+  }
+
+  for (const field of PROTECTED_FIELDS) {
+    if (record.get(field) !== stored.get(field)) {
+      throw new BadRequestError('Cannot modify credential fields directly');
+    }
+  }
+}, 'admin_passkeys');
+
 // Session status (admin-capable users)
 routerAdd('GET', '/api/blog-admin/webauthn/session', (c) => {
   const user = requireAdminCapable(c);

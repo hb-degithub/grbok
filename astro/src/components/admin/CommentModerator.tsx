@@ -58,7 +58,7 @@ export default function CommentModerator() {
     setLoading(true);
     const pb = getPocketBase();
     try {
-      const f = filter === 'all' ? '' : `status = "${filter}"`;
+      const f = filter === 'all' ? '' : pb.filter('status = {:status}', { status: filter });
       const result = await pb.collection('comments').getList<Comment>(1, 100, { filter: f, sort: '-created', expand: 'post_id' });
       setComments(result.items);
     } catch (err) {

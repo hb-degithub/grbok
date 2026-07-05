@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify';
 
-const ALLOWED_TAGS = ['p', 'br', 'strong', 'em', 'a', 'code', 'pre', 'blockquote', 'ul', 'ol', 'li', 'h3', 'h4', 'img', 'hr'];
+const ALLOWED_TAGS = ['p', 'br', 'strong', 'em', 'a', 'code', 'pre', 'blockquote', 'ul', 'ol', 'li', 'h3', 'h4', 'img', 'hr', 'mark'];
 const VOID_TAGS = new Set(['br', 'hr', 'img']);
 const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'title', 'target', 'rel']);
 const URL_ATTRS = new Set(['href', 'src']);

@@ -48,7 +48,7 @@ export default function PostManager() {
     setLoading(true);
     const pb = getPocketBase();
     try {
-      const f = filter === 'all' ? '' : `status = "${filter}"`;
+      const f = filter === 'all' ? '' : pb.filter('status = {:status}', { status: filter });
       const result = await pb.collection('posts').getList<Post>(1, 80, { filter: f, sort: '-updated' });
       setPosts(result.items);
     } catch (err) {
@@ -169,8 +169,14 @@ export default function PostManager() {
       };
       const publishedAt = 'published_at' in editing ? editing.published_at : '';
       if (editing.status === 'published' && !publishedAt) data.published_at = new Date().toISOString();
-      if (editing.id && editing.id.trim()) await pb.collection('posts').update(editing.id, data);
-      else await pb.collection('posts').create({ ...data, author: pb.authStore.record?.id });
+      let savedPostId: string;
+      if (editing.id && editing.id.trim()) {
+        await pb.collection('posts').update(editing.id, data);
+        savedPostId = editing.id;
+      } else {
+        const created = await pb.collection('posts').create({ ...data, author: pb.authStore.record?.id });
+        savedPostId = created.id;
+      }
       setEditing(null);
       clearSavedDraft();
       setDirty(false);
@@ -178,14 +184,13 @@ export default function PostManager() {
       setSelectedTagIds([]);
       // Sync tags via post_tags
       try {
-        const savedPostId = editing.id?.trim() || pb.authStore.record?.id;
         if (savedPostId) {
-          const existing = await pb.collection("post_tags").getList(1, 100, { filter: "post_id=\"" + editing.id + "\"" }).catch(() => ({ items: [] }));
+          const existing = await pb.collection("post_tags").getList(1, 100, { filter: pb.filter('post_id = {:postId}', { postId: savedPostId }) }).catch(() => ({ items: [] }));
           const existingIds = existing.items.map(i => i.tag_id);
           const toRemove = existing.items.filter(i => !selectedTagIds.includes(i.tag_id));
           const toAdd = selectedTagIds.filter(id => !existingIds.includes(id)).filter(Boolean);
           await Promise.all(toRemove.map(i => pb.collection("post_tags").delete(i.id)));
-          await Promise.all(toAdd.map(id => pb.collection("post_tags").create({ post_id: editing.id, tag_id: id })));
+          await Promise.all(toAdd.map(id => pb.collection("post_tags").create({ post_id: savedPostId, tag_id: id })));
         }
       } catch (e) { console.error("Tag sync failed:", e); }
     } catch (err) {

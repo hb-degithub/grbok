@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { NestedComment, CommentFormData } from '../../types/pocketbase';
-import { ReplyForm } from './ReplyForm';
+import ReplyForm from './ReplyForm';
 import { cn } from '../../lib/utils';
+import { sanitizeText } from '../../lib/security';
 
 interface CommentItemProps {
   /** 评论数据（含嵌套子评论） */
@@ -151,7 +152,7 @@ export default function CommentItem({
 
           {/* 评论内容 */}
           <div className="mb-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-zinc-700 [overflow-wrap:anywhere] dark:text-zinc-300">
-            {comment.content}
+            {sanitizeText(comment.content)}
           </div>
 
           {/* 操作栏 */}

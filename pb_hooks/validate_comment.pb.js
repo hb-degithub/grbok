@@ -73,6 +73,7 @@ onRecordBeforeCreateRequest((e) => {
   const authorEmail = String(record.get('author_email') || '').trim();
   const content = stripTags(record.get('content'));
   const ip = getClientIP();
+  if (!ip) throw new BadRequestError('无法识别客户端');
 
   if (!boolSetting('enable_comments', true)) throw new BadRequestError('Comments are disabled.');
   if (!authorName) throw new BadRequestError('Author name is required.');

@@ -223,6 +223,17 @@ const Particles = ({
         container.removeEventListener('mousemove', handleMouseMove);
       }
       cancelAnimationFrame(animationFrameId);
+
+      // Dispose GPU resources to prevent WebGL memory leak
+      geometry.remove();
+      program.remove();
+      // Delete shader objects (Program.remove only deletes the linked program)
+      gl.deleteShader(program.vertexShader);
+      gl.deleteShader(program.fragmentShader);
+      // Lose the WebGL context to free all remaining GPU resources
+      const ext = gl.getExtension('WEBGL_lose_context');
+      if (ext) ext.loseContext();
+
       if (container.contains(gl.canvas)) {
         container.removeChild(gl.canvas);
       }

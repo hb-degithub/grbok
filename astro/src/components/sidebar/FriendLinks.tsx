@@ -3,6 +3,15 @@ import { motion } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
 import type { FriendLink } from '../../types/pocketbase';
 
+function isSafeLinkUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export default function FriendLinks() {
   const [links, setLinks] = useState<FriendLink[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +32,7 @@ export default function FriendLinks() {
       <div className="widget-title">友情链接</div>
       <div className="flex flex-wrap gap-2">
         {links.map((link) => (
-          <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-border bg-bg-soft px-3 py-1.5 text-sm text-text-secondary transition-all hover:border-accent hover:text-accent hover:shadow-sm">
+          <a key={link.id} href={isSafeLinkUrl(link.url) ? link.url : '#'} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-border bg-bg-soft px-3 py-1.5 text-sm text-text-secondary transition-all hover:border-accent hover:text-accent hover:shadow-sm">
             {link.name}
           </a>
         ))}

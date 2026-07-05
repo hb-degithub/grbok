@@ -9,4 +9,6 @@ COPY src ./src
 
 EXPOSE 8787
 
+USER node
+
 CMD ["npm", "run", "start"]

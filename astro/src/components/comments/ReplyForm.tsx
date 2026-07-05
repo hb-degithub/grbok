@@ -30,7 +30,7 @@ const textareaClass =
  * 设计决策：用 glass（比主表单的 glass-strong 更通透）表示「嵌套/次要」层级；
  * height:auto 过渡实现平滑展开收起；textarea 用 parentId 派生 id 关联 label。
  */
-export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderationEnabled = true }: ReplyFormProps) {
+export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderationEnabled = true }: ReplyFormProps) {
   const [formData, setFormData] = useState<CommentFormData>({
     author_name: '',
     author_email: '',
