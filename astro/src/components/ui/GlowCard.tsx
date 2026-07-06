@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
+import useBreakpoint from '../../hooks/useBreakpoint';
 
 interface GlowCardProps {
   children: React.ReactNode;
@@ -16,12 +17,13 @@ export default function GlowCard({
   className = '',
   glowColor = 'rgba(120, 113, 108, 0.10)',
 }: GlowCardProps) {
+  const { isMobile } = useBreakpoint();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isHovered, setIsHovered] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
+    if (isMobile || !cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
     setMousePosition({
       x: e.clientX - rect.left,
@@ -36,18 +38,21 @@ export default function GlowCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={`relative overflow-hidden ${className}`}
-      whileHover={{ y: -4 }}
+      whileHover={isMobile ? {} : { y: -4 }}
+      whileTap={isMobile ? { scale: 0.98 } : undefined}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
     >
-      {/* 光晕效果 */}
-      <motion.div
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          background: `radial-gradient(300px circle at ${mousePosition.x}px ${mousePosition.y}px, ${glowColor}, transparent 70%)`,
-        }}
-        animate={{ opacity: isHovered ? 1 : 0 }}
-        transition={{ duration: 0.3 }}
-      />
+      {/* 光晕效果 — 桌面端 only */}
+      {!isMobile && (
+        <motion.div
+          className="pointer-events-none absolute inset-0 z-0"
+          style={{
+            background: `radial-gradient(300px circle at ${mousePosition.x}px ${mousePosition.y}px, ${glowColor}, transparent 70%)`,
+          }}
+          animate={{ opacity: isHovered ? 1 : 0 }}
+          transition={{ duration: 0.3 }}
+        />
+      )}
 
       {/* 内容 */}
       <div className="relative z-10">

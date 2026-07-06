@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
 import { cn } from '../../lib/utils';
+import { showToast } from '../ui/Toast';
+import ConfirmDialog from '../ui/ConfirmDialog';
 import type { Comment } from '../../types/pocketbase';
 
 type CommentFilter = 'all' | 'pending' | 'approved' | 'spam';
@@ -15,6 +17,15 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = { pending: '待审核', approved: '已通过', spam: '垃圾评论' };
 const filterLabels: Record<CommentFilter, string> = { pending: '待审核', all: '全部', approved: '已通过', spam: '垃圾评论' };
 
+const listVariants = {
+  hidden: { opacity: 1 },
+  visible: { transition: { staggerChildren: 0.04 } }
+};
+const itemVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } }
+};
+
 function getPostTitle(comment: Comment) {
   return ((comment.expand?.post_id as unknown as { title?: string } | undefined)?.title) || comment.post_id;
 }
@@ -24,27 +35,34 @@ export default function CommentModerator() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<CommentFilter>('pending');
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
   const batchAction = async (action: 'approved' | 'spam', label: string) => {
     if (selectedIds.length === 0) return;
-    if (!confirm('确定' + label + selectedIds.length + '条评论吗？')) return;
-    const pb = getPocketBase();
-    try {
-      await Promise.all(selectedIds.map(id => pb.collection('comments').update(id, { status: action })));
-      setSelectedIds([]); fetchComments();
-    } catch (err) { console.error(err); }
+    setConfirmState({ open: true, title: '确认操作', message: '确定' + label + selectedIds.length + '条评论吗？', onConfirm: async () => {
+      const pb = getPocketBase();
+      try {
+        await Promise.all(selectedIds.map(id => pb.collection('comments').update(id, { status: action })));
+        setSelectedIds([]); fetchComments();
+        showToast('操作成功', 'success');
+      } catch (err) { console.error(err); showToast('操作失败', 'error'); }
+    }});
   };
   const batchDelete = async () => {
     if (selectedIds.length === 0) return;
-    if (!confirm('确定删除' + selectedIds.length + '条评论吗？不可撤销。')) return;
-    const pb = getPocketBase();
-    try {
-      await Promise.all(selectedIds.map(id => pb.collection('comments').delete(id)));
-      setSelectedIds([]); fetchComments();
-    } catch (err) { console.error(err); }
+    setConfirmState({ open: true, title: '确认删除', message: '确定删除' + selectedIds.length + '条评论吗？不可撤销。', onConfirm: async () => {
+      const pb = getPocketBase();
+      try {
+        await Promise.all(selectedIds.map(id => pb.collection('comments').delete(id)));
+        setSelectedIds([]); fetchComments();
+        showToast('评论已删除', 'success');
+      } catch (err) { console.error(err); showToast('删除失败', 'error'); }
+    }});
   };
   const riskHints = (comment: Comment) => {
     const hints: string[] = [];
@@ -58,50 +76,54 @@ export default function CommentModerator() {
     setLoading(true);
     const pb = getPocketBase();
     try {
-      const f = filter === 'all' ? '' : pb.filter('status = {:status}', { status: filter });
-      const result = await pb.collection('comments').getList<Comment>(1, 100, { filter: f, sort: '-created', expand: 'post_id' });
+      const parts: string[] = [];
+      if (filter !== 'all') parts.push(pb.filter('status = {:status}', { status: filter }));
+      const keyword = query.trim();
+      if (keyword) {
+        const escaped = keyword.replace(/["\\]/g, '');
+        parts.push(`(author_name ~ "${escaped}" || author_email ~ "${escaped}" || content ~ "${escaped}")`);
+      }
+      const f = parts.length ? parts.join(' && ') : '';
+      const result = await pb.collection('comments').getList<Comment>(page, 20, { filter: f, sort: '-created', expand: 'post_id' });
       setComments(result.items);
+      setTotalPages(result.totalPages);
     } catch (err) {
       console.error('获取评论失败：', err);
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, page, query]);
 
   useEffect(() => { fetchComments(); }, [fetchComments]);
 
-  const counts = useMemo(() => ({
-    all: comments.length,
-    pending: comments.filter((comment) => comment.status === 'pending').length,
-    approved: comments.filter((comment) => comment.status === 'approved').length,
-    spam: comments.filter((comment) => comment.status === 'spam').length,
-  }), [comments]);
+  useEffect(() => { setPage(1); }, [filter, query]);
 
-  const filteredComments = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    if (!keyword) return comments;
-    return comments.filter((comment) => [comment.author_name, comment.author_email, comment.content, getPostTitle(comment)].some((value) => String(value || '').toLowerCase().includes(keyword)));
-  }, [comments, query]);
+  const pageLabel = `第 ${page}/${Math.max(totalPages, 1)} 页 · ${comments.length} 条`;
 
   const updateStatus = async (id: string, status: Comment['status']) => {
     const pb = getPocketBase();
     try {
       await pb.collection('comments').update(id, { status });
+      showToast('状态更新成功', 'success');
       fetchComments();
     } catch (err) {
       console.error('更新评论状态失败：', err);
+      showToast('状态更新失败', 'error');
     }
   };
 
   const deleteComment = async (id: string) => {
-    if (!confirm('确定永久删除这条评论吗？')) return;
-    const pb = getPocketBase();
-    try {
-      await pb.collection('comments').delete(id);
-      fetchComments();
-    } catch (err) {
-      console.error('删除评论失败：', err);
-    }
+    setConfirmState({ open: true, title: '确认删除', message: '确定永久删除这条评论吗？', onConfirm: async () => {
+      const pb = getPocketBase();
+      try {
+        await pb.collection('comments').delete(id);
+        showToast('评论已删除', 'success');
+        fetchComments();
+      } catch (err) {
+        console.error('删除评论失败：', err);
+        showToast('删除失败', 'error');
+      }
+    }});
   };
 
   return (
@@ -115,10 +137,11 @@ export default function CommentModerator() {
               className={cn('min-h-10 flex-1 basis-[calc(50%-0.25rem)] rounded-md border px-3 py-2 text-xs transition-all sm:flex-none sm:basis-auto',
                 filter === f ? 'border-accent/30 bg-accent/10 text-accent' : 'border-transparent text-text-secondary hover:border-border hover:bg-bg-soft hover:text-text')}
             >
-              <span className="break-words [overflow-wrap:anywhere]">{filterLabels[f]}</span> <span className="ml-1 font-mono text-[10px] text-muted">{counts[f]}</span>
+              <span className="break-words [overflow-wrap:anywhere]">{filterLabels[f]}</span>
             </button>
           ))}
-          <div className="hidden min-w-[220px] flex-1 sm:block" />
+          <span className="hidden font-mono text-[10px] text-muted sm:inline">{pageLabel}</span>
+          <div className="hidden min-w-[120px] flex-1 sm:block" />
           <label className="relative w-full sm:w-80">
             <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-4.35-4.35M11 18a7 7 0 110-14 7 7 0 010 14z" /></svg>
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索作者、邮箱、内容、文章" className="h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft pl-9 pr-3 text-sm text-text outline-none transition focus:border-accent focus:bg-white" />
@@ -127,10 +150,10 @@ export default function CommentModerator() {
       </section>
 
       {loading ? <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-24 animate-pulse rounded-md border border-border bg-white" />)}</div>
-      : filteredComments.length === 0 ? <div className="card rounded-md p-6 text-center text-sm text-text-secondary sm:p-12">没有找到评论。</div>
-      : <div className="space-y-2">
-          {filteredComments.map((comment) => (
-            <motion.article key={comment.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card max-w-full overflow-hidden rounded-md p-3 shadow-xs sm:p-4">
+      : comments.length === 0 ? <div className="card rounded-md p-6 text-center text-sm text-text-secondary sm:p-12">{query ? '没有匹配的评论。' : '没有找到评论。'}</div>
+      : <motion.div variants={listVariants} initial="hidden" animate="visible" className="space-y-2">
+          {comments.map((comment) => (
+            <motion.article key={comment.id} layout variants={itemVariants} className="card max-w-full overflow-hidden rounded-md p-3 shadow-xs sm:p-4">
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_120px]">
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -159,8 +182,32 @@ export default function CommentModerator() {
               </div>
             </motion.article>
           ))}
-        </div>
+        </motion.div>
       }
+
+      {totalPages > 1 && (
+        <nav className="flex flex-wrap items-center justify-center gap-2" aria-label="评论分页">
+          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="inline-flex h-10 min-w-10 items-center justify-center rounded-md border border-border bg-white px-3 text-sm text-text-secondary transition-colors hover:border-border-hover disabled:cursor-not-allowed disabled:opacity-40">上一页</button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+            .map((p, idx, arr) => (
+              <span key={p} className="flex items-center gap-1">
+                {idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-muted">…</span>}
+                <button onClick={() => setPage(p)} aria-current={page === p ? 'page' : undefined} className={cn('inline-flex h-10 min-w-10 items-center justify-center rounded-md border px-3 text-sm font-medium transition-all', page === p ? 'border-accent/30 bg-accent/10 text-accent' : 'border-border bg-white text-text-secondary hover:border-border-hover hover:text-text')}>{p}</button>
+              </span>
+            ))}
+          <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="inline-flex h-10 min-w-10 items-center justify-center rounded-md border border-border bg-white px-3 text-sm text-text-secondary transition-colors hover:border-border-hover disabled:cursor-not-allowed disabled:opacity-40">下一页</button>
+        </nav>
+      )}
+
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        danger
+        onConfirm={() => { confirmState.onConfirm(); setConfirmState(s => ({ ...s, open: false })); }}
+        onCancel={() => setConfirmState(s => ({ ...s, open: false }))}
+      />
     </div>
   );
 }

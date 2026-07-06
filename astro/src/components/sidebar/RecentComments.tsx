@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
 import { sanitizeText } from '../../lib/security';
+import AnimatedList from '../reactbits/AnimatedList';
 import type { Comment } from '../../types/pocketbase';
 
 export default function RecentComments() {
@@ -18,30 +19,30 @@ export default function RecentComments() {
   }, []);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }} className="widget">
-      <div className="widget-title">最近评论</div>
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }} className="space-y-3">
+      <div className="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">最近评论</div>
       {loading ? (
         <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-14 animate-pulse rounded-lg bg-bg-soft" />)}
+          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-14 animate-pulse rounded-lg bg-zinc-50 dark:bg-zinc-900" />)}
         </div>
       ) : (
-        <div className="space-y-3">
+        <AnimatedList showGradients={false}>
           {comments.length === 0 ? (
-            <p className="text-sm text-text-secondary">暂无评论</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">暂无评论</p>
           ) : (
             comments.map((comment) => (
               <div key={comment.id} className="flex items-start gap-3">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-bold text-accent">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-teal-500/10 text-xs font-bold text-teal-600 dark:text-teal-400">
                   {comment.author_name.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-text">{comment.author_name}</p>
-                  <p className="line-clamp-2 text-xs text-text-secondary">{sanitizeText(comment.content)}</p>
+                  <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-50">{comment.author_name}</p>
+                  <p className="line-clamp-2 text-xs text-zinc-500 dark:text-zinc-400">{sanitizeText(comment.content)}</p>
                 </div>
               </div>
             ))
           )}
-        </div>
+        </AnimatedList>
       )}
     </motion.div>
   );

@@ -86,6 +86,17 @@ onRecordBeforeCreateRequest((e) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(authorEmail)) throw new BadRequestError('Invalid email format.');
   if (hasSpamPattern(content)) throw new BadRequestError('Comment contains suspicious content.');
 
+  // If the author_email belongs to a registered user, that user must have verified email
+  try {
+    const existingUser = $app.dao().findFirstRecordByFilter('users', 'email = {:email}', { email: authorEmail.toLowerCase() });
+    if (existingUser && !existingUser.verified()) {
+      throw new BadRequestError('请先验证你的邮箱后再发表评论');
+    }
+  } catch (err) {
+    if (err instanceof BadRequestError) throw err;
+    // No matching user found — anonymous comment, allow it
+  }
+
   const post = findRecord('posts', postId);
   if (!post || post.get('status') !== 'published') {
     throw new BadRequestError('Only published posts can be commented on.');

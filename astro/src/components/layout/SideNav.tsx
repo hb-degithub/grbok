@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SITE_CONFIG } from '../../config/site';
 import { useAuthStatus } from '../../hooks/useAuthStatus';
+import useBreakpoint from '../../hooks/useBreakpoint';
 
 interface SideNavProps {
   id?: string;
@@ -22,6 +23,33 @@ const loginNavItem = { href: '/login', label: '登录', icon: 'M11 16l-4-4m0 0l4
 
 const DRAWER_TRANSITION = { type: 'spring', damping: 28, stiffness: 260 } as const;
 
+const STAGGER_EASE = [0.16, 1, 0.3, 1] as const;
+
+function getStaggerVariants(reduced: boolean) {
+  if (reduced) {
+    return {
+      container: {
+        hidden: { opacity: 1 },
+        visible: { opacity: 1, transition: { staggerChildren: 0, delayChildren: 0 } },
+      },
+      item: {
+        hidden: { opacity: 1, x: 0 },
+        visible: { opacity: 1, x: 0, transition: { duration: 0 } },
+      },
+    };
+  }
+  return {
+    container: {
+      hidden: { opacity: 0 },
+      visible: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.1 } },
+    },
+    item: {
+      hidden: { opacity: 0, x: -20 },
+      visible: { opacity: 1, x: 0, transition: { duration: 0.3, ease: STAGGER_EASE } },
+    },
+  };
+}
+
 function getScrollbarWidth() {
   return typeof window !== 'undefined' ? window.innerWidth - document.documentElement.clientWidth : 0;
 }
@@ -30,10 +58,12 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
   const drawerRef = useRef<HTMLElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
   const { isAuthenticated, isLoading, canAccessAdmin } = useAuthStatus();
-  const secondaryNavItems = [
+  const { prefersReducedMotion } = useBreakpoint();
+  const staggerVariants = useMemo(() => getStaggerVariants(prefersReducedMotion), [prefersReducedMotion]);
+  const secondaryNavItems = useMemo(() => [
     canAccessAdmin ? adminNavItem : null,
     !isLoading && !isAuthenticated ? loginNavItem : null,
-  ].filter((item): item is typeof adminNavItem => Boolean(item));
+  ].filter((item): item is typeof adminNavItem => Boolean(item)), [canAccessAdmin, isLoading, isAuthenticated]);
 
   const isActive = (href: string) => {
     if (href === '/') return currentPath === '/';
@@ -163,13 +193,19 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
             </div>
 
             <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-4">
-              <div className="space-y-1">
+              <motion.div
+                className="space-y-1"
+                variants={staggerVariants.container}
+                initial="hidden"
+                animate="visible"
+              >
                 <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">主导航</p>
                 {mainNavItems.map((item) => (
-                  <a
+                  <motion.a
                     key={item.href}
                     href={item.href}
                     onClick={handleLinkClick}
+                    variants={staggerVariants.item}
                     className={`flex min-h-[44px] min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium leading-snug transition-colors ${
                       isActive(item.href)
                         ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
@@ -181,17 +217,23 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
                     </svg>
                     <span className="min-w-0 break-words">{item.label}</span>
-                  </a>
+                  </motion.a>
                 ))}
-              </div>
+              </motion.div>
 
-              <div className="mt-6 space-y-1">
+              <motion.div
+                className="mt-6 space-y-1"
+                variants={staggerVariants.container}
+                initial="hidden"
+                animate="visible"
+              >
                 <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">其他</p>
                 {secondaryNavItems.map((item) => (
-                  <a
+                  <motion.a
                     key={item.href}
                     href={item.href}
                     onClick={handleLinkClick}
+                    variants={staggerVariants.item}
                     className={`flex min-h-[44px] min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium leading-snug transition-colors ${
                       isActive(item.href)
                         ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
@@ -203,9 +245,9 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
                     </svg>
                     <span className="min-w-0 break-words">{item.label}</span>
-                  </a>
+                  </motion.a>
                 ))}
-              </div>
+              </motion.div>
             </nav>
           </motion.aside>
         </>

@@ -47,23 +47,23 @@ export default function CheckIn() {
 
   if (!mounted) {
     return (
-      <div className="widget relative overflow-hidden">
-        <div className="widget-title relative">每日打卡</div>
-        <div className="h-14 animate-pulse rounded-lg bg-bg-soft" />
+      <div className="space-y-3 relative overflow-hidden">
+        <div className="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50 relative">每日打卡</div>
+        <div className="h-14 animate-pulse rounded-lg bg-zinc-50 dark:bg-zinc-900" />
       </div>
     );
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="widget relative overflow-hidden">
-      <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-accent/5 blur-2xl"></div>
-      <div className="widget-title relative">每日打卡</div>
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className="space-y-3 relative overflow-hidden">
+      <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-teal-500/5 blur-2xl"></div>
+      <div className="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50 relative">每日打卡</div>
       <div className="relative flex items-center justify-between">
         <div>
-          <p className="text-3xl font-bold text-text">{streak}</p>
-          <p className="text-xs text-text-secondary">连续打卡天数</p>
+          <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-50">{streak}</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">连续打卡天数</p>
         </div>
-        <button onClick={handleCheckIn} disabled={checked} className={`rounded-full px-6 py-2.5 text-sm font-semibold transition-all ${checked ? 'bg-success/10 text-success' : 'bg-accent text-white hover:bg-accent-hover hover:shadow-lg hover:shadow-accent/25'}`}>
+        <motion.button onClick={handleCheckIn} disabled={checked} whileTap={{ scale: 0.95 }} className={`rounded-full px-6 py-2.5 text-sm font-semibold transition-all ${checked ? 'bg-emerald-500/10 text-emerald-500' : 'bg-teal-500 text-white hover:bg-teal-600 hover:shadow-lg hover:shadow-teal-500/25'}`}>
           <AnimatePresence mode="wait">
             {checked ? (
               <motion.span key="checked" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="flex items-center gap-1">
@@ -74,9 +74,9 @@ export default function CheckIn() {
               <motion.span key="checkin" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>立即打卡</motion.span>
             )}
           </AnimatePresence>
-        </button>
+        </motion.button>
       </div>
-      <p className="relative mt-3 text-xs text-text-muted">坚持打卡，记录每一天的进步。</p>
+      <p className="relative mt-3 text-xs text-zinc-400 dark:text-zinc-500">坚持打卡，记录每一天的进步。</p>
     </motion.div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { Renderer, Camera, Geometry, Program, Mesh } from 'ogl';
 
 import './Particles.css';
@@ -100,10 +101,12 @@ const Particles = ({
   pixelRatio = 1,
   className
 }) => {
+  const prefersReducedMotion = useReducedMotion();
   const containerRef = useRef(null);
   const mouseRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
+    if (prefersReducedMotion) return;
     const container = containerRef.current;
     if (!container) return;
 
@@ -192,6 +195,7 @@ const Particles = ({
 
     const update = t => {
       animationFrameId = requestAnimationFrame(update);
+      if (document.hidden) return;
       const delta = t - lastTime;
       lastTime = t;
       elapsed += delta * speed;
@@ -240,6 +244,7 @@ const Particles = ({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    prefersReducedMotion,
     particleCount,
     particleSpread,
     speed,
@@ -252,6 +257,8 @@ const Particles = ({
     disableRotation,
     pixelRatio
   ]);
+
+  if (prefersReducedMotion) return null;
 
   return <div ref={containerRef} className={`particles-container ${className || ''}`} />;
 };

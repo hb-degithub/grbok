@@ -57,10 +57,12 @@
 html {
   scroll-behavior: smooth;
   overflow-x: clip;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body {
   overflow-wrap: anywhere;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 img, video, canvas, svg {
@@ -609,6 +611,7 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
   }
   .animate-enter, .animate-enter-subtle, .animate-fade-in-up { opacity: 1; transform: none; }
   .card-lift:hover { transform: none; }
+  html, body { transition: none !important; }
 }
 
 /* ===========================

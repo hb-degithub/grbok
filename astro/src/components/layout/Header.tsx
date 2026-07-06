@@ -120,53 +120,57 @@ export default function Header() {
   };
 
   // Build dock items: nav links + search + theme + auth
-  const dockItems = [
-    ...navItems.map((item) => ({
-      icon: <Icon d={item.icon} />,
-      label: item.label,
-      href: item.href,
-      active: isActive(item.href),
-    })),
-    {
-      icon: <Icon d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />,
-      label: '搜索',
-      onClick: openSearch,
-      active: false,
-    },
-    {
-      icon: <Icon d={resolvedTheme === 'dark' ? 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z' : 'M12 3v2m0 14v2m7.071-16.071-1.414 1.414M6.343 17.657l-1.414 1.414M21 12h-2M5 12H3m16.071 7.071-1.414-1.414M6.343 6.343 4.929 4.929M16 12a4 4 0 11-8 0 4 4 0 018 0z'} />,
-      label: `主题：${activeThemeLabel}`,
-      onClick: () => setThemeMenuOpen((open) => !open),
-      hasPopup: 'menu',
-      expanded: themeMenuOpen,
-      active: false,
-    },
-  ];
+  const dockItems = useMemo(() => {
+    const items = [
+      ...navItems.map((item) => ({
+        icon: <Icon d={item.icon} />,
+        label: item.label,
+        href: item.href,
+        active: isActive(item.href),
+      })),
+      {
+        icon: <Icon d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />,
+        label: '搜索',
+        onClick: openSearch,
+        active: false,
+      },
+      {
+        icon: <Icon d={resolvedTheme === 'dark' ? 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z' : 'M12 3v2m0 14v2m7.071-16.071-1.414 1.414M6.343 17.657l-1.414 1.414M21 12h-2M5 12H3m16.071 7.071-1.414-1.414M6.343 6.343 4.929 4.929M16 12a4 4 0 11-8 0 4 4 0 018 0z'} />,
+        label: `主题：${activeThemeLabel}`,
+        onClick: () => setThemeMenuOpen((open) => !open),
+        hasPopup: 'menu',
+        expanded: themeMenuOpen,
+        active: false,
+      },
+    ];
 
-  // Add auth item
-  if (!isLoading) {
-    if (isAuthenticated) {
-      const displayName = getUserDisplayName(user);
-      const initial = getUserInitial(user);
-      dockItems.push({
-        icon: (
-          <div className="flex items-center justify-center rounded-full bg-zinc-700 text-xs font-bold text-white dark:bg-zinc-200 dark:text-zinc-900" style={{ width: 22, height: 22 }}>
-            {initial}
-          </div>
-        ),
-        label: displayName,
-        href: '/admin',
-        active: currentPath.startsWith('/admin'),
-      });
-    } else {
-      dockItems.push({
-        icon: <Icon d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />,
-        label: '登录',
-        href: '/login',
-        active: currentPath.startsWith('/login'),
-      });
+    // Add auth item
+    if (!isLoading) {
+      if (isAuthenticated) {
+        const displayName = getUserDisplayName(user);
+        const initial = getUserInitial(user);
+        items.push({
+          icon: (
+            <div className="flex items-center justify-center rounded-full bg-zinc-700 text-xs font-bold text-white dark:bg-zinc-200 dark:text-zinc-900" style={{ width: 22, height: 22 }}>
+              {initial}
+            </div>
+          ),
+          label: displayName,
+          href: '/admin',
+          active: currentPath.startsWith('/admin'),
+        });
+      } else {
+        items.push({
+          icon: <Icon d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />,
+          label: '登录',
+          href: '/login',
+          active: currentPath.startsWith('/login'),
+        });
+      }
     }
-  }
+    return items;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPath, openSearch, resolvedTheme, activeThemeLabel, themeMenuOpen, isLoading, isAuthenticated, user]);
 
   return (
     <>
@@ -174,7 +178,7 @@ export default function Header() {
       <button
         type="button"
         onClick={() => setSideNavOpen(true)}
-        className="focus-ring fixed left-3 top-3 z-50 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-200 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-xl transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:hidden"
+        className="focus-ring fixed left-3 top-3 z-50 inline-flex h-11 w-11 items-center justify-center rounded-lg border border-zinc-200 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-xl transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:hidden"
         aria-label="打开导航菜单"
         aria-controls="mobile-side-nav"
         aria-expanded={sideNavOpen}
@@ -218,7 +222,7 @@ export default function Header() {
                   type="button"
                   onClick={() => setMode(item.mode)}
                   className={cn(
-                    'flex min-h-[40px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left leading-snug transition-colors',
+                    'flex min-h-[44px] sm:min-h-[40px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left leading-snug transition-colors',
                     themeMode === item.mode
                       ? 'bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-white'
                       : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-white'

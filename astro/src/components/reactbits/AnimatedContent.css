@@ -1,0 +1,15 @@
+.animatedcontent {
+  overflow-clip-margin: 0;
+}
+
+.dark .animatedcontent {
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animatedcontent,
+  .animatedcontent * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

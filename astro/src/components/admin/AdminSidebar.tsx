@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAdminAuth, useAdminLogout, type AdminRole } from '../../hooks/useAdminAuth';
+import useBreakpoint from '../../hooks/useBreakpoint';
 import { cn } from '../../lib/utils';
 
 interface NavItem {
@@ -17,9 +18,13 @@ const navItems: NavItem[] = [
   { href: '/admin/posts', label: '文章', icon: 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z', section: '内容', requiredRole: 'author', hint: '撰写' },
   { href: '/admin/comments', label: '评论', icon: 'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z', section: '内容', requiredRole: 'admin', hint: '审核' },
   { href: '/admin/tags', label: '标签', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', section: '内容', requiredRole: 'author', hint: '分类' },
+  { href: '/admin/media', label: '媒体', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z', section: '内容', requiredRole: 'author', hint: '图片' },
+  { href: '/admin/friend-links', label: '友链', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1', section: '内容', requiredRole: 'super_admin', hint: '外链' },
   { href: '/admin/users', label: '用户', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', section: '系统', requiredRole: 'super_admin', hint: '权限' },
+  { href: '/admin/announcements', label: '公告', icon: 'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z', section: '系统', requiredRole: 'super_admin', hint: '广播' },
   { href: '/admin/settings', label: '设置', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', section: '系统', requiredRole: 'super_admin', hint: '站点' },
   { href: '/admin/security', label: '安全', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', section: '系统', requiredRole: 'super_admin', hint: '审计' },
+  { href: '/admin/audit', label: '审计日志', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4', section: '系统', requiredRole: 'super_admin', hint: '操作记录' },
 ];
 
 const roleLabels: Record<AdminRole, string> = {
@@ -45,11 +50,12 @@ function getScrollbarWidth() {
 }
 
 export default function AdminSidebar() {
+  const { isDesktop } = useBreakpoint();
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
     const stored = window.localStorage.getItem('admin-sidebar-collapsed');
     if (stored !== null) return stored === 'true';
-    return window.innerWidth < 1180;
+    return !isDesktop;
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLElement>(null);
@@ -64,9 +70,8 @@ export default function AdminSidebar() {
   const role = user?.role as AdminRole | undefined;
 
   useEffect(() => {
-    const media = window.matchMedia('(min-width: 1024px)');
     const syncSidebarWidth = () => {
-      if (!media.matches) {
+      if (!isDesktop) {
         document.documentElement.style.setProperty('--admin-sidebar-width', '0px');
         return;
       }
@@ -74,9 +79,7 @@ export default function AdminSidebar() {
       window.localStorage.setItem('admin-sidebar-collapsed', String(collapsed));
     };
     syncSidebarWidth();
-    media.addEventListener?.('change', syncSidebarWidth);
-    return () => media.removeEventListener?.('change', syncSidebarWidth);
-  }, [collapsed]);
+  }, [collapsed, isDesktop]);
 
   useEffect(() => {
     if (!drawerOpen) return;

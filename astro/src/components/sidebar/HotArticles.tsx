@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
+import AnimatedList from '../reactbits/AnimatedList';
 import type { Post } from '../../types/pocketbase';
 
 export default function HotArticles() {
@@ -17,28 +18,28 @@ export default function HotArticles() {
   }, []);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} className="widget">
-      <div className="widget-title">热榜文章</div>
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} className="space-y-3">
+      <div className="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">热榜文章</div>
       {loading ? (
         <div className="space-y-3">
-          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-bg-soft" />)}
+          {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-zinc-50 dark:bg-zinc-900" />)}
         </div>
       ) : (
-        <div className="space-y-3">
+        <AnimatedList showGradients={false}>
           {posts.length === 0 ? (
-            <p className="text-sm text-text-secondary">暂无热门文章</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">暂无热门文章</p>
           ) : (
             posts.map((post, index) => (
               <a key={post.id} href={`/posts/${post.slug}`} className="group flex items-start gap-3">
-                <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-xs font-bold ${index < 3 ? 'bg-accent text-white' : 'bg-bg-soft text-text-muted'}`}>{index + 1}</span>
+                <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md text-xs font-bold ${index < 3 ? 'bg-teal-500 text-white' : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-400 dark:text-zinc-500'}`}>{index + 1}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm font-medium text-text transition-colors group-hover:text-accent">{post.title}</p>
-                  <p className="mt-0.5 text-xs text-text-muted">{post.views || 0} 人已阅读</p>
+                  <p className="line-clamp-2 text-sm font-medium text-zinc-900 dark:text-zinc-50 transition-colors group-hover:text-teal-600 dark:group-hover:text-teal-400">{post.title}</p>
+                  <p className="mt-0.5 text-xs text-zinc-400 dark:text-zinc-500">{post.views || 0} 人已阅读</p>
                 </div>
               </a>
             ))
           )}
-        </div>
+        </AnimatedList>
       )}
     </motion.div>
   );

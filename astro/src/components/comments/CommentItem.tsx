@@ -20,6 +20,25 @@ interface CommentItemProps {
   moderationEnabled?: boolean;
 }
 
+const itemVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] },
+  },
+};
+
+/** 新评论高亮 - stone 背景渐隐 */
+const highlightVariants = {
+  initial: { backgroundColor: 'rgba(120, 113, 108, 0.15)' },
+  animate: {
+    backgroundColor: 'rgba(120, 113, 108, 0)',
+    transition: { duration: 2, ease: 'easeOut' },
+  },
+};
+
 /**
  * 单条评论组件
  *
@@ -79,25 +98,6 @@ export default function CommentItem({
     ];
     const index = seed.charCodeAt(0) % colors.length;
     return colors[index];
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20, scale: 0.98 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] },
-    },
-  };
-
-  /** 新评论高亮 - stone 背景渐隐 */
-  const highlightVariants = {
-    initial: { backgroundColor: 'rgba(120, 113, 108, 0.15)' },
-    animate: {
-      backgroundColor: 'rgba(120, 113, 108, 0)',
-      transition: { duration: 2, ease: 'easeOut' },
-    },
   };
 
   const canReply = depth < maxDepth;
@@ -161,7 +161,7 @@ export default function CommentItem({
               onClick={() => setIsReplyOpen(!isReplyOpen)}
               aria-expanded={isReplyOpen}
               aria-controls={`reply-form-${comment.id}`}
-              className="focus-ring flex items-center gap-1.5 rounded-md text-sm text-zinc-500 transition-colors hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-500"
+              className="focus-ring min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center gap-1.5 rounded-md text-sm text-zinc-500 transition-colors hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-500"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />

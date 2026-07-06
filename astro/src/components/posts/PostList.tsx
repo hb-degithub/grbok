@@ -1,16 +1,27 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { usePosts } from '../../hooks/usePocketBase';
+import useBreakpoint from '../../hooks/useBreakpoint';
 import PostCard from './PostCard';
+import Masonry from '../reactbits/Masonry';
 
 interface PostListProps {
   initialPage?: number;
   perPage?: number;
+  tagSlug?: string;
 }
 
 function cn(...classes: (string | boolean | undefined)[]) {
   return classes.filter(Boolean).join(' ');
 }
+
+const containerVariants = {
+  hidden: { opacity: 1 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06, delayChildren: 0.1 },
+  },
+};
 
 function SkeletonCard({ index }: { index: number }) {
   return (
@@ -37,17 +48,10 @@ function SkeletonCard({ index }: { index: number }) {
   );
 }
 
-export default function PostList({ initialPage = 1, perPage = 6 }: PostListProps) {
+export default function PostList({ initialPage = 1, perPage = 6, tagSlug }: PostListProps) {
   const [currentPage, setCurrentPage] = useState(initialPage);
-  const { posts, loading, error, totalPages } = usePosts(currentPage, perPage);
-
-  const containerVariants = {
-    hidden: { opacity: 1 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.06, delayChildren: 0.1 },
-    },
-  };
+  const { posts, loading, error, totalPages } = usePosts(currentPage, perPage, tagSlug);
+  const { isMobile } = useBreakpoint();
 
   if (loading) {
     return (
@@ -104,29 +108,48 @@ export default function PostList({ initialPage = 1, perPage = 6 }: PostListProps
 
   return (
     <div className="space-y-10">
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className="grid gap-5 sm:grid-cols-2"
-      >
-        {posts.map((post, index) => (
-          <PostCard key={post.id} post={post} index={index} />
-        ))}
-      </motion.div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentPage}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+        >
+          {isMobile ? (
+            <Masonry columns={{ mobile: 1, tablet: 2, desktop: 2 }} gap={20}>
+              {posts.map((post, index) => (
+                <PostCard key={post.id} post={post} index={index} />
+              ))}
+            </Masonry>
+          ) : (
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid gap-5 sm:grid-cols-2"
+            >
+              {posts.map((post, index) => (
+                <PostCard key={post.id} post={post} index={index} />
+              ))}
+            </motion.div>
+          )}
+        </motion.div>
+      </AnimatePresence>
 
       {totalPages > 1 && (
         <motion.nav
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: 0.1 }}
           className="flex flex-wrap items-center justify-center gap-2"
           aria-label="文章分页"
         >
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <button
+            <motion.button
               key={page}
               onClick={() => setCurrentPage(page)}
+              whileTap={{ scale: 0.95 }}
               aria-current={currentPage === page ? 'page' : undefined}
               aria-label={`第 ${page} 页`}
               className={cn(
@@ -137,7 +160,7 @@ export default function PostList({ initialPage = 1, perPage = 6 }: PostListProps
               )}
             >
               {page}
-            </button>
+            </motion.button>
           ))}
         </motion.nav>
       )}

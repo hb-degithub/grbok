@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useComments } from '../../hooks/useComments';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
+import { getPocketBase } from '../../lib/pocketbase';
 import CommentItem from './CommentItem';
 import CommentForm from './CommentForm';
 import type { CommentFormData } from '../../types/pocketbase';
@@ -52,6 +53,22 @@ export default function CommentSection({ postId }: CommentSectionProps) {
   const commentsEnabled = !settingsLoading && settings.enable_comments;
   const { comments, loading, error, submitComment, refresh } = useComments(postId, { enabled: commentsEnabled });
   const [newCommentIds, setNewCommentIds] = useState<Set<string>>(new Set());
+
+  // Track logged-in user's email verification status
+  const [userEmailVerified, setUserEmailVerified] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    const pb = getPocketBase();
+    const sync = () => {
+      if (pb.authStore.isValid && pb.authStore.record) {
+        setUserEmailVerified(!!(pb.authStore.record as any).verified);
+      } else {
+        setUserEmailVerified(undefined);
+      }
+    };
+    sync();
+    const unsub = pb.authStore.onChange(sync);
+    return () => { unsub?.(); };
+  }, []);
 
   /** 监听新评论，高亮 3 秒后消退 */
   useEffect(() => {
@@ -172,7 +189,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
       </div>
 
       {/* 主评论表单 */}
-      <CommentForm postId={postId} onSubmit={handleSubmit} moderationEnabled={settings.comment_moderation} />
+      <CommentForm postId={postId} onSubmit={handleSubmit} moderationEnabled={settings.comment_moderation} userEmailVerified={userEmailVerified} />
 
       {/* 评论列表 */}
       <AnimatePresence>

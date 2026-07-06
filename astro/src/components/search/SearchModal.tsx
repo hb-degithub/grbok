@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { sanitizeHtml } from '../../lib/security';
 import { cn } from '../../lib/utils';
+import useBreakpoint from '../../hooks/useBreakpoint';
 
 interface PagefindResult {
   id: string;
@@ -20,6 +21,17 @@ export default function SearchModal() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPagefindLoaded, setIsPagefindLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const { isMobile } = useBreakpoint();
+  const [isLandscapePhone, setIsLandscapePhone] = useState(false);
+
+  useEffect(() => {
+    const checkLandscape = () => {
+      setIsLandscapePhone(isMobile && window.innerHeight < 520);
+    };
+    checkLandscape();
+    window.addEventListener('resize', checkLandscape, { passive: true });
+    return () => window.removeEventListener('resize', checkLandscape);
+  }, [isMobile]);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -217,7 +229,7 @@ export default function SearchModal() {
               </button>
             </div>
 
-            <div ref={resultsRef} id={LISTBOX_ID} role="listbox" aria-label="搜索结果" className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:max-h-[60vh] sm:pb-2">
+            <div ref={resultsRef} id={LISTBOX_ID} role="listbox" aria-label="搜索结果" className={cn('min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] sm:max-h-[60vh] sm:pb-2', isLandscapePhone && 'max-h-[60dvh]')}>
               <div className="sr-only" aria-live="polite">{statusText}</div>
 
               {loadError && <div className="px-4 py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">搜索索引暂时不可用，请稍后再试。</div>}

@@ -11,7 +11,7 @@ export const SITE_CONFIG = {
   avatar: '/favicon.svg',
   author: 'HB',
   authorBio: '这家伙很懒，什么都没有写...',
-  since: '2022',
+  since: '2025',
   icp: { text: '辽ICP备2025065723号-1', url: 'https://beian.miit.gov.cn/' },
   police: { text: '辽公网安备 21029602001076号', url: 'http://www.beian.gov.cn/portal/registerSystemInfo?recordcode=21029602001076' },
   footerLinks: [],

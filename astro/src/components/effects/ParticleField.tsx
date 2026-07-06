@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import useBreakpoint from '../../hooks/useBreakpoint';
 
 interface Particle {
   x: number;
@@ -25,13 +26,13 @@ export default function ParticleField({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Particle[]>([]);
   const animationRef = useRef<number>();
+  const { prefersReducedMotion } = useBreakpoint();
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reducedMotion) return;
+    if (prefersReducedMotion) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -60,6 +61,10 @@ export default function ParticleField({
     };
 
     const animate = () => {
+      if (document.hidden) {
+        animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
       const width = canvas.offsetWidth || window.innerWidth;
       const height = canvas.offsetHeight || window.innerHeight;
       ctx.clearRect(0, 0, width, height);
@@ -105,7 +110,7 @@ export default function ParticleField({
       window.removeEventListener('resize', resize);
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [count, color, speed]);
+  }, [count, color, speed, prefersReducedMotion]);
 
   return <canvas ref={canvasRef} className={`pointer-events-none ${className}`} style={{ position: 'absolute', inset: 0 }} />;
 }

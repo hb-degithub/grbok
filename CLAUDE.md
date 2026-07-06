@@ -20,7 +20,7 @@
 | Search | Pagefind | Offline full-text search |
 | Backend | PocketBase 0.22.21 (SQLite) | Auth, DB, API, file storage |
 | Web Server | Caddy 2.8.4-alpine | Auto HTTPS, reverse proxy, security headers |
-| Email | msmtp + Aliyun push | Magic link / comment notifications |
+| Email | PocketBase SMTP (Aliyun) + msmtp fallback | Verification, magic link, notifications |
 | Deployment | Docker Compose | Unified orchestration |
 
 ## Architecture
@@ -57,7 +57,9 @@ pb_hooks/                 # PocketBase server-side hooks (.pb.js suffix required
   guard_user_role.pb.js   # Enforce user role on create/update
   login_security.pb.js.disabled  # Disabled (caused login 400 errors)
   send_email_comment.pb.js       # Email notification on new comments
-  validate_comment.pb.js         # Server-side comment validation + IP logging
+  validate_comment.pb.js         # Server-side comment validation + email verification gate
+  configure_smtp.pb.js           # Auto-configure SMTP from ALIYUN_SMTP_* env vars on startup
+  email_verification.pb.js       # Auto-send verification on registration, rate limit resends, audit log
 
 pb_migrations/            # PocketBase schema migrations
 pb_local/                 # Local dev PB data directory
@@ -88,19 +90,34 @@ tmp/                      # Temporary deployment artifacts
 ### Security
 - DOMPurify on rendered user content (comments).
 - `security.ts` provides browser fingerprint, CSRF, and rate limiting utilities.
-- Admin pages are guarded by `AdminGuard` (server-side token validation).
+- Admin pages are guarded by `AdminGuard` (server-side token validation + email verification + passkey MFA).
 - Caddy handles: HSTS, CSP, X-Frame-Options, directory-scan blocking, admin UI IP whitelist.
 - `login_security.pb.js` is DISABLED — dont re-enable without testing login flow.
-- `validate_comment.pb.js` logs IP address but excludes it from public API responses.
+- `validate_comment.pb.js` logs IP address but excludes it from public API responses; also enforces email verification for registered commenters.
+- `configure_smtp.pb.js` auto-configures SMTP on PB startup from `ALIYUN_SMTP_*` env vars (only if SMTP not already enabled).
+
+### Email Verification
+- Policy: "注册即可用，逐步引导验证" — registration works immediately, verification is progressively encouraged.
+- Registered users must verify email to comment; anonymous comments are unaffected.
+- Admin users must verify email before passkey MFA step (enforced in both backend hook and frontend AdminGuard).
+- Flow: register → auto-send verification email → user clicks link → `/verify-email?token=xxx` → `confirmVerification()` + `authRefresh()` → `emailVerified` updated.
+- Frontend: `EmailVerificationBanner` (dismissible prompt), `EmailVerificationResult` (confirmation page), `AdminEmailVerificationRequired` (admin gate), `CommentForm` verification prompt.
+- Rate limiting: 5/IP/15min, 3/email/15min on resend requests (`email_verification.pb.js`).
 
 ### Environment Variables
 | Variable | Used By | Default |
 |----------|---------|---------|
-| `PUBLIC_SITE_URL` | Astro build | `http://localhost:4321` |
+| `PUBLIC_SITE_URL` | Astro build + SMTP links | `http://localhost:4321` |
 | `PUBLIC_POCKETBASE_URL` | Astro (PB client) | `http://localhost:8090` |
 | `PB_ENCRYPTION_KEY` | Docker Compose | (required) |
 | `ADMIN_IP` | Caddy | (admin whitelist IP) |
 | `TZ` | PocketBase container | `Asia/Shanghai` |
+| `ALIYUN_SMTP_HOST` | PocketBase (configure_smtp.pb.js) | — |
+| `ALIYUN_SMTP_PORT` | PocketBase (configure_smtp.pb.js) | — |
+| `ALIYUN_SMTP_USER` | PocketBase (configure_smtp.pb.js) | — |
+| `ALIYUN_SMTP_PASSWORD` | PocketBase (configure_smtp.pb.js) | — |
+| `ALIYUN_FROM_EMAIL` | PocketBase (configure_smtp.pb.js) | — |
+| `ALIYUN_FROM_NAME` | PocketBase (configure_smtp.pb.js) | — |
 
 ## Database Schema
 

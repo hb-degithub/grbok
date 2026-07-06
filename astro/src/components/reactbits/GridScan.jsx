@@ -1,5 +1,6 @@
 import { BloomEffect, ChromaticAberrationEffect, EffectComposer, EffectPass, RenderPass } from 'postprocessing';
 import { useEffect, useRef, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import * as THREE from 'three';
 import './GridScan.css';
 
@@ -298,6 +299,7 @@ export const GridScan = ({
   className,
   style
 }) => {
+  const prefersReducedMotion = useReducedMotion();
   const containerRef = useRef(null);
   const videoRef = useRef(null);
   const faceApiRef = useRef(null);
@@ -418,6 +420,7 @@ export const GridScan = ({
   }, [uiFaceActive, snapBackDelay, scanOnClick, enableGyro]);
 
   useEffect(() => {
+    if (prefersReducedMotion) return;
     const container = containerRef.current;
     if (!container) return;
 
@@ -510,6 +513,11 @@ export const GridScan = ({
     let last = performance.now();
     const tick = () => {
       const now = performance.now();
+      if (document.hidden) {
+        last = now;
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
       const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
       last = now;
 
@@ -570,6 +578,7 @@ export const GridScan = ({
       container.removeChild(renderer.domElement);
     };
   }, [
+    prefersReducedMotion,
     sensitivity,
     lineThickness,
     linesColor,

@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 
 export default function CodeBlockWrapper({ children }: { children: React.ReactNode }) {
   const [copied, setCopied] = React.useState(false);
@@ -12,13 +13,13 @@ export default function CodeBlockWrapper({ children }: { children: React.ReactNo
   };
   return (
     <div className="relative group">
-      <button onClick={handleCopy} className="absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-md bg-zinc-800/80 text-zinc-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-zinc-700 hover:text-zinc-200" aria-label={copied ? "已复制" : "复制代码"}>
+      <motion.button onClick={handleCopy} animate={copied ? { scale: [1, 1.15, 1] } : { scale: 1 }} transition={{ duration: 0.3 }} className="absolute right-2 top-2 z-10 flex h-9 w-9 sm:h-8 sm:w-8 items-center justify-center rounded-md bg-zinc-800/80 text-zinc-400 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-zinc-700 hover:text-zinc-200" aria-label={copied ? "已复制" : "复制代码"}>
         {copied ? (
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
         ) : (
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
         )}
-      </button>
+      </motion.button>
       {children}
     </div>
   );

@@ -88,10 +88,20 @@ export function usePocketBase() {
         return { success: false, data: null, error: err };
       }
     }, [pb]),
+
+    requestVerification: useCallback(async (email: string) => {
+      try {
+        await pb.collection('users').requestVerification(normalizeAuthEmail(email));
+        return { success: true, error: null };
+      } catch (err) {
+        console.error('发送验证邮件失败:', err);
+        return { success: false, error: err };
+      }
+    }, [pb]),
   };
 }
 
-export function usePosts(page = 1, perPage = 10) {
+export function usePosts(page = 1, perPage = 10, tagSlug?: string) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -103,8 +113,33 @@ export function usePosts(page = 1, perPage = 10) {
     const fetchPosts = async () => {
       setLoading(true);
       try {
+        let filter = 'status = "published"';
+
+        if (tagSlug) {
+          const tagRes = await pb.collection('tags').getList(1, 1, {
+            filter: pb.filter('slug = {:slug}', { slug: tagSlug }),
+          });
+          const tag = tagRes.items[0];
+          if (!tag) {
+            setPosts([]);
+            setTotalPages(1);
+            return;
+          }
+          const ptRes = await pb.collection('post_tags').getFullList({
+            filter: pb.filter('tag_id = {:tagId}', { tagId: tag.id }),
+            fields: 'post_id',
+          });
+          const postIds = ptRes.map((pt: { post_id: string }) => pt.post_id);
+          if (postIds.length === 0) {
+            setPosts([]);
+            setTotalPages(1);
+            return;
+          }
+          filter += ` && id in '${postIds.join(',')}'`;
+        }
+
         const result = await pb.collection('posts').getList<Post>(page, perPage, {
-          filter: 'status = "published"',
+          filter,
           sort: '-published_at',
           expand: 'author',
         });
@@ -118,7 +153,7 @@ export function usePosts(page = 1, perPage = 10) {
     };
 
     fetchPosts();
-  }, [page, perPage]);
+  }, [page, perPage, tagSlug]);
 
   return { posts, loading, error, totalPages };
 }

@@ -1,0 +1,68 @@
+.animatedlist-root {
+  position: relative;
+  overflow-y: auto;
+  max-height: 320px;
+  scrollbar-width: thin;
+  scrollbar-color: #a1a1aa transparent;
+}
+
+.animatedlist-root::-webkit-scrollbar {
+  width: 4px;
+}
+
+.animatedlist-root::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.animatedlist-root::-webkit-scrollbar-thumb {
+  background-color: #a1a1aa;
+  border-radius: 2px;
+}
+
+.dark .animatedlist-root {
+  scrollbar-color: #52525b transparent;
+}
+
+.dark .animatedlist-root::-webkit-scrollbar-thumb {
+  background-color: #52525b;
+}
+
+.animatedlist-gradient-top,
+.animatedlist-gradient-bottom {
+  position: sticky;
+  left: 0;
+  right: 0;
+  height: 40px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.animatedlist-gradient-top {
+  top: 0;
+  background: linear-gradient(to bottom, var(--animatedlist-gradient-color, #fafafa), transparent);
+}
+
+.animatedlist-gradient-bottom {
+  bottom: 0;
+  background: linear-gradient(to top, var(--animatedlist-gradient-color, #fafafa), transparent);
+}
+
+.dark .animatedlist-gradient-top {
+  background: linear-gradient(to bottom, var(--animatedlist-gradient-color-dark, #09090b), transparent);
+}
+
+.dark .animatedlist-gradient-bottom {
+  background: linear-gradient(to top, var(--animatedlist-gradient-color-dark, #09090b), transparent);
+}
+
+.animatedlist-item {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animatedlist-root,
+  .animatedlist-root * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

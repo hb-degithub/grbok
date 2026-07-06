@@ -62,7 +62,7 @@ export default function Button({
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
       className={cn(
         // 基础样式
-        'inline-flex min-h-[40px] min-w-[40px] max-w-full items-center justify-center rounded-xl font-medium',
+        'inline-flex min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] max-w-full items-center justify-center rounded-xl font-medium',
         'whitespace-normal break-words text-center leading-snug',
         'transition-colors duration-200 ease-out',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-900',

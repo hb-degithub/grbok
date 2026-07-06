@@ -40,7 +40,12 @@ export default function StatsCard({ label, value, icon, color, trend, progress }
           {trend && <p className="mt-1 break-words text-xs text-text-secondary [overflow-wrap:anywhere]">{trend}</p>}
           {safeProgress !== null && (
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-bg-soft">
-              <div className={cn('h-full rounded-full', c.bar)} style={{ width: `${safeProgress}%` }} />
+              <motion.div
+                className={cn('h-full rounded-full', c.bar)}
+                initial={{ width: 0 }}
+                animate={{ width: `${safeProgress}%` }}
+                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
+              />
             </div>
           )}
         </div>

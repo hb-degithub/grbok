@@ -1,16 +1,28 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ScrollReveal from '../components/ui/ScrollReveal';
-import GlowCard from '../components/ui/GlowCard';
 import Typewriter from '../components/ui/Typewriter';
+import GlareHover from '../components/reactbits/GlareHover';
+import BlurText from '../components/reactbits/BlurText';
 
-const skills = [
-  { name: 'Astro', level: 90 },
-  { name: 'React', level: 85 },
-  { name: 'TypeScript', level: 88 },
-  { name: 'Tailwind CSS', level: 92 },
-  { name: 'Node.js', level: 80 },
-  { name: 'PocketBase', level: 75 },
+const techStack = [
+  { name: 'Astro 6', desc: 'SSG 静态站点生成，群岛架构' },
+  { name: 'React 19', desc: '交互组件 + Framer Motion 动效' },
+  { name: 'TailwindCSS 4', desc: '原子化样式，深色主题设计系统' },
+  { name: 'PocketBase', desc: 'BaaS 后端 — Auth / DB / API / 文件存储' },
+  { name: 'Caddy 2', desc: '反向代理，自动 HTTPS，安全响应头' },
+  { name: 'WebAuthn', desc: '管理员 Passkey 双因素认证' },
+  { name: 'Pagefind', desc: '离线全文搜索索引' },
+  { name: 'Docker Compose', desc: '容器化编排与部署' },
+];
+
+const features = [
+  { title: '安全加固', desc: 'CSP / HSTS / CORS 严格策略，多层速率限制，DOMPurify 防注入，Docker 容器权限最小化' },
+  { title: '管理员体系', desc: 'RBAC 四级角色，WebAuthn Passkey 二次验证，服务端认证守卫，IP 白名单' },
+  { title: '交互体验', desc: '粒子背景、网格扫描、Dock 导航、Bento 卡片、阅读进度、滚动揭示动效' },
+  { title: 'SEO & PWA', desc: 'RSS 订阅、站点地图、Open Graph、Service Worker 离线缓存、Manifest' },
+  { title: '评论系统', desc: '嵌套回复、服务端校验、邮件通知、速率限制、实时订阅更新' },
+  { title: '全文搜索', desc: 'Pagefind 离线索引，即时搜索结果高亮，零服务器依赖' },
 ];
 
 const links = [
@@ -29,11 +41,11 @@ const links = [
           <span class="font-display text-3xl font-black text-zinc-500 dark:text-zinc-400">B</span>
         </div>
         <h1 class="font-display text-4xl font-black uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-4">
-          关于博客
+          <BlurText client:visible text="关于博客" className="text-4xl font-black tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-5xl" />
         </h1>
         <div class="text-zinc-500 dark:text-zinc-400">
           <Typewriter
-            text="一个分享技术、思考与生活的个人博客"
+            text="分享技术、思考与生活"
             client:visible
           />
         </div>
@@ -48,13 +60,10 @@ const links = [
         </h2>
         <div class="space-y-4 text-zinc-500 dark:text-zinc-400">
           <p>
-            这是一个使用现代技术栈构建的个人博客系统，旨在分享技术文章、学习笔记和个人思考。
+            胡巴的博客是一个自建的全栈个人博客系统，使用 Astro + React + PocketBase 构建，自 2025 年运行至今。
           </p>
           <p>
-            博客采用 Astro 框架构建，结合 React 组件实现交互功能，使用 PocketBase 作为后端服务。
-          </p>
-          <p>
-            设计风格采用科幻/终端风格，追求极致的视觉体验和流畅的交互动效。
+            前端采用 Astro 群岛架构实现静态生成与交互组件的混合渲染，后端依托 PocketBase 提供 Auth、数据库与 API 服务，Caddy 负责反向代理与安全防护，Docker Compose 统一编排部署。
           </p>
         </div>
       </div>
@@ -66,19 +75,30 @@ const links = [
         <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-6">
           技术栈
         </h2>
-        <div class="space-y-4">
-          {skills.map((skill) => (
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {techStack.map((tech) => (
+            <GlareHover client:visible glareColor="rgba(20, 184, 166, 0.08)">
+              <div class="flex items-center gap-3 rounded-md border border-zinc-200 dark:border-zinc-700/50 px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-500/30">
+                <span class="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{tech.name}</span>
+                <span class="text-xs text-zinc-400 dark:text-zinc-500 truncate">{tech.desc}</span>
+              </div>
+            </GlareHover>
+          ))}
+        </div>
+      </div>
+    </ScrollReveal>
+
+    <!-- 功能特性 -->
+    <ScrollReveal delay={0.25} client:visible>
+      <div class="card rounded-lg p-8 mb-8">
+        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-6">
+          功能特性
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {features.map((f) => (
             <div>
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-mono text-sm text-zinc-900 dark:text-zinc-100">{skill.name}</span>
-                <span class="font-mono text-xs text-zinc-500 dark:text-zinc-400">{skill.level}%</span>
-              </div>
-              <div class="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-                <div
-                  class="h-full rounded-full bg-gradient-to-r from-zinc-500 to-zinc-400 transition-all duration-1000 ease-out"
-                  style={`width: ${skill.level}%`}
-                />
-              </div>
+              <h3 class="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{f.title}</h3>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>

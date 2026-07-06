@@ -61,7 +61,7 @@ const tag = await fetchTag(slug ?? '');
   </div>
 
   {tag ? (
-    <PostList client:visible perPage={12} />
+    <PostList client:visible perPage={12} tagSlug={slug} />
   ) : (
     <div class="card flex flex-col items-center justify-center py-20 text-center rounded-lg">
       <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">

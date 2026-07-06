@@ -3,6 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import ScrollReveal from '../../components/ui/ScrollReveal';
 import ShareButton from '../../components/ui/ShareButton';
 import CommentSection from '../../components/comments/CommentSection';
+import TableOfContents from '../../components/posts/TableOfContents';
 import { sanitizeHtml } from '../../lib/security';
 
 const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
@@ -65,13 +66,34 @@ const formattedDate = post?.published_at
   : '';
 
 const readingTime = post?.content ? Math.max(1, Math.ceil(post.content.length / 300)) : 0;
-const safeContent = post?.content ? sanitizeHtml(post.content) : '';
+let safeContent = post?.content ? sanitizeHtml(post.content) : '';
+
+// Extract headings and inject IDs for TOC
+interface Heading { id: string; text: string; level: number; }
+const headings: Heading[] = [];
+let headingIndex = 0;
+safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
+  const level = parseInt(tag[1], 10);
+  const id = `heading-${headingIndex++}`;
+  const plainText = text.replace(/<[^>]+>/g, '');
+  headings.push({ id, text: plainText, level });
+  return `<${tag} id="${id}">${text}</${tag}>`;
+});
 ---
 
 <BaseLayout title={post?.title || '文章'} description={post?.excerpt || ''} image={post?.cover}>
   {post ? (
-    <article class="mx-auto w-full max-w-4xl px-[var(--page-pad,1rem)] py-8 sm:py-10">
-      <ScrollReveal client:visible>
+    <article class="mx-auto w-full max-w-5xl px-[var(--page-pad,1rem)] py-8 sm:py-10">
+      <!-- Mobile TOC -->
+      {headings.length > 0 && (
+        <div class="mb-6 lg:hidden">
+          <TableOfContents client:load headings={headings} />
+        </div>
+      )}
+
+      <div class="flex gap-8">
+        <div class="flex-1 min-w-0">
+          <ScrollReveal client:visible>
         <a href="/posts" class="mb-8 inline-flex min-h-11 items-center gap-2 rounded-lg text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100">
           <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -107,17 +129,15 @@ const safeContent = post?.content ? sanitizeHtml(post.content) : '';
 
           {post.cover && (
             <div class="mt-8 overflow-hidden rounded-xl border border-zinc-200 shadow-xl shadow-zinc-900/[0.04] dark:border-zinc-800">
-              <img src={post.cover} alt={post.title} class="h-auto w-full object-cover" loading="lazy" />
+              <img src={post.cover} alt={post.title} class="h-auto w-full object-cover opacity-0 transition-opacity duration-500" loading="lazy" onload="this.style.opacity='1'" />
             </div>
           )}
         </header>
       </ScrollReveal>
 
-      <ScrollReveal delay={0.2} client:visible>
-        <div class="prose mb-16 max-w-full break-words [overflow-wrap:anywhere]">
-          <div set:html={safeContent} />
-        </div>
-      </ScrollReveal>
+      <div class="prose mb-16 max-w-full break-words [overflow-wrap:anywhere] reveal-content">
+        <div set:html={safeContent} />
+      </div>
 
       <ScrollReveal delay={0.3} client:visible>
         <footer class="border-t border-zinc-200 pt-10 dark:border-zinc-800">
@@ -143,6 +163,15 @@ const safeContent = post?.content ? sanitizeHtml(post.content) : '';
           </div>
         </footer>
       </ScrollReveal>
+        </div>
+
+        <!-- Desktop TOC sidebar -->
+        {headings.length > 0 && (
+          <aside class="hidden lg:block w-52 shrink-0 sticky top-[calc(var(--header-offset,4rem)+2rem)] self-start max-h-[calc(100vh-8rem)]">
+            <TableOfContents client:load headings={headings} />
+          </aside>
+        )}
+      </div>
     </article>
   ) : (
     <div class="flex flex-col items-center justify-center px-4 py-20 text-center">
@@ -157,3 +186,41 @@ const safeContent = post?.content ? sanitizeHtml(post.content) : '';
     </div>
   )}
 </BaseLayout>
+
+<style>
+  .reveal-content > div > * {
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .reveal-content > div > *.revealed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal-content > div > * {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  const prose = document.querySelector('.reveal-content > div');
+  if (prose) {
+    const children = Array.from(prose.children);
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          const el = entry.target as HTMLElement;
+          const idx = children.indexOf(el);
+          el.style.transitionDelay = `${Math.min(idx * 40, 400)}ms`;
+          el.classList.add('revealed');
+          observer.unobserve(el);
+        }
+      }
+    }, { rootMargin: '0px 0px -40px 0px', threshold: 0.1 });
+    children.forEach(child => observer.observe(child));
+  }
+</script>

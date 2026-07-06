@@ -15,6 +15,8 @@ import Footer from '../components/layout/Footer.astro';
 import SearchModal from '../components/search/SearchModal';
 import AnnouncementBar from '../components/layout/AnnouncementBar';
 import DebugProtection from '../components/effects/DebugProtection';
+import SplashOverlay from '../components/effects/SplashOverlay';
+import WelcomeOverlay from '../components/effects/WelcomeOverlay';
 import ToastContainer from '../components/ui/Toast';
 import { SITE_CONFIG } from '../config/site';
 
@@ -83,7 +85,13 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
         const applyTheme = () => {
           const mode = readMode();
           const theme = resolveTheme(mode);
-          document.documentElement.classList.toggle('dark', theme === 'dark');
+          if (document.startViewTransition) {
+            document.startViewTransition(() => {
+              document.documentElement.classList.toggle('dark', theme === 'dark');
+            });
+          } else {
+            document.documentElement.classList.toggle('dark', theme === 'dark');
+          }
           document.documentElement.dataset.theme = theme;
           document.documentElement.dataset.themeMode = mode;
         };
@@ -162,7 +170,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 </head>
   <body class="min-h-[100svh] bg-white font-sans text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-50">
     <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-indigo-600 focus:text-white focus:rounded-md">跳转到主要内容</a>
-    {showChrome && <Header client:load />}
+    {showChrome && <Header transition:persist="header" client:load />}
     {showChrome && <SearchModal client:load />}
     {showChrome && <AnnouncementBar client:load />}
 
@@ -170,8 +178,10 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
       <slot />
     </main>
 
-    {showChrome && <Footer />}
+    {showChrome && <Footer transition:persist="footer" />}
     <DebugProtection client:load />
+    <SplashOverlay client:load />
+    <WelcomeOverlay client:load />
   <ToastContainer client:load />
 </body>
 </html>

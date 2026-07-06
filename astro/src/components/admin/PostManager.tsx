@@ -1,7 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
 import { cn } from '../../lib/utils';
+import { showToast } from '../ui/Toast';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import MediaLibrary from './MediaLibrary';
 import type { Post } from '../../types/pocketbase';
 
 type PostDraft = Omit<Post, 'id' | 'created' | 'updated' | 'author' | 'published_at' | 'views'> & { id?: string };
@@ -26,6 +29,15 @@ const filterLabels: Record<PostFilter, string> = {
   archived: '已归档',
 };
 
+const listVariants = {
+  hidden: { opacity: 1 },
+  visible: { transition: { staggerChildren: 0.04 } }
+};
+const itemVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } }
+};
+
 function formatDate(value?: string) {
   if (!value) return '未发布';
   return new Date(value).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
@@ -36,29 +48,47 @@ export default function PostManager() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<PostFilter>('all');
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [editing, setEditing] = useState<Post | PostDraft | null>(null);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const draftKey = useMemo(() => 'blog-draft-' + (editing?.id || '__new__'), [editing?.id]);
   const [draftRestored, setDraftRestored] = useState(false);
   const [allTags, setAllTags] = useState([]);
   const [selectedTagIds, setSelectedTagIds] = useState([]);
+  const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     const pb = getPocketBase();
     try {
-      const f = filter === 'all' ? '' : pb.filter('status = {:status}', { status: filter });
-      const result = await pb.collection('posts').getList<Post>(1, 80, { filter: f, sort: '-updated' });
+      const parts: string[] = [];
+      if (filter !== 'all') parts.push(pb.filter('status = {:status}', { status: filter }));
+      const keyword = query.trim();
+      if (keyword) {
+        // 标题/slug/摘要 模糊匹配（ PocketBase ~ 不区分大小写）
+        const escaped = keyword.replace(/["\\]/g, '');
+        parts.push(`(title ~ "${escaped}" || slug ~ "${escaped}" || excerpt ~ "${escaped}")`);
+      }
+      const f = parts.length ? parts.join(' && ') : '';
+      const result = await pb.collection('posts').getList<Post>(page, 20, { filter: f, sort: '-updated' });
       setPosts(result.items);
+      setTotalPages(result.totalPages);
     } catch (err) {
       console.error('获取文章失败:', err);
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, page, query]);
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
+
+  // 筛选/搜索变化时回到第 1 页
+  useEffect(() => { setPage(1); }, [filter, query]);
 
   // Auto-save to localStorage when editing
   useEffect(() => {
@@ -107,18 +137,9 @@ export default function PostManager() {
     }
   }, [draftRestored, editing]);
 
-  const counts = useMemo(() => ({
-    all: posts.length,
-    published: posts.filter((post) => post.status === 'published').length,
-    draft: posts.filter((post) => post.status === 'draft').length,
-    archived: posts.filter((post) => post.status === 'archived').length,
-  }), [posts]);
-
-  const filteredPosts = useMemo(() => {
-    const keyword = query.trim().toLowerCase();
-    if (!keyword) return posts;
-    return posts.filter((post) => [post.title, post.slug, post.excerpt].some((value) => String(value || '').toLowerCase().includes(keyword)));
-  }, [posts, query]);
+  // counts 基于 PocketBase 实际总数（通过 totalPages * perPage 估算），但精确计数需单独查询；
+  // 此处仅显示当前页条数与总页数，避免每页重新计算误导。
+  const pageLabel = `第 ${page}/${Math.max(totalPages, 1)} 页 · ${posts.length} 条`;
 
   const updateStatus = async (id: string, status: Post['status']) => {
     const pb = getPocketBase();
@@ -126,21 +147,26 @@ export default function PostManager() {
     if (status === 'published') data.published_at = new Date().toISOString();
     try {
       await pb.collection('posts').update(id, data);
+      showToast('状态更新成功', 'success');
       fetchPosts();
     } catch (err) {
       console.error('更新文章状态失败:', err);
+      showToast('状态更新失败', 'error');
     }
   };
 
   const deletePost = async (id: string) => {
-    if (!confirm('确定删除这篇文章吗？此操作无法撤销。')) return;
-    const pb = getPocketBase();
-    try {
-      await pb.collection('posts').delete(id);
-      fetchPosts();
-    } catch (err) {
-      console.error('删除文章失败:', err);
-    }
+    setConfirmState({ open: true, title: '确认删除', message: '确定删除这篇文章吗？此操作无法撤销。', onConfirm: async () => {
+      const pb = getPocketBase();
+      try {
+        await pb.collection('posts').delete(id);
+        showToast('文章已删除', 'success');
+        fetchPosts();
+      } catch (err) {
+        console.error('删除文章失败:', err);
+        showToast('删除文章失败', 'error');
+      }
+    }});
   };
 
   const savePost = async (skipChecks = false) => {
@@ -148,7 +174,8 @@ export default function PostManager() {
     if (!skipChecks && editing?.status === 'published') {
       const warnings = qualityChecks(editing);
       if (warnings.length > 0) {
-        if (!confirm('发布前检查发现问题，仍要发布吗？')) return;
+        setConfirmState({ open: true, title: '发布前检查', message: '发布前检查发现问题，仍要发布吗？', onConfirm: () => savePost(true) });
+        return;
       }
     }
     setSaving(true);
@@ -193,9 +220,10 @@ export default function PostManager() {
           await Promise.all(toAdd.map(id => pb.collection("post_tags").create({ post_id: savedPostId, tag_id: id })));
         }
       } catch (e) { console.error("Tag sync failed:", e); }
+      showToast('文章保存成功', 'success');
     } catch (err) {
       console.error('保存文章失败:', err);
-      alert('保存失败，请检查 slug 是否唯一。');
+      showToast('保存失败，请检查 slug 是否唯一。', 'error');
     } finally {
       setSaving(false);
     }
@@ -216,7 +244,40 @@ export default function PostManager() {
   const clearSavedDraft = () => {
     try { localStorage.removeItem(draftKey); } catch {}
   };
-  const startCreate = () => setEditing({ id: '', title: '', slug: '', excerpt: '', content: '', cover: '', status: 'draft' });
+  const startCreate = () => { setPreviewMode(false); setEditing({ id: '', title: '', slug: '', excerpt: '', content: '', cover: '', status: 'draft' }); };
+
+  // 在 textarea 选区前后包裹标签
+  const wrapSelection = (open: string, close: string, placeholder = '文本') => {
+    const ta = contentRef.current;
+    if (!ta || !editing) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const before = editing.content || '';
+    const selected = before.slice(start, end) || placeholder;
+    const next = before.slice(0, start) + open + selected + close + before.slice(end);
+    setDirty(true);
+    setEditing({ ...editing, content: next });
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = start + open.length;
+      ta.setSelectionRange(pos, pos + selected.length);
+    });
+  };
+
+  const insertLinePrefix = (prefix: string) => {
+    const ta = contentRef.current;
+    if (!ta || !editing) return;
+    const start = ta.selectionStart;
+    const before = editing.content || '';
+    const lineStart = before.lastIndexOf('\n', start - 1) + 1;
+    const next = before.slice(0, lineStart) + prefix + before.slice(lineStart);
+    setDirty(true);
+    setEditing({ ...editing, content: next });
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(start + prefix.length, start + prefix.length);
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -233,10 +294,11 @@ export default function PostManager() {
                   : 'border-transparent text-text-secondary hover:border-border hover:bg-bg-soft hover:text-text'
               )}
             >
-              {filterLabels[f]} <span className="ml-1 font-mono text-[10px] text-muted">{counts[f]}</span>
+              {filterLabels[f]}
             </button>
           ))}
-          <div className="hidden min-w-[220px] flex-1 sm:block" />
+          <span className="hidden font-mono text-[10px] text-muted sm:inline">{pageLabel}</span>
+          <div className="hidden min-w-[120px] flex-1 sm:block" />
           <label className="relative w-full sm:w-72">
             <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-4.35-4.35M11 18a7 7 0 110-14 7 7 0 010 14z" /></svg>
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索标题、slug、摘要" className="h-10 w-full rounded-md border border-border bg-bg-soft pl-9 pr-3 text-sm text-text outline-none transition focus:border-accent focus:bg-white" />
@@ -247,16 +309,16 @@ export default function PostManager() {
 
       {loading ? (
         <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-md border border-border bg-white" />)}</div>
-      ) : filteredPosts.length === 0 ? (
-        <div className="card rounded-md p-12 text-center text-sm text-text-secondary">没有找到文章。</div>
+      ) : posts.length === 0 ? (
+        <div className="card rounded-md p-12 text-center text-sm text-text-secondary">{query ? '没有匹配的文章。' : '没有找到文章。'}</div>
       ) : (
         <div className="space-y-3 lg:overflow-hidden lg:rounded-md lg:border lg:border-border lg:bg-white lg:shadow-xs">
           <div className="hidden grid-cols-[minmax(0,1fr)_110px_90px_110px] gap-3 border-b border-border bg-bg-soft px-4 py-2 font-mono text-[10px] uppercase tracking-wide text-muted lg:grid">
             <span>文章</span><span>状态</span><span>浏览</span><span className="text-right">操作</span>
           </div>
-          <div className="space-y-3 lg:divide-y lg:divide-border lg:space-y-0">
-            {filteredPosts.map((post) => (
-              <motion.div key={post.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card rounded-md border border-border bg-white p-3 shadow-xs lg:grid lg:grid-cols-[minmax(0,1fr)_110px_90px_110px] lg:items-center lg:rounded-none lg:border-0 lg:bg-transparent lg:p-4 lg:shadow-none">
+          <motion.div variants={listVariants} initial="hidden" animate="visible" className="space-y-3 lg:divide-y lg:divide-border lg:space-y-0">
+            {posts.map((post) => (
+              <motion.div key={post.id} layout variants={itemVariants} className="card rounded-md border border-border bg-white p-3 shadow-xs lg:grid lg:grid-cols-[minmax(0,1fr)_110px_90px_110px] lg:items-center lg:rounded-none lg:border-0 lg:bg-transparent lg:p-4 lg:shadow-none">
                 <div className="flex min-w-0 items-start gap-3 lg:items-center">
                   {post.cover ? <img src={post.cover} alt="" className="h-11 w-16 shrink-0 rounded-md object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} /> : <div className="flex h-11 w-16 shrink-0 items-center justify-center rounded-md border border-border bg-bg-soft font-mono text-[10px] text-muted">NO IMG</div>}
                   <div className="min-w-0">
@@ -285,8 +347,46 @@ export default function PostManager() {
                 </div>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
+      )}
+
+      {totalPages > 1 && (
+        <nav className="flex flex-wrap items-center justify-center gap-2" aria-label="文章分页">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="focus-ring inline-flex h-10 min-w-10 items-center justify-center rounded-md border border-border bg-white px-3 text-sm text-text-secondary transition-colors hover:border-border-hover disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            上一页
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1)
+            .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+            .map((p, idx, arr) => (
+              <span key={p} className="flex items-center gap-1">
+                {idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-muted">…</span>}
+                <button
+                  onClick={() => setPage(p)}
+                  aria-current={page === p ? 'page' : undefined}
+                  className={cn(
+                    'focus-ring inline-flex h-10 min-w-10 items-center justify-center rounded-md border px-3 text-sm font-medium transition-all',
+                    page === p
+                      ? 'border-accent/30 bg-accent/10 text-accent'
+                      : 'border-border bg-white text-text-secondary hover:border-border-hover hover:text-text'
+                  )}
+                >
+                  {p}
+                </button>
+              </span>
+            ))}
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            className="focus-ring inline-flex h-10 min-w-10 items-center justify-center rounded-md border border-border bg-white px-3 text-sm text-text-secondary transition-colors hover:border-border-hover disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            下一页
+          </button>
+        </nav>
       )}
 
       <AnimatePresence>
@@ -308,8 +408,40 @@ export default function PostManager() {
                     <input type="text" value={editing.title} onChange={(e) => { setDirty(true); setEditing({ ...editing, title: e.target.value, slug: !editing.id ? e.target.value.toLowerCase().replace(/[^\w\u4e00-\u9fa5\s-]/g, '').replace(/[\s]+/g, '-').substring(0, 100) : editing.slug })}} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" /></div>
                   <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">摘要</label>
                     <textarea value={editing.excerpt || ''} onChange={(e) => setEditing({ ...editing, excerpt: e.target.value })} rows={3} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" /></div>
-                  <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">正文（HTML）</label>
-                    <textarea value={editing.content || ''} onChange={(e) => setEditing({ ...editing, content: e.target.value })} rows={14} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-accent focus:bg-white" /></div>
+                  <div>
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <label className="block font-mono text-xs uppercase tracking-wide text-text-secondary">正文（HTML）</label>
+                      <div className="flex items-center gap-1 rounded-md border border-border bg-bg-soft p-0.5">
+                        <button type="button" onClick={() => setPreviewMode(false)} className={cn('rounded px-2 py-1 text-[11px] font-medium transition', !previewMode ? 'bg-white text-text shadow-sm' : 'text-text-secondary')}>编辑</button>
+                        <button type="button" onClick={() => setPreviewMode(true)} className={cn('rounded px-2 py-1 text-[11px] font-medium transition', previewMode ? 'bg-white text-text shadow-sm' : 'text-text-secondary')}>预览</button>
+                      </div>
+                    </div>
+                    {!previewMode ? (
+                      <>
+                        <div className="mb-2 flex flex-wrap gap-1 rounded-md border border-border bg-bg-soft p-1.5">
+                          {[
+                            { label: 'B', title: '粗体', action: () => wrapSelection('<strong>', '</strong>') },
+                            { label: 'I', title: '斜体', action: () => wrapSelection('<em>', '</em>') },
+                            { label: 'H2', title: '二级标题', action: () => insertLinePrefix('## ') },
+                            { label: 'H3', title: '三级标题', action: () => insertLinePrefix('### ') },
+                            { label: '“ ”', title: '引用', action: () => insertLinePrefix('> ') },
+                            { label: '• 列表', title: '无序列表', action: () => insertLinePrefix('- ') },
+                            { label: '链接', title: '插入链接', action: () => wrapSelection('<a href="https://">', '</a>', '链接文字') },
+                            { label: '图片', title: '插入图片', action: () => wrapSelection('<img src="', '" alt="" />', 'https://') },
+                            { label: '</>', title: '代码块', action: () => insertLinePrefix('    ') },
+                            { label: '—', title: '分割线', action: () => insertLinePrefix('\n<hr />\n') },
+                          ].map((b) => (
+                            <button key={b.label} type="button" onClick={b.action} title={b.title} className="inline-flex h-8 min-w-8 items-center justify-center rounded px-2 text-xs font-medium text-text-secondary transition-colors hover:bg-white hover:text-text">
+                              {b.label}
+                            </button>
+                          ))}
+                        </div>
+                        <textarea ref={contentRef} value={editing.content || ''} onChange={(e) => { setDirty(true); setEditing({ ...editing, content: e.target.value }); }} rows={14} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-accent focus:bg-white" />
+                      </>
+                    ) : (
+                      <div className="prose max-w-none rounded-md border border-border bg-white px-4 py-3 text-sm text-text [overflow-wrap:anywhere]" dangerouslySetInnerHTML={{ __html: editing.content || '<p class="text-text-secondary">无内容</p>' }} />
+                    )}
+                  </div>
                 </div>
                 <aside className="space-y-4">
                   <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">Slug</label>
@@ -318,8 +450,12 @@ export default function PostManager() {
                     <select value={editing.status} onChange={(e) => setEditing({ ...editing, status: e.target.value as Post['status'] })} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white">
                       <option value="draft">草稿</option><option value="published">已发布</option><option value="archived">已归档</option>
                     </select></div>
-                  <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">封面图片 URL</label>
-                    <input type="text" value={editing.cover || ''} onChange={(e) => setEditing({ ...editing, cover: e.target.value })} placeholder="https://..." className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-accent focus:bg-white" />
+                  <div>
+                    <label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">封面图片</label>
+                    <div className="flex gap-2">
+                      <input type="text" value={editing.cover || ''} onChange={(e) => setEditing({ ...editing, cover: e.target.value })} placeholder="https://..." className="min-h-11 min-w-0 flex-1 rounded-md border border-border bg-bg-soft px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-accent focus:bg-white" />
+                      <button type="button" onClick={() => setMediaPickerOpen(true)} className="btn-ghost min-h-11 shrink-0 rounded-md px-3 text-xs" title="从媒体库选择">媒体库</button>
+                    </div>
                     {editing.cover && (() => { try { const u = new URL(editing.cover); if (u.protocol !== 'http:' && u.protocol !== 'https:') return null; } catch { return null; } return <img src={editing.cover} alt="封面预览" className="mt-3 aspect-video w-full rounded-md border border-border object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />; })()}
                   </div>
                   <div>
@@ -357,6 +493,36 @@ export default function PostManager() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {mediaPickerOpen && editing && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60] flex items-stretch justify-center overflow-y-auto glass-overlay p-0 sm:items-center sm:p-4" onClick={() => setMediaPickerOpen(false)}>
+            <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 18 }} onClick={(e) => e.stopPropagation()} className="card flex min-h-[var(--vvh,100dvh)] w-full max-w-3xl flex-col rounded-none p-4 sm:min-h-0 sm:max-h-[88vh] sm:rounded-md sm:p-5">
+              <div className="mb-4 flex items-center justify-between gap-3 border-b border-border pb-3">
+                <h2 className="text-base font-black text-text">从媒体库选择封面</h2>
+                <button onClick={() => setMediaPickerOpen(false)} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-text-secondary hover:bg-bg-soft hover:text-text" title="关闭" aria-label="关闭">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <MediaLibrary
+                  onSelect={(url) => { setDirty(true); setEditing((cur) => cur ? { ...cur, cover: url } : cur); setMediaPickerOpen(false); showToast('已选择封面', 'success'); }}
+                  onClose={() => setMediaPickerOpen(false)}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        danger
+        onConfirm={() => { confirmState.onConfirm(); setConfirmState(s => ({ ...s, open: false })); }}
+        onCancel={() => setConfirmState(s => ({ ...s, open: false }))}
+      />
     </div>
   );
 }

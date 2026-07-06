@@ -9,6 +9,10 @@ import HotArticles from '../components/sidebar/HotArticles';
 import RecentComments from '../components/sidebar/RecentComments';
 import FriendLinks from '../components/sidebar/FriendLinks';
 import MagicBento from '../components/reactbits/MagicBento';
+import CountUp from '../components/reactbits/CountUp';
+import Carousel from '../components/reactbits/Carousel';
+import ScrollFloat from '../components/reactbits/ScrollFloat';
+import ScrollVelocity from '../components/reactbits/ScrollVelocity';
 
 const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 
@@ -31,7 +35,7 @@ const [postsCount, tagsCount] = await Promise.all([
 ---
 
 <BaseLayout title="首页" description="欢迎来到胡巴的个人博客" mainClass="pt-0 sm:pt-0 sm:pb-8">
-  <aside class="floating-sidebar sidebar-left fixed left-6 top-28 z-30 hidden w-80 space-y-5 2xl:block" aria-label="固定分区导航">
+  <aside class="floating-sidebar sidebar-left fixed left-6 top-28 z-30 hidden w-72 space-y-5 xl:block" aria-label="固定分区导航">
     <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
       <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">站内导航</h3>
       <nav class="mt-4 grid gap-2 text-sm" aria-label="分区导航">
@@ -52,7 +56,7 @@ const [postsCount, tagsCount] = await Promise.all([
     </section>
   </aside>
 
-  <aside class="floating-sidebar sidebar-right fixed right-6 top-28 z-30 hidden w-80 space-y-5 2xl:block" aria-label="固定资料侧栏">
+  <aside class="floating-sidebar sidebar-right fixed right-6 top-28 z-30 hidden w-72 space-y-5 xl:block" aria-label="固定资料侧栏">
     <section class="side-panel overflow-hidden rounded-xl border border-zinc-200 bg-white p-6 shadow-2xl shadow-zinc-900/[0.06] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
       <div class="flex items-center gap-4">
         <div class="flex h-14 w-14 items-center justify-center rounded-lg bg-zinc-900 text-xl font-black text-white shadow-lg shadow-zinc-900/15 dark:bg-zinc-100 dark:text-zinc-950">B</div>
@@ -63,8 +67,8 @@ const [postsCount, tagsCount] = await Promise.all([
       </div>
       <p class="mt-5 text-sm leading-7 text-zinc-500 dark:text-zinc-400">技术、生活和偶尔冒出来的奇思妙想。</p>
       <div class="mt-5 grid gap-3 sm:grid-cols-2">
-        <div class="stat-tile rounded-lg bg-zinc-50 p-4 dark:bg-zinc-950/50"><div class="text-2xl font-black text-zinc-950 dark:text-zinc-50">{postsCount}</div><div class="text-xs text-zinc-500 dark:text-zinc-400">已发布文章</div></div>
-        <div class="stat-tile rounded-lg bg-zinc-50 p-4 dark:bg-zinc-950/50"><div class="text-2xl font-black text-zinc-950 dark:text-zinc-50">{tagsCount}</div><div class="text-xs text-zinc-500 dark:text-zinc-400">内容标签</div></div>
+        <div class="stat-tile rounded-lg bg-zinc-50 p-4 dark:bg-zinc-950/50"><div class="text-2xl font-black text-zinc-950 dark:text-zinc-50"><CountUp client:visible to={postsCount} duration={1.5} /></div><div class="text-xs text-zinc-500 dark:text-zinc-400">已发布文章</div></div>
+        <div class="stat-tile rounded-lg bg-zinc-50 p-4 dark:bg-zinc-950/50"><div class="text-2xl font-black text-zinc-950 dark:text-zinc-50"><CountUp client:visible to={tagsCount} duration={1.5} /></div><div class="text-xs text-zinc-500 dark:text-zinc-400">内容标签</div></div>
       </div>
     </section>
 
@@ -77,7 +81,7 @@ const [postsCount, tagsCount] = await Promise.all([
     </section>
   </aside>
 
-  <section class="journal-hero relative min-h-[var(--hero-min-h,100svh)] w-full overflow-hidden border-b border-zinc-200/70 px-[var(--page-pad,1rem)] pb-16 pt-[calc(var(--header-offset,4rem)+1.5rem)] shadow-sm dark:border-zinc-800/70 sm:px-6 lg:px-12 lg:pb-20 lg:pt-24 xl:px-16 2xl:px-[23rem]">
+  <section class="journal-hero relative min-h-[var(--hero-min-h,100svh)] w-full overflow-hidden border-b border-zinc-200/70 px-[var(--page-pad,1rem)] pb-16 pt-[calc(var(--header-offset,4rem)+1.5rem)] shadow-sm dark:border-zinc-800/70 sm:px-6 lg:px-12 lg:pb-20 lg:pt-24 xl:px-16 xl:px-[21rem]">
 
     <div class="absolute inset-0 overflow-hidden">
 
@@ -117,12 +121,12 @@ const [postsCount, tagsCount] = await Promise.all([
     </div>
   </section>
 
-  <section id="latest" class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-12 xl:px-16 2xl:px-[23rem]">
+  <section id="latest" class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-12 xl:px-16 xl:px-[21rem]">
     <div class="min-w-0">
       <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p class="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-400">Latest Notes</p>
-          <h2 class="mt-2 text-3xl font-black tracking-tight text-zinc-950 dark:text-zinc-50">最新文章</h2>
+          <h2 class="mt-2 text-3xl font-black tracking-tight text-zinc-950 dark:text-zinc-50"><ScrollFloat client:visible text="最新文章" /></h2>
           <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">最近发布的技术文章和思考。</p>
         </div>
         <a href="/posts" class="inline-flex min-h-10 w-fit items-center gap-1.5 rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 no-underline transition-all hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
@@ -133,7 +137,7 @@ const [postsCount, tagsCount] = await Promise.all([
       <PostList client:visible perPage={6} />
     </div>
 
-    <div class="mt-8 grid gap-5 lg:grid-cols-2 2xl:hidden">
+    <div class="mt-8 grid gap-5 lg:grid-cols-2 xl:hidden">
       <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
         <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">站内导航</h3>
         <div class="mt-4 grid gap-2">
@@ -150,7 +154,7 @@ const [postsCount, tagsCount] = await Promise.all([
       </section>
     </div>
 
-    <div class="mt-8 grid gap-5 lg:grid-cols-2 2xl:hidden">
+    <div class="mt-8 grid gap-5 lg:grid-cols-2 xl:hidden">
       <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
         <ProfileCard client:visible />
       </section>
@@ -158,32 +162,63 @@ const [postsCount, tagsCount] = await Promise.all([
         <HotArticles client:visible />
       </section>
     </div>
-    <div class="mt-5 2xl:hidden">
+    <div class="mt-5 xl:hidden">
       <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900"><RecentComments client:visible /></section>
       <section class="side-panel mt-5 rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900"><FriendLinks client:visible /></section>
     </div>
   </section>
 
-  <section class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-12 xl:px-16 2xl:px-[23rem]">
+  <div class="hidden xl:block">
+    <ScrollVelocity client:visible text="胡巴的博客 · 技术与生活 · Huba's Blog · " baseVelocity={1} />
+  </div>
+
+  <section class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-12 xl:px-16 xl:px-[21rem]">
     <div class="mb-8">
       <p class="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-400">探索</p>
-      <h2 class="mt-2 text-3xl font-black tracking-tight text-zinc-950 dark:text-zinc-50">探索更多</h2>
+      <h2 class="mt-2 text-3xl font-black tracking-tight text-zinc-950 dark:text-zinc-50"><ScrollFloat client:visible text="探索更多" /></h2>
       <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">发现博客的更多功能和内容。</p>
     </div>
     <div class="bento-wrapper">
-      <MagicBento
-        textAutoHide={true}
-        enableStars={true}
-        enableSpotlight={true}
-        enableBorderGlow={true}
-        enableTilt={true}
-        enableMagnetism={true}
-        clickEffect={true}
-        spotlightRadius={300}
-        particleCount={12}
-        glowColor="56, 189, 248"
-        client:only="react"
-      />
+      <!-- Mobile: Carousel, Desktop: MagicBento -->
+      <div class="sm:hidden">
+        <Carousel client:visible autoplay={true} autoplayInterval={4000}>
+          <a href="/posts" class="block rounded-xl border border-zinc-200 bg-white p-6 no-underline dark:border-zinc-800 dark:bg-zinc-900">
+            <span class="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">文章</span>
+            <h3 class="mt-2 text-lg font-bold text-zinc-950 dark:text-zinc-50">技术文章</h3>
+            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">深度技术解析与实践分享</p>
+          </a>
+          <a href="/tags" class="block rounded-xl border border-zinc-200 bg-white p-6 no-underline dark:border-zinc-800 dark:bg-zinc-900">
+            <span class="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">标签</span>
+            <h3 class="mt-2 text-lg font-bold text-zinc-950 dark:text-zinc-50">标签索引</h3>
+            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">按主题浏览所有内容</p>
+          </a>
+          <a href="/about" class="block rounded-xl border border-zinc-200 bg-white p-6 no-underline dark:border-zinc-800 dark:bg-zinc-900">
+            <span class="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">关于</span>
+            <h3 class="mt-2 text-lg font-bold text-zinc-950 dark:text-zinc-50">关于博主</h3>
+            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">了解写这些文字的人</p>
+          </a>
+          <a href="/login" class="block rounded-xl border border-zinc-200 bg-white p-6 no-underline dark:border-zinc-800 dark:bg-zinc-900">
+            <span class="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">登录</span>
+            <h3 class="mt-2 text-lg font-bold text-zinc-950 dark:text-zinc-50">登录入口</h3>
+            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">进入账号和后台页面</p>
+          </a>
+        </Carousel>
+      </div>
+      <div class="hidden sm:block">
+        <MagicBento
+          textAutoHide={true}
+          enableStars={true}
+          enableSpotlight={true}
+          enableBorderGlow={true}
+          enableTilt={true}
+          enableMagnetism={true}
+          clickEffect={true}
+          spotlightRadius={300}
+          particleCount={12}
+          glowColor="56, 189, 248"
+          client:only="react"
+        />
+      </div>
     </div>
   </section>
 </BaseLayout>

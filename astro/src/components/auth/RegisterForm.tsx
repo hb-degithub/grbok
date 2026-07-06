@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { usePocketBase } from '../../hooks/usePocketBase';
 import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
@@ -16,7 +16,14 @@ export default function RegisterForm() {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [status, setStatus] = useState<RegisterStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [success, setSuccess] = useState(false);
   const { registerReader } = usePocketBase();
+
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => { window.location.href = '/?verify_email_sent=1'; }, 500);
+    return () => clearTimeout(timer);
+  }, [success]);
 
   const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -66,15 +73,15 @@ export default function RegisterForm() {
     setStatus('loading');
     setErrorMessage('');
 
-    const { success } = await registerReader({
+    const { success: registerSuccess } = await registerReader({
       email: trimmedEmail,
       name: trimmedName,
       password,
       passwordConfirm,
     });
 
-    if (success) {
-      window.location.href = '/';
+    if (registerSuccess) {
+      setSuccess(true);
       return;
     }
 
@@ -94,6 +101,15 @@ export default function RegisterForm() {
   };
 
   return (
+    <AnimatePresence mode="wait">
+      {success ? (
+        <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }} className="flex flex-col items-center gap-3 py-8">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-500/10">
+            <svg className="h-7 w-7 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          </div>
+          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">注册成功</p>
+        </motion.div>
+      ) : (
     <motion.form
       key="register-form"
       variants={containerVariants}
@@ -167,7 +183,7 @@ export default function RegisterForm() {
       </motion.div>
 
       <motion.p variants={itemVariants} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm leading-snug text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-300 sm:px-4 sm:py-3">
-        注册后默认获得 reader 权限，后台权限需要超级管理员另行分配。
+        注册后默认获得 reader 权限，后台权限需要超级管理员另行分配。验证邮箱后即可发表评论。
       </motion.p>
 
       <motion.div variants={itemVariants}>
@@ -176,5 +192,7 @@ export default function RegisterForm() {
         </PixelButton>
       </motion.div>
     </motion.form>
+      )}
+    </AnimatePresence>
   );
 }

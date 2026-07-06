@@ -34,14 +34,14 @@ export default function AnnouncementBar() {
           exit={{ opacity: 0, height: 0 }}
           className={cn('border-b px-4 py-2.5 text-center text-sm', typeStyles[a.type] || typeStyles.normal)}
         >
-          <div className="mx-auto flex max-w-4xl items-center justify-center gap-3">
-            <span className="min-w-0">
+          <div className="mx-auto flex max-w-full sm:max-w-4xl items-center justify-center gap-3">
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap sm:whitespace-normal">
               {a.title && <span className="font-semibold">{a.title}：</span>}
               <span>{a.content}</span>
             </span>
             <button
               onClick={() => setClosed(prev => new Set([...prev, a.id]))}
-              className="shrink-0 rounded p-1 opacity-70 transition-opacity hover:opacity-100"
+              className="shrink-0 rounded p-2 sm:p-1 opacity-70 transition-opacity hover:opacity-100"
               aria-label="关闭公告"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

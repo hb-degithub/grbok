@@ -42,3 +42,11 @@
   border-radius: 6px;
   backdrop-filter: blur(4px);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .gridscan,
+  .gridscan * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

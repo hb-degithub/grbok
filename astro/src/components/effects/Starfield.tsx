@@ -49,6 +49,10 @@ export default function Starfield() {
 
     let raf = 0;
     const animate = () => {
+      if (document.hidden) {
+        raf = requestAnimationFrame(animate);
+        return;
+      }
       ctx.clearRect(0, 0, width, height);
       const now = Date.now();
       for (const s of stars) {

@@ -7,6 +7,15 @@ interface PostCardProps {
   index?: number;
 }
 
+const makeCardVariants = (index: number) => ({
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] },
+  },
+});
+
 /**
  * 文章卡片组件
  *
@@ -26,14 +35,7 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
 
   const readingTime = Math.max(1, Math.ceil((post.content?.length || 0) / 300));
 
-  const cardVariants = {
-    hidden: { opacity: 0, y: 16 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.45, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] },
-    },
-  };
+  const cardVariants = makeCardVariants(index);
 
   return (
     <motion.article variants={cardVariants} initial="hidden" animate="visible" className="group h-full">
@@ -59,10 +61,11 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
               <motion.img
                 src={post.cover}
                 alt={post.title}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover opacity-0 transition-opacity duration-500"
                 whileHover={{ scale: 1.05 }}
                 transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                 loading="lazy"
+                onLoad={(e) => { (e.target as HTMLImageElement).style.opacity = '1'; }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
             </div>

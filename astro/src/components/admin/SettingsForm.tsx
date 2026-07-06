@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
 import { DEFAULT_SITE_SETTINGS, mergeSettingRecords, type SiteSettings } from '../../lib/site-settings';
+import { showToast } from '../ui/Toast';
 
 const settingDescriptions: Record<keyof SiteSettings, string> = {
   site_title: '站点标题',
@@ -69,7 +70,7 @@ export default function SettingsForm() {
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
       console.error('保存设置失败：', err);
-      alert('保存设置失败。');
+      showToast('保存设置失败', 'error');
     } finally {
       setSaving(false);
     }

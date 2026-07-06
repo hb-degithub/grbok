@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import useBreakpoint from '../../hooks/useBreakpoint';
 import './PixelCard.css';
 
 class Pixel {
@@ -128,7 +129,7 @@ export default function PixelCard({ variant = 'default', gap, speed, colors, noF
   const pixelsRef = useRef([]);
   const animationRef = useRef(null);
   const timePreviousRef = useRef(performance.now());
-  const reducedMotion = useRef(typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches).current;
+  const { prefersReducedMotion: reducedMotion } = useBreakpoint();
 
   const variantCfg = VARIANTS[variant] || VARIANTS.default;
   const finalGap = gap ?? variantCfg.gap;
@@ -222,7 +223,7 @@ export default function PixelCard({ variant = 'default', gap, speed, colors, noF
       cancelAnimationFrame(animationRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finalGap, finalSpeed, finalColors, finalNoFocus]);
+  }, [finalGap, finalSpeed, finalColors, finalNoFocus, reducedMotion]);
 
   return (
     <div

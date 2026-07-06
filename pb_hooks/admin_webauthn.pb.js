@@ -20,6 +20,10 @@ function requireAdminCapable(c) {
   if (!user || ADMIN_CAPABLE_ROLES.indexOf(roleOf(user)) === -1) {
     throw new UnauthorizedError('Admin authentication required');
   }
+  // Enforce email verification for admin users
+  if (!user.verified()) {
+    throw new BadRequestError('管理员必须先验证邮箱');
+  }
   return user;
 }
 
@@ -27,6 +31,17 @@ function requireSuperAdmin(c) {
   const user = currentUser(c);
   if (!user || roleOf(user) !== SUPER_ADMIN_ROLE) {
     throw new UnauthorizedError('Super admin authentication required');
+  }
+  return user;
+}
+
+// Check email verification status for the current admin user.
+// This endpoint does NOT require emailVerified — it is used by the
+// frontend to determine whether to show the verification gate.
+function requireAdminCapableUnverified(c) {
+  const user = currentUser(c);
+  if (!user || ADMIN_CAPABLE_ROLES.indexOf(roleOf(user)) === -1) {
+    throw new UnauthorizedError('Admin authentication required');
   }
   return user;
 }
@@ -390,4 +405,13 @@ routerAdd('GET', '/api/blog-admin/webauthn/session', (c) => {
   }
   const result = verifySessionBinding(user.id, c);
   return c.json(200, result);
+});
+
+// Email verification status for admin users (does NOT require emailVerified)
+routerAdd('GET', '/api/blog-admin/email-verification-status', (c) => {
+  const user = requireAdminCapableUnverified(c);
+  return c.json(200, {
+    emailVerified: !!user.verified(),
+    email: user.get('email') || '',
+  });
 });

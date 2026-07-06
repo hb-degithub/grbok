@@ -1,9 +1,9 @@
-import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from 'framer-motion';
+import { motion, useMotionValue, useSpring, useTransform, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Children, cloneElement, useEffect, useMemo, useRef, useState } from 'react';
 
 import './Dock.css';
 
-function DockItem({ children, className = '', href, onClick, mouseX, spring, distance, magnification, baseItemSize, label, active, hasPopup, expanded }) {
+function DockItem({ children, className = '', href, onClick, mouseX, spring, distance, magnification, baseItemSize, label, active, hasPopup, expanded, prefersReducedMotion }) {
   const ref = useRef(null);
   const isHovered = useMotionValue(0);
 
@@ -27,15 +27,16 @@ function DockItem({ children, className = '', href, onClick, mouseX, spring, dis
 
   const Component = href ? motion.a : motion.button;
 
+  const reducedStyle = prefersReducedMotion
+    ? { width: baseItemSize, height: baseItemSize }
+    : { width: size, height: size };
+
   return (
     <Component
       ref={ref}
       href={href}
       type={href ? undefined : 'button'}
-      style={{
-        width: size,
-        height: size
-      }}
+      style={reducedStyle}
       onHoverStart={() => isHovered.set(1)}
       onHoverEnd={() => isHovered.set(0)}
       onFocus={() => isHovered.set(1)}
@@ -98,6 +99,7 @@ export default function Dock({
   dockHeight = 256,
   baseItemSize = 50
 }) {
+  const prefersReducedMotion = useReducedMotion();
   const mouseX = useMotionValue(Infinity);
   const isHovered = useMotionValue(0);
 
@@ -108,12 +110,18 @@ export default function Dock({
   const heightRow = useTransform(isHovered, [0, 1], [panelHeight, maxHeight]);
   const height = useSpring(heightRow, spring);
 
+  const outerStyle = prefersReducedMotion
+    ? { height: panelHeight, scrollbarWidth: 'none' }
+    : { height, scrollbarWidth: 'none' };
+
   return (
-    <motion.div style={{ height, scrollbarWidth: 'none' }} className="dock-outer">
+    <motion.div style={outerStyle} className="dock-outer">
       <motion.div
         onMouseMove={({ pageX }) => {
-          isHovered.set(1);
-          mouseX.set(pageX);
+          if (!prefersReducedMotion) {
+            isHovered.set(1);
+            mouseX.set(pageX);
+          }
         }}
         onMouseLeave={() => {
           isHovered.set(0);
@@ -139,6 +147,7 @@ export default function Dock({
             active={item.active}
             hasPopup={item.hasPopup}
             expanded={item.expanded}
+            prefersReducedMotion={prefersReducedMotion}
           >
             <DockIcon>{item.icon}</DockIcon>
             <DockLabel>{item.label}</DockLabel>

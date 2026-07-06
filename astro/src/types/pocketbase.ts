@@ -7,6 +7,7 @@ export interface User {
   avatar: string;
   role: UserRole;
   bio: string;
+  emailVerified: boolean;
   created: string;
   updated: string;
 }
@@ -153,4 +154,30 @@ export interface AdminPasskey {
   expand?: {
     owner?: User;
   };
+}
+
+export interface MediaAsset {
+  id: string;
+  file: string;
+  alt: string;
+  uploader: string;
+  size: number;
+  usage_count: number;
+  created: string;
+  updated: string;
+  expand?: {
+    uploader?: User;
+  };
+}
+
+export interface AuditLog {
+  id: string;
+  actor: string;
+  action: string;
+  target_collection: string;
+  target_id: string;
+  summary: string;
+  ip: string;
+  user_agent: string;
+  created: string;
 }

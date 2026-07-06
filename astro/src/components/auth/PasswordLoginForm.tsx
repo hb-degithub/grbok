@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
 import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
@@ -19,6 +19,17 @@ import {
 const loginLimiter = new RateLimiter(5, 1 / 12);
 const otpLimiter = new RateLimiter(3, 1 / 30);
 const adminRoles = new Set(['author', 'admin', 'super_admin']);
+
+const containerVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.08, ease: [0.16, 1, 0.3, 1] } },
+  exit: { opacity: 0, y: -16, transition: { duration: 0.25 } },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 12 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
+};
 
 function getPostLoginRedirect(role: unknown) {
   return typeof role === 'string' && adminRoles.has(role) ? '/admin' : '/';
@@ -63,7 +74,14 @@ export default function PasswordLoginForm() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'mfa-sending' | 'mfa-verifying' | 'error'>('idle');
   const [passkeyStep, setPasskeyStep] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [success, setSuccess] = useState(false);
   const isMfaStep = !!mfaId && !!otpId;
+
+  useEffect(() => {
+    if (!success) return;
+    const timer = setTimeout(() => { window.location.href = getPostLoginRedirect(undefined); }, 500);
+    return () => clearTimeout(timer);
+  }, [success]);
 
   const resetMfa = () => {
     setOtpCode('');
@@ -140,7 +158,7 @@ export default function PasswordLoginForm() {
       setStatus('idle');
       return;
     }
-    window.location.href = getPostLoginRedirect(role);
+    setSuccess(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -200,16 +218,6 @@ export default function PasswordLoginForm() {
     }
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0, y: 16 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.08, ease: [0.16, 1, 0.3, 1] } },
-    exit: { opacity: 0, y: -16, transition: { duration: 0.25 } },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 12 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
-  };
 
   if (passkeyStep) {
     return (
@@ -223,33 +231,46 @@ export default function PasswordLoginForm() {
   }
 
   return (
-    <motion.form key="password-form" variants={containerVariants} initial="hidden" animate="visible" exit="exit" onSubmit={handleSubmit} className="space-y-3 sm:space-y-4" noValidate>
-      <motion.div variants={itemVariants}>
-        <Input label="邮箱" type="email" placeholder="your@email.com" value={email} onChange={(e) => { setEmail(e.target.value); resetMfa(); if (status === 'error') setStatus('idle'); }} error={status === 'error' ? errorMessage : undefined} required autoComplete="email" />
-      </motion.div>
-
-      <motion.div variants={itemVariants}>
-        <Input label="密码" type="password" placeholder="输入密码" value={password} onChange={(e) => { setPassword(e.target.value); resetMfa(); if (status === 'error') setStatus('idle'); }} required autoComplete="current-password" />
-      </motion.div>
-
-      {isMfaStep && (
-        <motion.div variants={itemVariants} className="space-y-3 sm:space-y-4">
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm leading-snug text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200 sm:px-4 sm:py-3" role="status" aria-live="polite">
-            当前账号已启用二次验证，验证码已发送到邮箱。
+    <AnimatePresence mode="wait">
+      {success ? (
+        <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }} className="flex flex-col items-center gap-3 py-8">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-500/10">
+            <svg className="h-7 w-7 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
           </div>
-          <Input label="二次验证码" type="text" inputMode="numeric" placeholder="输入邮箱验证码" value={otpCode} onChange={(e) => { setOtpCode(e.target.value); if (status === 'error') setStatus('idle'); }} error={status === 'error' ? errorMessage : undefined} required autoComplete="one-time-code" />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <PixelButton type="button" onClick={() => requestMfaCode()} disabled={status === 'mfa-sending' || status === 'mfa-verifying'} variant="secondary">{status === 'mfa-sending' ? '发送中...' : '重新发送'}</PixelButton>
-            <PixelButton type="button" onClick={resetMfa} disabled={status === 'mfa-verifying'} variant="secondary">返回密码</PixelButton>
-          </div>
+          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">登录成功</p>
+        </motion.div>
+      ) : (
+        <motion.div key="form" initial={false} exit={{ opacity: 0, scale: 0.95 }}>
+          <motion.form key="password-form" variants={containerVariants} initial="hidden" animate="visible" exit="exit" onSubmit={handleSubmit} className="space-y-3 sm:space-y-4" noValidate>
+            <motion.div variants={itemVariants}>
+              <Input label="邮箱" type="email" placeholder="your@email.com" value={email} onChange={(e) => { setEmail(e.target.value); resetMfa(); if (status === 'error') setStatus('idle'); }} error={status === 'error' ? errorMessage : undefined} required autoComplete="email" />
+            </motion.div>
+
+            <motion.div variants={itemVariants}>
+              <Input label="密码" type="password" placeholder="输入密码" value={password} onChange={(e) => { setPassword(e.target.value); resetMfa(); if (status === 'error') setStatus('idle'); }} required autoComplete="current-password" />
+            </motion.div>
+
+            {isMfaStep && (
+              <motion.div variants={itemVariants} className="space-y-3 sm:space-y-4">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm leading-snug text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200 sm:px-4 sm:py-3" role="status" aria-live="polite">
+                  当前账号已启用二次验证，验证码已发送到邮箱。
+                </div>
+                <Input label="二次验证码" type="text" inputMode="numeric" placeholder="输入邮箱验证码" value={otpCode} onChange={(e) => { setOtpCode(e.target.value); if (status === 'error') setStatus('idle'); }} error={status === 'error' ? errorMessage : undefined} required autoComplete="one-time-code" />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <PixelButton type="button" onClick={() => requestMfaCode()} disabled={status === 'mfa-sending' || status === 'mfa-verifying'} variant="secondary">{status === 'mfa-sending' ? '发送中...' : '重新发送'}</PixelButton>
+                  <PixelButton type="button" onClick={resetMfa} disabled={status === 'mfa-verifying'} variant="secondary">返回密码</PixelButton>
+                </div>
+              </motion.div>
+            )}
+
+            <motion.div variants={itemVariants}>
+              <PixelButton type="submit" loading={status === 'loading' || status === 'mfa-verifying'} variant="primary">
+                {isMfaStep ? status === 'mfa-verifying' ? '验证中...' : '验证并登录' : status === 'loading' ? '登录中...' : '登录'}
+              </PixelButton>
+            </motion.div>
+          </motion.form>
         </motion.div>
       )}
-
-      <motion.div variants={itemVariants}>
-        <PixelButton type="submit" loading={status === 'loading' || status === 'mfa-verifying'} variant="primary">
-          {isMfaStep ? status === 'mfa-verifying' ? '验证中...' : '验证并登录' : status === 'loading' ? '登录中...' : '登录'}
-        </PixelButton>
-      </motion.div>
-    </motion.form>
+    </AnimatePresence>
   );
 }
