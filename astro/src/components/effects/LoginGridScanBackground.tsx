@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react';
-import { GridScan } from '../reactbits/GridScan';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import './LoginGridScanBackground.css';
+
+// Lazy-load GridScan so the three.js + postprocessing vendor chunk (~700KB)
+// streams in AFTER the login form renders. The background is decorative; the
+// form is the functional content and must paint first.
+const GridScan = lazy(() => import('../reactbits/GridScan').then(m => ({ default: m.GridScan })));
 
 type Theme = 'light' | 'dark';
 
@@ -82,13 +86,15 @@ export default function LoginGridScanBackground() {
 
   return (
     <div className={`login-gridscan-bg${isDark ? ' login-gridscan-bg--night' : ' login-gridscan-bg--day'}`} aria-hidden="true">
-      <GridScan
-        enableWebcam={false}
-        showPreview={false}
-        sensitivity={0.42}
-        enablePost
-        {...props}
-      />
+      <Suspense fallback={null}>
+        <GridScan
+          enableWebcam={false}
+          showPreview={false}
+          sensitivity={0.42}
+          enablePost
+          {...props}
+        />
+      </Suspense>
     </div>
   );
 }

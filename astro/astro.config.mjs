@@ -29,6 +29,23 @@ export default defineConfig({
 
   vite: {
     plugins: [tailwindcss(), buildStampPlugin()],
+    build: {
+      // Split heavy vendor libraries into separate chunks so pages that don't use
+      // them (every page except login/home) don't pay the download cost.
+      // three+postprocessing (~700KB) only load on /login; ogl/gsap only on home.
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return;
+            if (/[\\/]node_modules[\\/](three|postprocessing)[\\/]/.test(id)) return 'three-vendor';
+            if (/[\\/]node_modules[\\/]ogl[\\/]/.test(id)) return 'ogl-vendor';
+            if (/[\\/]node_modules[\\/]gsap[\\/]/.test(id)) return 'gsap-vendor';
+            if (/[\\/]node_modules[\\/]framer-motion[\\/]/.test(id)) return 'framer-vendor';
+            if (/[\\/]node_modules[\\/]pocketbase[\\/]/.test(id)) return 'pocketbase-vendor';
+          },
+        },
+      },
+    },
   },
 
   integrations: [

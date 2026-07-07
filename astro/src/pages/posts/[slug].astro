@@ -87,7 +87,7 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
       <!-- Mobile TOC -->
       {headings.length > 0 && (
         <div class="mb-6 lg:hidden">
-          <TableOfContents client:load headings={headings} />
+          <TableOfContents client:idle headings={headings} />
         </div>
       )}
 
@@ -168,7 +168,7 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
         <!-- Desktop TOC sidebar -->
         {headings.length > 0 && (
           <aside class="hidden lg:block w-52 shrink-0 sticky top-[calc(var(--header-offset,4rem)+2rem)] self-start max-h-[calc(100vh-8rem)]">
-            <TableOfContents client:load headings={headings} />
+            <TableOfContents client:idle headings={headings} />
           </aside>
         )}
       </div>
