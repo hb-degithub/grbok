@@ -1,9 +1,9 @@
-import React, { useState, Children, useRef, useLayoutEffect } from 'react';
+import React, { useState, Children, useRef, useLayoutEffect, useImperativeHandle, forwardRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 
 import './Stepper.css';
 
-export default function Stepper({
+const Stepper = forwardRef(function Stepper({
   children,
   initialStep = 1,
   onStepChange = () => {},
@@ -18,9 +18,10 @@ export default function Stepper({
   nextButtonText = 'Continue',
   completeButtonText = 'Complete',
   disableStepIndicators = false,
+  hideFooterNext,
   renderStepIndicator,
   ...rest
-}) {
+}, ref) {
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [direction, setDirection] = useState(0);
   const stepsArray = Children.toArray(children);
@@ -55,6 +56,23 @@ export default function Stepper({
     setDirection(1);
     updateStep(totalSteps + 1);
   };
+
+  // Expose imperative navigation so parent components can advance the stepper
+  // after an async action (e.g. registration success) without coupling step
+  // logic into this generic component.
+  useImperativeHandle(ref, () => ({
+    next: handleNext,
+    back: handleBack,
+    complete: handleComplete,
+    goTo: (step) => {
+      if (step >= 1 && step <= totalSteps + 1) {
+        setDirection(step > currentStep ? 1 : -1);
+        updateStep(step);
+      }
+    },
+  }), [currentStep, isLastStep, totalSteps]);
+
+  const shouldHideNext = typeof hideFooterNext === 'function' ? hideFooterNext(currentStep) : false;
 
   return (
     <div className="stepper-outer-container" {...rest}>
@@ -102,7 +120,7 @@ export default function Stepper({
 
         {!isCompleted && (
           <div className={`stepper-footer-container ${footerClassName}`}>
-            <div className={`stepper-footer-nav ${currentStep !== 1 ? 'spread' : 'end'}`}>
+            <div className={`stepper-footer-nav ${currentStep !== 1 ? 'spread' : shouldHideNext ? 'spread' : 'end'}`}>
               {currentStep !== 1 && (
                 <button
                   onClick={handleBack}
@@ -112,16 +130,20 @@ export default function Stepper({
                   {backButtonText}
                 </button>
               )}
-              <button onClick={isLastStep ? handleComplete : handleNext} className="stepper-next-button" {...nextButtonProps}>
-                {isLastStep ? completeButtonText : nextButtonText}
-              </button>
+              {!shouldHideNext && (
+                <button onClick={isLastStep ? handleComplete : handleNext} className="stepper-next-button" {...nextButtonProps}>
+                  {isLastStep ? completeButtonText : nextButtonText}
+                </button>
+              )}
             </div>
           </div>
         )}
       </div>
     </div>
   );
-}
+});
+
+export default Stepper;
 
 function StepContentWrapper({ isCompleted, currentStep, direction, children, className }) {
   const [parentHeight, setParentHeight] = useState(0);

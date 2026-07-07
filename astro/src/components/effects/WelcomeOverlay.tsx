@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Stepper, { Step } from '../reactbits/Stepper';
 import SplitText from '../reactbits/SplitText';
@@ -44,6 +44,17 @@ export default function WelcomeOverlay() {
   const { isMobile } = useBreakpoint();
   const spotlightSize = isMobile ? 120 : 180;
   const [isLandscapePhone, setIsLandscapePhone] = useState(false);
+
+  // Imperative handle into the Stepper so we can advance it after async
+  // registration succeeds — the registration step has no footer "next" button,
+  // so the only way forward is a successful register (auto-advances) or the
+  // explicit "skip registration" confirmation.
+  const stepperRef = useRef(null);
+
+  // Step 4 is the registration step (only present for logged-out users).
+  // The email-verification step that follows only renders after regStatus ===
+  // 'success', so the registration step number stays 4 regardless.
+  const registrationStepNumber = 4;
 
   useEffect(() => {
     const checkLandscape = () => {
@@ -134,6 +145,12 @@ export default function WelcomeOverlay() {
     if (success) {
       setRegisteredEmail(trimmedEmail);
       setRegStatus('success');
+      // Auto-advance to the email-verification step now that the registration
+      // step's success UI has rendered. Deferred so the success state paints
+      // before the slide transition kicks in.
+      setTimeout(() => {
+        stepperRef.current?.next();
+      }, 600);
     } else {
       setRegStatus('error');
       setRegError('注册失败，邮箱可能已被注册');
@@ -175,11 +192,13 @@ export default function WelcomeOverlay() {
             className={isLandscapePhone ? 'w-full max-w-lg max-h-[90dvh] overflow-y-auto p-4' : 'w-full max-w-lg'}
           >
             <Stepper
+              ref={stepperRef}
               initialStep={1}
               onFinalStepCompleted={handleFinalStep}
               backButtonText="上一步"
               nextButtonText="下一步"
               completeButtonText="开始探索"
+              hideFooterNext={(step) => !isLoggedIn && step === registrationStepNumber}
               stepCircleContainerClassName={isLandscapePhone ? 'landscape-compact' : ''}
               footerClassName={isLandscapePhone ? 'landscape-compact' : ''}
             >
