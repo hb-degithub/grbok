@@ -15,15 +15,16 @@ function getHeader(e, name) {
 }
 
 function getClientIP(e) {
+  // Prefer PocketBase's trusted realIP() over spoofable X-Forwarded-For.
+  try {
+    const real = e.httpContext?.realIP?.();
+    if (real && real.trim()) return real.trim();
+  } catch (_) {}
   const realIP = getHeader(e, 'X-Real-IP');
   if (realIP) return realIP.trim();
   const forwarded = getHeader(e, 'X-Forwarded-For');
   if (forwarded) return forwarded.split(',')[0].trim();
-  try {
-    return e.httpContext?.realIP?.() || '';
-  } catch (_) {
-    return '';
-  }
+  return '';
 }
 
 function rateLimit(key, maxAttempts) {

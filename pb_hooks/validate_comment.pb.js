@@ -34,15 +34,16 @@ onRecordBeforeCreateRequest((e) => {
   };
 
   const getClientIP = () => {
+    // Prefer PocketBase's trusted realIP() over spoofable X-Forwarded-For.
+    try {
+      const real = e.httpContext?.realIP?.();
+      if (real && real.trim()) return real.trim();
+    } catch (_) {}
     const forwarded = getHeader('X-Forwarded-For');
     if (forwarded) return forwarded.split(',')[0].trim();
     const real = getHeader('X-Real-IP');
     if (real) return real.trim();
-    try {
-      return e.httpContext?.realIP?.() || '';
-    } catch (_) {
-      return '';
-    }
+    return '';
   };
 
   const rateLimit = (key, limit, windowMs) => {
@@ -86,15 +87,46 @@ onRecordBeforeCreateRequest((e) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(authorEmail)) throw new BadRequestError('Invalid email format.');
   if (hasSpamPattern(content)) throw new BadRequestError('Comment contains suspicious content.');
 
-  // If the author_email belongs to a registered user, that user must have verified email
+  // H4/H5: anti-impersonation + side-channel elimination.
+  // If author_email belongs to a registered user, the requester MUST be
+  // authenticated as that exact user. An anonymous (or different) requester
+  // using a registered user's email is an impersonation attempt — we must NOT
+  // let it be published as that user. To avoid revealing that the email is
+  // registered (which would let an attacker enumerate accounts), we do NOT
+  // throw a distinguishable error: we silently accept the comment into the
+  // pending moderation queue, with a response identical to the unregistered
+  // anonymous path. The admin reviews it; it is never auto-published.
+  let ownerUser = null;
   try {
-    const existingUser = $app.dao().findFirstRecordByFilter('users', 'email = {:email}', { email: authorEmail.toLowerCase() });
-    if (existingUser && !existingUser.verified()) {
+    ownerUser = $app.dao().findFirstRecordByFilter('users', 'email = {:email}', { email: authorEmail.toLowerCase() });
+  } catch (_) {
+    // No matching user — legitimate anonymous comment, fall through.
+  }
+
+  let impersonationAttempt = false;
+  if (ownerUser) {
+    let authed = null;
+    if (e.auth) {
+      authed = e.auth;
+    } else {
+      try {
+        if (typeof $apis !== 'undefined' && e.httpContext) {
+          const info = $apis.requestInfo(e.httpContext);
+          authed = info.auth || info.authRecord || null;
+        }
+      } catch (_) {}
+    }
+
+    if (!authed || authed.id !== ownerUser.id) {
+      // Anonymous or wrong-user comment using a registered email. Silently
+      // force into pending; response stays identical to the anonymous path.
+      impersonationAttempt = true;
+    } else if (!ownerUser.verified()) {
+      // Authenticated owner but email not verified — keep the verification
+      // gate. No side-channel: the requester is the account owner and
+      // already knows the email is registered.
       throw new BadRequestError('请先验证你的邮箱后再发表评论');
     }
-  } catch (err) {
-    if (err instanceof BadRequestError) throw err;
-    // No matching user found — anonymous comment, allow it
   }
 
   const post = findRecord('posts', postId);
@@ -129,7 +161,11 @@ onRecordBeforeCreateRequest((e) => {
   record.set('author_name', authorName);
   record.set('author_email', authorEmail);
   record.set('content', content);
-  record.set('status', boolSetting('comment_moderation', true) ? 'pending' : 'approved');
+  // Impersonation attempts are never auto-published, even when moderation is
+  // disabled — they must pass admin review. Legitimate comments respect the
+  // moderation setting as before.
+  const baseStatus = boolSetting('comment_moderation', true) ? 'pending' : 'approved';
+  record.set('status', impersonationAttempt ? 'pending' : baseStatus);
   record.set('ip_address', ip || '');
 
   if (typeof e.next === 'function') e.next();

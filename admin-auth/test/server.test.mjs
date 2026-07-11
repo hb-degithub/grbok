@@ -1,4 +1,4 @@
-﻿import { describe, it, before, after } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from '../src/server.mjs';
 
@@ -69,6 +69,16 @@ describe('server', () => {
       body: JSON.stringify({}),
     });
     assert.equal(res.status, 403);
+  });
+
+  it('rejects request bodies larger than 1 MiB', async () => {
+    const res = await fetch(`${baseUrl}/internal/webauthn/registration/options`, {
+      method: 'POST',
+      headers: { 'X-Internal-Secret': config.internalSecret, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payload: 'x'.repeat(1024 * 1024) }),
+    });
+    assert.equal(res.status, 413);
+    assert.deepEqual(await res.json(), { error: 'Request body too large' });
   });
 
   it('POST /internal/webauthn/registration/options forwards to service', async () => {

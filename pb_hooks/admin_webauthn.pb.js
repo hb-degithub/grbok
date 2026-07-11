@@ -91,7 +91,13 @@ function writeAuditLog({ userId, action, targetCollection, targetId, summary, ip
     record.set('ip', redactIp(ip));
     $app.dao().saveRecord(record);
   } catch (err) {
-    console.error('audit log error:', err);
+    // Surface audit-write failures to stderr with a clear marker so operators
+    // can alert on them. The main operation still proceeds — audit logging
+    // must never break the user-facing flow — but a silent swallow would hide
+    // a broken audit trail.
+    console.error('[audit-write-failed]', JSON.stringify({
+      action, targetCollection, targetId, error: String(err && err.message || err),
+    }));
   }
 }
 
@@ -140,14 +146,30 @@ function consumeChallenge(userId, purpose) {
     throw new BadRequestError('Invalid user ID format');
   }
   const now = new Date().toISOString();
-  const filter = `user = '${userId}' && purpose = '${purpose}' && expires_at > '${now}'`;
-  const records = $app.dao().findRecordsByFilter('webauthn_challenges', filter, '-created', 1);
-  if (records.length === 0) {
+  // Atomic challenge consumption: find + delete inside a transaction so two
+  // concurrent verify requests cannot both consume the same challenge. The
+  // transaction serializes the read-modify-delete; the second concurrent call
+  // finds no record (already deleted) and throws.
+  let consumed = null;
+  $app.dao().runInTransaction((txDao) => {
+    const filter = "user = {:userId} && purpose = {:purpose} && expires_at > {:now}";
+    const records = txDao.findRecordsByFilter(
+      'webauthn_challenges',
+      filter,
+      '-created',
+      1,
+      0,
+      { userId, purpose, now }
+    );
+    if (!records || records.length === 0) return;
+    const record = records[0];
+    txDao.deleteRecord(record);
+    consumed = record;
+  });
+  if (!consumed) {
     throw new BadRequestError('Challenge not found or expired');
   }
-  const record = records[0];
-  $app.dao().deleteRecord(record);
-  return record.get('challenge');
+  return consumed.get('challenge');
 }
 
 function saveVerifiedSession(session) {
@@ -169,8 +191,8 @@ function findPasskeyByCredentialId(credentialId) {
   if (!credentialId || !/^[A-Za-z0-9_-]+$/.test(credentialId)) {
     throw new BadRequestError('Invalid credential ID format');
   }
-  const filter = `credential_id = '${credentialId}' && revoked_at = null`;
-  const records = $app.dao().findRecordsByFilter('admin_passkeys', filter, '-created', 1);
+  const filter = "credential_id = {:credentialId} && revoked_at = null";
+  const records = $app.dao().findRecordsByFilter('admin_passkeys', filter, '-created', 1, 0, { credentialId });
   return records.length > 0 ? records[0] : null;
 }
 
@@ -178,8 +200,8 @@ function listActivePasskeys(userId) {
   if (!userId || !/^[a-zA-Z0-9]{15}$/.test(userId)) {
     throw new BadRequestError('Invalid user ID format');
   }
-  const filter = `owner = '${userId}' && revoked_at = null`;
-  return $app.dao().findRecordsByFilter('admin_passkeys', filter, '-created', 100);
+  const filter = "owner = {:userId} && revoked_at = null";
+  return $app.dao().findRecordsByFilter('admin_passkeys', filter, '-created', 100, 0, { userId });
 }
 
 function buildAllowCredentials(userId) {
@@ -205,8 +227,8 @@ function verifySessionBinding(userId, c) {
   }
 
   const now = new Date().toISOString();
-  const filter = `user = '${userId}' && revoked_at = null && expires_at > '${now}'`;
-  const records = $app.dao().findRecordsByFilter('admin_verified_sessions', filter, '-expires_at', 1);
+  const filter = "user = {:userId} && revoked_at = null && expires_at > {:now}";
+  const records = $app.dao().findRecordsByFilter('admin_verified_sessions', filter, '-expires_at', 1, 0, { userId, now });
   if (records.length === 0) {
     return { verified: false };
   }
@@ -372,12 +394,14 @@ routerAdd('POST', '/api/blog-admin/webauthn/authenticate/verify', (c) => {
   });
 });
 
-// Prevent modification of credential_id and public_key on admin_passkeys update.
-// These fields must only be set during WebAuthn registration; allowing direct
-// API modification would bypass the registration ceremony.
+// Prevent modification of credential_id, public_key, and owner on admin_passkeys
+// update. credential_id/public_key must only be set during WebAuthn registration;
+// owner is the trust anchor tying a passkey to a user — allowing it to be
+// reassigned would let an attacker transfer a passkey to another account (or
+// attach their passkey to a victim admin) without going through registration.
 onRecordBeforeUpdateRequest((e) => {
   const record = e.record;
-  const PROTECTED_FIELDS = ['credential_id', 'public_key'];
+  const PROTECTED_FIELDS = ['credential_id', 'public_key', 'owner'];
 
   // Fetch the stored record to compare against pre-update values
   let stored;

@@ -78,6 +78,10 @@ export function createServer({ config, webauthnService }) {
 
       sendJson(res, 200, result);
     } catch (err) {
+      if (err && err.message === 'PAYLOAD_TOO_LARGE') {
+        sendJson(res, 413, { error: 'Request body too large' });
+        return;
+      }
       console.error('admin-auth server error:', err);
       sendJson(res, 500, { error: 'Internal server error' });
     }
@@ -85,8 +89,17 @@ export function createServer({ config, webauthnService }) {
 }
 
 async function readJson(req) {
+  // Cap request body size to protect the internal service from memory
+  // exhaustion via oversized JSON payloads. 1 MiB is far above any legitimate
+  // WebAuthn options/assertion payload.
+  const MAX_BODY_BYTES = 1 * 1024 * 1024;
   const chunks = [];
+  let total = 0;
   for await (const chunk of req) {
+    total += chunk.length;
+    if (total > MAX_BODY_BYTES) {
+      throw new Error('PAYLOAD_TOO_LARGE');
+    }
     chunks.push(chunk);
   }
   const text = Buffer.concat(chunks).toString('utf-8');
@@ -106,6 +119,12 @@ function sendJson(res, status, body) {
 export function startServer({
   config = createConfig(),
   adapter = simpleWebAuthnAdapter,
+  // Bind to 0.0.0.0 so the PocketBase container can reach this service over
+  // the Docker bridge network (PB connects to http://admin-auth:8787). This
+  // is NOT a host exposure: docker-compose uses `expose:` (not `ports:`), so
+  // 8787 is only reachable inside the Docker network. Every request is still
+  // authenticated by the shared X-Internal-Secret. Do not change to 127.0.0.1
+  // unless running admin-auth in the same network namespace as PocketBase.
   host = env.HOST || '0.0.0.0',
   port = parseInt(env.PORT || '8787', 10),
 } = {}) {

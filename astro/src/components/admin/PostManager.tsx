@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
 import { cn } from '../../lib/utils';
+import { sanitizeHtml } from '../../lib/security';
 import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import MediaLibrary from './MediaLibrary';
@@ -439,7 +440,7 @@ export default function PostManager() {
                         <textarea ref={contentRef} value={editing.content || ''} onChange={(e) => { setDirty(true); setEditing({ ...editing, content: e.target.value }); }} rows={14} className="min-h-11 w-full rounded-md border border-border bg-bg-soft px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-accent focus:bg-white" />
                       </>
                     ) : (
-                      <div className="prose max-w-none rounded-md border border-border bg-white px-4 py-3 text-sm text-text [overflow-wrap:anywhere]" dangerouslySetInnerHTML={{ __html: editing.content || '<p class="text-text-secondary">无内容</p>' }} />
+                      <div className="prose max-w-none rounded-md border border-border bg-white px-4 py-3 text-sm text-text [overflow-wrap:anywhere]" dangerouslySetInnerHTML={{ __html: sanitizeHtml(editing.content || '') || '<p class="text-text-secondary">无内容</p>' }} />
                     )}
                   </div>
                 </div>

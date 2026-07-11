@@ -11,6 +11,7 @@ services:
     expose:
       - "8787"
     environment:
+      - NODE_ENV=production
       - ADMIN_AUTH_INTERNAL_SECRET=${ADMIN_AUTH_INTERNAL_SECRET}
       - ADMIN_AUTH_HASH_SECRET=${ADMIN_AUTH_HASH_SECRET}
       - ADMIN_AUTH_RP_ID=${ADMIN_AUTH_RP_ID:-localhost}

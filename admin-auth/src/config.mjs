@@ -1,6 +1,13 @@
 ﻿import { env } from 'node:process';
 
 export function createConfig() {
+  // Fail fast in development mode: stack traces and Verbose errors leak
+  // internals, and the dev runtime is slower. Production is the only mode
+  // this service should run in.
+  if (env.NODE_ENV && env.NODE_ENV !== 'production') {
+    throw new Error(`admin-auth must run with NODE_ENV=production (got "${env.NODE_ENV}")`);
+  }
+
   const secret = env.ADMIN_AUTH_INTERNAL_SECRET;
   if (!secret || secret.length < 32) {
     throw new Error('ADMIN_AUTH_INTERNAL_SECRET must be at least 32 characters');

@@ -103,8 +103,11 @@ function writeAudit({ actorId, actorRole, action, collection, recordId, summary,
     }
     $app.dao().saveRecord(rec);
   } catch (err) {
-    // Never let audit logging break the actual operation
-    console.error('audit log error:', err);
+    // Never let audit logging break the actual operation, but surface the
+    // failure with a clear marker so a broken audit trail is detectable.
+    console.error('[audit-write-failed]', JSON.stringify({
+      action, collection, recordId, error: String(err && err.message || err),
+    }));
   }
 }
 

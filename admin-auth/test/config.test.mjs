@@ -7,7 +7,9 @@ describe('createConfig', () => {
     const previousInternalSecret = process.env.ADMIN_AUTH_INTERNAL_SECRET;
     const previousHashSecret = process.env.ADMIN_AUTH_HASH_SECRET;
     const previousRpName = process.env.ADMIN_AUTH_RP_NAME;
+    const previousNodeEnv = process.env.NODE_ENV;
 
+    process.env.NODE_ENV = 'production';
     process.env.ADMIN_AUTH_INTERNAL_SECRET = 'i'.repeat(32);
     process.env.ADMIN_AUTH_HASH_SECRET = 'h'.repeat(32);
     delete process.env.ADMIN_AUTH_RP_NAME;
@@ -19,6 +21,18 @@ describe('createConfig', () => {
       restoreEnv('ADMIN_AUTH_INTERNAL_SECRET', previousInternalSecret);
       restoreEnv('ADMIN_AUTH_HASH_SECRET', previousHashSecret);
       restoreEnv('ADMIN_AUTH_RP_NAME', previousRpName);
+      restoreEnv('NODE_ENV', previousNodeEnv);
+    }
+  });
+
+  it('rejects non-production mode', () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+
+    try {
+      assert.throws(() => createConfig(), /NODE_ENV=production/);
+    } finally {
+      restoreEnv('NODE_ENV', previousNodeEnv);
     }
   });
 });
