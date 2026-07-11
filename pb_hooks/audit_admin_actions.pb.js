@@ -1,3 +1,4 @@
+(function () {
 /// <reference path="../pb_data/types.d.ts" />
 
 // Audit logging hook — records create/update/delete events for admin-managed
@@ -146,3 +147,4 @@ function logEvent(e, action) {
 onRecordAfterCreateRequest((e) => logEvent(e, 'create'));
 onRecordAfterUpdateRequest((e) => logEvent(e, 'update'));
 onRecordAfterDeleteRequest((e) => logEvent(e, 'delete'));
+})();

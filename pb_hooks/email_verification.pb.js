@@ -1,3 +1,4 @@
+(function () {
 /// <reference path="../pb_data/types.d.ts" />
 
 // Email verification management: auto-send on registration,
@@ -80,3 +81,4 @@ onRecordAfterConfirmVerificationRequest((e) => {
   }
   if (typeof e.next === 'function') e.next();
 }, 'users');
+})();

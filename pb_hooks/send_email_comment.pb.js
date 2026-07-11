@@ -1,4 +1,5 @@
-﻿function escapeHtml(value) {
+(function () {
+function escapeHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -66,3 +67,4 @@ onRecordAfterCreateRequest((e) => {
     console.error('[comment-mail] failed:', err);
   }
 }, 'comments');
+})();

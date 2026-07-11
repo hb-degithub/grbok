@@ -1,3 +1,4 @@
+(function () {
 /// <reference path="../pb_data/types.d.ts" />
 
 // 密码登录速率限制 — per-IP + per-email
@@ -91,3 +92,4 @@ onAdminBeforeAuthWithPasswordRequest((e) => {
 onAdminAfterAuthWithPasswordRequest((e) => {
   clearAttempts(e);
 });
+})();

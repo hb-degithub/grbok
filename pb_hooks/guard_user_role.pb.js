@@ -1,3 +1,4 @@
+(function () {
 const USER_ROLES = ['reader', 'author', 'admin', 'super_admin'];
 
 function next(e) {
@@ -98,3 +99,4 @@ onRecordBeforeDeleteRequest((e) => {
   }
   next(e);
 }, 'users');
+})();

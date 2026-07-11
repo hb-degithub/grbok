@@ -1,4 +1,5 @@
-﻿const ADMIN_CAPABLE_ROLES = ['author', 'admin', 'super_admin'];
+(function () {
+const ADMIN_CAPABLE_ROLES = ['author', 'admin', 'super_admin'];
 const SUPER_ADMIN_ROLE = 'super_admin';
 const CHALLENGE_TTL_MINUTES = 5;
 
@@ -439,3 +440,4 @@ routerAdd('GET', '/api/blog-admin/email-verification-status', (c) => {
     email: user.get('email') || '',
   });
 });
+})();

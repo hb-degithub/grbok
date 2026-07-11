@@ -1,3 +1,4 @@
+(function () {
 /// <reference path="../pb_data/types.d.ts" />
 
 // Auto-configure SMTP from environment variables on PocketBase startup.
@@ -70,4 +71,5 @@
   } catch (err) {
     console.error('[smtp] Auto-config failed:', err);
   }
+})();
 })();

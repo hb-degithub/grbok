@@ -1,3 +1,4 @@
+(function () {
 const MAX_NESTING_DEPTH = 5;
 
 onRecordBeforeCreateRequest((e) => {
@@ -170,3 +171,4 @@ onRecordBeforeCreateRequest((e) => {
 
   if (typeof e.next === 'function') e.next();
 }, 'comments');
+})();

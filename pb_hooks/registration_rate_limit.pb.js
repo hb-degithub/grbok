@@ -1,3 +1,4 @@
+(function () {
 /// <reference path="../pb_data/types.d.ts" />
 
 // 用户注册速率限制 — per-IP
@@ -76,3 +77,4 @@ onRecordBeforeCreateRequest((e) => {
 
   if (typeof e.next === 'function') e.next();
 }, 'users');
+})();

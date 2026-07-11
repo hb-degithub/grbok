@@ -1,3 +1,4 @@
+(function () {
 /// <reference path="../pb_data/types.d.ts" />
 
 // Server-side passkey enforcement layer.
@@ -115,3 +116,4 @@ function requireVerifiedSession(e) {
 onRecordBeforeCreateRequest((e) => requireVerifiedSession(e));
 onRecordBeforeUpdateRequest((e) => requireVerifiedSession(e));
 onRecordBeforeDeleteRequest((e) => requireVerifiedSession(e));
+})();

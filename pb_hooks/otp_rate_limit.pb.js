@@ -1,3 +1,4 @@
+(function () {
 /// <reference path="../pb_data/types.d.ts" />
 
 // OTP（魔法链接）请求速率限制 — per-IP + per-email
@@ -52,7 +53,8 @@ function rateLimit(key, maxAttempts) {
 
 // OTP请求限速检查：在发送验证码邮件之前执行
 // 注意：OTP成功不代表用户已认证（仅表示邮件已发送），因此不清除计数器
-onRecordBeforeAuthWithOTPRequest((e) => {
+if (typeof onRecordBeforeAuthWithOTPRequest === 'function') {
+  onRecordBeforeAuthWithOTPRequest((e) => {
   const ip = getClientIP(e);
   const email = getEmailFromBody(e);
 
@@ -64,4 +66,6 @@ onRecordBeforeAuthWithOTPRequest((e) => {
   }
 
   if (typeof e.next === 'function') e.next();
-}, 'users');
+  }, 'users');
+}
+})();
