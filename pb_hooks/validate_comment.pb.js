@@ -5,6 +5,18 @@ onRecordBeforeCreateRequest((e) => {
   const stripTags = (value) => String(value || '').replace(/<[^>]*>/g, '').trim();
   const commentRateBuckets = globalThis.commentRateBuckets || (globalThis.commentRateBuckets = {});
 
+  // Cleanup old entries periodically
+  const _now = Date.now();
+  if (!globalThis._commentLastCleanup || _now - globalThis._commentLastCleanup > 5 * 60 * 1000) {
+    globalThis._commentLastCleanup = _now;
+    for (const key of Object.keys(commentRateBuckets)) {
+      const bucket = commentRateBuckets[key];
+      if (!bucket || bucket.length === 0 || _now - bucket[bucket.length - 1] > 600000) {
+        delete commentRateBuckets[key];
+      }
+    }
+  }
+
   const boolSetting = (key, fallback) => {
     try {
       let record = null;

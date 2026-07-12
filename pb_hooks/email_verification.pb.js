@@ -11,6 +11,20 @@ const VERIFY_WINDOW_MS = 15 * 60 * 1000;
 
 const verifyRateBuckets = globalThis.verifyRateBuckets || (globalThis.verifyRateBuckets = {});
 
+let verifyLastCleanup = Date.now();
+
+function verifyMaybeCleanup() {
+  const now = Date.now();
+  if (now - verifyLastCleanup < 5 * 60 * 1000) return;
+  verifyLastCleanup = now;
+  for (const key of Object.keys(verifyRateBuckets)) {
+    const bucket = verifyRateBuckets[key];
+    if (!bucket || bucket.length === 0 || now - bucket[bucket.length - 1] > VERIFY_WINDOW_MS) {
+      delete verifyRateBuckets[key];
+    }
+  }
+}
+
 function getVerifyHeader(e, name) {
   try { return e.httpContext?.request()?.header?.get(name) || ''; } catch (_) { return ''; }
 }
@@ -30,6 +44,7 @@ function getVerifyClientIP(e) {
 
 function verifyRateLimit(key, maxAttempts) {
   const now = Date.now();
+  verifyMaybeCleanup();
   const bucket = verifyRateBuckets[key] || [];
   const active = bucket.filter((t) => now - t < VERIFY_WINDOW_MS);
   if (active.length >= maxAttempts) return false;
@@ -44,7 +59,7 @@ onRecordAfterCreateRequest((e) => {
   if (!record) { if (typeof e.next === 'function') e.next(); return; }
 
   // Skip if already verified (shouldn't happen on create, but defensive)
-  if (record.verified) { if (typeof e.next === 'function') e.next(); return; }
+  if (record.verified()) { if (typeof e.next === 'function') e.next(); return; }
 
   try {
     const user = $app.dao().findRecordById('users', record.id);

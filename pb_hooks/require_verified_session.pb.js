@@ -41,7 +41,7 @@ const PROTECTED_COLLECTIONS = [
   'announcements',
   'media_assets',
   'settings',
-  'admin_passkeys',
+  'post_versions',
 ];
 
 function roleOf(record) {

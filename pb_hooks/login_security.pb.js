@@ -8,6 +8,20 @@ const WINDOW_MS = 15 * 60 * 1000;    // 15分钟窗口
 
 const loginRateBuckets = globalThis.loginRateBuckets || (globalThis.loginRateBuckets = {});
 
+let loginLastCleanup = Date.now();
+
+function loginMaybeCleanup() {
+  const now = Date.now();
+  if (now - loginLastCleanup < 5 * 60 * 1000) return;
+  loginLastCleanup = now;
+  for (const key of Object.keys(loginRateBuckets)) {
+    const bucket = loginRateBuckets[key];
+    if (!bucket || bucket.length === 0 || now - bucket[bucket.length - 1] > WINDOW_MS) {
+      delete loginRateBuckets[key];
+    }
+  }
+}
+
 function getHeader(e, name) {
   try {
     return e.httpContext?.request()?.header?.get(name) || '';
@@ -45,6 +59,7 @@ function getEmailFromBody(e) {
 
 function rateLimit(key, maxAttempts) {
   const now = Date.now();
+  loginMaybeCleanup();
   const bucket = loginRateBuckets[key] || [];
   const active = bucket.filter((t) => now - t < WINDOW_MS);
   if (active.length >= maxAttempts) return false; // 限速触发

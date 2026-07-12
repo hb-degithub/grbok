@@ -9,6 +9,20 @@ const WINDOW_MS = 15 * 60 * 1000;   // 15分钟窗口
 
 const otpRateBuckets = globalThis.otpRateBuckets || (globalThis.otpRateBuckets = {});
 
+let otpLastCleanup = Date.now();
+
+function otpMaybeCleanup() {
+  const now = Date.now();
+  if (now - otpLastCleanup < 5 * 60 * 1000) return;
+  otpLastCleanup = now;
+  for (const key of Object.keys(otpRateBuckets)) {
+    const bucket = otpRateBuckets[key];
+    if (!bucket || bucket.length === 0 || now - bucket[bucket.length - 1] > WINDOW_MS) {
+      delete otpRateBuckets[key];
+    }
+  }
+}
+
 function getHeader(e, name) {
   try {
     return e.httpContext?.request()?.header?.get(name) || '';
@@ -43,6 +57,7 @@ function getEmailFromBody(e) {
 
 function rateLimit(key, maxAttempts) {
   const now = Date.now();
+  otpMaybeCleanup();
   const bucket = otpRateBuckets[key] || [];
   const active = bucket.filter((t) => now - t < WINDOW_MS);
   if (active.length >= maxAttempts) return false; // 限速触发

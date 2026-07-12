@@ -80,8 +80,8 @@ export default function CommentModerator() {
       if (filter !== 'all') parts.push(pb.filter('status = {:status}', { status: filter }));
       const keyword = query.trim();
       if (keyword) {
-        const escaped = keyword.replace(/["\\]/g, '');
-        parts.push(`(author_name ~ "${escaped}" || author_email ~ "${escaped}" || content ~ "${escaped}")`);
+        const safeKeyword = keyword.replace(/["\\]/g, '');
+        parts.push(pb.filter('(author_name ~ {:kw} || author_email ~ {:kw} || content ~ {:kw})', { kw: safeKeyword }));
       }
       const f = parts.length ? parts.join(' && ') : '';
       const result = await pb.collection('comments').getList<Comment>(page, 20, { filter: f, sort: '-created', expand: 'post_id' });

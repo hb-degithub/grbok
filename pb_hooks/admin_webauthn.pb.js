@@ -6,6 +6,9 @@ const CHALLENGE_TTL_MINUTES = 5;
 const INTERNAL_URL = ($os.getenv('ADMIN_AUTH_INTERNAL_URL') || '').trim() || 'http://admin-auth:8787';
 const INTERNAL_SECRET = ($os.getenv('ADMIN_AUTH_INTERNAL_SECRET') || '').trim();
 const HASH_SECRET = ($os.getenv('ADMIN_AUTH_HASH_SECRET') || '').trim();
+if (!INTERNAL_SECRET) {
+  console.error('[admin-webauthn] ADMIN_AUTH_INTERNAL_SECRET is not set; passkey endpoints will be insecure');
+}
 
 function currentUser(c) {
   return c.get('authRecord') || null;
@@ -32,6 +35,9 @@ function requireSuperAdmin(c) {
   const user = currentUser(c);
   if (!user || roleOf(user) !== SUPER_ADMIN_ROLE) {
     throw new UnauthorizedError('Super admin authentication required');
+  }
+  if (!user.verified()) {
+    throw new BadRequestError('Super admin must verify email first');
   }
   return user;
 }
@@ -67,7 +73,7 @@ function hashForAudit(value) {
   try {
     return $security.sha256(value);
   } catch (_) {
-    return value;
+    return 'hash-error';
   }
 }
 
@@ -114,7 +120,8 @@ function postInternal(path, body) {
     timeout: 10000,
   });
   if (res.statusCode >= 400) {
-    throw new Error(`admin-auth error ${res.statusCode}: ${res.raw}`);
+    console.error('[admin-auth-error]', res.statusCode, res.raw);
+    throw new Error(`admin-auth error ${res.statusCode}`);
   }
   try {
     return JSON.parse(res.raw);
@@ -350,6 +357,10 @@ routerAdd('POST', '/api/blog-admin/webauthn/authenticate/verify', (c) => {
   const passkey = findPasskeyByCredentialId(credentialId);
   if (!passkey) {
     throw new BadRequestError('Passkey not found');
+  }
+  // Verify the passkey belongs to the authenticated user
+  if (passkey.get('owner') !== userId) {
+    throw new BadRequestError('Passkey does not belong to current user');
   }
 
   const authenticator = {

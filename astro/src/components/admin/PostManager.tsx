@@ -72,8 +72,8 @@ export default function PostManager() {
       const keyword = query.trim();
       if (keyword) {
         // 标题/slug/摘要 模糊匹配（ PocketBase ~ 不区分大小写）
-        const escaped = keyword.replace(/["\\]/g, '');
-        parts.push(`(title ~ "${escaped}" || slug ~ "${escaped}" || excerpt ~ "${escaped}")`);
+        const safeKeyword = keyword.replace(/["\\]/g, '');
+        parts.push(pb.filter('(title ~ {:kw} || slug ~ {:kw} || excerpt ~ {:kw})', { kw: safeKeyword }));
       }
       const f = parts.length ? parts.join(' && ') : '';
       const result = await pb.collection('posts').getList<Post>(page, 20, { filter: f, sort: '-updated' });

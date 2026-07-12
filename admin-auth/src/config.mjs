@@ -18,12 +18,18 @@ export function createConfig() {
     throw new Error('ADMIN_AUTH_HASH_SECRET must be at least 32 characters');
   }
 
+  const rpId = env.ADMIN_AUTH_RP_ID || 'localhost';
+  const origin = env.ADMIN_AUTH_ORIGIN || 'http://localhost';
+  if (env.NODE_ENV === 'production' && !origin.startsWith('https://') && rpId !== 'localhost') {
+    throw new Error('ADMIN_AUTH_ORIGIN must use HTTPS in production');
+  }
+
   return {
     internalSecret: secret,
     hashSecret,
     rpName: env.ADMIN_AUTH_RP_NAME || '个人博客',
-    rpId: env.ADMIN_AUTH_RP_ID || 'localhost',
-    origin: env.ADMIN_AUTH_ORIGIN || 'http://localhost',
-    sessionTtlSeconds: parseInt(env.ADMIN_AUTH_SESSION_TTL_SECONDS || '900', 10),
+    rpId,
+    origin,
+    sessionTtlSeconds: Math.min(Math.max(parseInt(env.ADMIN_AUTH_SESSION_TTL_SECONDS || '900', 10), 60), 3600),
   };
 }

@@ -34,7 +34,7 @@ migrate((db) => {
   ensureField(ann, { name: "start_at", type: "date", required: false, options: { min: "", max: "" } });
   ensureField(ann, { name: "end_at", type: "date", required: false, options: { min: "", max: "" } });
   ann.listRule = "enabled = true && (start_at = null || start_at <= @now) && (end_at = null || end_at >= @now) || " + SUPER_ADMIN_RULE;
-  ann.viewRule = "enabled = true || " + SUPER_ADMIN_RULE;
+  ann.viewRule = "enabled = true && (start_at = null || start_at <= @now) && (end_at = null || end_at >= @now) || " + SUPER_ADMIN_RULE;
   ann.createRule = SUPER_ADMIN_RULE;
   ann.updateRule = SUPER_ADMIN_RULE;
   ann.deleteRule = SUPER_ADMIN_RULE;

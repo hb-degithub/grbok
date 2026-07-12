@@ -1,4 +1,5 @@
 import { createServer as createHttpServer } from 'node:http';
+import { timingSafeEqual } from 'node:crypto';
 import { argv, env } from 'node:process';
 import { pathToFileURL } from 'node:url';
 import * as simpleWebAuthnAdapter from '@simplewebauthn/server';
@@ -7,8 +8,29 @@ import { createVerifiedSessionRecord, isVerifiedSessionValid } from './session-p
 import { createWebAuthnService } from './webauthn-service.mjs';
 
 export function createServer({ config, webauthnService }) {
+  const rateLimitMap = new Map();
+  let lastRlCleanup = Date.now();
   return createHttpServer(async (req, res) => {
     try {
+      const clientIp = req.socket.remoteAddress || 'unknown';
+      const now = Date.now();
+      const rlKey = 'rl:' + clientIp;
+      const rlEntry = rateLimitMap.get(rlKey);
+      if (rlEntry && now - rlEntry.windowStart < 60000) {
+        if (rlEntry.count >= 30) {
+          sendJson(res, 429, { error: 'Too many requests' });
+          return;
+        }
+        rlEntry.count++;
+      } else {
+        rateLimitMap.set(rlKey, { windowStart: now, count: 1 });
+      }
+      if (now - lastRlCleanup > 5 * 60 * 1000) {
+        lastRlCleanup = now;
+        for (const [k, v] of rateLimitMap) {
+          if (now - v.windowStart > 60000) rateLimitMap.delete(k);
+        }
+      }
       const url = new URL(req.url, `http://${req.headers.host}`);
 
       if (url.pathname === '/health' && req.method === 'GET') {
@@ -22,7 +44,6 @@ export function createServer({ config, webauthnService }) {
       }
 
       const secret = req.headers['x-internal-secret'];
-      const { timingSafeEqual } = await import('node:crypto');
       const expected = Buffer.from(config.internalSecret, 'utf8');
       const provided = Buffer.from(secret || '', 'utf8');
       if (expected.length !== provided.length || !timingSafeEqual(expected, provided)) {
@@ -35,7 +56,14 @@ export function createServer({ config, webauthnService }) {
         return;
       }
 
-      const body = await readJson(req);
+      let body;
+      try {
+        body = await readJson(req);
+      } catch (err) {
+        if (err && err.message === 'PAYLOAD_TOO_LARGE') throw err;
+        sendJson(res, 400, { error: 'Invalid JSON' });
+        return;
+      }
       let result;
 
       switch (url.pathname) {
@@ -82,7 +110,7 @@ export function createServer({ config, webauthnService }) {
         sendJson(res, 413, { error: 'Request body too large' });
         return;
       }
-      console.error('admin-auth server error:', err);
+      console.error('admin-auth server error:', err.message || String(err));
       sendJson(res, 500, { error: 'Internal server error' });
     }
   });
@@ -112,6 +140,8 @@ function sendJson(res, status, body) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
     'Content-Length': Buffer.byteLength(data),
+    'X-Content-Type-Options': 'nosniff',
+    'Cache-Control': 'no-store',
   });
   res.end(data);
 }
