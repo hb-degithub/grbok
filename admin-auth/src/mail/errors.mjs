@@ -12,10 +12,11 @@ const PUBLIC_MESSAGES = Object.freeze({
 
 export class MailError extends Error {
   constructor(code, retryable, cause) {
-    super(PUBLIC_MESSAGES[code] || PUBLIC_MESSAGES.INTERNAL_ERROR);
+    const stableCode = Object.hasOwn(PUBLIC_MESSAGES, code) ? code : 'INTERNAL_ERROR';
+    super(PUBLIC_MESSAGES[stableCode]);
     Object.defineProperty(this, 'name', { configurable: true, value: 'MailError' });
     Object.defineProperty(this, 'message', { configurable: true, enumerable: true, value: this.message });
-    this.code = PUBLIC_MESSAGES[code] ? code : 'INTERNAL_ERROR';
+    this.code = stableCode;
     this.retryable = Boolean(retryable);
     Object.defineProperty(this, 'cause', {
       configurable: true, enumerable: false, writable: false, value: cause,
@@ -30,15 +31,22 @@ export class MailError extends Error {
 export function classifySmtpError(error) {
   if (error instanceof MailError) return error;
 
-  if (error?.code === 'EAUTH') return new MailError('SMTP_AUTH', false, error);
-  if (error?.code === 'ETIMEDOUT' || error?.code === 'ESOCKETTIMEDOUT') {
-    return new MailError('SMTP_TIMEOUT', true, error);
-  }
-  if (['ECONNECTION', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EHOSTUNREACH'].includes(error?.code)) {
-    return new MailError('SMTP_CONNECTION', true, error);
+  let providerCode;
+  let responseCode = Number.NaN;
+  try {
+    providerCode = error?.code;
+    responseCode = Number(error?.responseCode);
+  } catch {
+    return new MailError('INTERNAL_ERROR', true, error);
   }
 
-  const responseCode = Number(error?.responseCode);
+  if (providerCode === 'EAUTH') return new MailError('SMTP_AUTH', false, error);
+  if (providerCode === 'ETIMEDOUT' || providerCode === 'ESOCKETTIMEDOUT') {
+    return new MailError('SMTP_TIMEOUT', true, error);
+  }
+  if (['ECONNECTION', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EHOSTUNREACH'].includes(providerCode)) {
+    return new MailError('SMTP_CONNECTION', true, error);
+  }
   if (responseCode === 421) return new MailError('RATE_LIMITED', true, error);
   if (responseCode >= 400 && responseCode < 500) {
     return new MailError('RECIPIENT_TEMPORARY', true, error);

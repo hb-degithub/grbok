@@ -6,6 +6,7 @@ describe('MailError', () => {
   it('exposes only stable public fields and hides its cause', () => {
     const cause = new Error('smtp.example secret response');
     const error = new MailError('SMTP_AUTH', false, cause);
+    const unknown = new MailError('__proto__', false, cause);
     assert.deepEqual({ ...error }, {
       code: 'SMTP_AUTH', retryable: false, message: 'SMTP authentication failed',
     });
@@ -16,6 +17,19 @@ describe('MailError', () => {
 });
 
 describe('classifySmtpError', () => {
+  it('falls back to INTERNAL_ERROR when response code coercion is hostile', () => {
+    const cases = [
+      { responseCode: Symbol('smtp') },
+      { responseCode: { valueOf() { throw new Error('provider getter secret'); } } },
+      Object.defineProperty({}, 'code', { get() { throw new Error('provider code secret'); } }),
+    ];
+    for (const input of cases) {
+      const classified = classifySmtpError(input);
+      assert.deepEqual([classified.code, classified.retryable], ['INTERNAL_ERROR', true]);
+      assert.equal(classified.cause, input);
+    }
+  });
+
   it('maps provider errors to stable codes and retry policy', () => {
     const cases = [
       [{ code: 'EAUTH' }, ['SMTP_AUTH', false]],
