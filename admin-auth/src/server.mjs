@@ -3,40 +3,64 @@ import { timingSafeEqual } from 'node:crypto';
 import { argv, env } from 'node:process';
 import { pathToFileURL } from 'node:url';
 import * as simpleWebAuthnAdapter from '@simplewebauthn/server';
+import nodemailer from 'nodemailer';
 import { createConfig } from './config.mjs';
+import { createMailConfig } from './mail/config.mjs';
+import { createMailHttpHandler } from './mail/http.mjs';
+import { createMailRequestVerifier } from './mail/request-auth.mjs';
+import { createMailService } from './mail/service.mjs';
+import { createMailTransport } from './mail/transport.mjs';
 import { createVerifiedSessionRecord, isVerifiedSessionValid } from './session-policy.mjs';
 import { createWebAuthnService } from './webauthn-service.mjs';
 
-export function createServer({ config, webauthnService }) {
+export function createServer({
+  config,
+  webauthnService,
+  mailHttpHandler = { handle: async () => false },
+  logger = console,
+}) {
   const rateLimitMap = new Map();
   let lastRlCleanup = Date.now();
+
+  function isLegacyRateLimited(req, res) {
+    const clientIp = req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const rlKey = 'rl:' + clientIp;
+    const rlEntry = rateLimitMap.get(rlKey);
+    if (rlEntry && now - rlEntry.windowStart < 60000) {
+      if (rlEntry.count >= 30) {
+        sendJson(res, 429, { error: 'Too many requests' });
+        return true;
+      }
+      rlEntry.count++;
+    } else {
+      rateLimitMap.set(rlKey, { windowStart: now, count: 1 });
+    }
+    if (now - lastRlCleanup > 5 * 60 * 1000) {
+      lastRlCleanup = now;
+      for (const [key, value] of rateLimitMap) {
+        if (now - value.windowStart > 60000) rateLimitMap.delete(key);
+      }
+    }
+    return false;
+  }
+
   return createHttpServer(async (req, res) => {
     try {
-      const clientIp = req.socket.remoteAddress || 'unknown';
-      const now = Date.now();
-      const rlKey = 'rl:' + clientIp;
-      const rlEntry = rateLimitMap.get(rlKey);
-      if (rlEntry && now - rlEntry.windowStart < 60000) {
-        if (rlEntry.count >= 30) {
-          sendJson(res, 429, { error: 'Too many requests' });
-          return;
-        }
-        rlEntry.count++;
-      } else {
-        rateLimitMap.set(rlKey, { windowStart: now, count: 1 });
-      }
-      if (now - lastRlCleanup > 5 * 60 * 1000) {
-        lastRlCleanup = now;
-        for (const [k, v] of rateLimitMap) {
-          if (now - v.windowStart > 60000) rateLimitMap.delete(k);
-        }
-      }
       const url = new URL(req.url, `http://${req.headers.host}`);
 
       if (url.pathname === '/health' && req.method === 'GET') {
+        if (isLegacyRateLimited(req, res)) return;
         sendJson(res, 200, { status: 'ok' });
         return;
       }
+
+      if (url.pathname.startsWith('/internal/mail/')) {
+        const handled = await mailHttpHandler.handle(req, res, url);
+        if (handled) return;
+      }
+
+      if (isLegacyRateLimited(req, res)) return;
 
       if (!url.pathname.startsWith('/internal/')) {
         sendJson(res, 404, { error: 'Not found' });
@@ -60,7 +84,7 @@ export function createServer({ config, webauthnService }) {
       try {
         body = await readJson(req);
       } catch (err) {
-        if (err && err.message === 'PAYLOAD_TOO_LARGE') throw err;
+        if (hasErrorMessage(err, 'PAYLOAD_TOO_LARGE')) throw err;
         sendJson(res, 400, { error: 'Invalid JSON' });
         return;
       }
@@ -106,12 +130,12 @@ export function createServer({ config, webauthnService }) {
 
       sendJson(res, 200, result);
     } catch (err) {
-      if (err && err.message === 'PAYLOAD_TOO_LARGE') {
-        sendJson(res, 413, { error: 'Request body too large' });
+      if (hasErrorMessage(err, 'PAYLOAD_TOO_LARGE')) {
+        safelySendError(res, 413, { error: 'Request body too large' });
         return;
       }
-      console.error('admin-auth server error:', err.message || String(err));
-      sendJson(res, 500, { error: 'Internal server error' });
+      safelyLogServerError(logger);
+      safelySendError(res, 500, { error: 'Internal server error' });
     }
   });
 }
@@ -133,6 +157,39 @@ async function readJson(req) {
   const text = Buffer.concat(chunks).toString('utf-8');
   if (!text) return {};
   return JSON.parse(text);
+}
+
+function hasErrorMessage(error, expected) {
+  try {
+    return error?.message === expected;
+  } catch {
+    return false;
+  }
+}
+
+function safelyLogServerError(logger) {
+  try {
+    if (logger && typeof logger.error === 'function') logger.error('admin-auth server error');
+  } catch {
+    // Logging must not change the response or process outcome.
+  }
+}
+
+function safelySendError(res, status, body) {
+  try {
+    if (res.writableEnded) return;
+    if (res.headersSent) {
+      res.end();
+      return;
+    }
+    sendJson(res, status, body);
+  } catch {
+    try {
+      res.destroy();
+    } catch {
+      // The socket is already unusable; no further recovery is possible.
+    }
+  }
 }
 
 function sendJson(res, status, body) {
@@ -159,7 +216,12 @@ export function startServer({
   port = parseInt(env.PORT || '8787', 10),
 } = {}) {
   const webauthnService = createWebAuthnService(adapter, config);
-  const server = createServer({ config, webauthnService });
+  const mailConfig = createMailConfig(env);
+  const mailTransport = createMailTransport({ config: mailConfig, nodemailer });
+  const mailService = createMailService({ config: mailConfig, transport: mailTransport });
+  const mailVerifier = createMailRequestVerifier({ secret: config.mailInternalSecret });
+  const mailHttpHandler = createMailHttpHandler({ verifier: mailVerifier, service: mailService, config: mailConfig });
+  const server = createServer({ config, webauthnService, mailHttpHandler });
 
   server.listen(port, host, () => {
     console.log(`admin-auth listening on ${host}:${port}`);

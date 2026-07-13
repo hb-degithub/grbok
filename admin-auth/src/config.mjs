@@ -18,6 +18,11 @@ export function createConfig() {
     throw new Error('ADMIN_AUTH_HASH_SECRET must be at least 32 characters');
   }
 
+  const mailInternalSecret = env.MAIL_INTERNAL_SECRET;
+  if (!mailInternalSecret || mailInternalSecret.length < 32) {
+    throw new Error('MAIL_INTERNAL_SECRET must be at least 32 characters');
+  }
+
   const rpId = env.ADMIN_AUTH_RP_ID || 'localhost';
   const origin = env.ADMIN_AUTH_ORIGIN || 'http://localhost';
   if (env.NODE_ENV === 'production' && !origin.startsWith('https://') && rpId !== 'localhost') {
@@ -27,6 +32,7 @@ export function createConfig() {
   return {
     internalSecret: secret,
     hashSecret,
+    mailInternalSecret,
     rpName: env.ADMIN_AUTH_RP_NAME || '个人博客',
     rpId,
     origin,
