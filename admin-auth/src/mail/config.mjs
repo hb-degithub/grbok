@@ -1,3 +1,5 @@
+import { isIP } from 'node:net';
+
 const aliases = Object.freeze({
   SMTP_HOST: 'ALIYUN_SMTP_HOST',
   SMTP_PORT: 'ALIYUN_SMTP_PORT',
@@ -88,6 +90,8 @@ function configuredMailConfig(source, values) {
 function unconfiguredMailConfig(source) {
   const tlsMode = parseTlsMode(source.SMTP_TLS_MODE);
   const localTestMode = parseBoolean(source.MAIL_LOCAL_TEST_MODE);
+  const rawSiteUrl = optionalValue(source.PUBLIC_SITE_URL);
+  const siteUrl = rawSiteUrl ? parseSiteUrl(rawSiteUrl, source.NODE_ENV) : '';
   if (localTestMode) {
     throw invalidMailConfiguration();
   }
@@ -108,7 +112,7 @@ function unconfiguredMailConfig(source) {
     socketTimeoutMs: parseTimeout(source.SMTP_SOCKET_TIMEOUT_MS, 30000, 3000, 120000),
     providerLabel: optionalValue(source.MAIL_PROVIDER_LABEL) || 'SMTP',
     alertRecipients: parseAddressList(source.MAIL_ALERT_RECIPIENTS),
-    siteUrl: optionalValue(source.PUBLIC_SITE_URL),
+    siteUrl,
     localTestMode,
     testRecipientAllowlist: parseAddressList(source.MAIL_TEST_RECIPIENT_ALLOWLIST),
   };
@@ -213,7 +217,7 @@ function parseBoolean(value) {
 }
 
 function isLoopbackHost(host) {
-  return host === 'localhost' || host === '::1' || /^127(?:\.\d{1,3}){3}$/.test(host);
+  return host === 'localhost' || host === '::1' || (isIP(host) === 4 && host.startsWith('127.'));
 }
 
 function invalidMailConfiguration() {
