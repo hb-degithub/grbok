@@ -215,6 +215,28 @@ describe('createMailRequestVerifier', () => {
     assert.deepEqual(verify(signedInput({ ...vector, nonce: signatureNonce })), { ok: true });
   });
 
+  it('rejects nonce expiry arithmetic outside the safe integer range without poisoning the cache', () => {
+    const ttl = 120;
+    const maxSafeNow = Number.MAX_SAFE_INTEGER - ttl;
+    let now = maxSafeNow;
+    const nonce = 'nonce_safe_expiry_boundary';
+    const verify = verifierWithClock(() => now, { nonceTtlSeconds: ttl });
+
+    assert.deepEqual(verify(signedAt(now, nonce)), { ok: true });
+
+    now = maxSafeNow + 1;
+    assert.throws(
+      () => verify(signedAt(now, 'nonce_unsafe_expiry_boundary')),
+      { name: 'RangeError', message: 'nonce expiry must be a finite safe integer' },
+    );
+
+    now = maxSafeNow;
+    assert.deepEqual(
+      verify(signedAt(now, 'nonce_unsafe_expiry_boundary')),
+      { ok: true },
+    );
+  });
+
   it('allows nonce reuse once its TTL expires', () => {
     let now = 1783872000;
     const verify = verifierWithClock(() => now, { nonceTtlSeconds: 120 });

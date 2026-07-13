@@ -80,7 +80,11 @@ export function createMailRequestVerifier(options = {}) {
     while (nonces.size >= maxNonces) {
       nonces.delete(nonces.keys().next().value);
     }
-    nonces.set(input.nonce, now + nonceTtlSeconds);
+    const expiresAt = now + nonceTtlSeconds;
+    if (!Number.isSafeInteger(expiresAt)) {
+      throw new RangeError('nonce expiry must be a finite safe integer');
+    }
+    nonces.set(input.nonce, expiresAt);
 
     return { ok: true };
   };
