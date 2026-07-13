@@ -29,11 +29,10 @@ export class MailError extends Error {
 }
 
 export function classifySmtpError(error) {
-  if (error instanceof MailError) return error;
-
   let providerCode;
   let responseCode = Number.NaN;
   try {
+    if (error instanceof MailError) return error;
     providerCode = error?.code;
     responseCode = Number(error?.responseCode);
   } catch {

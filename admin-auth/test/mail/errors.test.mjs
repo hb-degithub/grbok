@@ -22,6 +22,7 @@ describe('classifySmtpError', () => {
       { responseCode: Symbol('smtp') },
       { responseCode: { valueOf() { throw new Error('provider getter secret'); } } },
       Object.defineProperty({}, 'code', { get() { throw new Error('provider code secret'); } }),
+      new Proxy({}, { getPrototypeOf() { throw new Error('provider prototype secret'); } }),
     ];
     for (const input of cases) {
       const classified = classifySmtpError(input);
