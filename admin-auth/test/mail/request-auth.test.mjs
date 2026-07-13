@@ -44,6 +44,67 @@ describe('canonicalMailRequest', () => {
 });
 
 describe('createMailRequestVerifier', () => {
+  it('rejects invalid positive-integer replay cache options at construction', () => {
+    const invalidValues = [0, -1, Number.NaN, Number.POSITIVE_INFINITY, 1.5, 2 ** 53];
+
+    for (const option of ['nonceTtlSeconds', 'maxNonces']) {
+      for (const value of invalidValues) {
+        assert.throws(
+          () => verifierWithClock(() => 1783872000, { [option]: value }),
+          {
+            name: 'RangeError',
+            message: option + ' must be a finite safe integer greater than 0',
+          },
+        );
+      }
+    }
+  });
+
+  it('rejects invalid non-negative integer skew values at construction', () => {
+    for (const maxSkewSeconds of [-1, Number.NaN, Number.POSITIVE_INFINITY, 1.5, 2 ** 53]) {
+      assert.throws(
+        () => verifierWithClock(() => 1783872000, { maxSkewSeconds }),
+        {
+          name: 'RangeError',
+          message: 'maxSkewSeconds must be a finite safe integer greater than or equal to 0',
+        },
+      );
+    }
+
+    assert.doesNotThrow(() => verifierWithClock(() => 1783872000, { maxSkewSeconds: 0 }));
+  });
+
+  it('requires nowSeconds to be a function at construction', () => {
+    for (const nowSeconds of [undefined, null, 1783872000, '1783872000']) {
+      assert.throws(
+        () => createMailRequestVerifier({ secret, nowSeconds }),
+        { name: 'TypeError', message: 'nowSeconds must be a function' },
+      );
+    }
+  });
+
+  it('rejects non-finite, non-integer, and unsafe nowSeconds results', () => {
+    for (const now of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 1.5, 2 ** 53]) {
+      const verify = verifierWithClock(() => now);
+
+      assert.throws(
+        () => verify(signedInput(vector)),
+        { name: 'RangeError', message: 'nowSeconds must return a finite safe integer' },
+      );
+    }
+  });
+
+  it('validates the nowSeconds result on every verification', () => {
+    const clockValues = [1783872000, Number.NaN];
+    const verify = verifierWithClock(() => clockValues.shift());
+
+    assert.deepEqual(verify(signedInput(vector)), { ok: true });
+    assert.throws(
+      () => verify(signedInput({ ...vector, nonce: 'nonce_second_clock_read' })),
+      { name: 'RangeError', message: 'nowSeconds must return a finite safe integer' },
+    );
+  });
+
   it('rejects each missing required value', () => {
     const verify = verifierAt(1783872000);
     const valid = signedInput(vector);
