@@ -36,6 +36,7 @@ describe('classifySmtpError', () => {
       [{ code: 'EAUTH' }, ['SMTP_AUTH', false]],
       [{ code: 'ETIMEDOUT' }, ['SMTP_TIMEOUT', true]],
       [{ code: 'ECONNECTION' }, ['SMTP_CONNECTION', true]],
+      [{ code: 'ESOCKET' }, ['SMTP_CONNECTION', true]],
       [{ responseCode: 421 }, ['RATE_LIMITED', true]],
       [{ responseCode: 450 }, ['RECIPIENT_TEMPORARY', true]],
       [{ responseCode: 550 }, ['RECIPIENT_PERMANENT', false]],

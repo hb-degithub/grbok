@@ -43,7 +43,7 @@ export function classifySmtpError(error) {
   if (providerCode === 'ETIMEDOUT' || providerCode === 'ESOCKETTIMEDOUT') {
     return new MailError('SMTP_TIMEOUT', true, error);
   }
-  if (['ECONNECTION', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EHOSTUNREACH'].includes(providerCode)) {
+  if (['ECONNECTION', 'ECONNREFUSED', 'ECONNRESET', 'ENOTFOUND', 'EHOSTUNREACH', 'ESOCKET'].includes(providerCode)) {
     return new MailError('SMTP_CONNECTION', true, error);
   }
   if (responseCode === 421) return new MailError('RATE_LIMITED', true, error);
