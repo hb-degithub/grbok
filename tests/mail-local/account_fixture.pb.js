@@ -87,6 +87,75 @@
       return c.json(500, { error: String(error && error.message ? error.message : error) });
     }
   });
+  routerAdd('GET', '/api/test/mail-account/render-log', function (c) {
+    try {
+      let templates;
+      let logs;
+      try {
+        templates = require(__hooks + '/lib/mail_templates.js');
+        logs = require(__hooks + '/lib/mail_logs.js');
+      } catch (loadError) {
+        throw new Error('render-log module load failed: ' + String(
+          loadError && loadError.message ? loadError.message : loadError,
+        ));
+      }
+
+      const rendered = templates.render('reader_otp', {
+        displayName: '<Reader>',
+        code: '123456',
+        expiresMinutes: '10',
+      });
+      if (rendered.html.indexOf('&lt;Reader&gt;') === -1) {
+        throw new Error('display name was not escaped');
+      }
+      if (rendered.html.indexOf('<Reader>') !== -1) throw new Error('raw HTML leaked');
+      if (rendered.text.indexOf('123456') === -1) throw new Error('text alternative missing code');
+      if (rendered.subject !== '\u4f60\u7684\u767b\u5f55\u9a8c\u8bc1\u7801') {
+        throw new Error('subject mismatch');
+      }
+
+      logs.delivery({
+        request_id: 'fixture_log_1',
+        category: 'reader_otp',
+        source_collection: 'users',
+        source_record_id: 'fixture_reader',
+        recipient_masked: 'r****r@example.com',
+        recipient_hash: 'recipient_hash_fixture',
+        request_ip_hash: 'request_ip_hash_fixture',
+        result: 'sent',
+        duration_ms: 200000,
+        attempt: 101,
+        error_class: 'none',
+      });
+      const saved = $app.dao().findFirstRecordByData(
+        'mail_delivery_logs',
+        'request_id',
+        'fixture_log_1',
+      );
+      for (const forbidden of ['html', 'text', 'body', 'token', 'code', 'recipient']) {
+        if (saved.get(forbidden)) throw new Error('forbidden log field: ' + forbidden);
+      }
+      if (saved.getInt('duration_ms') !== 120000) throw new Error('duration clamp failed');
+      if (saved.getInt('attempt') !== 100) throw new Error('attempt clamp failed');
+      const count = logs.rateCount(
+        'recipient_hash',
+        'recipient_hash_fixture',
+        '2000-01-01 00:00:00.000Z',
+      );
+      if (count !== 1) throw new Error('rate count mismatch');
+
+      return c.json(200, {
+        category: rendered.category,
+        version: rendered.version,
+        subject: rendered.subject,
+        escaped: true,
+        bodyFree: true,
+        rateCount: count,
+      });
+    } catch (error) {
+      return c.json(500, { error: String(error && error.message ? error.message : error) });
+    }
+  });
   routerAdd('GET', '/api/mail-local/account-foundation', (c) => {
     function assertPrivate(collection, name) {
       if (
