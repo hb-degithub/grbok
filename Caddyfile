@@ -48,6 +48,21 @@
         file_server
     }
 
+    @blockedAccountMailRequests path \
+        /api/collections/users/request-password-reset \
+        /api/collections/users/request-password-reset/ \
+        /api/collections/users/request-verification \
+        /api/collections/users/request-verification/ \
+        /api/collections/users/request-email-change \
+        /api/collections/users/request-email-change/ \
+        /api/collections/_pb_users_auth_/request-password-reset \
+        /api/collections/_pb_users_auth_/request-password-reset/ \
+        /api/collections/_pb_users_auth_/request-verification \
+        /api/collections/_pb_users_auth_/request-verification/ \
+        /api/collections/_pb_users_auth_/request-email-change \
+        /api/collections/_pb_users_auth_/request-email-change/
+    respond @blockedAccountMailRequests 404
+
     handle /api/admins/* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
         reverse_proxy pocketbase:8090 {

@@ -1,6 +1,157 @@
 (function () {
   /// <reference path="../../pb_local/pb/pb_data/types.d.ts" />
 
+  routerAdd('POST', '/api/test/mail-account/seed-request-limits', function (c) {
+    try {
+      const crypto = require(__hooks + '/lib/mail_crypto.js');
+      const logs = require(__hooks + '/lib/mail_logs.js');
+      const input = JSON.parse(readerToString(c.request().body, 4096) || '{}');
+      const count = Number(input.count);
+      const scope = String(input.scope || '');
+      const email = String(input.email || 'seed@example.com').trim().toLowerCase();
+      const ip = String(input.ip || '127.0.0.1').trim();
+      if (
+        !Number.isInteger(count)
+        || count < 0
+        || count > 30
+        || ['email', 'ip', 'global'].indexOf(scope) === -1
+      ) {
+        return c.json(400, { code: 'INVALID_FIXTURE_INPUT' });
+      }
+
+      for (let i = 0; i < count; i++) {
+        const rowEmail = scope === 'email' ? email : 'seed' + i + '@example.com';
+        const rowIp = scope === 'ip' ? ip : '198.51.100.' + ((i % 200) + 1);
+        logs.delivery({
+          request_id: 'fixture_limit_' + scope + '_' + Date.now() + '_' + i,
+          category: [
+            'account_password_reset',
+            'account_verification',
+            'account_email_change',
+          ][i % 3],
+          source_collection: 'account_request',
+          source_record_id: 'fixture_seed',
+          recipient_masked: crypto.maskEmail(rowEmail),
+          recipient_hash: crypto.hashPrivate('email', rowEmail),
+          request_ip_hash: crypto.hashPrivate('ip', rowIp),
+          result: 'accepted',
+          duration_ms: 0,
+          attempt: 1,
+          error_class: 'none',
+        });
+      }
+      return c.json(200, { seeded: count, scope: scope });
+    } catch (error) {
+      return c.json(500, { error: String(error && error.message ? error.message : error) });
+    }
+  });
+  routerAdd('GET', '/api/test/mail-account/request-log-summary', function (c) {
+    try {
+      const crypto = require(__hooks + '/lib/mail_crypto.js');
+      const email = String(c.queryParam('email') || '').trim().toLowerCase();
+      const hash = crypto.hashPrivate('email', email);
+      const requestRecords = $app.dao().findRecordsByFilter(
+        'mail_delivery_logs',
+        'source_collection = {:source} && recipient_hash = {:hash}',
+        'created',
+        200,
+        0,
+        { source: 'account_request', hash: hash },
+      );
+      const deliveryRecords = $app.dao().findRecordsByFilter(
+        'mail_delivery_logs',
+        'source_collection = {:source} && recipient_hash = {:hash}',
+        'created',
+        200,
+        0,
+        { source: 'users', hash: hash },
+      );
+      function summarize(record) {
+        return {
+          category: record.getString('category'),
+          result: record.getString('result'),
+          sourceRecordId: record.getString('source_record_id'),
+          recipientMasked: record.getString('recipient_masked'),
+          errorClass: record.getString('error_class'),
+        };
+      }
+      return c.json(200, {
+        count: requestRecords.length,
+        rows: requestRecords.map(summarize),
+        deliveryCount: deliveryRecords.length,
+        deliveries: deliveryRecords.map(summarize),
+      });
+    } catch (error) {
+      return c.json(500, { error: String(error && error.message ? error.message : error) });
+    }
+  });
+  routerAdd('POST', '/api/test/mail-account/setup-facade-users', function (c) {
+    try {
+      const users = $app.dao().findCollectionByNameOrId('users');
+      const suffix = $security.randomStringWithAlphabet(
+        10,
+        'abcdefghijklmnopqrstuvwxyz0123456789',
+      );
+
+      function createAccount(label, verified, role) {
+        const record = new Record(users);
+        const email = label + '_' + suffix + '@example.com';
+        record.set('email', email);
+        record.set('username', label + '_' + suffix);
+        record.set('password', 'Test12345!');
+        record.set('passwordConfirm', 'Test12345!');
+        record.set('name', label);
+        record.set('role', role);
+        record.set('verified', verified);
+        record.refreshTokenKey();
+        $app.dao().saveRecord(record);
+        return {
+          id: record.id,
+          email: email,
+          token: verified ? $tokens.recordAuthToken($app, record) : '',
+        };
+      }
+
+      return c.json(200, {
+        reader: createAccount('facade_reader', true, 'reader'),
+        superAdmin: createAccount('facade_super', true, 'super_admin'),
+        unverifiedReader: createAccount('facade_unverified_reader', false, 'reader'),
+        unverifiedAdmin: createAccount('facade_unverified_admin', false, 'admin'),
+      });
+    } catch (error) {
+      return c.json(500, { error: String(error && error.message ? error.message : error) });
+    }
+  });
+  routerAdd('POST', '/internal/mail/send', function (c) {
+    try {
+      const raw = readerToString(c.request().body, 262144);
+      const message = JSON.parse(raw || '{}');
+      const expectedPath = {
+        account_verification: '/verify-email?token=',
+        account_password_reset: '/reset-password?token=',
+        account_email_change: '/confirm-email-change?token=',
+      }[message.category];
+      const combined = String(message.html || '') + '\n' + String(message.text || '');
+      if (
+        !expectedPath
+        || combined.indexOf(expectedPath) === -1
+        || !/^req_[A-Za-z0-9_-]{20,}$/.test(String(message.requestId || ''))
+        || !/^msg_[A-Za-z0-9_-]{20,}$/.test(String(message.messageId || ''))
+      ) {
+        return c.json(422, {
+          ok: false,
+          error: { code: 'PAYLOAD_INVALID', retryable: false },
+        });
+      }
+      return c.json(202, { ok: true, requestId: message.requestId });
+    } catch (_) {
+      return c.json(422, {
+        ok: false,
+        error: { code: 'PAYLOAD_INVALID', retryable: false },
+      });
+    }
+  });
+
   routerAdd('GET', '/api/test/mail-account/crypto', function (e) {
     try {
       let crypto;
@@ -312,4 +463,278 @@ routerAdd('GET', '/api/mail-local/account-foundation', (c) => {
       return c.json(500, { error: String(error && error.message ? error.message : error) });
     }
   });
+  routerAdd('GET', '/api/test/mail-account/account-facade-parity', function (c) {
+    try {
+      const crypto = require(__hooks + '/lib/mail_crypto.js');
+      const base = 'http://127.0.0.1:8090';
+      const setup = $http.send({
+        url: base + '/api/test/mail-account/setup-facade-users',
+        method: 'POST',
+        timeout: 5,
+      });
+      if (setup.statusCode !== 200 || !setup.json) {
+        throw new Error('facade account setup failed');
+      }
+
+      const accounts = setup.json;
+      const suffix = $security.randomStringWithAlphabet(
+        10,
+        'abcdefghijklmnopqrstuvwxyz0123456789',
+      );
+      const resetPath = '/api/blog-auth/password-reset/request';
+      const verificationPath = '/api/blog-auth/verification/request';
+      const changePath = '/api/blog-auth/email-change/request';
+      const cases = [
+        {
+          label: 'password-reader',
+          path: resetPath,
+          field: 'email',
+          email: accounts.reader.email,
+          sourceId: accounts.reader.id,
+          expectedResult: 'accepted',
+          shouldDeliver: true,
+        },
+        {
+          label: 'password-super-admin',
+          path: resetPath,
+          field: 'email',
+          email: accounts.superAdmin.email,
+          sourceId: accounts.superAdmin.id,
+          expectedResult: 'accepted',
+          shouldDeliver: true,
+        },
+        {
+          label: 'password-unknown',
+          path: resetPath,
+          field: 'email',
+          email: 'facade_unknown_reset_' + suffix + '@example.com',
+          sourceId: 'decoy',
+          expectedResult: 'decoy',
+          shouldDeliver: false,
+        },
+        {
+          label: 'verification-reader',
+          path: verificationPath,
+          field: 'email',
+          email: accounts.unverifiedReader.email,
+          sourceId: accounts.unverifiedReader.id,
+          expectedResult: 'accepted',
+          shouldDeliver: true,
+        },
+        {
+          label: 'verification-admin',
+          path: verificationPath,
+          field: 'email',
+          email: accounts.unverifiedAdmin.email,
+          sourceId: accounts.unverifiedAdmin.id,
+          expectedResult: 'accepted',
+          shouldDeliver: true,
+        },
+        {
+          label: 'verification-verified',
+          path: verificationPath,
+          field: 'email',
+          email: accounts.reader.email,
+          sourceId: accounts.reader.id,
+          expectedResult: 'decoy',
+          shouldDeliver: false,
+        },
+        {
+          label: 'verification-unknown',
+          path: verificationPath,
+          field: 'email',
+          email: 'facade_unknown_verify_' + suffix + '@example.com',
+          sourceId: 'decoy',
+          expectedResult: 'decoy',
+          shouldDeliver: false,
+        },
+        {
+          label: 'email-change-reader',
+          path: changePath,
+          field: 'newEmail',
+          email: 'facade_change_reader_' + suffix + '@example.com',
+          sourceId: accounts.reader.id,
+          expectedResult: 'accepted',
+          shouldDeliver: true,
+          token: accounts.reader.token,
+        },
+        {
+          label: 'email-change-super-admin',
+          path: changePath,
+          field: 'newEmail',
+          email: 'facade_change_super_' + suffix + '@example.com',
+          sourceId: accounts.superAdmin.id,
+          expectedResult: 'accepted',
+          shouldDeliver: true,
+          token: accounts.superAdmin.token,
+        },
+        {
+          label: 'email-change-unauthenticated',
+          path: changePath,
+          field: 'newEmail',
+          email: 'facade_change_unauth_' + suffix + '@example.com',
+          sourceId: 'decoy',
+          expectedResult: 'decoy',
+          shouldDeliver: false,
+        },
+      ];
+
+      function utf8ByteLength(value) {
+        let length = 0;
+        for (let i = 0; i < value.length; i++) {
+          const code = value.charCodeAt(i);
+          if (code <= 0x7f) length += 1;
+          else if (code <= 0x7ff) length += 2;
+          else if (code >= 0xd800 && code <= 0xdbff && i + 1 < value.length) {
+            const next = value.charCodeAt(i + 1);
+            if (next >= 0xdc00 && next <= 0xdfff) {
+              length += 4;
+              i++;
+            } else length += 3;
+          } else length += 3;
+        }
+        return length;
+      }
+
+      const expectedMessage = '如果该账户可用，我们会发送邮件。';
+      let canonicalRaw = '';
+      const observed = [];
+
+      for (let i = 0; i < cases.length; i++) {
+        const item = cases[i];
+        const headers = {
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '198.51.100.' + (i + 1),
+        };
+        if (item.token) headers.Authorization = item.token;
+        const body = {};
+        body[item.field] = item.email;
+
+        const startedAt = Date.now();
+        const response = $http.send({
+          url: base + item.path,
+          method: 'POST',
+          body: JSON.stringify(body),
+          headers: headers,
+          timeout: 10,
+        });
+        const elapsedMs = Date.now() - startedAt;
+        const raw = String(response.raw || '');
+        const parsed = JSON.parse(raw || '{}');
+        const keys = Object.keys(parsed).sort().join(',');
+
+        if (
+          response.statusCode !== 202
+          || keys !== 'accepted,message'
+          || parsed.accepted !== true
+          || parsed.message !== expectedMessage
+          || elapsedMs < 330
+        ) {
+          throw new Error(
+            item.label
+            + ' parity failed: status=' + response.statusCode
+            + ' keys=' + keys
+            + ' elapsed=' + elapsedMs,
+          );
+        }
+        if (!canonicalRaw) canonicalRaw = raw;
+        if (raw !== canonicalRaw) {
+          throw new Error(item.label + ' response bytes differ');
+        }
+
+        const hash = crypto.hashPrivate('email', item.email);
+        const requestRows = $app.dao().findRecordsByFilter(
+          'mail_delivery_logs',
+          'source_collection = {:source} && category = {:category} && recipient_hash = {:hash}',
+          '-created',
+          10,
+          0,
+          {
+            source: 'account_request',
+            category: item.path === resetPath
+              ? 'account_password_reset'
+              : item.path === verificationPath
+                ? 'account_verification'
+                : 'account_email_change',
+            hash: hash,
+          },
+        );
+        if (
+          requestRows.length !== 1
+          || requestRows[0].getString('result') !== item.expectedResult
+          || requestRows[0].getString('source_record_id') !== item.sourceId
+        ) {
+          throw new Error(item.label + ' request log mismatch');
+        }
+
+        const deliveryRows = $app.dao().findRecordsByFilter(
+          'mail_delivery_logs',
+          'source_collection = {:source} && category = {:category} && recipient_hash = {:hash}',
+          '-created',
+          10,
+          0,
+          {
+            source: 'users',
+            category: requestRows[0].getString('category'),
+            hash: hash,
+          },
+        );
+        if (
+          item.shouldDeliver
+            ? deliveryRows.length !== 1
+              || deliveryRows[0].getString('result') !== 'sent'
+              || deliveryRows[0].getString('source_record_id') !== item.sourceId
+            : deliveryRows.length !== 0
+        ) {
+          throw new Error(item.label + ' delivery log mismatch');
+        }
+
+        observed.push({
+          label: item.label,
+          status: response.statusCode,
+          elapsedMs: elapsedMs,
+          bodyBytes: utf8ByteLength(raw),
+          result: item.expectedResult,
+          deliveries: deliveryRows.length,
+        });
+      }
+
+      const canonicalBytes = utf8ByteLength(canonicalRaw);
+      if (canonicalBytes !== 79) {
+        throw new Error('unexpected accepted response byte length: ' + canonicalBytes);
+      }
+      return c.json(200, {
+        cases: observed,
+        canonicalBytes: canonicalBytes,
+      });
+    } catch (error) {
+      return c.json(500, {
+        error: String(error && error.message ? error.message : error),
+      });
+    }
+  });
+
+  routerAdd('GET', '/api/test/mail-account/account-facade-red', function (c) {
+    var routes = [
+      ['/api/blog-auth/password-reset/request', { email: 'unknown@example.com' }],
+      ['/api/blog-auth/verification/request', { email: 'unknown@example.com' }],
+      ['/api/blog-auth/email-change/request', { newEmail: 'unknown@example.com' }],
+    ];
+    var observed = [];
+    for (var i = 0; i < routes.length; i++) {
+      var response = $http.send({
+        url: 'http://127.0.0.1:8090' + routes[i][0],
+        method: 'POST',
+        body: JSON.stringify(routes[i][1]),
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 5,
+      });
+      observed.push({ path: routes[i][0], status: response.statusCode, body: response.raw });
+      if (response.statusCode !== 202) {
+        return c.json(500, { expected: 202, observed: observed });
+      }
+    }
+    return c.json(200, { routes: observed });
+  });
+
 })();
