@@ -596,7 +596,7 @@ routerAdd('GET', '/api/mail-local/account-foundation', (c) => {
         return length;
       }
 
-      const expectedMessage = '如果该账户可用，我们会发送邮件。';
+      const expectedMessage = '\u5982\u679c\u8be5\u8d26\u6237\u53ef\u7528\uff0c\u6211\u4eec\u4f1a\u53d1\u9001\u90ae\u4ef6\u3002';
       let canonicalRaw = '';
       const observed = [];
 
@@ -737,4 +737,236 @@ routerAdd('GET', '/api/mail-local/account-foundation', (c) => {
     return c.json(200, { routes: observed });
   });
 
+  routerAdd('POST', '/api/test/mail-account/setup-otp-users', function (c) {
+    try {
+      var collection = $app.dao().findCollectionByNameOrId('users');
+      function createAccount(email, verified, role) {
+        var existing = $app.dao().findRecordsByFilter(
+          'users', 'email = {:email}', '', 1, 0, { email: email }
+        );
+        if (existing && existing.length) return existing[0];
+        var record = new Record(collection);
+        record.set('email', email);
+        record.set('username', email.split('@')[0].replace(/[^a-z0-9]/g, '_'));
+        record.set('password', 'Test12345!');
+        record.set('passwordConfirm', 'Test12345!');
+        record.set('name', email.split('@')[0]);
+        record.set('role', role);
+        record.set('verified', verified);
+        record.refreshTokenKey();
+        $app.dao().saveRecord(record);
+        return record;
+      }
+      var accounts = {
+        reader: createAccount('reader@example.local', true, 'reader'),
+        unverified: createAccount('unverified@example.local', false, 'reader'),
+        admin: createAccount('admin@example.local', true, 'admin'),
+        superAdmin: createAccount('super@example.local', true, 'super_admin'),
+        author: createAccount('author@example.local', true, 'author'),
+      };
+      return c.json(200, {
+        reader: { id: accounts.reader.id, email: accounts.reader.getString('email') },
+        unverified: { id: accounts.unverified.id, email: accounts.unverified.getString('email') },
+        admin: { id: accounts.admin.id, email: accounts.admin.getString('email') },
+        superAdmin: { id: accounts.superAdmin.id, email: accounts.superAdmin.getString('email') },
+        author: { id: accounts.author.id, email: accounts.author.getString('email') },
+      });
+    } catch (error) {
+      return c.json(500, { error: String(error && error.message ? error.message : error) });
+    }
+  });
+
+  routerAdd('POST', '/api/test/mail-account/reset-otp-challenges', function (c) {
+    try {
+      while (true) {
+        var rows = $app.dao().findRecordsByFilter(
+          'auth_otp_challenges', 'challenge_id != ""', 'created', 500, 0, {}
+        );
+        for (var i = 0; i < rows.length; i++) $app.dao().deleteRecord(rows[i]);
+        if (rows.length < 500) break;
+      }
+      return c.json(200, { reset: true });
+    } catch (error) {
+      return c.json(500, { error: String(error && error.message ? error.message : error) });
+    }
+  });
+
+  routerAdd('POST', '/api/test/mail-account/seed-otp-limits', function (c) {
+    try {
+      var input = JSON.parse(readerToString(c.request().body, 4096) || '{}');
+      var scope = String(input.scope || '');
+      var count = Number(input.count);
+      var email = String(input.email || 'reader@example.local').trim().toLowerCase();
+      var ip = String(input.ip || '127.0.0.1').trim();
+      if (
+        ['email', 'ip', 'global'].indexOf(scope) === -1
+        || !Number.isInteger(count)
+        || count < 0
+        || count > 30
+      ) {
+        return c.json(400, { code: 'INVALID_FIXTURE_INPUT' });
+      }
+      var crypto = require(__hooks + '/lib/mail_crypto.js');
+      var collection = $app.dao().findCollectionByNameOrId('auth_otp_challenges');
+      var secret = String($os.getenv('MAIL_HASH_SECRET') || '');
+      for (var i = 0; i < count; i++) {
+        var challengeId = 'fixture_' + scope + '_' + $security.randomStringWithAlphabet(
+          24,
+          'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'
+        );
+        var rowEmail = scope === 'email' ? email : 'seed' + i + '@example.local';
+        var rowIp = scope === 'ip' ? ip : '198.51.100.' + ((i % 200) + 1);
+        var code = String(100000 + i).slice(-6);
+        var record = new Record(collection);
+        record.set('challenge_id', challengeId);
+        record.set('user', '');
+        record.set('email_hash', crypto.hashPrivate('email', rowEmail));
+        record.set('ip_hash', crypto.hashPrivate('ip', rowIp));
+        record.set('code_hash', $security.hs256('otp-code:' + challengeId + ':' + code, secret));
+        record.set('expires_at', new Date(Date.now() + 10 * 60 * 1000).toISOString().replace('T', ' '));
+        record.set('attempts', 0);
+        record.set('consumed_at', '');
+        $app.dao().saveRecord(record);
+      }
+      return c.json(200, { seeded: count, scope: scope });
+    } catch (error) {
+      return c.json(500, { error: String(error && error.message ? error.message : error) });
+    }
+  });
+
+  routerAdd('POST', '/api/test/mail-account/expire-otp-challenge', function (c) {
+    try {
+      var input = JSON.parse(readerToString(c.request().body, 4096) || '{}');
+      var rows = $app.dao().findRecordsByFilter(
+        'auth_otp_challenges',
+        'challenge_id = {:challengeId}',
+        '',
+        1,
+        0,
+        { challengeId: String(input.challengeId || '') }
+      );
+      var record = rows && rows.length ? rows[0] : null;
+      if (!record) return c.json(404, { code: 'NOT_FOUND' });
+      record.set('expires_at', new Date(Date.now() - 60 * 1000).toISOString().replace('T', ' '));
+      $app.dao().saveRecord(record);
+      return c.json(200, { expired: true });
+    } catch (error) {
+      return c.json(500, { error: String(error && error.message ? error.message : error) });
+    }
+  });
+
+  routerAdd('GET', '/api/test/mail-account/otp-challenge-state', function (c) {
+    try {
+      var found = $app.dao().findRecordsByFilter(
+        'auth_otp_challenges',
+        'challenge_id = {:challengeId}',
+        '',
+        1,
+        0,
+        { challengeId: String(c.queryParam('challengeId') || '') }
+      );
+      var record = found && found.length ? found[0] : null;
+      if (!record) return c.json(404, { code: 'NOT_FOUND' });
+      var userId = record.getString('user');
+      var activeForUser = 0;
+      if (userId) {
+        var rows = $app.dao().findRecordsByFilter(
+          'auth_otp_challenges',
+          'user = {:user}',
+          '-created',
+          1000,
+          0,
+          { user: userId }
+        );
+        for (var i = 0; i < rows.length; i++) {
+          if (!rows[i].getString('consumed_at')) activeForUser += 1;
+        }
+      }
+      return c.json(200, {
+        attempts: record.getInt('attempts'),
+        user: userId,
+        consumed: Boolean(record.getString('consumed_at')),
+        activeForUser: activeForUser,
+        codeHash: record.getString('code_hash'),
+      });
+    } catch (error) {
+      return c.json(500, { error: String(error && error.message ? error.message : error) });
+    }
+  });
+
+  routerAdd('GET', '/api/test/mail-account/otp-storage-scan', function (c) {
+    try {
+      var needle = String(c.queryParam('needle') || '');
+      if (!needle) return c.json(400, { code: 'INVALID_FIXTURE_INPUT' });
+      var challengeMatches = 0;
+      var logMatches = 0;
+      var challenges = $app.dao().findRecordsByFilter(
+        'auth_otp_challenges', 'challenge_id != ""', '-created', 1000, 0, {}
+      );
+      var logs = $app.dao().findRecordsByFilter(
+        'mail_delivery_logs', 'request_id != ""', '-created', 1000, 0, {}
+      );
+      for (var i = 0; i < challenges.length; i++) {
+        var challengeText = JSON.stringify({
+          challenge_id: challenges[i].getString('challenge_id'),
+          user: challenges[i].getString('user'),
+          email_hash: challenges[i].getString('email_hash'),
+          ip_hash: challenges[i].getString('ip_hash'),
+          code_hash: challenges[i].getString('code_hash'),
+          expires_at: challenges[i].getString('expires_at'),
+          attempts: challenges[i].getInt('attempts'),
+          consumed_at: challenges[i].getString('consumed_at'),
+        });
+        if (challengeText.indexOf(needle) !== -1) challengeMatches += 1;
+      }
+      for (var j = 0; j < logs.length; j++) {
+        var logText = JSON.stringify({
+          request_id: logs[j].getString('request_id'),
+          category: logs[j].getString('category'),
+          source_collection: logs[j].getString('source_collection'),
+          source_record_id: logs[j].getString('source_record_id'),
+          recipient_masked: logs[j].getString('recipient_masked'),
+          recipient_hash: logs[j].getString('recipient_hash'),
+          request_ip_hash: logs[j].getString('request_ip_hash'),
+          result: logs[j].getString('result'),
+          error_class: logs[j].getString('error_class'),
+        });
+        if (logText.indexOf(needle) !== -1) logMatches += 1;
+      }
+      return c.json(200, { challengeMatches: challengeMatches, logMatches: logMatches });
+    } catch (error) {
+      return c.json(500, { error: String(error && error.message ? error.message : error) });
+    }
+  });
+
+  routerAdd('GET', '/api/test/mail-account/otp-red', function (c) {
+    try {
+      var request = $http.send({
+        url: 'http://127.0.0.1:8090/api/blog-auth/otp/request',
+        method: 'POST',
+        body: JSON.stringify({ email: 'unknown@example.local' }),
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10,
+      });
+      var verify = $http.send({
+        url: 'http://127.0.0.1:8090/api/blog-auth/otp/verify',
+        method: 'POST',
+        body: JSON.stringify({
+          challengeId: 'fixture_missing_challenge_0001',
+          code: '123456',
+        }),
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10,
+      });
+      if (request.statusCode !== 202 || verify.statusCode !== 400) {
+        throw new Error(
+          'OTP routes unavailable: request=' + request.statusCode
+          + ' verify=' + verify.statusCode
+        );
+      }
+      return c.json(200, { request: 202, verify: 400 });
+    } catch (error) {
+      return c.json(500, { error: String(error && error.message ? error.message : error) });
+    }
+  });
 })();
