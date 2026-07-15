@@ -156,7 +156,91 @@
       return c.json(500, { error: String(error && error.message ? error.message : error) });
     }
   });
-  routerAdd('GET', '/api/mail-local/account-foundation', (c) => {
+    routerAdd('GET', '/api/test/mail-account/account-mail', function (c) {
+    try {
+      var facade = require(__hooks + '/lib/auth_facade.js');
+      var crypto = require(__hooks + '/lib/mail_crypto.js');
+      var logs = require(__hooks + '/lib/mail_logs.js');
+
+      // Create a test user record
+      var usersCollection = $app.dao().findCollectionByNameOrId('users');
+      var testEmail = 'test_account_' + Date.now() + '@example.com';
+      var user = new Record(usersCollection);
+      user.set('email', testEmail);
+      user.set('name', 'TestReader');
+      user.set('username', 'test_' + Date.now());
+      user.set('password', 'Test12345!');
+      user.set('passwordConfirm', 'Test12345!');
+      user.set('verified', false);
+      user.set('role', 'reader');
+      $app.dao().saveRecord(user);
+
+      // Simulate a Mailer Before event
+      var fakeToken = 'tok_' + $security.randomStringWithAlphabet(32, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789');
+      var fakeEvent = {
+        record: user,
+        message: {
+          from: { address: 'noreply@hlydwz.com', name: 'hlydwz' },
+          to: [{ address: testEmail }],
+          subject: 'test',
+          html: '<p>test</p>',
+          text: 'test',
+          headers: {},
+          attachments: {},
+        },
+        meta: { token: fakeToken },
+      };
+
+      var gatewayEnabled = String($os.getenv('MAIL_GATEWAY_ENABLED') || '').trim().toLowerCase() === 'true';
+      var accountEnabled = String($os.getenv('MAIL_ACCOUNT_ENABLED') || '').trim().toLowerCase() === 'true';
+
+      var errorCaught = null;
+      if (gatewayEnabled && accountEnabled) {
+        try {
+          facade.forwardAccountMail('account_verification', fakeEvent);
+        } catch (err) {
+          errorCaught = String(err && err.message ? err.message : err);
+        }
+      } else {
+        facade.forwardAccountMail('account_verification', fakeEvent);
+      }
+
+      // Verify the token does NOT appear in mail_delivery_logs
+      var allLogs = $app.dao().findRecordsByFilter(
+        'mail_delivery_logs',
+        'request_id != ""',
+        '-created',
+        1000,
+        0,
+        {}
+      );
+
+      var tokenInLogs = false;
+      for (var i = 0; i < allLogs.length; i++) {
+        var row = allLogs[i];
+        var rowStr = JSON.stringify({
+          request_id: row.getString('request_id'),
+          category: row.getString('category'),
+          recipient_masked: row.getString('recipient_masked'),
+          error_class: row.getString('error_class'),
+        });
+        if (rowStr.indexOf(fakeToken) !== -1) tokenInLogs = true;
+      }
+
+      // Clean up test user
+      try { $app.dao().deleteRecord(user); } catch (_) {}
+
+      return c.json(200, {
+        featureEnabled: gatewayEnabled && accountEnabled,
+        errorCaught: errorCaught,
+        tokenLeakedToLogs: tokenInLogs,
+        logCount: allLogs.length,
+      });
+    } catch (error) {
+      return c.json(500, { error: String(error && error.message ? error.message : error) });
+    }
+  });
+routerAdd('GET', '/api/mail-local/account-foundation', (c) => {
     function assertPrivate(collection, name) {
       if (
         collection.listRule !== null
