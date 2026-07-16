@@ -42,6 +42,8 @@ export async function revokeCurrentAdminCredential(
   clearLocalCredential: () => void,
 ): Promise<{ revoked: boolean; alreadyInvalid: boolean }> {
   if (!pb.authStore.token && !pb.authStore.record) {
+    clearLocalCredential();
+    pb.authStore.clear();
     return { revoked: false, alreadyInvalid: false };
   }
 

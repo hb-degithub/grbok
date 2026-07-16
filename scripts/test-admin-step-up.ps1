@@ -35,6 +35,17 @@ function New-RandomSecret {
     return [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 }
 
+function Get-HmacSha256Hex {
+    param(
+        [Parameter(Mandatory)][string]$Key,
+        [Parameter(Mandatory)][string]$Value
+    )
+    $hmac = [Security.Cryptography.HMACSHA256]::new([Text.Encoding]::UTF8.GetBytes($Key))
+    try {
+        return [BitConverter]::ToString($hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes($Value))).Replace('-', '').ToLowerInvariant()
+    } finally { $hmac.Dispose() }
+}
+
 function Assert-SafeRunRoot {
     $tempRoot = [IO.Path]::GetFullPath($env:TEMP).TrimEnd('\')
     $resolved = [IO.Path]::GetFullPath($runRoot)
@@ -185,7 +196,9 @@ $preCutoverMigrationsPath = Join-Path $resolvedRunRoot 'pre_cutover_migrations'
 $preCutoverHooksPath = Join-Path $resolvedRunRoot 'pre_cutover_hooks'
 New-Item -ItemType Directory -Force -Path $dataPath,$emptyMigrationsPath,$emptyHooksPath,$preCutoverMigrationsPath,$preCutoverHooksPath | Out-Null
 Get-ChildItem -LiteralPath $migrationsPath -File -Filter '*.pb.js' |
-    Where-Object { $_.Name -ne '20260716100500_harden_admin_recovery_cutover.pb.js' } |
+    Where-Object {
+        $_.Name -notin @('20260716100500_harden_admin_recovery_cutover.pb.js', '20260716100600_add_admin_audit_actor.pb.js')
+    } |
     ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $preCutoverMigrationsPath -Force }
 Copy-Item -LiteralPath $legacySeedFixture -Destination (Join-Path $preCutoverHooksPath 'legacy_session_seed.pb.js') -Force
 Copy-Hooks -Destination $hooksPath
@@ -292,6 +305,7 @@ try {
         $adminAuth = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/admins/auth-with-password" -Body @{ identity = $adminEmail; password = $adminPassword }
         if ($adminAuth.Status -ne 200) { throw 'Temporary admin authentication failed' }
         $adminToken = [string]$adminAuth.Json.token
+        $expectedAdminActorReference = Get-HmacSha256Hex -Key $hashSecret -Value "admin-audit-actor:$([string]$adminAuth.Json.admin.id)"
 
         $failedPageRecovery = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/local-recovery" -Token $adminToken -Headers @{ 'X-Test-Fail-Recovery-Page' = '2' } -Body @{ email = [string]$setup.Json.email }
         if ($failedPageRecovery.Status -lt 400) { throw 'Recovery page failure injection did not fail recovery' }
@@ -318,6 +332,9 @@ try {
         }
         if ($afterRecovery.Json.auditBefore.activePasskeys -ne $expectedPasskeys -or $afterRecovery.Json.auditBefore.activeStepUps -ne $expectedStepUps -or $afterRecovery.Json.auditBefore.activeLegacySessions -ne $expectedLegacy) {
             throw "Local recovery audit counts invalid: $($afterRecovery.Raw)"
+        }
+        if ([string]$afterRecovery.Json.auditActorType -cne 'pb_admin' -or [string]$afterRecovery.Json.auditActorReference -cne $expectedAdminActorReference) {
+            throw "Local recovery audit actor is missing or not pseudonymized: $($afterRecovery.Raw)"
         }
 
         $browserHeaders = @{

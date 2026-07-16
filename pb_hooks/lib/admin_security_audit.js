@@ -6,7 +6,12 @@ function writeSecurityAudit(dao, secureContext, event) {
   }
   var collection = dao.findCollectionByNameOrId('admin_security_audits');
   var record = new Record(collection);
+  var actorType = secureContext && secureContext.actorType
+    ? String(secureContext.actorType)
+    : (secureContext && secureContext.actorId ? 'user' : 'system');
   record.set('actor', secureContext && secureContext.actorId ? secureContext.actorId : '');
+  record.set('actor_type', actorType);
+  record.set('actor_reference', secureContext && secureContext.actorReference ? String(secureContext.actorReference) : '');
   record.set('action_code', String(event.actionCode || 'ADMIN_SECURITY_EVENT'));
   record.set('target_type', String(event.targetType || 'admin_security'));
   record.set('target_id', String(event.targetId || ''));

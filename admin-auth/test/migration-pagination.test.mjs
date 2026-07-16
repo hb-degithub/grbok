@@ -144,3 +144,23 @@ test('recovery cutover migration drains every challenge and legacy-session page'
   assert.equal(challenges.records.length, 0);
   assert.equal(legacy.records.length, 0);
 });
+
+test('audit actor migration backfills every historical row before requiring actor_type', async () => {
+  const audits = collection('admin_security_audits', [{ id: 'actor-id', name: 'actor' }]);
+  audits.indexes = [];
+  for (let index = 0; index < 5; index++) {
+    seed(audits, { id: `audit-${index}`, actor: index % 2 === 0 ? `user-${index}` : '' });
+  }
+  const dao = new FakeDao([audits], 2);
+  const up = await loadUpCallback('../../pb_migrations/20260716100600_add_admin_audit_actor.pb.js');
+
+  up({ dao });
+
+  assert.deepEqual(
+    audits.records.map((record) => record.getString('actor_type')),
+    ['user', 'system', 'user', 'system', 'user'],
+  );
+  assert.equal(audits.schema.getFieldByName('actor_type').required, true);
+  assert.equal(audits.schema.getFieldByName('actor_reference').required, false);
+  assert.equal(audits.indexes.some((value) => value.includes('idx_admin_security_audits_actor_type')), true);
+});

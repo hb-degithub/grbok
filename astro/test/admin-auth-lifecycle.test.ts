@@ -64,6 +64,22 @@ test('network and 5xx failures retain every local credential and throw a stable 
   }
 });
 
+test('missing auth state still clears stale local admin credentials', async () => {
+  const fixture = client(async () => {
+    throw new Error('server revoke must not be called without an auth credential');
+  });
+  fixture.pb.authStore.token = '';
+  fixture.pb.authStore.record = null as unknown as { id: string };
+
+  const result = await revokeCurrentAdminCredential(
+    fixture.pb,
+    () => fixture.observed.push('step-up-clear'),
+  );
+
+  assert.deepEqual(result, { revoked: false, alreadyInvalid: false });
+  assert.deepEqual(fixture.observed, ['step-up-clear', 'auth-clear']);
+});
+
 test('a login operation starts only after the old token and step-up were revoked', async () => {
   const fixture = client(async () => ({ revoked: true }));
   const result = await runAfterAdminCredentialRevoked(

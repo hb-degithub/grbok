@@ -413,6 +413,8 @@ routerAdd('POST', '/api/test/admin-step-up/recovery/check', function (c) {
   const state = states.length ? states[0] : null;
   const auditBefore = auditRows.length ? auditRows[0].get('before_json') : null;
   const auditAfter = auditRows.length ? auditRows[0].get('after_json') : null;
+  const auditActorType = auditRows.length ? auditRows[0].getString('actor_type') : '';
+  const auditActorReference = auditRows.length ? auditRows[0].getString('actor_reference') : '';
   return c.json(200, {
     activePasskeys,
     activeStepUps,
@@ -422,6 +424,8 @@ routerAdd('POST', '/api/test/admin-step-up/recovery/check', function (c) {
     audits: auditRows.length,
     auditBefore,
     auditAfter,
+    auditActorType,
+    auditActorReference,
   });
 });
 

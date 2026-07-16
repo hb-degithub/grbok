@@ -13,6 +13,12 @@ function hasSessionStorage(): boolean {
   try { return typeof window !== 'undefined' && !!window.sessionStorage; } catch { return false; }
 }
 
+function authRecordId(record: unknown): string {
+  if (!record || typeof record !== 'object' || !('id' in record)) return '';
+  const value = (record as { id?: unknown }).id;
+  return typeof value === 'string' ? value : '';
+}
+
 function base64Url(bytes: Uint8Array): string {
   let binary = '';
   bytes.forEach((value) => { binary += String.fromCharCode(value); });
@@ -74,6 +80,13 @@ export function installAdminStepUpHeaders(pb: PocketBase): void {
   installedClients.add(pb);
   const originalBeforeSend = pb.beforeSend;
   const apiOrigin = new URL(pb.baseUrl).origin;
+  let activeUserId = authRecordId(pb.authStore.record);
+
+  pb.authStore.onChange((token, record) => {
+    const nextUserId = authRecordId(record);
+    if (!token || !nextUserId || nextUserId !== activeUserId) clearAdminStepUp({ includeClientSession: true });
+    activeUserId = nextUserId;
+  }, false);
 
   pb.beforeSend = async (url, options) => {
     const prior = originalBeforeSend ? await originalBeforeSend(url, options) : options;

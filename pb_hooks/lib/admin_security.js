@@ -38,6 +38,26 @@ function requireTrustedAdminIp(c) {
   if (!trustedAdminIp(c)) apiError(403, 'ADMIN_NETWORK_DENIED');
 }
 
+function isLoopbackAddress(value) {
+  var normalized = String(value || '').trim().toLowerCase();
+  if (normalized === '::1' || normalized === '0:0:0:0:0:0:0:1') return true;
+  if (normalized.indexOf('::ffff:') === 0) normalized = normalized.slice(7);
+  var parts = normalized.split('.');
+  if (parts.length !== 4 || parts[0] !== '127') return false;
+  for (var i = 0; i < parts.length; i++) {
+    if (!/^\d{1,3}$/.test(parts[i])) return false;
+    var octet = Number(parts[i]);
+    if (!isFinite(octet) || octet < 0 || octet > 255) return false;
+  }
+  return true;
+}
+
+function requireLoopbackRealIp(c) {
+  var actual = '';
+  try { actual = String(c.realIP() || '').trim(); } catch (_) {}
+  if (!isLoopbackAddress(actual)) apiError(403, 'ADMIN_NETWORK_DENIED');
+}
+
 function header(c, name) {
   try { return String(c.request().header.get(name) || '').trim(); } catch (_) { return ''; }
 }
@@ -410,12 +430,15 @@ function requireLocalAdmin(c) {
   var admin = null;
   try { admin = c.get('admin') || null; } catch (_) {}
   if (!admin) apiError(401, 'AUTH_REQUIRED');
-  requireTrustedAdminIp(c);
+  requireLoopbackRealIp(c);
   return admin;
 }
 
 function localRecovery(c) {
-  requireLocalAdmin(c);
+  var pbAdmin = requireLocalAdmin(c);
+  var adminId = String(pbAdmin.id || '').trim();
+  if (!adminId || HASH_SECRET.length < 32) apiError(503, 'ADMIN_RECOVERY_UNAVAILABLE');
+  var adminReference = $security.hs256('admin-audit-actor:' + adminId, HASH_SECRET);
   var input = body(c);
   var email = String(input.email || '').trim().toLowerCase();
   if (!email || email.length > 320) apiError(400, 'INVALID_REQUEST');
@@ -442,6 +465,8 @@ function localRecovery(c) {
     txDao.saveRecord(state);
     audits.writeSecurityAudit(txDao, {
       actorId: '',
+      actorType: 'pb_admin',
+      actorReference: adminReference,
       referenceId: referenceId,
       failAudit: header(c, 'X-Test-Fail-Audit') === '1',
     }, {
@@ -465,6 +490,7 @@ function localRecovery(c) {
 }
 
 module.exports = {
+  isLoopbackAddress: isLoopbackAddress,
   listPasskeys: listPasskeys,
   revokePasskey: revokePasskey,
   stepUpStatus: stepUpStatus,
