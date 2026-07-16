@@ -7,6 +7,7 @@ var INTERNAL_SECRET = String($os.getenv('ADMIN_AUTH_INTERNAL_SECRET') || '').tri
 var HASH_SECRET = String($os.getenv('ADMIN_AUTH_HASH_SECRET') || '').trim();
 var ADMIN_ROLES = ['author', 'admin', 'super_admin'];
 var CHALLENGE_ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-';
+var CHALLENGE_BINDING_REQUIRED = 'ADMIN_STEP_UP_REQUIRED';
 
 function apiError(status, code) {
   throw new ApiError(status, code);
@@ -38,6 +39,12 @@ function requireTrustedAdminIp(c) {
 
 function header(c, name) {
   try { return String(c.request().header.get(name) || '').trim(); } catch (_) { return ''; }
+}
+
+function challengeClientSessionHmac(c) {
+  var clientSession = header(c, 'X-Admin-Session');
+  if (!clientSession || HASH_SECRET.length < 32) apiError(403, CHALLENGE_BINDING_REQUIRED);
+  return $security.hs256('step-up-client-session:' + clientSession, HASH_SECRET);
 }
 
 function body(c) {
@@ -172,6 +179,7 @@ function stepUpStatus(c) {
 
 function authenticationOptions(c) {
   var user = requireAdmin(c, false);
+  var clientSessionHmac = challengeClientSessionHmac(c);
   var passkeys = activePasskeys($app.dao(), user.id);
   if (!passkeys.length) apiError(409, 'PASSKEY_REQUIRED');
   var challenge = $security.randomStringWithAlphabet(43, CHALLENGE_ALPHABET);
@@ -179,7 +187,12 @@ function authenticationOptions(c) {
     challenge: challenge,
     allowCredentials: passkeys.map(function (item) { return { id: item.getString('credential_id'), type: 'public-key' }; }),
   });
-  saveChallenge($app.dao(), { userId: user.id, purpose: 'authentication', challenge: challenge });
+  saveChallenge($app.dao(), {
+    userId: user.id,
+    purpose: 'authentication',
+    challenge: challenge,
+    clientSessionHmac: clientSessionHmac,
+  });
   return c.json(200, options);
 }
 
@@ -192,6 +205,9 @@ function authenticationVerify(c) {
   var ip = String(c.realIP() || '').trim();
   if (!clientSession || !fingerprint || !userAgent || !ip) apiError(400, 'INVALID_REQUEST');
   var challenge = consumeChallenge($app.dao(), user.id, 'authentication');
+  if (challenge.getString('client_session_hmac') !== challengeClientSessionHmac(c)) {
+    apiError(403, CHALLENGE_BINDING_REQUIRED);
+  }
   var credentialId = input.response && input.response.id ? String(input.response.id) : '';
   var found = records($app.dao(), 'admin_passkeys', 'owner = {:user} && credential_id = {:credential} && revoked_at = null', '', 1, { user: user.id, credential: credentialId });
   if (!found.length) apiError(400, 'PASSKEY_VERIFICATION_FAILED');
@@ -227,6 +243,7 @@ function registrationOptions(c) {
   var user = requireAdmin(c, true);
   requireTrustedAdminIp(c);
   var mode = registrationMode($app.dao(), user.id);
+  var clientSessionHmac = challengeClientSessionHmac(c);
   var secure = null;
   if (mode === 'add_registration') secure = stepUp.requireAdminStepUp(c, { requireVerifiedEmail: true });
   var challenge = $security.randomStringWithAlphabet(43, CHALLENGE_ALPHABET);
@@ -237,7 +254,8 @@ function registrationOptions(c) {
   });
   saveChallenge($app.dao(), {
     userId: user.id, purpose: mode, challenge: challenge,
-    bindingSelector: secure ? secure.selector : '', clientSessionHmac: secure ? secure.clientSessionHmac : '',
+    bindingSelector: secure ? secure.selector : '',
+    clientSessionHmac: clientSessionHmac,
   });
   options.registrationMode = mode;
   return c.json(200, options);
@@ -248,9 +266,13 @@ function registrationVerify(c) {
   requireTrustedAdminIp(c);
   var input = body(c);
   var mode = registrationMode($app.dao(), user.id);
+  var clientSessionHmac = challengeClientSessionHmac(c);
   var challenge;
   var secure = null;
   $app.dao().runInTransaction(function (txDao) { challenge = consumeChallenge(txDao, user.id, mode); });
+  if (challenge.getString('client_session_hmac') !== clientSessionHmac) {
+    apiError(403, CHALLENGE_BINDING_REQUIRED);
+  }
   if (mode === 'add_registration') {
     secure = stepUp.requireAdminStepUp(c, { requireVerifiedEmail: true });
     if (challenge.getString('binding_selector') !== secure.selector || challenge.getString('client_session_hmac') !== secure.clientSessionHmac) {

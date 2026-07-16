@@ -98,6 +98,14 @@ Install-PocketBase
 Assert-PortFree
 
 if (-not (Test-Path -LiteralPath $fixturePath -PathType Leaf)) { throw "Missing fixture: $fixturePath" }
+$securityModule = Join-Path $hooksSource 'lib\admin_security.js'
+if (-not (Test-Path -LiteralPath $securityModule -PathType Leaf)) { throw "Missing security module: $securityModule" }
+$securityContract = Get-Content -LiteralPath $securityModule -Raw
+foreach ($requiredMarker in @('challengeClientSessionHmac', 'CHALLENGE_BINDING_REQUIRED')) {
+    if ($securityContract -notmatch [regex]::Escape($requiredMarker)) {
+        throw "Admin security challenge binding contract missing: $requiredMarker"
+    }
+}
 if (Test-Path -LiteralPath $resolvedRunRoot) { Remove-Item -LiteralPath $resolvedRunRoot -Recurse -Force }
 $dataPath = Join-Path $resolvedRunRoot 'pb_data'
 $hooksPath = Join-Path $resolvedRunRoot 'pb_hooks'
