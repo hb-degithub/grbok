@@ -60,7 +60,23 @@ routerAdd('GET', '/api/test/security-rate/rate', function (c) {
       assert(rows.length === 0, 'injected failure left a partial bucket write');
     }
 
-    return c.json(200, { ok: true, boundary: true, corruption: true, rollback: true });
+    var bucketCollection = $app.dao().findCollectionByNameOrId('security_rate_buckets');
+    var cleanupNow = Date.now();
+    var expiredBucket = new Record(bucketCollection);
+    expiredBucket.set('policy', 'account_mail_ip'); expiredBucket.set('subject_hash', rate._subjectHash('account_mail_ip', 'cleanup-expired'));
+    expiredBucket.set('events_json', '[]'); expiredBucket.set('expires_at', new Date(cleanupNow - 1).toISOString()); $app.dao().saveRecord(expiredBucket);
+    var activeBucket = new Record(bucketCollection);
+    activeBucket.set('policy', 'account_mail_ip'); activeBucket.set('subject_hash', rate._subjectHash('account_mail_ip', 'cleanup-active'));
+    activeBucket.set('events_json', '[]'); activeBucket.set('expires_at', new Date(cleanupNow + 60000).toISOString()); $app.dao().saveRecord(activeBucket);
+    var cleaned = rate.cleanupExpired($app.dao(), cleanupNow);
+    assert(cleaned >= 1, 'cleanup did not delete expired buckets');
+    var expiredMissing = false;
+    try { $app.dao().findRecordById('security_rate_buckets', expiredBucket.id); } catch (_) { expiredMissing = true; }
+    assert(expiredMissing, 'cleanup retained expired bucket');
+    assert($app.dao().findRecordById('security_rate_buckets', activeBucket.id).id === activeBucket.id, 'cleanup deleted active bucket');
+    assert(rate.cleanupExpired($app.dao(), cleanupNow) === 0, 'cleanup must be idempotent');
+
+    return c.json(200, { ok: true, boundary: true, corruption: true, rollback: true, cleanup: true });
   } catch (error) {
     return c.json(500, { ok: false, error: String(error && error.message ? error.message : error) });
   }

@@ -255,12 +255,30 @@ function consume(txDao, input) {
   return { allowed: true, limitedBy: null, retryAfterSeconds: 0 };
 }
 
+function cleanupExpired(dao, nowMs) {
+  if (!dao || !Number.isSafeInteger(nowMs) || nowMs < 0) throw invalid('invalid cleanup input');
+  var total = 0;
+  var cutoff = new Date(nowMs).toISOString().replace('T', ' ');
+  while (true) {
+    var deleted = 0;
+    dao.runInTransaction(function (txDao) {
+      var rows = txDao.findRecordsByFilter('security_rate_buckets', 'expires_at < {:cutoff}', 'expires_at', 500, 0, { cutoff: cutoff });
+      for (var i = 0; i < rows.length; i++) txDao.deleteRecord(rows[i]);
+      deleted = rows.length;
+    });
+    total += deleted;
+    if (deleted < 500) break;
+  }
+  return total;
+}
+
 module.exports = {
   RateLimitUnavailableError: RateLimitUnavailableError,
   consume: consume,
   normalizeEmail: normalizeEmail,
   normalizeIp: normalizeIp,
   ipv6Prefix64: ipv6Prefix64,
+  cleanupExpired: cleanupExpired,
   _parseEvents: parseEvents,
   _pruneEvents: pruneEvents,
   _subjectHash: subjectHash,
