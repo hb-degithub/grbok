@@ -20,6 +20,7 @@ describe('mail constants', () => {
     assert.deepEqual(MAIL_CATEGORIES, [
       'account_verification', 'account_password_reset', 'account_email_change',
       'reader_otp', 'comment_new', 'comment_approved', 'comment_reply',
+      'comment_notification', 'account_retention_notice',
       'admin_test', 'ops_alert',
     ]);
     assert.deepEqual(MAIL_ERROR_CODES, [

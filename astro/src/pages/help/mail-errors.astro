@@ -1,0 +1,31 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const errors = [
+  ['INVALID_REQUEST', '请检查邮箱地址和请求内容后重试。'],
+  ['MAIL_REQUEST_ACCEPTED', '请求已受理；如果账户符合条件，邮件会随后送达。'],
+  ['REQUEST_RATE_LIMITED', '请求过于频繁，请等待 Retry-After 指示的时间后重试。'],
+  ['EMAIL_RATE_LIMITED', '此邮箱的请求过于频繁，请稍后重试。'],
+  ['IP_RATE_LIMITED', '当前网络的请求过于频繁，请稍后重试。'],
+  ['GLOBAL_RATE_LIMITED', '邮件服务当前繁忙，请稍后重试。'],
+  ['INVALID_REGISTRATION', '请检查注册资料后重新提交。'],
+  ['REGISTRATION_RATE_LIMITED', '当前网络的注册请求过于频繁，请稍后重试。'],
+  ['REGISTRATION_UNAVAILABLE', '注册保护服务暂不可用，请稍后重试。'],
+];
+---
+
+<BaseLayout title="邮件与注册错误代码">
+  <main class="mx-auto max-w-3xl px-6 py-20">
+    <p class="text-sm font-medium text-indigo-600">帮助中心</p>
+    <h1 class="mt-3 text-4xl font-semibold tracking-tight text-zinc-950 dark:text-white">邮件与注册错误代码</h1>
+    <p class="mt-5 text-zinc-600 dark:text-zinc-300">这些代码只说明可采取的安全操作，不会确认账户是否存在，也不会披露服务商或当前配额信息。</p>
+    <div class="mt-12 divide-y divide-zinc-200 border-y border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+      {errors.map(([code, action]) => (
+        <section id={code} class="scroll-mt-24 py-7">
+          <h2 class="font-mono text-lg font-semibold text-zinc-950 dark:text-white">{code}</h2>
+          <p class="mt-2 text-zinc-600 dark:text-zinc-300">{action}</p>
+        </section>
+      ))}
+    </div>
+  </main>
+</BaseLayout>

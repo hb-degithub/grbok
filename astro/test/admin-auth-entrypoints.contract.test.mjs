@@ -4,13 +4,16 @@ import test from 'node:test';
 
 const source = async (path) => readFile(new URL(path, import.meta.url), 'utf8');
 
-test('every browser login entry point revokes the previous admin credential first', async () => {
+test('supported browser login entry points revoke old admin state and never restore native OTP or registration bypasses', async () => {
   const password = await source('../src/components/auth/PasswordLoginForm.tsx');
   const pocketbase = await source('../src/hooks/usePocketBase.ts');
-  assert.match(password, /runAfterAdminCredentialRevoked\([\s\S]{0,500}authWithOTP/);
   assert.match(password, /runAfterAdminCredentialRevoked\([\s\S]{0,500}authWithPassword/);
-  assert.match(pocketbase, /runAfterAdminCredentialRevoked\([\s\S]{0,500}authWithOTP/);
-  assert.match(pocketbase, /runAfterAdminCredentialRevoked\([\s\S]{0,500}authWithPassword/);
+  assert.match(password, /MFA_UNSUPPORTED/);
+  assert.doesNotMatch(password, /requestOTP|authWithOTP/);
+  assert.match(pocketbase, /runAfterAdminCredentialRevoked\([\s\S]{0,500}verifyReaderOtp/);
+  assert.match(pocketbase, /registerReaderRequest\(data\)/);
+  assert.match(pocketbase, /requestVerificationRequest\(email\)/);
+  assert.doesNotMatch(pocketbase, /collection\('users'\)\.(?:create|requestVerification|requestOTP|authWithOTP)/);
 });
 
 test('both logout hooks await server revoke instead of directly clearing auth', async () => {

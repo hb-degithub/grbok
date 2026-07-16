@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
+import { requestVerification } from '../../lib/blog-auth-client';
 import type { User } from '../../types/pocketbase';
 
 interface AdminEmailVerificationRequiredProps {
@@ -14,8 +14,7 @@ export default function AdminEmailVerificationRequired({ user, onReturnToLogin }
   const handleResend = useCallback(async () => {
     setStatus('sending');
     try {
-      const pb = getPocketBase();
-      await pb.collection('users').requestVerification(user.email);
+      await requestVerification(user.email);
       setStatus('sent');
     } catch (err) {
       console.error('Resend admin verification failed:', err);

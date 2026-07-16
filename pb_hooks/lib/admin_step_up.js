@@ -9,10 +9,10 @@ var PROTECTED_COLLECTIONS = [
 ];
 var SAFE_SELF_PROFILE_FIELDS = ['name', 'username', 'avatar'];
 
-function forbidden() {
+function forbidden(code) {
   var referenceId = $security.randomStringWithAlphabet(22, REFERENCE_ALPHABET);
   console.error('[admin-step-up-denied] reference=' + referenceId);
-  throw new ForbiddenError('ADMIN_STEP_UP_REQUIRED');
+  throw new ForbiddenError(code || 'ADMIN_STEP_UP_REQUIRED');
 }
 
 function requestContext(ctx) {
@@ -51,6 +51,11 @@ function clientIp(ctx) {
     return '';
   }
 }
+function trustedAdminIp(ip) {
+  var configured = String($os.getenv('ADMIN_IP') || '').split(/[\s,]+/).filter(Boolean);
+  return !!ip && configured.indexOf(String(ip)) !== -1;
+}
+
 
 function hash(secret, namespace, value) {
   return $security.hs256(namespace + ':' + String(value), secret);
@@ -83,6 +88,7 @@ function requireAdminStepUp(ctx, options) {
     var actor = currentActor(ctx);
     var role = actor ? String(actor.get('role') || '').trim() : '';
     if (!actor || ADMIN_ROLES.indexOf(role) === -1) forbidden();
+    if (options.requireSuperAdmin && role !== 'super_admin') forbidden();
     if (options.requireVerifiedEmail && !actor.verified()) forbidden();
 
     var credential = header(ctx, 'X-Admin-Step-Up');
@@ -95,6 +101,7 @@ function requireAdminStepUp(ctx, options) {
     var ip = clientIp(ctx);
     var userAgent = header(ctx, 'User-Agent');
     if (!clientSession || !fingerprint || !ip || !userAgent) forbidden();
+    if (options.requireTrustedAdminIp && !trustedAdminIp(ip)) forbidden('ADMIN_NETWORK_DENIED');
 
     var hashSecret = String($os.getenv('ADMIN_AUTH_HASH_SECRET') || '');
     if (hashSecret.length < 32) forbidden();
@@ -119,7 +126,7 @@ function requireAdminStepUp(ctx, options) {
       clientIp: ip,
     };
   } catch (error) {
-    if (error && error.message === 'ADMIN_STEP_UP_REQUIRED') throw error;
+    if (error && (error.message === 'ADMIN_STEP_UP_REQUIRED' || error.message === 'ADMIN_NETWORK_DENIED')) throw error;
     forbidden();
   }
 }

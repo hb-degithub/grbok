@@ -1,10 +1,14 @@
-﻿# Local test Caddy config.
+# Local test Caddy config.
 # The docker compose image is the standard caddy:2.8.4-alpine image, so do not
 # use third-party directives such as rate_limit here.
 
 {
     auto_https off
     admin off
+    servers {
+        trusted_proxies static 127.0.0.1/32 172.16.0.0/12
+        client_ip_headers X-Forwarded-For X-Real-IP
+    }
 }
 
 :80 {
@@ -33,14 +37,41 @@
         respond 403
     }
 
+    @blockedNativeAuth path \
+        /api/collections/users/records \
+        /api/collections/users/records/ \
+        /api/collections/users/request-password-reset \
+        /api/collections/users/request-password-reset/ \
+        /api/collections/users/request-verification \
+        /api/collections/users/request-verification/ \
+        /api/collections/users/request-email-change \
+        /api/collections/users/request-email-change/ \
+        /api/collections/users/request-otp \
+        /api/collections/users/request-otp/ \
+        /api/collections/users/auth-with-otp \
+        /api/collections/users/auth-with-otp/ \
+        /api/collections/_pb_users_auth_/request-otp \
+        /api/collections/_pb_users_auth_/request-otp/ \
+        /api/collections/_pb_users_auth_/auth-with-otp \
+        /api/collections/_pb_users_auth_/auth-with-otp/ \
+        /api/collections/_pb_users_auth_/records \
+        /api/collections/_pb_users_auth_/records/ \
+        /api/collections/_pb_users_auth_/request-password-reset \
+        /api/collections/_pb_users_auth_/request-password-reset/ \
+        /api/collections/_pb_users_auth_/request-verification \
+        /api/collections/_pb_users_auth_/request-verification/ \
+        /api/collections/_pb_users_auth_/request-email-change \
+        /api/collections/_pb_users_auth_/request-email-change/
+    respond @blockedNativeAuth "Not Found" 404
+
     @pb_admin {
         path /_/*
         not path /_astro/*
     }
     handle @pb_admin {
         reverse_proxy pocketbase:8090 {
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP {client_ip}
+            header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
         }
     }
@@ -55,8 +86,8 @@
 
     handle /api/* {
         reverse_proxy pocketbase:8090 {
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP {client_ip}
+            header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
         }
     }

@@ -22,27 +22,11 @@ function loginMaybeCleanup() {
   }
 }
 
-function getHeader(e, name) {
-  try {
-    return e.httpContext?.request()?.header?.get(name) || '';
-  } catch (_) {
-    return '';
-  }
-}
-
 function getClientIP(e) {
-  // Prefer PocketBase's trusted realIP() — Caddy overwrites X-Forwarded-For
-  // with the true remote host, but if PB is ever exposed directly (or another
-  // untrusted proxy is layered in front), header-based IP would be spoofable.
-  // realIP() reflects the configured trusted proxy chain.
   try {
     const real = e.httpContext?.realIP?.();
     if (real && real.trim()) return real.trim();
   } catch (_) {}
-  const realIP = getHeader(e, 'X-Real-IP');
-  if (realIP) return realIP.trim();
-  const forwarded = getHeader(e, 'X-Forwarded-For');
-  if (forwarded) return forwarded.split(',')[0].trim();
   return '';
 }
 

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
+import { requestVerification } from '../../lib/blog-auth-client';
 
 interface EmailVerificationBannerProps {
   email: string;
@@ -14,8 +14,6 @@ export default function EmailVerificationBanner({ email, initialHighlight = fals
     initialHighlight ? 'sent' : 'idle',
   );
   const [highlight, setHighlight] = useState(initialHighlight);
-  const pb = getPocketBase();
-
   useEffect(() => {
     if (highlight) {
       const timer = setTimeout(() => setHighlight(false), 5000);
@@ -26,13 +24,13 @@ export default function EmailVerificationBanner({ email, initialHighlight = fals
   const handleResend = useCallback(async () => {
     setStatus('sending');
     try {
-      await pb.collection('users').requestVerification(email);
+      await requestVerification(email);
       setStatus('sent');
     } catch (err) {
       console.error('Resend verification failed:', err);
       setStatus('error');
     }
-  }, [pb, email]);
+  }, [email]);
 
   if (dismissed) return null;
 
