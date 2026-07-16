@@ -42,8 +42,8 @@ function Start-TestPocketBase {
     param([int]$Port)
     $stdout = Join-Path $runRoot "pocketbase-$Port.out.log"
     $stderr = Join-Path $runRoot "pocketbase-$Port.err.log"
-    $env:MAIL_HASH_SECRET = 'LOCAL_TEST_ONLY_MAIL_HASH_SECRET_0123456789'
-    $env:MAIL_INTERNAL_SECRET = 'LOCAL_TEST_ONLY_MAIL_INTERNAL_SECRET_012345'
+    $env:MAIL_HASH_SECRET = 'REPLACE_WITH_LOCAL_TEST_MAIL_HASH_SECRET'
+    $env:MAIL_INTERNAL_SECRET = 'REPLACE_WITH_LOCAL_TEST_MAIL_INTERNAL_SECRET'
     $env:MAIL_GATEWAY_ENABLED = 'true'
     $env:MAIL_ACCOUNT_ENABLED = 'true'
     $env:MAIL_OTP_ENABLED = 'true'
@@ -204,11 +204,17 @@ function Invoke-AccountMailScenarios {
 
     Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/account-mail/reset-buckets" -TimeoutSec 10 | Out-Null
     Invoke-JsonPost -Port $Port -Path '/api/test/security-rate/account-mail/prime' -Body @{ policyKey='account_mail_ip'; subject=[string]$Setup.requestIp; count=5 } | Out-Null
-    Assert-DetailedLimit (Invoke-JsonPost -Port $Port -Path '/api/blog-auth/email-change/request' -Headers $authHeaders -Body @{ newEmail='new-ip-limit@example.com' }) 'IP_RATE_LIMITED'
+    Assert-PublicMailResponse (Invoke-JsonPost -Port $Port -Path '/api/blog-auth/email-change/request' -Headers $authHeaders -Body @{ newEmail='new-ip-limit@example.com' }) 'email-change IP limit remains uniform'
+    Assert-DetailedLimit (Invoke-JsonPost -Port $Port -Path '/api/blog-auth/verification/request' -Headers $verifyHeaders -Body @{ email=[string]$Setup.unverified.email }) 'IP_RATE_LIMITED'
+
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/account-mail/reset-buckets" -TimeoutSec 10 | Out-Null
+    Invoke-JsonPost -Port $Port -Path '/api/test/security-rate/account-mail/prime' -Body @{ policyKey='account_mail_email'; subject='third-party-target@example.com'; count=2 } | Out-Null
+    Assert-PublicMailResponse (Invoke-JsonPost -Port $Port -Path '/api/blog-auth/email-change/request' -Headers $authHeaders -Body @{ newEmail='third-party-target@example.com' }) 'third-party email-change remains uniform'
 
     Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/account-mail/reset-buckets" -TimeoutSec 10 | Out-Null
     Invoke-JsonPost -Port $Port -Path '/api/test/security-rate/account-mail/prime' -Body @{ policyKey='account_mail_global'; subject='v1'; count=30 } | Out-Null
-    Assert-DetailedLimit (Invoke-JsonPost -Port $Port -Path '/api/blog-auth/email-change/request' -Headers $authHeaders -Body @{ newEmail='new-global-limit@example.com' }) 'GLOBAL_RATE_LIMITED'
+    Assert-PublicMailResponse (Invoke-JsonPost -Port $Port -Path '/api/blog-auth/email-change/request' -Headers $authHeaders -Body @{ newEmail='new-global-limit@example.com' }) 'email-change global limit remains uniform'
+    Assert-DetailedLimit (Invoke-JsonPost -Port $Port -Path '/api/blog-auth/verification/request' -Headers $verifyHeaders -Body @{ email=[string]$Setup.unverified.email }) 'GLOBAL_RATE_LIMITED'
     Assert-PublicMailResponse (Invoke-JsonPost -Port $Port -Path '/api/blog-auth/password-reset/request' -Body @{ email=[string]$Setup.authenticated.email }) 'password reset remains uniform'
     $uniformOtp = Invoke-JsonPost -Port $Port -Path '/api/blog-auth/otp/request' -Body @{ email='uniform-otp@example.com' }
     if ($uniformOtp.Status -ne 202 -or $uniformOtp.Body.code -ne 'MAIL_REQUEST_ACCEPTED') { throw 'reader OTP no longer uniform under limit' }

@@ -64,19 +64,16 @@ function enqueue(txDao, input) {
   }
   return { queued: true, outboxId: record.id };
 }
-function parseDate(value) {
-  var ms = new Date(String(value || '').replace(' ', 'T')).getTime();
-  return Number.isFinite(ms) ? ms : 0;
-}
 function leaseBatch(nowMs, limit) {
   var leased = [];
+  var batchSize = Math.max(1, Math.min(MAX_BATCH, Number(limit) || MAX_BATCH));
   $app.dao().runInTransaction(function (txDao) {
-    var rows = txDao.findRecordsByFilter('mail_outbox', 'status = "pending" || status = "retry" || status = "processing"', 'created', 100, 0);
-    for (var i = 0; i < rows.length && leased.length < Math.max(1, Math.min(MAX_BATCH, Number(limit) || MAX_BATCH)); i++) {
-      var status = rows[i].getString('status');
-      var eligible = status === 'pending' || (status === 'retry' && parseDate(rows[i].getString('next_attempt_at')) <= nowMs) ||
-        (status === 'processing' && parseDate(rows[i].getString('lease_until')) <= nowMs);
-      if (!eligible) continue;
+    var rows = txDao.findRecordsByFilter(
+      'mail_outbox',
+      'status = "pending" || (status = "retry" && next_attempt_at <= {:now}) || (status = "processing" && lease_until <= {:now})',
+      'created', batchSize, 0, { now: new Date(nowMs).toISOString().replace('T', ' ') }
+    );
+    for (var i = 0; i < rows.length; i++) {
       var leaseToken = $security.randomStringWithAlphabet(32, ALPHABET);
       rows[i].set('status', 'processing'); rows[i].set('lease_until', new Date(nowMs + LEASE_MS).toISOString()); rows[i].set('lease_token', leaseToken);
       rows[i].set('attempt', rows[i].getInt('attempt') + 1); txDao.saveRecord(rows[i]);

@@ -160,7 +160,10 @@ function processAccountRequest(e, kind) {
   if (!ip) return;
   var authHeader = (kind === 'emailChange' || kind === 'verification') ? getAuthorization(e) : '';
   var currentRecord = authHeader ? getCurrentRecord(e) : null;
-  var identityConfirmed = Boolean(currentRecord && authHeader && (kind === 'emailChange' || (kind === 'verification' && currentRecord.getString('email').trim().toLowerCase() === email)));
+  var identityConfirmed = Boolean(
+    kind === 'verification' && currentRecord && authHeader &&
+    currentRecord.getString('email').trim().toLowerCase() === email
+  );
   var selected = null;
   var allowed = false;
   var limited = null;

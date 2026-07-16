@@ -25,6 +25,28 @@ migrate((db) => {
   }
   dao.saveCollection(collection);
 
+  const archiveCategories = {
+    account_verification: true, account_password_reset: true, account_email_change: true,
+    reader_otp: true, comment_new: true, comment_approved: true, comment_reply: true,
+    admin_test: true, ops_alert: true, account_retention_notice: true,
+  };
+  function boundedInteger(value, min, max, fallback) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return fallback;
+    return Math.max(min, Math.min(max, Math.floor(number)));
+  }
+  function archiveCategory(category, sourceKind) {
+    if (archiveCategories[category]) return category;
+    if (category === 'operations_alert') return 'ops_alert';
+    if (category.indexOf('registration_') === 0) return 'account_verification';
+    const fallback = {
+      reader: 'reader_otp', comment: 'comment_new', admin: 'admin_test',
+      operations: 'ops_alert', retention: 'account_retention_notice',
+      registration: 'account_verification', account: 'account_verification',
+    };
+    return fallback[sourceKind] || 'account_verification';
+  }
+
   const seenEventIds = {};
   let offset = 0;
   while (true) {
@@ -44,7 +66,10 @@ migrate((db) => {
       seenEventIds[eventId] = true;
       row.set('event_id', eventId);
       row.set('source_kind', sourceKind);
+      row.set('category', archiveCategory(category, sourceKind));
       row.set('result', row.getString('result') === 'sent' ? 'sent' : 'failed');
+      row.set('attempt', boundedInteger(row.get('attempt'), 1, 20, 1));
+      row.set('duration_ms', boundedInteger(row.get('duration_ms'), 0, 120000, 0));
       row.set('error_class', 'INTERNAL_ERROR');
       row.set('source_record_id', ''); row.set('recipient_masked', ''); row.set('recipient_hash', ''); row.set('request_ip_hash', '');
       dao.saveRecord(row);

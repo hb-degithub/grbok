@@ -42,15 +42,3 @@ export async function verifyReaderOtp(challengeId: string, code: string): Promis
   pb.authStore.save(result.token, result.record);
   return result;
 }
-
-export async function requestPasswordMfaOtp(email: string, mfaId: string): Promise<{ otpId: string }> {
-  const pb = getPocketBase();
-  return withAuthRequestHeaders(pb, () => pb.send<{ otpId: string }>('/api/blog-auth/mfa/otp/request', { method: 'POST', body: { email: normalizeAuthEmail(email), mfaId } }));
-}
-
-export async function verifyPasswordMfaOtp(otpId: string, code: string, mfaId: string): Promise<AuthResponse> {
-  const pb = getPocketBase();
-  const result = await withAuthRequestHeaders(pb, () => pb.send<AuthResponse>('/api/blog-auth/mfa/otp/verify', { method: 'POST', body: { otpId, code, mfaId } }));
-  pb.authStore.save(result.token, result.record);
-  return result;
-}

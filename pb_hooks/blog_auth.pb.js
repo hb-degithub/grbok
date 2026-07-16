@@ -64,22 +64,6 @@
     catch (_) { return e.json(400, { code: 'INVALID_OR_EXPIRED_CODE' }); }
   }, $apis.bodyLimit(4096));
 
-  routerAdd('POST', '/api/blog-auth/mfa/otp/request', function (e) {
-    var mfa = require(__hooks + '/lib/auth_mfa.js');
-    try { return e.json(200, mfa.request(e)); }
-    catch (error) {
-      if (error && error.code === 'REQUEST_RATE_LIMITED') return e.json(429, { code: error.code, retryAfter: Number(error.retryAfter || 1) });
-      if (error && error.code === 'INVALID_REQUEST') return e.json(400, { code: 'INVALID_REQUEST' });
-      return e.json(503, { code: 'MFA_UNAVAILABLE' });
-    }
-  }, $apis.bodyLimit(8192));
-
-  routerAdd('POST', '/api/blog-auth/mfa/otp/verify', function (e) {
-    var mfa = require(__hooks + '/lib/auth_mfa.js');
-    try { return e.json(200, mfa.verify(e)); }
-    catch (error) { return e.json(error && error.code === 'INVALID_REQUEST' ? 400 : 401, { code: error && error.code === 'INVALID_REQUEST' ? 'INVALID_REQUEST' : 'INVALID_OR_EXPIRED_CODE' }); }
-  }, $apis.bodyLimit(8192));
-
   cronAdd('reader-otp-challenge-cleanup', '0 * * * *', function () {
     require(__hooks + '/lib/auth_otp.js').cleanupExpired();
   });
@@ -90,7 +74,6 @@
     var managed = [
       '/api/blog-auth/password-reset/request', '/api/blog-auth/verification/request',
       '/api/blog-auth/email-change/request', '/api/blog-auth/otp/request', '/api/blog-auth/otp/verify',
-      '/api/blog-auth/mfa/otp/request', '/api/blog-auth/mfa/otp/verify',
     ];
     if (managed.indexOf(path) === -1) return;
     var status = Number(e.error.statusCode || e.error.status || e.error.code || 0);

@@ -7,6 +7,31 @@ routerAdd('GET', '/api/test/security-rate/outbox', function (c) {
     }
     if (!collection.schema.getFieldByName('lease_token')) throw new Error('mail_outbox lease_token missing');
     var probeNow = Date.now();
+    var starvationRows = [];
+    function starvationRecord(index, status) {
+      var row = new Record(collection);
+      row.set('dedupe_key', 'starvation:' + index);
+      row.set('event_id', $security.randomStringWithAlphabet(22, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'));
+      row.set('status', status); row.set('category', 'comment_notification'); row.set('template_key', 'comment_new');
+      row.set('recipient', 'probe@example.com');
+      row.set('variables_json', { postTitle: 'Probe', commenter: 'Worker', content: 'Lease', postUrl: 'http://localhost:4321/posts/probe' });
+      row.set('attempt', status === 'retry' ? 1 : 0);
+      row.set('next_attempt_at', new Date(probeNow + (status === 'retry' ? 3600000 : 0)).toISOString());
+      row.set('created', new Date(status === 'retry' ? probeNow - 3600000 + Number(index) : probeNow).toISOString());
+      row.set('lease_until', ''); row.set('lease_token', ''); row.set('last_error_class', '');
+      $app.dao().saveRecord(row); starvationRows.push(row); return row;
+    }
+    for (var blocked = 0; blocked < 100; blocked++) starvationRecord(blocked, 'retry');
+    var visiblePending = starvationRecord('pending', 'pending');
+    var visibleLease = outbox._leaseBatch(probeNow, 1);
+    if (visibleLease.length !== 1 || visibleLease[0].id !== visiblePending.id) {
+      var leasedId = visibleLease.length ? visibleLease[0].id : 'none';
+      var leasedRow = leasedId === 'none' ? null : $app.dao().findRecordById('mail_outbox', leasedId);
+      var leasedStatus = leasedRow ? leasedRow.getString('status') : 'none';
+      var leasedNext = leasedRow ? leasedRow.getString('next_attempt_at') : 'none';
+      throw new Error('future retries obscured a due pending row leased=' + leasedId + ' status=' + leasedStatus + ' next=' + leasedNext + ' now=' + new Date(probeNow).toISOString() + ' expected=' + visiblePending.id);
+    }
+    for (var sr = 0; sr < starvationRows.length; sr++) $app.dao().deleteRecord(starvationRows[sr]);
     for (var probe = 0; probe < 5; probe++) {
       $app.dao().runInTransaction(function (txDao) {
         var queuedProbe = outbox.enqueue(txDao, { dedupeKey: 'lease-probe:' + probe, category: 'comment_notification', recipient: 'probe@example.com', templateKey: 'comment_new', variables: { postTitle: 'Probe', commenter: 'Worker', content: 'Lease', postUrl: 'http://localhost:4321/posts/probe' } });

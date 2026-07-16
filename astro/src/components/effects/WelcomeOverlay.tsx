@@ -304,7 +304,7 @@ export default function WelcomeOverlay() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
                         </div>
-                        <p className="text-sm font-medium text-teal-700 dark:text-teal-300">提交已受理，请验证邮箱</p>
+                        <p className="text-sm font-medium text-teal-700 dark:text-teal-300">提交后请验证邮箱，验证完成后可评论</p>
                       </motion.div>
                     ) : (
                       <div className="space-y-3">
