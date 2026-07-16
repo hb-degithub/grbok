@@ -121,7 +121,7 @@ function retryDelay(attempt) {
   return 0;
 }
 
-function retentionNoticeInput(user, state, nowMs, siteUrl) {
+function retentionNoticeInput(user, nowMs, siteUrl, cleanupEligibleAt) {
   if (!siteUrl || !/^https:\/\//.test(siteUrl)) throw new Error('RETENTION_SITE_URL_INVALID');
   return {
     policy: 'account_retention_notice',
@@ -129,7 +129,7 @@ function retentionNoticeInput(user, state, nowMs, siteUrl) {
     recipient: String(user.get('email') || ''),
     variables: {
       site_url: siteUrl,
-      cleanup_date: String(state.get('cleanup_eligible_at') || ''),
+      cleanup_date: String(cleanupEligibleAt || ''),
     },
     source_kind: 'account_retention',
     source_record_id: recordId(user),
@@ -166,9 +166,12 @@ function runDueReminders(nowMs, limit) {
             return;
           }
 
+          var originalCleanupMs = Date.parse(String(state.get('cleanup_eligible_at') || ''));
+          var extendedCleanupMs = Math.max(isFinite(originalCleanupMs) ? originalCleanupMs : 0, nowMs + 15 * DAY_MS);
+          var extendedCleanupAt = iso(extendedCleanupMs);
           var result;
           try {
-            result = deps.mailOutbox.enqueue(txDao, retentionNoticeInput(user, state, nowMs, deps.siteUrl));
+            result = deps.mailOutbox.enqueue(txDao, retentionNoticeInput(user, nowMs, deps.siteUrl, extendedCleanupAt));
           } catch (_) {
             result = { queued: false, error_class: 'OUTBOX_UNAVAILABLE' };
           }
@@ -176,6 +179,7 @@ function runDueReminders(nowMs, limit) {
           state.set('reminder_attempts', attempt);
           if (result && result.queued) {
             state.set('reminder_sent_at', nowIso);
+            state.set('cleanup_eligible_at', extendedCleanupAt);
             state.set('next_attempt_at', null);
             state.set('last_error_class', '');
             summary.queued++;

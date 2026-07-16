@@ -31,10 +31,35 @@ function requireBatchId(value) { var text = String(value || ''); if (!/^[A-Za-z0
 function requireObjectKey(value) { var text = String(value || ''); if (!/^\d{4}-\d{2}\/[A-Za-z0-9_-]+\.jsonl\.gz\.age$/.test(text)) throw archiveError('ARCHIVE_OBJECT_KEY_INVALID'); return text; }
 function requireIso(value, code) { var text = String(value || ''); var parsed = Date.parse(text); if (!/^\d{4}-\d{2}-\d{2}T/.test(text) || !isFinite(parsed)) throw archiveError(code); return iso(parsed); }
 
+function requireRecipientFingerprints(value, allowMissing) {
+  var parsed = value;
+  if (typeof parsed === 'string' && parsed) {
+    try { parsed = JSON.parse(parsed); } catch (_) { parsed = null; }
+  }
+  if ((parsed == null || parsed === '') && allowMissing) return null;
+  if (!Array.isArray(parsed) || parsed.length < 1 || parsed.length > 2) throw archiveError('ARCHIVE_AGE_RECIPIENT_FINGERPRINTS_INVALID');
+  var normalized = parsed.map(function (item) { return requireHash(String(item || '').toLowerCase(), 'ARCHIVE_AGE_RECIPIENT_FINGERPRINTS_INVALID'); }).sort();
+  for (var i = 1; i < normalized.length; i++) if (normalized[i] === normalized[i - 1]) throw archiveError('ARCHIVE_AGE_RECIPIENT_DUPLICATE');
+  return normalized;
+}
+
+function batchRecipientFingerprints(batch, allowMissing) {
+  var plural = batch.get('age_recipient_fingerprints');
+  if (plural != null && plural !== '') return requireRecipientFingerprints(plural, allowMissing);
+  var legacy = String(batch.get('age_recipient_fingerprint') || '').toLowerCase();
+  if (legacy) return requireRecipientFingerprints([legacy], false);
+  return requireRecipientFingerprints(null, allowMissing);
+}
+
 function findBatch(dao, batchId) {
   var rows = dao.findRecordsByFilter('mail_archive_batches', 'batch_id = {:batch}', '', 1, 0, { batch: String(batchId) }) || [];
   if (!rows.length) throw archiveError('ARCHIVE_BATCH_NOT_FOUND');
   return rows[0];
+}
+
+function findRetentionTombstone(dao, batchId) {
+  var rows = dao.findRecordsByFilter('mail_archive_retention_tombstones', 'batch_id = {:batch}', '', 1, 0, { batch: String(batchId) }) || [];
+  return rows.length ? rows[0] : null;
 }
 
 function projectLog(record) {
@@ -108,9 +133,10 @@ function exportBatch(batchId) {
 }
 
 function batchDescriptor(batch) {
-  var keys = ['batch_id','status','cursor','row_count','min_created_at','max_created_at','plaintext_sha256','gzip_sha256','cipher_sha256','cipher_size','age_recipient_fingerprint','object_key','manifest_sha256','prepared_at','sealed_at','uploaded_at','committed_at'];
+  var keys = ['batch_id','status','cursor','row_count','min_created_at','max_created_at','plaintext_sha256','gzip_sha256','cipher_sha256','cipher_size','object_key','manifest_sha256','prepared_at','sealed_at','uploaded_at','committed_at'];
   var output = {};
   for (var i = 0; i < keys.length; i++) output[keys[i]] = batch.get(keys[i]) || null;
+  output.age_recipient_fingerprints = batchRecipientFingerprints(batch, true);
   return output;
 }
 
@@ -133,7 +159,9 @@ function sealBatch(batchId, input, nowMs) {
     batch.set('gzip_sha256', requireHash(input.gzip_sha256, 'ARCHIVE_GZIP_HASH_INVALID'));
     batch.set('cipher_sha256', requireHash(input.cipher_sha256, 'ARCHIVE_CIPHER_HASH_INVALID'));
     batch.set('cipher_size', boundedInteger(input.cipher_size, 1, Number.MAX_SAFE_INTEGER, 'ARCHIVE_CIPHER_SIZE_INVALID'));
-    batch.set('age_recipient_fingerprint', String(input.age_recipient_fingerprint || ''));
+    var recipientFingerprints = requireRecipientFingerprints(input.age_recipient_fingerprints, false);
+    batch.set('age_recipient_fingerprints', recipientFingerprints);
+    batch.set('age_recipient_fingerprint', recipientFingerprints.length === 1 ? recipientFingerprints[0] : '');
     batch.set('object_key', objectKey);
     batch.set('status', 'sealed'); batch.set('sealed_at', iso(nowMs)); txDao.saveRecord(batch);
     return { batch_id: String(batchId), status: 'sealed' };
@@ -181,7 +209,7 @@ function restoreDescriptor(batchId) {
     objectKey: requireObjectKey(batch.get('object_key')),
     cipherSha256: requireHash(batch.get('cipher_sha256'), 'ARCHIVE_CIPHER_HASH_INVALID'),
     manifestSha256: requireHash(batch.get('manifest_sha256'), 'ARCHIVE_MANIFEST_HASH_INVALID'),
-    ageRecipientFingerprint: String(batch.get('age_recipient_fingerprint') || ''),
+    ageRecipientFingerprints: batchRecipientFingerprints(batch, false),
     rowCount: boundedInteger(batch.get('row_count'), 1, MAX_ROWS, 'ARCHIVE_ROW_COUNT_INVALID'),
     cursor: String(batch.get('cursor') || ''),
   };
@@ -223,16 +251,30 @@ function confirmRetention(input, nowMs) {
   var objectKey = requireObjectKey(input && input.objectKey);
   var cipherHash = requireHash(input && input.cipherSha256, 'ARCHIVE_CIPHER_HASH_INVALID');
   return dependencies().runInTransaction(function (txDao) {
+    if (findRetentionTombstone(txDao, batchId)) return { batchId: batchId, status: 'retention_confirmed', idempotent: true };
     var batch = findBatch(txDao, batchId);
     if (String(batch.get('status')) !== 'committed') throw archiveError('ARCHIVE_RETENTION_NOT_COMMITTED');
     if (String(batch.get('object_key')) !== objectKey || String(batch.get('cipher_sha256')) !== cipherHash) throw archiveError('ARCHIVE_RETENTION_MISMATCH');
     var maxCreatedMs = Date.parse(String(batch.get('max_created_at') || ''));
     var currentMs = Number(nowMs);
     if (!isFinite(maxCreatedMs) || !isFinite(currentMs) || maxCreatedMs >= currentMs - 90 * DAY_MS) throw archiveError('ARCHIVE_RETENTION_NOT_DUE');
-    if (batch.get('retention_confirmed_at')) return { batchId: batchId, status: 'retention_confirmed', idempotent: true };
-    batch.set('retention_confirmed_at', iso(currentMs));
-    txDao.saveRecord(batch);
+    var tombstone = newRecord(txDao, txDao.findCollectionByNameOrId('mail_archive_retention_tombstones'));
+    tombstone.set('batch_id', batchId);
+    tombstone.set('confirmed_at', iso(currentMs));
+    tombstone.set('expires_at', iso(currentMs + 7 * DAY_MS));
+    txDao.saveRecord(tombstone);
+    txDao.deleteRecord(batch);
     return { batchId: batchId, status: 'retention_confirmed', idempotent: false };
+  });
+}
+
+function cleanupRetentionTombstones(nowMs, limit) {
+  return dependencies().runInTransaction(function (txDao) {
+    var rows = txDao.findRecordsByFilter(
+      'mail_archive_retention_tombstones', 'expires_at <= {:now}', 'expires_at,batch_id', boundedLimit(limit), 0, { now: iso(nowMs) }
+    ) || [];
+    for (var i = 0; i < rows.length; i++) txDao.deleteRecord(rows[i]);
+    return rows.length;
   });
 }
 
@@ -244,6 +286,6 @@ module.exports = {
   getPendingBatch: getPendingBatch, getBatchStatus: getBatchStatus,
   sealBatch: sealBatch, markUploaded: markUploaded, commitBatch: commitBatch,
   restoreDescriptor: restoreDescriptor,
-  retentionDue: retentionDue, confirmRetention: confirmRetention,
+  retentionDue: retentionDue, confirmRetention: confirmRetention, cleanupRetentionTombstones: cleanupRetentionTombstones,
   _setDependenciesForTests: setDependenciesForTests, _resetDependenciesForTests: resetDependenciesForTests,
 };

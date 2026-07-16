@@ -34,6 +34,7 @@ function createDao() {
   var tables = {
     mail_archive_request_nonces: [],
     mail_archive_batches: [],
+    mail_archive_retention_tombstones: [],
     mail_delivery_logs: [],
   };
   var sequence = 0;
@@ -65,6 +66,9 @@ function createDao() {
       if (collection === 'mail_archive_request_nonces') {
         if (filter.indexOf('nonce =') !== -1) rows = rows.filter(function (item) { return item.get('nonce') === params.nonce; });
         if (filter.indexOf('expires_at <') !== -1) rows = rows.filter(function (item) { return Date.parse(item.get('expires_at')) < Date.parse(params.now); });
+      } else if (collection === 'mail_archive_retention_tombstones') {
+        if (filter.indexOf('batch_id =') !== -1) rows = rows.filter(function (item) { return item.get('batch_id') === params.batch; });
+        if (filter.indexOf('expires_at <=') !== -1) rows = rows.filter(function (item) { return Date.parse(item.get('expires_at')) <= Date.parse(params.now); });
       } else if (collection === 'mail_archive_batches') {
         if (filter.indexOf('batch_id =') !== -1) rows = rows.filter(function (item) { return item.get('batch_id') === params.batch; });
         if (filter.indexOf('status = "committed"') !== -1) rows = rows.filter(function (item) { return item.get('status') === 'committed'; });
@@ -131,6 +135,19 @@ function run() {
   ['active_slot', 'idx_mail_archive_batches_one_active', 'CREATE UNIQUE INDEX'].forEach(function (needle) {
     assert(activeMigration.indexOf(needle) !== -1, 'archive active-slot migration missing ' + needle);
   });
+  var tombstoneMigrationPath = path.join(repoRoot, 'pb_migrations', '20260716124000_add_mail_archive_retention_tombstones.pb.js');
+  assert(fs.existsSync(tombstoneMigrationPath), 'archive retention tombstone migration is required');
+  var tombstoneMigration = read('pb_migrations/20260716124000_add_mail_archive_retention_tombstones.pb.js');
+  ['mail_archive_retention_tombstones', 'batch_id', 'confirmed_at', 'expires_at', 'idx_mail_archive_retention_tombstones_expiry'].forEach(function (needle) {
+    assert(tombstoneMigration.indexOf(needle) !== -1, 'archive tombstone migration missing ' + needle);
+  });
+  ['object_key', 'cipher_sha256', 'manifest_sha256', 'fingerprint', 'max_created_at'].forEach(function (forbidden) {
+    assert(tombstoneMigration.indexOf(forbidden) === -1, 'archive tombstone migration must not persist ' + forbidden);
+  });
+  var recipientMigrationPath = path.join(repoRoot, 'pb_migrations', '20260716125000_add_mail_archive_recipient_fingerprints.pb.js');
+  assert(fs.existsSync(recipientMigrationPath), 'archive recipient fingerprint array migration is required');
+  var recipientMigration = read('pb_migrations/20260716125000_add_mail_archive_recipient_fingerprints.pb.js');
+  assert(recipientMigration.indexOf('age_recipient_fingerprints') !== -1, 'archive recipient migration stores the trusted fingerprint array');
 
   var dao = createDao();
   var sec = security();
@@ -204,7 +221,7 @@ function run() {
   assertThrowsCode(function () { archive.markUploaded(prepared.batch_id, { cipher_sha256: 'a'.repeat(64), object_key: '2026-07/batch-1.jsonl.gz.age', manifest_sha256: 'b'.repeat(64) }); }, 'ARCHIVE_INVALID_TRANSITION', 'uploaded before seal is rejected');
   var sealedInput = {
     plaintext_sha256: '1'.repeat(64), gzip_sha256: '2'.repeat(64), cipher_sha256: '3'.repeat(64),
-    cipher_size: 1234, age_recipient_fingerprint: 'AGE-FINGERPRINT-1', object_key: '2026-07/batch-1.jsonl.gz.age',
+    cipher_size: 1234, age_recipient_fingerprints: ['1'.repeat(64), '2'.repeat(64)], object_key: '2026-07/batch-1.jsonl.gz.age',
   };
   archive.sealBatch(prepared.batch_id, sealedInput, now);
   assertThrowsCode(function () { archive.markUploaded(prepared.batch_id, { cipher_sha256: '4'.repeat(64), object_key: sealedInput.object_key, manifest_sha256: '5'.repeat(64) }, now); }, 'ARCHIVE_COMMIT_MISMATCH', 'uploaded transition requires sealed cipher hash');
@@ -220,7 +237,8 @@ function run() {
   assertThrowsCode(function () { archive.exportBatch('unknown-batch'); }, 'ARCHIVE_BATCH_NOT_FOUND', 'unknown batch is rejected');
   assertEqual(archive.getPendingBatch(), null, 'committed batch is not returned as pending');
   var restoreDescriptor = archive.restoreDescriptor(prepared.batch_id);
-  assertEqual(Object.keys(restoreDescriptor).sort().join(','), 'ageRecipientFingerprint,batchId,cipherSha256,cursor,manifestSha256,objectKey,rowCount', 'restore descriptor exposes only trusted committed fields');
+  assertEqual(Object.keys(restoreDescriptor).sort().join(','), 'ageRecipientFingerprints,batchId,cipherSha256,cursor,manifestSha256,objectKey,rowCount', 'restore descriptor exposes only trusted committed fields');
+  assertEqual(restoreDescriptor.ageRecipientFingerprints.join(','), ['1'.repeat(64), '2'.repeat(64)].join(','), 'restore descriptor preserves the sorted trusted recipient set');
   assertEqual(restoreDescriptor.batchId, prepared.batch_id, 'restore descriptor identifies the committed batch');
   assertEqual(restoreDescriptor.manifestSha256, uploadedInput.manifest_sha256, 'restore descriptor anchors the remote manifest hash');
 
@@ -263,8 +281,13 @@ function run() {
     archive.confirmRetention({ batchId: retentionTarget.batchId, objectKey: '2026-03/different-batch.jsonl.gz.age', cipherSha256: retentionTarget.cipherSha256 }, Date.parse('2026-06-01T00:00:00.000Z'));
   }, 'ARCHIVE_RETENTION_MISMATCH', 'retention confirmation rechecks object identity');
   var retentionConfirmed = archive.confirmRetention(retentionConfirmInput, Date.parse('2026-06-01T00:00:00.000Z'));
-  assertEqual(retentionConfirmed.status, 'retention_confirmed', 'retention confirmation marks metadata only after remote deletion');
+  assertEqual(retentionConfirmed.status, 'retention_confirmed', 'retention confirmation removes full batch metadata only after remote deletion');
+  assertEqual(dao.tables.mail_archive_batches.some(function (item) { return item.get('batch_id') === retentionTarget.batchId; }), false, 'confirmed batch metadata does not survive 90 day retention');
+  assertEqual(dao.tables.mail_archive_retention_tombstones.length, 1, 'retention confirmation creates one minimal tombstone');
+  assertEqual(Object.keys(dao.tables.mail_archive_retention_tombstones[0].values).sort().join(','), 'batch_id,confirmed_at,expires_at', 'tombstone contains only idempotency fields');
   assertEqual(archive.confirmRetention(retentionConfirmInput, Date.parse('2026-06-01T00:00:00.000Z')).idempotent, true, 'retention confirmation is idempotent');
+  assertEqual(archive.cleanupRetentionTombstones(Date.parse('2026-06-08T00:00:00.000Z'), 100), 1, 'seven day tombstone is deleted on schedule');
+  assertEqual(dao.tables.mail_archive_retention_tombstones.length, 0, 'expired tombstone metadata is gone');
   assertThrowsCode(function () {
     archive.confirmRetention({ batchId: 'retention-boundary', objectKey: '2026-04/retention-boundary.jsonl.gz.age', cipherSha256: 'a'.repeat(64) }, Date.parse('2026-07-15T12:00:00.000Z'));
   }, 'ARCHIVE_RETENTION_NOT_DUE', 'retention confirmation uses a strict 90-day event-time cutoff');
@@ -280,6 +303,7 @@ function run() {
   assert(routes.indexOf('MAIL_ARCHIVE_API_ENABLED') !== -1, 'archive API is environment gated');
   assert(routes.indexOf("code = 'ARCHIVE_AUTH_REJECTED'") !== -1, 'route hides the exact authentication mismatch');
   assert(routes.indexOf("cronAdd('mail-archive-nonce-cleanup'") !== -1, 'nonce cleanup is scheduled');
+  assert(routes.indexOf("cronAdd('mail-archive-retention-tombstone-cleanup'") !== -1, 'retention tombstone cleanup is scheduled');
 
   archive._resetDependenciesForTests();
   auth._resetDependenciesForTests();

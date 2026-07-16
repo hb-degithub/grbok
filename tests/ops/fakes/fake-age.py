@@ -33,10 +33,15 @@ def main():
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_bytes(payload[len(header):])
         return 0
-    if len(args) != 5 or args[0] != "--recipient" or args[2] != "--output":
+    recipients = []
+    index = 0
+    while index + 1 < len(args) and args[index] == "--recipient":
+        recipients.append(args[index + 1])
+        index += 2
+    if not 1 <= len(recipients) <= 2 or index + 2 >= len(args) or args[index] != "--output":
         return 2
-    output = pathlib.Path(args[3])
-    source = pathlib.Path(args[4])
+    output = pathlib.Path(args[index + 1])
+    source = pathlib.Path(args[index + 2])
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("wb") as target:
         target.write(b"FAKE-AGE-V1\n")

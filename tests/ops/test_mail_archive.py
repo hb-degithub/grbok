@@ -172,6 +172,7 @@ class MailArchivePipelineTests(unittest.TestCase):
         self.server.__enter__()
         recipient = "age1fixturepublicrecipient000000000000000000000000000000000"
         self.recipient = recipient
+        self.second_recipient = "age1fixturepublicrecipient111111111111111111111111111111111"
         self.env = os.environ.copy()
         self.env.update(
             {
@@ -221,7 +222,7 @@ class MailArchivePipelineTests(unittest.TestCase):
             "objectKey": manifest["object_key"],
             "cipherSha256": manifest["cipher_sha256"],
             "manifestSha256": hashlib.sha256(pathlib.Path(manifest_path).read_bytes()).hexdigest(),
-            "ageRecipientFingerprint": manifest["age_recipient_fingerprint"],
+            "ageRecipientFingerprints": manifest["age_recipient_fingerprints"],
             "rowCount": manifest["row_count"],
             "cursor": manifest["cursor"],
         }
@@ -254,6 +255,53 @@ class MailArchivePipelineTests(unittest.TestCase):
         self.assertIn(self.server.state.batch_id, self.server.state.status_batch_queries)
         self.assertEqual(list(self.workdir.glob("*.jsonl.gz.age")), [], "committed local ciphertext is deleted immediately")
         self.assert_no_plaintext()
+
+    def test_dual_recipient_rotation_encrypts_once_and_restores_with_either_trusted_identity(self):
+        first_fingerprint = hashlib.sha256(self.recipient.encode()).hexdigest()
+        second_fingerprint = hashlib.sha256(self.second_recipient.encode()).hexdigest()
+        dual_env = {
+            "MAIL_ARCHIVE_AGE_RECIPIENTS": f"{self.second_recipient},{self.recipient}",
+            "MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINTS": f"{second_fingerprint},{first_fingerprint}",
+        }
+
+        archived = self.run_archive(dual_env)
+
+        self.assertEqual(archived.returncode, 0, archived.stderr)
+        manifest = next(self.remote.rglob("*.manifest.json"))
+        manifest_data = json.loads(manifest.read_text(encoding="utf-8"))
+        self.assertIn("age_recipient_fingerprints", manifest_data)
+        self.assertEqual(manifest_data["age_recipient_fingerprints"], sorted([first_fingerprint, second_fingerprint]))
+        descriptor, descriptor_hash = self.trusted_descriptor(manifest)
+        cipher = next(self.remote.rglob("*.jsonl.gz.age"))
+        for index, recipient in enumerate((self.recipient, self.second_recipient)):
+            identity = self.root / f"offline-age-identity-{index}.txt"
+            identity.write_text(recipient + "\n", encoding="utf-8")
+            restore_root = self.root / f"isolated-restore-{index}"
+            restore_root.mkdir(mode=0o700)
+            env = dict(self.env, MAIL_ARCHIVE_RESTORE_AGE_BIN=str(FAKE_AGE), MAIL_ARCHIVE_RESTORE_AGE_KEYGEN_BIN=str(FAKE_AGE))
+            restored = subprocess.run(
+                [sys.executable, str(RESTORE_SCRIPT), "--cipher", str(cipher), "--manifest", str(manifest),
+                 "--identity", str(identity), "--trusted-descriptor", str(descriptor),
+                 "--trusted-descriptor-sha256", descriptor_hash, "--archive-work-dir", str(self.workdir),
+                 "--sync-root", str(self.sync_root), "--repo-root", str(REPO_ROOT), "--restore-root", str(restore_root)],
+                cwd=REPO_ROOT, env=env, text=True, encoding="utf-8", errors="replace",
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
+            )
+            self.assertEqual(restored.returncode, 0, restored.stderr)
+
+    def test_dual_recipient_rejects_count_duplicates_and_wrong_fingerprint(self):
+        second_fingerprint = hashlib.sha256(self.second_recipient.encode()).hexdigest()
+        cases = [
+            ({"MAIL_ARCHIVE_AGE_RECIPIENTS": f"{self.recipient},{self.second_recipient}", "MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINTS": second_fingerprint}, "ARCHIVE_AGE_RECIPIENT_COUNT_MISMATCH"),
+            ({"MAIL_ARCHIVE_AGE_RECIPIENTS": f"{self.recipient},{self.recipient}", "MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINTS": f"{second_fingerprint},{second_fingerprint}"}, "ARCHIVE_AGE_RECIPIENT_DUPLICATE"),
+            ({"MAIL_ARCHIVE_AGE_RECIPIENTS": f"{self.recipient},{self.second_recipient}", "MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINTS": f"{'0' * 64},{second_fingerprint}"}, "AGE_RECIPIENT_FINGERPRINT_MISMATCH"),
+        ]
+        for extra, code in cases:
+            with self.subTest(code=code):
+                self.reset_run_state()
+                result = self.run_archive(extra)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(code, result.stderr)
 
     def test_every_failure_keeps_database_uncommitted_and_removes_plaintext(self):
         cases = [
@@ -328,6 +376,25 @@ class MailArchivePipelineTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(all(not path.exists() for path in stale))
         self.assert_no_plaintext()
+
+    def test_startup_removes_sigkill_plaintext_before_api_failure_without_deleting_cipher(self):
+        stale = [
+            self.workdir / f"{self.server.state.batch_id}.jsonl",
+            self.workdir / f"{self.server.state.batch_id}.jsonl.gz",
+            self.workdir / f"{self.server.state.batch_id}.jsonl.tmp",
+            self.workdir / f"{self.server.state.batch_id}.jsonl.gz.tmp",
+        ]
+        cipher = self.workdir / f"{self.server.state.batch_id}.jsonl.gz.age"
+        for path in stale:
+            path.write_bytes(b"sigkill-leftover-plaintext")
+        cipher.write_bytes(b"cipher-must-survive-startup-cleanup")
+        self.server.state.fail_stage = "status"
+
+        result = self.run_archive()
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue(all(not path.exists() for path in stale))
+        self.assertEqual(cipher.read_bytes(), b"cipher-must-survive-startup-cleanup")
 
     def test_external_command_timeout_is_bounded_and_stable(self):
         result = self.run_archive({"FAKE_AGE_MODE": "timeout", "MAIL_ARCHIVE_COMMAND_TIMEOUT_SECONDS": "1"})

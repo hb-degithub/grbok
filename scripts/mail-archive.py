@@ -44,8 +44,8 @@ def recipient_fingerprint(recipient):
 class Config:
     api_url: str
     hmac_secret: str
-    age_recipient: str
-    age_recipient_fingerprint: str
+    age_recipients: tuple
+    age_recipient_fingerprints: tuple
     rclone_remote: str
     rclone_prefix: str
     work_dir: pathlib.Path
@@ -60,13 +60,36 @@ class Config:
     @classmethod
     def from_env(cls):
         required = [
-            "MAIL_ARCHIVE_API_URL", "MAIL_ARCHIVE_HMAC_SECRET", "MAIL_ARCHIVE_AGE_RECIPIENT",
-            "MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINT", "MAIL_ARCHIVE_RCLONE_REMOTE",
+            "MAIL_ARCHIVE_API_URL", "MAIL_ARCHIVE_HMAC_SECRET", "MAIL_ARCHIVE_RCLONE_REMOTE",
             "MAIL_ARCHIVE_RCLONE_PREFIX", "MAIL_ARCHIVE_WORK_DIR",
         ]
+        plural_recipients = os.environ.get("MAIL_ARCHIVE_AGE_RECIPIENTS", "").strip()
+        plural_fingerprints = os.environ.get("MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINTS", "").strip()
+        if not plural_recipients and not plural_fingerprints:
+            required.extend(["MAIL_ARCHIVE_AGE_RECIPIENT", "MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINT"])
         missing = [name for name in required if not os.environ.get(name)]
         if missing:
             raise ArchiveError("ARCHIVE_CONFIG_MISSING:" + ",".join(missing))
+        if bool(plural_recipients) != bool(plural_fingerprints):
+            raise ArchiveError("ARCHIVE_AGE_RECIPIENT_COUNT_MISMATCH")
+        if plural_recipients:
+            recipients = [value.strip() for value in plural_recipients.split(",")]
+            fingerprints = [value.strip().lower() for value in plural_fingerprints.split(",")]
+        else:
+            recipients = [os.environ["MAIL_ARCHIVE_AGE_RECIPIENT"].strip()]
+            fingerprints = [os.environ["MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINT"].strip().lower()]
+        if not 1 <= len(recipients) <= 2 or any(not value for value in recipients):
+            raise ArchiveError("ARCHIVE_AGE_RECIPIENTS_INVALID")
+        if len(recipients) != len(fingerprints):
+            raise ArchiveError("ARCHIVE_AGE_RECIPIENT_COUNT_MISMATCH")
+        if any(re.fullmatch(r"[a-f0-9]{64}", value) is None for value in fingerprints):
+            raise ArchiveError("ARCHIVE_AGE_RECIPIENT_FINGERPRINTS_INVALID")
+        if len(set(recipients)) != len(recipients) or len(set(fingerprints)) != len(fingerprints):
+            raise ArchiveError("ARCHIVE_AGE_RECIPIENT_DUPLICATE")
+        for recipient, fingerprint in zip(recipients, fingerprints):
+            if not hmac.compare_digest(recipient_fingerprint(recipient), fingerprint):
+                raise ArchiveError("AGE_RECIPIENT_FINGERPRINT_MISMATCH")
+        ordered_pairs = sorted(zip(fingerprints, recipients))
         test_mode = os.environ.get("MAIL_ARCHIVE_TEST_MODE") == "1"
         api_url = os.environ["MAIL_ARCHIVE_API_URL"].rstrip("/")
         if not test_mode and not api_url.startswith("https://"):
@@ -108,8 +131,8 @@ class Config:
         return cls(
             api_url=api_url,
             hmac_secret=secret,
-            age_recipient=os.environ["MAIL_ARCHIVE_AGE_RECIPIENT"].strip(),
-            age_recipient_fingerprint=os.environ["MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINT"].strip().lower(),
+            age_recipients=tuple(pair[1] for pair in ordered_pairs),
+            age_recipient_fingerprints=tuple(pair[0] for pair in ordered_pairs),
             rclone_remote=remote,
             rclone_prefix=prefix,
             work_dir=work_dir,
@@ -259,7 +282,7 @@ def upload_verified(config, local_path, object_key):
 def manifest_for(batch):
     keys = [
         "batch_id", "cursor", "min_created_at", "max_created_at", "row_count", "plaintext_sha256",
-        "gzip_sha256", "cipher_sha256", "cipher_size", "age_recipient_fingerprint",
+        "gzip_sha256", "cipher_sha256", "cipher_size", "age_recipient_fingerprints",
         "object_key", "sealed_at",
     ]
     manifest = {"schema_version": 1}
@@ -299,8 +322,8 @@ def require_capacity(config):
         raise ArchiveError("ARCHIVE_WORK_DIR_CAPACITY_EXCEEDED")
 
 
-def cleanup_temporary_files(config):
-    pattern = re.compile(r"^[A-Za-z0-9_-]{8,100}\.jsonl(?:\.gz(?:\.age)?)?\.tmp$")
+def cleanup_startup_plaintext(config):
+    pattern = re.compile(r"^[A-Za-z0-9_-]{8,100}\.jsonl(?:\.gz)?(?:\.tmp)?$")
     for path in config.work_dir.iterdir():
         if path.is_symlink():
             raise ArchiveError("ARCHIVE_WORK_DIR_SYMLINK_REJECTED")
@@ -308,7 +331,7 @@ def cleanup_temporary_files(config):
             try:
                 path.unlink()
             except OSError as error:
-                raise ArchiveError("ARCHIVE_TEMP_CLEANUP_FAILED") from error
+                raise ArchiveError("ARCHIVE_PLAINTEXT_CLEANUP_FAILED") from error
 
 
 def cleanup_committed_ciphers(api, config, now):
@@ -350,7 +373,6 @@ def commit_and_remove_local_cipher(api, config, batch):
 
 def run_archive(config):
     api = ApiClient(config)
-    cleanup_temporary_files(config)
     cleanup_committed_ciphers(api, config, dt.datetime.now(dt.timezone.utc))
     require_capacity(config)
     pending = api.post("status", {})
@@ -382,12 +404,13 @@ def run_archive(config):
                 raise ArchiveError("ARCHIVE_INJECTED_GZIP_FAILURE")
             write_deterministic_gzip(plain_path, gzip_path)
             gzip_hash = sha256_file(gzip_path)
-            actual_fingerprint = recipient_fingerprint(config.age_recipient)
-            if not hmac.compare_digest(actual_fingerprint, config.age_recipient_fingerprint):
-                raise ArchiveError("AGE_RECIPIENT_FINGERPRINT_MISMATCH")
             cipher_tmp = cipher_path.with_name(cipher_path.name + ".tmp")
             try:
-                run_command(config, config.age_bin, ["--recipient", config.age_recipient, "--output", str(cipher_tmp), str(gzip_path)])
+                age_args = []
+                for recipient in config.age_recipients:
+                    age_args.extend(["--recipient", recipient])
+                age_args.extend(["--output", str(cipher_tmp), str(gzip_path)])
+                run_command(config, config.age_bin, age_args)
                 os.replace(cipher_tmp, cipher_path)
             finally:
                 try:
@@ -401,7 +424,7 @@ def run_archive(config):
             seal_input = {
                 "batch_id": batch_id, "plaintext_sha256": plaintext_hash, "gzip_sha256": gzip_hash,
                 "cipher_sha256": cipher_hash, "cipher_size": cipher_path.stat().st_size,
-                "age_recipient_fingerprint": actual_fingerprint, "object_key": object_key,
+                "age_recipient_fingerprints": list(config.age_recipient_fingerprints), "object_key": object_key,
             }
             api.post("seal", seal_input)
             batch.update(seal_input)
@@ -594,6 +617,7 @@ def main(argv=None):
         return 2
     try:
         config = Config.from_env()
+        cleanup_startup_plaintext(config)
         if argv == ["run"]:
             result = run_archive(config)
             retention = run_retention(config)

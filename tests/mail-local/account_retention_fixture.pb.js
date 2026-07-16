@@ -197,6 +197,14 @@ function runJobTests() {
   assertEqual(queuedInputs[0].variables.site_url, 'https://fixture.invalid', 'retention URL comes from trusted config');
   assertEqual(retention.runDueReminders(now, 20).queued, 0, 'repeated reminder job is idempotent');
 
+  var lateReminderState = addAccount('late-reminder', 60, false, false);
+  var lateReminder = retention.runDueReminders(now, 20);
+  var extendedCleanup = new Date(now + 15 * retention.DAY_MS).toISOString();
+  assertEqual(lateReminder.queued, 1, 'day 60 late reminder is queued once');
+  assertEqual(lateReminderState.get('cleanup_eligible_at'), extendedCleanup, 'successful late reminder grants a fresh 15 day cleanup window');
+  assertEqual(queuedInputs[1].variables.cleanup_date, extendedCleanup, 'late reminder email uses the extended cleanup date');
+  assertEqual(retention.runDueCleanup(now, 20).deleted, 0, 'late reminder cannot be cleaned on the enqueue day');
+
   var retryState = addAccount('retry', 45, false, false);
   queueResults.push({ queued: false, error_class: 'TRANSIENT_PROVIDER' });
   assertEqual(retention.runDueReminders(now, 20).failed, 1, 'transient reminder failure is summarized');

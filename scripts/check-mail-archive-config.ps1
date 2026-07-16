@@ -49,6 +49,9 @@ Reject-Match $wrapper '(?im)age[^\r\n]*(identity|private|secret|key-file)|MAIL_A
 Reject-Match $wrapper '(?m)rclone[^\r\n]*(\$\{|\$[A-Za-z_])' 'wrapper must not interpolate rclone flags'
 
 Require-Match $python 'MAIL_ARCHIVE_WORK_DIR' 'Python client must require a fixed work directory configuration'
+Require-Match $python 'MAIL_ARCHIVE_AGE_RECIPIENTS' 'Python client must support the plural age recipient rotation configuration'
+Require-Match $python 'MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINTS' 'Python client must support plural recipient fingerprints'
+Require-Match $python 'cleanup_startup_plaintext\(config\)' 'Python client must clean crash-left plaintext before archive API work'
 Reject-Match $python 'MAIL_ARCHIVE_AGE_IDENTITY|--identity|-i\s' 'production Python client must not reference an age private identity'
 
 foreach ($requiredText in @(
@@ -59,6 +62,9 @@ foreach ($requiredText in @(
     '90',
     'monthly',
     'fingerprint',
+    'MAIL_ARCHIVE_AGE_RECIPIENTS',
+    'MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINTS',
+    'ageRecipientFingerprints',
     'rclone',
     'MAIL_ARCHIVE_RETENTION_MODE=s3-versioned',
     'MAIL_ARCHIVE_WORK_DIR_MAX_BYTES',

@@ -43,4 +43,7 @@ route('retention-confirm', function (body) { return archive.confirmRetention(bod
 cronAdd('mail-archive-nonce-cleanup', '11 * * * *', function () {
   $app.runInTransaction(function (txDao) { auth.cleanupExpiredNonces(txDao, Date.now(), 500); });
 });
+cronAdd('mail-archive-retention-tombstone-cleanup', '23 3 * * *', function () {
+  archive.cleanupRetentionTombstones(Date.now(), 5000);
+});
 })();

@@ -21,7 +21,7 @@ CATEGORIES = {"account_verification", "account_password_reset", "account_email_c
 SOURCE_KINDS = {"account", "reader", "comment", "admin", "operations", "retention", "registration"}
 RESULTS = {"sent", "failed"}
 ERROR_CLASSES = {"NONE", "MAIL_NOT_CONFIGURED", "SMTP_AUTH", "SMTP_CONNECTION", "SMTP_TIMEOUT", "RECIPIENT_TEMPORARY", "RECIPIENT_PERMANENT", "PAYLOAD_INVALID", "RATE_LIMITED", "INTERNAL_ERROR", "GATEWAY_UNAVAILABLE", "OUTBOX_UNAVAILABLE"}
-DESCRIPTOR_KEYS = {"batchId", "objectKey", "cipherSha256", "manifestSha256", "ageRecipientFingerprint", "rowCount", "cursor"}
+DESCRIPTOR_KEYS = {"batchId", "objectKey", "cipherSha256", "manifestSha256", "ageRecipientFingerprints", "rowCount", "cursor"}
 
 
 class RestoreError(RuntimeError):
@@ -59,7 +59,7 @@ def load_manifest(path):
         raise RestoreError("RESTORE_MANIFEST_INVALID") from error
     required = {
         "batch_id", "cursor", "row_count", "plaintext_sha256", "gzip_sha256",
-        "cipher_sha256", "cipher_size", "object_key",
+        "cipher_sha256", "cipher_size", "object_key", "age_recipient_fingerprints",
     }
     if not isinstance(manifest, dict) or not required.issubset(manifest):
         raise RestoreError("RESTORE_MANIFEST_INVALID")
@@ -84,7 +84,10 @@ def load_trusted_descriptor(path, expected_hash):
         raise RestoreError("RESTORE_DESCRIPTOR_INVALID")
     if not re.fullmatch(r"\d{4}-\d{2}/[A-Za-z0-9_-]+\.jsonl\.gz\.age", str(descriptor["objectKey"])):
         raise RestoreError("RESTORE_DESCRIPTOR_INVALID")
-    if not valid_hash(descriptor["cipherSha256"]) or not valid_hash(descriptor["manifestSha256"]) or not valid_hash(descriptor["ageRecipientFingerprint"]):
+    fingerprints = descriptor["ageRecipientFingerprints"]
+    if not valid_hash(descriptor["cipherSha256"]) or not valid_hash(descriptor["manifestSha256"]):
+        raise RestoreError("RESTORE_DESCRIPTOR_INVALID")
+    if not isinstance(fingerprints, list) or not 1 <= len(fingerprints) <= 2 or fingerprints != sorted(set(fingerprints)) or not all(valid_hash(value) for value in fingerprints):
         raise RestoreError("RESTORE_DESCRIPTOR_INVALID")
     if isinstance(descriptor["rowCount"], bool) or not isinstance(descriptor["rowCount"], int) or not 1 <= descriptor["rowCount"] <= 5000:
         raise RestoreError("RESTORE_DESCRIPTOR_INVALID")
@@ -100,7 +103,7 @@ def verify_manifest_trust(manifest_path, manifest, descriptor):
         "batch_id": descriptor["batchId"],
         "object_key": descriptor["objectKey"],
         "cipher_sha256": descriptor["cipherSha256"],
-        "age_recipient_fingerprint": descriptor["ageRecipientFingerprint"],
+        "age_recipient_fingerprints": descriptor["ageRecipientFingerprints"],
         "row_count": descriptor["rowCount"],
         "cursor": descriptor["cursor"],
     }
@@ -214,7 +217,7 @@ def verify_restore(args):
     manifest = load_manifest(manifest_path)
     descriptor = load_trusted_descriptor(descriptor_path, args.trusted_descriptor_sha256)
     verify_manifest_trust(manifest_path, manifest, descriptor)
-    if identity_fingerprint(identity) != descriptor["ageRecipientFingerprint"]:
+    if identity_fingerprint(identity) not in descriptor["ageRecipientFingerprints"]:
         raise RestoreError("RESTORE_IDENTITY_FINGERPRINT_MISMATCH")
     if cipher.stat().st_size != int(manifest["cipher_size"]) or sha256_file(cipher) != descriptor["cipherSha256"]:
         raise RestoreError("RESTORE_CIPHER_HASH_MISMATCH")
