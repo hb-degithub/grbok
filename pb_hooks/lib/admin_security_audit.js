@@ -1,6 +1,9 @@
 'use strict';
 
 function writeSecurityAudit(dao, secureContext, event) {
+  if (secureContext && secureContext.failAudit && String($os.getenv('ADMIN_SECURITY_TEST_MODE') || '') === 'true') {
+    throw new Error('fixture audit failure');
+  }
   var collection = dao.findCollectionByNameOrId('admin_security_audits');
   var record = new Record(collection);
   record.set('actor', secureContext && secureContext.actorId ? secureContext.actorId : '');

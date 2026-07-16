@@ -100,6 +100,31 @@ function Wait-Ready {
     throw 'Timed out waiting for PocketBase'
 }
 
+function Invoke-JsonRequest {
+    param(
+        [Parameter(Mandatory)][Net.Http.HttpClient]$Client,
+        [Parameter(Mandatory)][string]$Method,
+        [Parameter(Mandatory)][string]$Url,
+        [string]$Token = '',
+        [hashtable]$Headers = @{},
+        $Body = $null
+    )
+    $message = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::new($Method), $Url)
+    try {
+        if ($Token) { [void]$message.Headers.TryAddWithoutValidation('Authorization', $Token) }
+        foreach ($name in $Headers.Keys) { [void]$message.Headers.TryAddWithoutValidation($name, [string]$Headers[$name]) }
+        if ($null -ne $Body) {
+            $json = $Body | ConvertTo-Json -Depth 10 -Compress
+            $message.Content = [Net.Http.StringContent]::new($json, [Text.Encoding]::UTF8, 'application/json')
+        }
+        $response = $Client.SendAsync($message).GetAwaiter().GetResult()
+        $raw = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+        return [pscustomobject]@{ Status = [int]$response.StatusCode; Raw = $raw; Json = if ($raw) { $raw | ConvertFrom-Json } else { $null } }
+    } finally {
+        $message.Dispose()
+    }
+}
+
 $resolvedRunRoot = Assert-SafeRunRoot
 Install-PocketBase
 Assert-PortFree
@@ -113,6 +138,13 @@ $securityContract = Get-Content -LiteralPath $securityModule -Raw
 foreach ($requiredMarker in @('challengeClientSessionHmac', 'CHALLENGE_BINDING_REQUIRED')) {
     if ($securityContract -notmatch [regex]::Escape($requiredMarker)) {
         throw "Admin security challenge binding contract missing: $requiredMarker"
+    }
+}
+$browserStepUpModule = Join-Path $repoRoot 'astro\src\lib\admin-step-up.ts'
+$browserStepUpContract = Get-Content -LiteralPath $browserStepUpModule -Raw
+foreach ($requiredMarker in @('X-Admin-Recovery-Code', 'saveAdminRecoveryCode')) {
+    if ($browserStepUpContract -notmatch [regex]::Escape($requiredMarker)) {
+        throw "Browser recovery contract missing: $requiredMarker"
     }
 }
 if (Test-Path -LiteralPath $resolvedRunRoot) { Remove-Item -LiteralPath $resolvedRunRoot -Recurse -Force }
@@ -172,6 +204,10 @@ try {
     $process.Dispose()
     $process = $null
 
+    $adminEmail = 'track-a-recovery@example.local'
+    $adminPassword = 'TrackA-' + (New-RandomSecret)
+    & $PocketBasePath admin create $adminEmail $adminPassword "--dir=$dataPath" '--dev=false' | Out-Null
+
     $stdoutPath = Join-Path $resolvedRunRoot 'pre-cutover.out.log'
     $stderrPath = Join-Path $resolvedRunRoot 'pre-cutover.err.log'
     $preCutoverArguments = @(
@@ -217,7 +253,48 @@ try {
         }
         $result = $body | ConvertFrom-Json
         if ([string]$result.code -cne 'PASS') { throw "Unexpected fixture result: $body" }
-        Write-Host "PASS admin step-up fixture: $($result.observed.Count) scenarios" -ForegroundColor Green
+
+        $baseUrl = "http://127.0.0.1:$Port"
+        $setup = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/test/admin-step-up/recovery/setup"
+        if ($setup.Status -ne 200) { throw "Recovery setup failed: $($setup.Raw)" }
+        $adminAuth = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/admins/auth-with-password" -Body @{ identity = $adminEmail; password = $adminPassword }
+        if ($adminAuth.Status -ne 200) { throw 'Temporary admin authentication failed' }
+        $adminToken = [string]$adminAuth.Json.token
+
+        $failedRecovery = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/local-recovery" -Token $adminToken -Headers @{ 'X-Test-Fail-Audit' = '1' } -Body @{ email = [string]$setup.Json.email }
+        if ($failedRecovery.Status -lt 400) { throw 'Audit failure injection did not fail recovery' }
+        $afterFailure = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/test/admin-step-up/recovery/check" -Body @{ userId = [string]$setup.Json.userId }
+        if ($afterFailure.Json.activePasskeys -ne 2 -or $afterFailure.Json.activeStepUps -ne 1 -or $afterFailure.Json.recoveryPending -or $afterFailure.Json.audits -ne 0) {
+            throw "Recovery audit rollback failed: $($afterFailure.Raw)"
+        }
+
+        $recovery = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/local-recovery" -Token $adminToken -Body @{ email = [string]$setup.Json.email }
+        if ($recovery.Status -ne 200 -or -not $recovery.Json.recoveryCode) { throw "Local recovery failed: $($recovery.Raw)" }
+        $afterRecovery = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/test/admin-step-up/recovery/check" -Body @{ userId = [string]$setup.Json.userId }
+        if ($afterRecovery.Json.activePasskeys -ne 0 -or $afterRecovery.Json.activeStepUps -ne 0 -or -not $afterRecovery.Json.bootstrapped -or -not $afterRecovery.Json.recoveryPending -or $afterRecovery.Json.audits -ne 1) {
+            throw "Local recovery state invalid: $($afterRecovery.Raw)"
+        }
+
+        $browserHeaders = @{
+            'X-Admin-Session' = [string]$setup.Json.clientSession
+            'X-Browser-Fingerprint' = [string]$setup.Json.fingerprint
+            'User-Agent' = [string]$setup.Json.userAgent
+        }
+        $ordinaryOptions = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/passkeys/registration/options" -Token ([string]$setup.Json.token) -Headers $browserHeaders -Body @{}
+        if ($ordinaryOptions.Status -ne 403) { throw "Ordinary token unexpectedly reopened recovery: $($ordinaryOptions.Raw)" }
+        $browserHeaders['X-Admin-Recovery-Code'] = [string]$recovery.Json.recoveryCode
+        $recoveryOptions = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/passkeys/registration/options" -Token ([string]$setup.Json.token) -Headers $browserHeaders -Body @{}
+        if ($recoveryOptions.Status -ne 200) { throw "Recovery registration options failed: $($recoveryOptions.Raw)" }
+        $recoveryVerify = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/passkeys/registration/verify" -Token ([string]$setup.Json.token) -Headers $browserHeaders -Body @{ response = @{ id = 'recovered-fixture-credential' }; label = 'Recovered' }
+        if ($recoveryVerify.Status -ne 200) { throw "Recovery registration verify failed: $($recoveryVerify.Raw)" }
+        $replayOptions = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/passkeys/registration/options" -Token ([string]$setup.Json.token) -Headers $browserHeaders -Body @{}
+        if ($replayOptions.Status -ne 403) { throw "Recovery code replay unexpectedly succeeded: $($replayOptions.Raw)" }
+        $afterReenroll = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/test/admin-step-up/recovery/check" -Body @{ userId = [string]$setup.Json.userId }
+        if ($afterReenroll.Json.activePasskeys -ne 1 -or -not $afterReenroll.Json.bootstrapped -or $afterReenroll.Json.recoveryPending) {
+            throw "Recovery reenrollment state invalid: $($afterReenroll.Raw)"
+        }
+
+        Write-Host "PASS admin step-up fixture: $($result.observed.Count + 12) scenarios" -ForegroundColor Green
     } finally {
         $client.Dispose()
     }

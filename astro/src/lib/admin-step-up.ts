@@ -3,6 +3,7 @@ import { getBrowserFingerprint } from './security';
 
 const STEP_UP_KEY = 'blog.admin.step-up.v1';
 const CLIENT_SESSION_KEY = 'blog.admin.client-session.v1';
+const RECOVERY_CODE_KEY = 'blog.admin.recovery-code.v1';
 const installedClients = new WeakSet<PocketBase>();
 
 type StoredStepUp = { credential: string; expiresAt: string };
@@ -50,7 +51,21 @@ export function readAdminStepUp(): StoredStepUp | null {
 export function clearAdminStepUp(options: { includeClientSession?: boolean } = {}): void {
   if (!hasSessionStorage()) return;
   sessionStorage.removeItem(STEP_UP_KEY);
-  if (options.includeClientSession) sessionStorage.removeItem(CLIENT_SESSION_KEY);
+  if (options.includeClientSession) {
+    sessionStorage.removeItem(CLIENT_SESSION_KEY);
+    sessionStorage.removeItem(RECOVERY_CODE_KEY);
+  }
+}
+
+export function saveAdminRecoveryCode(code: string): void {
+  if (!hasSessionStorage()) return;
+  const value = code.trim();
+  if (value) sessionStorage.setItem(RECOVERY_CODE_KEY, value);
+  else sessionStorage.removeItem(RECOVERY_CODE_KEY);
+}
+
+export function clearAdminRecoveryCode(): void {
+  if (hasSessionStorage()) sessionStorage.removeItem(RECOVERY_CODE_KEY);
 }
 
 export function installAdminStepUpHeaders(pb: PocketBase): void {
@@ -73,6 +88,8 @@ export function installAdminStepUpHeaders(pb: PocketBase): void {
     headers.set('X-Requested-With', 'XMLHttpRequest');
     const stored = readAdminStepUp();
     if (stored) headers.set('X-Admin-Step-Up', stored.credential);
+    const recoveryCode = sessionStorage.getItem(RECOVERY_CODE_KEY);
+    if (recoveryCode) headers.set('X-Admin-Recovery-Code', recoveryCode);
     next.headers = Object.fromEntries(headers.entries());
     return next;
   };

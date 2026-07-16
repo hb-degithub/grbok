@@ -24,3 +24,6 @@ routerAdd('POST', '/api/blog-admin/passkeys/registration/verify', function (c) {
 routerAdd('POST', '/api/blog-admin/passkeys/:id/revoke', function (c) {
   return require(__hooks + '/lib/admin_security.js').revokePasskey(c);
 });
+routerAdd('POST', '/api/blog-admin/local-recovery', function (c) {
+  return require(__hooks + '/lib/admin_security.js').localRecovery(c);
+});

@@ -312,3 +312,81 @@ routerAdd('GET', '/api/test/admin-step-up/run', function (c) {
     });
   }
 });
+
+routerAdd('POST', '/api/test/admin-step-up/recovery/setup', function (c) {
+  const alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-';
+  const suffix = $security.randomStringWithAlphabet(8, 'abcdefghijklmnopqrstuvwxyz0123456789');
+  const users = $app.dao().findCollectionByNameOrId('users');
+  const user = new Record(users);
+  user.set('email', 'recovery_' + suffix + '@example.local');
+  user.set('username', 'recovery_' + suffix);
+  user.set('password', 'Test12345!');
+  user.set('passwordConfirm', 'Test12345!');
+  user.set('role', 'super_admin');
+  user.set('verified', true);
+  user.refreshTokenKey();
+  $app.dao().saveRecord(user);
+
+  const state = new Record($app.dao().findCollectionByNameOrId('admin_passkey_state'));
+  state.set('user', user.id);
+  state.set('bootstrapped_at', new Date(Date.now() - 86400000).toISOString());
+  state.set('recovery_nonce_hmac', '');
+  state.set('recovery_expires_at', '');
+  $app.dao().saveRecord(state);
+
+  for (const label of ['Primary', 'Backup']) {
+    const passkey = new Record($app.dao().findCollectionByNameOrId('admin_passkeys'));
+    passkey.set('owner', user.id);
+    passkey.set('label', label);
+    passkey.set('credential_id', 'recovery_' + suffix + '_' + label.toLowerCase());
+    passkey.set('public_key', 'AQID');
+    passkey.set('counter', 0);
+    passkey.set('revoked_at', '');
+    $app.dao().saveRecord(passkey);
+  }
+
+  const hashSecret = String($os.getenv('ADMIN_AUTH_HASH_SECRET') || '');
+  const clientSession = $security.randomStringWithAlphabet(43, alphabet);
+  const fingerprint = 'recovery-fingerprint-' + suffix;
+  const userAgent = 'recovery-agent-' + suffix;
+  const selector = $security.randomStringWithAlphabet(24, alphabet);
+  const secret = $security.randomStringWithAlphabet(43, alphabet);
+  const session = new Record($app.dao().findCollectionByNameOrId('admin_step_up_sessions'));
+  session.set('user', user.id);
+  session.set('selector', selector);
+  session.set('secret_hmac', $security.hs256('step-up-secret:' + secret, hashSecret));
+  session.set('client_session_hmac', $security.hs256('step-up-client-session:' + clientSession, hashSecret));
+  session.set('fingerprint_hash', $security.hs256('step-up-fingerprint:' + fingerprint, hashSecret));
+  session.set('ip_hash', $security.hs256('step-up-ip:127.0.0.1', hashSecret));
+  session.set('user_agent_hash', $security.hs256('step-up-ua:' + userAgent, hashSecret));
+  session.set('verified_at', new Date().toISOString());
+  session.set('expires_at', new Date(Date.now() + 900000).toISOString());
+  session.set('revoked_at', '');
+  $app.dao().saveRecord(session);
+
+  return c.json(200, {
+    userId: user.id,
+    email: user.getString('email'),
+    token: $tokens.recordAuthToken($app, user),
+    clientSession,
+    fingerprint,
+    userAgent,
+  });
+});
+
+routerAdd('POST', '/api/test/admin-step-up/recovery/check', function (c) {
+  const input = JSON.parse(readerToString(c.request().body, 4096) || '{}');
+  const userId = String(input.userId || '');
+  const activePasskeys = $app.dao().findRecordsByFilter('admin_passkeys', 'owner = {:user} && revoked_at = null', '', 100, 0, { user: userId });
+  const activeStepUps = $app.dao().findRecordsByFilter('admin_step_up_sessions', 'user = {:user} && revoked_at = null', '', 100, 0, { user: userId });
+  const states = $app.dao().findRecordsByFilter('admin_passkey_state', 'user = {:user}', '', 1, 0, { user: userId });
+  const auditRows = $app.dao().findRecordsByFilter('admin_security_audits', 'target_id = {:user} && action_code = "ADMIN_LOCAL_RECOVERY" && priority = "high"', '', 100, 0, { user: userId });
+  const state = states.length ? states[0] : null;
+  return c.json(200, {
+    activePasskeys: activePasskeys.length,
+    activeStepUps: activeStepUps.length,
+    bootstrapped: !!(state && state.getString('bootstrapped_at')),
+    recoveryPending: !!(state && state.getString('recovery_nonce_hmac') && state.getString('recovery_expires_at')),
+    audits: auditRows.length,
+  });
+});

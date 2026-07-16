@@ -86,9 +86,25 @@ function activePasskeys(dao, userId) {
   return records(dao, 'admin_passkeys', 'owner = {:user} && revoked_at = null', '-created', 100, { user: userId });
 }
 
-function registrationMode(dao, userId) {
+function recoveryCodeHmac(code) {
+  if (!code || HASH_SECRET.length < 32) return '';
+  return $security.hs256('admin-recovery-reenroll:' + String(code), HASH_SECRET);
+}
+
+function validRecoveryState(state, c) {
+  if (!state) return false;
+  var code = header(c, 'X-Admin-Recovery-Code');
+  var stored = state.getString('recovery_nonce_hmac');
+  var expiresAt = dateMillis(state.getString('recovery_expires_at'));
+  var expected = recoveryCodeHmac(code);
+  return !!(code && stored && expected && isFinite(expiresAt) && expiresAt > Date.now() && $security.equal(stored, expected));
+}
+
+function registrationMode(dao, userId, c) {
   var state = passkeyState(dao, userId);
-  return state && state.getString('bootstrapped_at') ? 'add_registration' : 'bootstrap_registration';
+  if (!state || !state.getString('bootstrapped_at')) return 'bootstrap_registration';
+  if (c && validRecoveryState(state, c)) return 'recovery_registration';
+  return 'add_registration';
 }
 
 function invalidateChallenges(dao, userId, purpose) {
@@ -185,10 +201,11 @@ function revokePasskey(c) {
 
 function stepUpStatus(c) {
   var user = requireAdmin(c, false);
-  var mode = registrationMode($app.dao(), user.id);
+  var mode = registrationMode($app.dao(), user.id, c);
   if (mode === 'bootstrap_registration') {
     return c.json(200, { status: trustedAdminIp(c) && String(user.get('role')) === 'super_admin' ? 'bootstrap_required' : 'expired', verified: false });
   }
+  if (mode === 'recovery_registration') return c.json(200, { status: 'recovery_reenroll', verified: false });
   if (activePasskeys($app.dao(), user.id).length === 0) return c.json(200, { status: 'expired', verified: false });
   try {
     var secure = stepUp.requireAdminStepUp(c, { requireVerifiedEmail: true });
@@ -288,7 +305,7 @@ function authenticationVerify(c) {
 function registrationOptions(c) {
   var user = requireAdmin(c, true);
   requireTrustedAdminIp(c);
-  var mode = registrationMode($app.dao(), user.id);
+  var mode = registrationMode($app.dao(), user.id, c);
   var clientSessionHmac = challengeClientSessionHmac(c);
   var secure = null;
   if (mode === 'add_registration') secure = stepUp.requireAdminStepUp(c, { requireVerifiedEmail: true });
@@ -311,7 +328,7 @@ function registrationVerify(c) {
   var user = requireAdmin(c, true);
   requireTrustedAdminIp(c);
   var input = body(c);
-  var mode = registrationMode($app.dao(), user.id);
+  var mode = registrationMode($app.dao(), user.id, c);
   var clientSessionHmac = challengeClientSessionHmac(c);
   var challenge = findChallenge($app.dao(), user.id, mode);
   var secure = null;
@@ -321,7 +338,7 @@ function registrationVerify(c) {
     if (challenge.getString('binding_selector') !== secure.selector || challenge.getString('client_session_hmac') !== secure.clientSessionHmac) {
       apiError(403, 'ADMIN_STEP_UP_REQUIRED');
     }
-  } else if (passkeyState($app.dao(), user.id)) {
+  } else if (mode === 'bootstrap_registration' && passkeyState($app.dao(), user.id)) {
     apiError(409, 'PASSKEY_ALREADY_BOOTSTRAPPED');
   }
   var verified = postInternal('/internal/webauthn/registration/verify', { response: input.response, expectedChallenge: challenge.getString('challenge') });
@@ -340,6 +357,13 @@ function registrationVerify(c) {
       }
     }
     if (mode === 'bootstrap_registration' && passkeyState(txDao, user.id)) apiError(409, 'PASSKEY_ALREADY_BOOTSTRAPPED');
+    var txState = passkeyState(txDao, user.id);
+    if (mode === 'recovery_registration') {
+      if (!txState || !txState.getString('bootstrapped_at') || !validRecoveryState(txState, c)) apiError(403, 'ADMIN_RECOVERY_REQUIRED');
+      txState.set('recovery_nonce_hmac', '');
+      txState.set('recovery_expires_at', '');
+      txDao.saveRecord(txState);
+    }
     txDao.deleteRecord(currentChallenge);
     var collection = txDao.findCollectionByNameOrId('admin_passkeys');
     saved = new Record(collection);
@@ -351,11 +375,70 @@ function registrationVerify(c) {
       state.set('user', user.id); state.set('bootstrapped_at', new Date().toISOString()); txDao.saveRecord(state);
     }
     audits.writeSecurityAudit(txDao, txSecure || secure || { actorId: user.id, referenceId: $security.randomStringWithAlphabet(22, CHALLENGE_ALPHABET) }, {
-      actionCode: 'ADMIN_PASSKEY_REGISTERED', targetType: 'admin_passkey', targetId: saved.id,
+      actionCode: mode === 'recovery_registration' ? 'ADMIN_PASSKEY_RECOVERY_REGISTERED' : 'ADMIN_PASSKEY_REGISTERED', targetType: 'admin_passkey', targetId: saved.id,
       before: null, after: { active: true, label: saved.getString('label') }, version: 1,
     });
   });
   return c.json(200, { verified: true, item: passkeyDto(saved, credential.id, activePasskeys($app.dao(), user.id).length) });
+}
+
+function requireLocalAdmin(c) {
+  var admin = null;
+  try { admin = c.get('admin') || null; } catch (_) {}
+  if (!admin) apiError(401, 'AUTH_REQUIRED');
+  requireTrustedAdminIp(c);
+  return admin;
+}
+
+function localRecovery(c) {
+  requireLocalAdmin(c);
+  var input = body(c);
+  var email = String(input.email || '').trim().toLowerCase();
+  if (!email || email.length > 320) apiError(400, 'INVALID_REQUEST');
+  var recoveryCode = $security.randomStringWithAlphabet(43, CHALLENGE_ALPHABET);
+  var referenceId = $security.randomStringWithAlphabet(22, CHALLENGE_ALPHABET);
+  var expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  var result = null;
+
+  $app.dao().runInTransaction(function (txDao) {
+    var users = records(txDao, 'users', 'email = {:email}', '', 1, { email: email });
+    if (!users.length) apiError(404, 'USER_NOT_FOUND');
+    var user = users[0];
+    if (user.getString('role') !== 'super_admin' || !user.verified()) apiError(403, 'AUTH_REQUIRED');
+    var state = passkeyState(txDao, user.id);
+    if (!state || !state.getString('bootstrapped_at')) apiError(409, 'PASSKEY_NOT_BOOTSTRAPPED');
+    var now = new Date().toISOString();
+    var passkeys = activePasskeys(txDao, user.id);
+    for (var i = 0; i < passkeys.length; i++) { passkeys[i].set('revoked_at', now); txDao.saveRecord(passkeys[i]); }
+    var stepUps = records(txDao, 'admin_step_up_sessions', 'user = {:user} && revoked_at = null', '', 1000, { user: user.id });
+    for (var j = 0; j < stepUps.length; j++) { stepUps[j].set('revoked_at', now); txDao.saveRecord(stepUps[j]); }
+    var legacy = records(txDao, 'admin_verified_sessions', 'user = {:user} && revoked_at = null', '', 1000, { user: user.id });
+    for (var k = 0; k < legacy.length; k++) { legacy[k].set('revoked_at', now); txDao.saveRecord(legacy[k]); }
+    state.set('recovery_nonce_hmac', recoveryCodeHmac(recoveryCode));
+    state.set('recovery_expires_at', expiresAt);
+    txDao.saveRecord(state);
+    audits.writeSecurityAudit(txDao, {
+      actorId: '',
+      referenceId: referenceId,
+      failAudit: header(c, 'X-Test-Fail-Audit') === '1',
+    }, {
+      actionCode: 'ADMIN_LOCAL_RECOVERY',
+      targetType: 'user',
+      targetId: user.id,
+      before: { activePasskeys: passkeys.length, activeStepUps: stepUps.length },
+      after: { activePasskeys: 0, activeStepUps: 0, recoveryPending: true },
+      version: 1,
+      priority: 'high',
+    });
+    result = { passkeys: passkeys.length, stepUps: stepUps.length, legacySessions: legacy.length };
+  });
+
+  return c.json(200, {
+    recoveryCode: recoveryCode,
+    expiresAt: expiresAt,
+    referenceId: referenceId,
+    counts: result,
+  });
 }
 
 module.exports = {
@@ -367,4 +450,5 @@ module.exports = {
   registrationOptions: registrationOptions,
   registrationVerify: registrationVerify,
   revokeStepUp: revokeStepUp,
+  localRecovery: localRecovery,
 };

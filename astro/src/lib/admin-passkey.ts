@@ -1,6 +1,6 @@
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
 import { getPocketBase } from './pocketbase';
-import { clearAdminStepUp, saveAdminStepUp } from './admin-step-up';
+import { clearAdminRecoveryCode, clearAdminStepUp, saveAdminStepUp } from './admin-step-up';
 
 const ADMIN_CAPABLE_ROLES = ['author', 'admin', 'super_admin'];
 
@@ -8,7 +8,7 @@ export function isAdminCapableRole(role: unknown): boolean {
   return typeof role === 'string' && ADMIN_CAPABLE_ROLES.includes(role);
 }
 
-export type AdminStepUpStatus = 'bootstrap_required' | 'verified' | 'expired' | 'binding_changed';
+export type AdminStepUpStatus = 'bootstrap_required' | 'recovery_reenroll' | 'verified' | 'expired' | 'binding_changed';
 export type AdminVerificationStatus = { status: AdminStepUpStatus; verified: boolean; expiresAt?: string };
 export type AdminPasskeyDto = { id: string; label: string; created: string; revokedAt: string | null; current: boolean };
 
@@ -56,5 +56,6 @@ export async function registerAdminPasskey(label: string): Promise<{ verified: b
     method: 'POST',
     body: { response: attestation, label },
   }) as { verified: boolean; item?: { id: string } };
+  if (result.verified) clearAdminRecoveryCode();
   return { verified: result.verified, credentialId: result.item?.id };
 }

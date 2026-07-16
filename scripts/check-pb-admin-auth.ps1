@@ -116,7 +116,8 @@ if (-not (Test-Path -LiteralPath $hookFile -PathType Leaf)) {
         '/api/blog-admin/passkeys',
         '/api/blog-admin/passkeys/registration/options',
         '/api/blog-admin/passkeys/registration/verify',
-        '/api/blog-admin/passkeys/:id/revoke'
+        '/api/blog-admin/passkeys/:id/revoke',
+        '/api/blog-admin/local-recovery'
     )
     foreach ($route in $requiredRoutes) {
         if ($hookContent -notmatch [regex]::Escape($route)) {
