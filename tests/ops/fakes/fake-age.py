@@ -2,12 +2,24 @@ import os
 import pathlib
 import shutil
 import sys
+import time
 
 
 def main():
+    if os.environ.get("FAKE_AGE_MODE") == "timeout":
+        time.sleep(2)
     if os.environ.get("FAKE_AGE_MODE") == "fail":
         return 7
     args = sys.argv[1:]
+    if len(args) == 2 and args[0] == "-y":
+        identity = pathlib.Path(args[1])
+        if not identity.is_file():
+            return 4
+        recipient = identity.read_text(encoding="utf-8").splitlines()[0].strip()
+        if not recipient:
+            return 5
+        sys.stdout.write(recipient + "\n")
+        return 0
     if len(args) == 6 and args[0] == "--decrypt" and args[1] == "--identity" and args[3] == "--output":
         identity = pathlib.Path(args[2])
         output = pathlib.Path(args[4])

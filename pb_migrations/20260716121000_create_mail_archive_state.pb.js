@@ -59,9 +59,9 @@ migrate((db) => {
   try {
     const logs = dao.findCollectionByNameOrId('mail_delivery_logs');
     logs.indexes = (logs.indexes || []).filter((sql) => sql.indexOf('idx_mail_delivery_logs_archive_') === -1);
+    try { logs.schema.removeField(logs.schema.getFieldByName('archive_batch_id').id); } catch (_) {}
     dao.saveCollection(logs);
   } catch (_) {}
   try { dao.deleteCollection(dao.findCollectionByNameOrId('mail_archive_request_nonces')); } catch (_) {}
   try { dao.deleteCollection(dao.findCollectionByNameOrId('mail_archive_batches')); } catch (_) {}
 });
-

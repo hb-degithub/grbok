@@ -27,6 +27,7 @@ class ArchiveApiState:
         self.commit_calls = 0
         self.retention_items = []
         self.retention_confirm_calls = []
+        self.status_batch_queries = []
         self.batch_id = "batch-fixture-0000000001"
         self.rows = [
             {
@@ -70,6 +71,8 @@ class ArchiveApiState:
             payload["sealed_at"] = "2026-07-16T12:00:00.000Z"
         if self.uploaded:
             payload.update(self.uploaded)
+        if self.status == "committed":
+            payload["committed_at"] = "2026-07-14T00:00:00.000Z"
         return payload
 
 
@@ -98,7 +101,11 @@ class ApiServer:
                     self.send_json(503, {"code": "INJECTED_" + stage.upper()})
                     return
                 if stage == "status":
-                    payload = state.prepared() if state.status and state.status != "committed" else {"empty": True}
+                    state.status_batch_queries.append(body.get("batch_id"))
+                    if body.get("batch_id") and state.status:
+                        payload = state.prepared()
+                    else:
+                        payload = state.prepared() if state.status and state.status != "committed" else {"empty": True}
                 elif stage == "prepare":
                     if state.status == "committed":
                         payload = {"empty": True}
@@ -157,11 +164,14 @@ class MailArchivePipelineTests(unittest.TestCase):
         self.root = pathlib.Path(self.temp.name)
         self.workdir = self.root / "work"
         self.remote = self.root / "remote"
+        self.sync_root = self.root / "sync"
         self.workdir.mkdir(mode=0o700)
         self.remote.mkdir(mode=0o700)
+        self.sync_root.mkdir(mode=0o700)
         self.server = ApiServer()
         self.server.__enter__()
         recipient = "age1fixturepublicrecipient000000000000000000000000000000000"
+        self.recipient = recipient
         self.env = os.environ.copy()
         self.env.update(
             {
@@ -204,6 +214,23 @@ class MailArchivePipelineTests(unittest.TestCase):
         self.assertEqual(list(self.workdir.rglob("*.jsonl")), [])
         self.assertEqual(list(self.workdir.rglob("*.jsonl.gz")), [])
 
+    def trusted_descriptor(self, manifest_path, **overrides):
+        manifest = json.loads(pathlib.Path(manifest_path).read_text(encoding="utf-8"))
+        descriptor = {
+            "batchId": manifest["batch_id"],
+            "objectKey": manifest["object_key"],
+            "cipherSha256": manifest["cipher_sha256"],
+            "manifestSha256": hashlib.sha256(pathlib.Path(manifest_path).read_bytes()).hexdigest(),
+            "ageRecipientFingerprint": manifest["age_recipient_fingerprint"],
+            "rowCount": manifest["row_count"],
+            "cursor": manifest["cursor"],
+        }
+        descriptor.update(overrides)
+        path = self.root / ("trusted-descriptor-" + str(len(list(self.root.glob("trusted-descriptor-*.json")))) + ".json")
+        raw = (json.dumps(descriptor, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
+        path.write_bytes(raw)
+        return path, hashlib.sha256(raw).hexdigest()
+
     def reset_run_state(self):
         self.server.state.reset()
         for item in list(self.workdir.iterdir()):
@@ -224,6 +251,8 @@ class MailArchivePipelineTests(unittest.TestCase):
         self.assertIsNotNone(self.server.state.uploaded)
         self.assertEqual(len(list(self.remote.rglob("*.age"))), 1)
         self.assertEqual(len(list(self.remote.rglob("*.manifest.json"))), 1)
+        self.assertIn(self.server.state.batch_id, self.server.state.status_batch_queries)
+        self.assertEqual(list(self.workdir.glob("*.jsonl.gz.age")), [], "committed local ciphertext is deleted immediately")
         self.assert_no_plaintext()
 
     def test_every_failure_keeps_database_uncommitted_and_removes_plaintext(self):
@@ -270,6 +299,41 @@ class MailArchivePipelineTests(unittest.TestCase):
         second = self.run_archive()
         self.assertEqual(second.returncode, 0, second.stderr)
         self.assertEqual(self.server.state.commit_calls, 1)
+        self.assertEqual(list(self.workdir.glob("*.jsonl.gz.age")), [])
+        self.assert_no_plaintext()
+
+    def test_work_directory_capacity_limit_fails_closed(self):
+        (self.workdir / "unexpected-capacity.bin").write_bytes(b"12")
+        result = self.run_archive({"MAIL_ARCHIVE_WORK_DIR_MAX_BYTES": "1"})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ARCHIVE_WORK_DIR_CAPACITY_EXCEEDED", result.stderr)
+        self.assertEqual(self.server.state.commit_calls, 0)
+
+    def test_startup_removes_cipher_for_batch_committed_at_least_24_hours_ago(self):
+        self.server.state.status = "committed"
+        local_cipher = self.workdir / f"{self.server.state.batch_id}.jsonl.gz.age"
+        local_cipher.write_bytes(b"already-committed")
+        result = self.run_archive()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(local_cipher.exists())
+
+    def test_stale_temporary_plaintext_files_are_removed_before_export(self):
+        stale = [
+            self.workdir / f"{self.server.state.batch_id}.jsonl.tmp",
+            self.workdir / f"{self.server.state.batch_id}.jsonl.gz.tmp",
+        ]
+        for path in stale:
+            path.write_bytes(b"stale-plaintext")
+        result = self.run_archive()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(all(not path.exists() for path in stale))
+        self.assert_no_plaintext()
+
+    def test_external_command_timeout_is_bounded_and_stable(self):
+        result = self.run_archive({"FAKE_AGE_MODE": "timeout", "MAIL_ARCHIVE_COMMAND_TIMEOUT_SECONDS": "1"})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ARCHIVE_COMMAND_TIMEOUT", result.stderr)
+        self.assertEqual(self.server.state.commit_calls, 0)
         self.assert_no_plaintext()
 
     def test_retention_deletes_only_api_authorized_due_objects_versions_and_trash(self):
@@ -298,10 +362,14 @@ class MailArchivePipelineTests(unittest.TestCase):
             target = self.remote / "mail-audit" / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(payload)
-            for hidden in (".versions", ".trash"):
-                historical = self.remote / hidden / "mail-audit" / relative
-                historical.parent.mkdir(parents=True, exist_ok=True)
-                historical.write_bytes(payload + hidden.encode("ascii"))
+            name = pathlib.PurePosixPath(relative).name
+            stem, suffix = name.rsplit(".", 1)
+            for timestamp, historical_payload in (
+                ("2026-04-01-120000-000", payload + b"-old-version"),
+                ("2026-04-02-120000-000", b""),
+            ):
+                historical = target.with_name(f"{stem}-v{timestamp}.{suffix}")
+                historical.write_bytes(historical_payload)
         for relative in protected:
             target = self.remote / "mail-audit" / relative
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -315,8 +383,10 @@ class MailArchivePipelineTests(unittest.TestCase):
         }])
         for relative in (due_key, due_manifest_key):
             self.assertFalse((self.remote / "mail-audit" / relative).exists())
-            self.assertFalse((self.remote / ".versions" / "mail-audit" / relative).exists())
-            self.assertFalse((self.remote / ".trash" / "mail-audit" / relative).exists())
+            name = pathlib.PurePosixPath(relative).name
+            stem, suffix = name.rsplit(".", 1)
+            self.assertFalse((self.remote / "mail-audit" / pathlib.PurePosixPath(relative).parent / f"{stem}-v2026-04-01-120000-000.{suffix}").exists())
+            self.assertFalse((self.remote / "mail-audit" / pathlib.PurePosixPath(relative).parent / f"{stem}-v2026-04-02-120000-000.{suffix}").exists())
         for relative in protected:
             self.assertTrue((self.remote / "mail-audit" / relative).is_file())
 
@@ -352,15 +422,20 @@ class MailArchivePipelineTests(unittest.TestCase):
         cipher = next(self.remote.rglob("*.jsonl.gz.age"))
         manifest = next(self.remote.rglob("*.manifest.json"))
         identity = self.root / "offline-age-identity.txt"
-        identity.write_text("AGE-SECRET-KEY-TEST-ONLY\n", encoding="utf-8")
+        identity.write_text(self.recipient + "\n", encoding="utf-8")
         restore_root = self.root / "isolated-restore"
         restore_root.mkdir(mode=0o700)
         env = self.env.copy()
         env["MAIL_ARCHIVE_RESTORE_AGE_BIN"] = str(FAKE_AGE)
+        env["MAIL_ARCHIVE_RESTORE_AGE_KEYGEN_BIN"] = str(FAKE_AGE)
+        descriptor, descriptor_hash = self.trusted_descriptor(manifest)
 
         result = subprocess.run(
             [sys.executable, str(RESTORE_SCRIPT), "--cipher", str(cipher), "--manifest", str(manifest),
-             "--identity", str(identity), "--archive-work-dir", str(self.workdir), "--restore-root", str(restore_root)],
+             "--identity", str(identity), "--trusted-descriptor", str(descriptor),
+             "--trusted-descriptor-sha256", descriptor_hash,
+             "--archive-work-dir", str(self.workdir), "--sync-root", str(self.sync_root),
+             "--repo-root", str(REPO_ROOT), "--restore-root", str(restore_root)],
             cwd=REPO_ROOT, env=env, text=True, encoding="utf-8", errors="replace",
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
         )
@@ -379,19 +454,94 @@ class MailArchivePipelineTests(unittest.TestCase):
 
     def test_restore_refuses_identity_inside_archive_work_directory(self):
         identity = self.workdir / "forbidden-identity.txt"
-        identity.write_text("AGE-SECRET-KEY-TEST-ONLY\n", encoding="utf-8")
+        identity.write_text(self.recipient + "\n", encoding="utf-8")
         cipher = self.root / "fixture.age"
         manifest = self.root / "fixture.manifest.json"
         cipher.write_bytes(b"invalid")
         manifest.write_text("{}", encoding="utf-8")
         result = subprocess.run(
             [sys.executable, str(RESTORE_SCRIPT), "--cipher", str(cipher), "--manifest", str(manifest),
-             "--identity", str(identity), "--archive-work-dir", str(self.workdir), "--restore-root", str(self.root / "restore")],
-            cwd=REPO_ROOT, env=dict(self.env, MAIL_ARCHIVE_RESTORE_AGE_BIN=str(FAKE_AGE)),
+             "--identity", str(identity), "--trusted-descriptor", str(manifest),
+             "--trusted-descriptor-sha256", "0" * 64,
+             "--archive-work-dir", str(self.workdir), "--sync-root", str(self.sync_root),
+             "--repo-root", str(REPO_ROOT), "--restore-root", str(self.root / "restore")],
+            cwd=REPO_ROOT, env=dict(self.env, MAIL_ARCHIVE_RESTORE_AGE_BIN=str(FAKE_AGE), MAIL_ARCHIVE_RESTORE_AGE_KEYGEN_BIN=str(FAKE_AGE)),
             text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("RESTORE_PATH_INSIDE_ARCHIVE_WORK_DIR", result.stderr)
+
+    def test_restore_rejects_replaced_cipher_and_self_consistent_remote_manifest(self):
+        archived = self.run_archive()
+        self.assertEqual(archived.returncode, 0, archived.stderr)
+        original_cipher = next(self.remote.rglob("*.jsonl.gz.age"))
+        original_manifest = next(self.remote.rglob("*.manifest.json"))
+        descriptor, descriptor_hash = self.trusted_descriptor(original_manifest)
+        replaced_cipher = self.root / "replaced.age"
+        replaced_cipher.write_bytes(original_cipher.read_bytes() + b"attacker")
+        replaced_manifest = self.root / "replaced.manifest.json"
+        manifest_data = json.loads(original_manifest.read_text(encoding="utf-8"))
+        manifest_data["cipher_sha256"] = hashlib.sha256(replaced_cipher.read_bytes()).hexdigest()
+        manifest_data["cipher_size"] = replaced_cipher.stat().st_size
+        replaced_manifest.write_text(json.dumps(manifest_data, separators=(",", ":")) + "\n", encoding="utf-8")
+        identity = self.root / "offline-identity.txt"
+        identity.write_text(self.recipient + "\n", encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, str(RESTORE_SCRIPT), "--cipher", str(replaced_cipher), "--manifest", str(replaced_manifest),
+             "--identity", str(identity), "--trusted-descriptor", str(descriptor),
+             "--trusted-descriptor-sha256", descriptor_hash, "--archive-work-dir", str(self.workdir),
+             "--sync-root", str(self.sync_root), "--repo-root", str(REPO_ROOT),
+             "--restore-root", str(self.root / "replacement-restore")],
+            cwd=REPO_ROOT, env=dict(self.env, MAIL_ARCHIVE_RESTORE_AGE_BIN=str(FAKE_AGE), MAIL_ARCHIVE_RESTORE_AGE_KEYGEN_BIN=str(FAKE_AGE)),
+            text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("RESTORE_MANIFEST_TRUST_MISMATCH", result.stderr)
+
+    def test_restore_rejects_identity_for_a_different_recipient(self):
+        archived = self.run_archive()
+        self.assertEqual(archived.returncode, 0, archived.stderr)
+        cipher = next(self.remote.rglob("*.jsonl.gz.age"))
+        manifest = next(self.remote.rglob("*.manifest.json"))
+        descriptor, descriptor_hash = self.trusted_descriptor(manifest)
+        identity = self.root / "wrong-offline-identity.txt"
+        identity.write_text("age1differentrecipient00000000000000000000000000000000000\n", encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, str(RESTORE_SCRIPT), "--cipher", str(cipher), "--manifest", str(manifest),
+             "--identity", str(identity), "--trusted-descriptor", str(descriptor),
+             "--trusted-descriptor-sha256", descriptor_hash, "--archive-work-dir", str(self.workdir),
+             "--sync-root", str(self.sync_root), "--repo-root", str(REPO_ROOT),
+             "--restore-root", str(self.root / "wrong-recipient-restore")],
+            cwd=REPO_ROOT, env=dict(self.env, MAIL_ARCHIVE_RESTORE_AGE_BIN=str(FAKE_AGE), MAIL_ARCHIVE_RESTORE_AGE_KEYGEN_BIN=str(FAKE_AGE)),
+            text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("RESTORE_IDENTITY_FINGERPRINT_MISMATCH", result.stderr)
+
+    def test_restore_refuses_output_inside_repository(self):
+        archived = self.run_archive()
+        self.assertEqual(archived.returncode, 0, archived.stderr)
+        cipher = next(self.remote.rglob("*.jsonl.gz.age"))
+        manifest = next(self.remote.rglob("*.manifest.json"))
+        descriptor, descriptor_hash = self.trusted_descriptor(manifest)
+        identity = self.root / "offline-identity.txt"
+        identity.write_text(self.recipient + "\n", encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, str(RESTORE_SCRIPT), "--cipher", str(cipher), "--manifest", str(manifest),
+             "--identity", str(identity), "--trusted-descriptor", str(descriptor),
+             "--trusted-descriptor-sha256", descriptor_hash, "--archive-work-dir", str(self.workdir),
+             "--sync-root", str(self.sync_root), "--repo-root", str(REPO_ROOT),
+             "--restore-root", str(REPO_ROOT / "forbidden-restore-output")],
+            cwd=REPO_ROOT, env=dict(self.env, MAIL_ARCHIVE_RESTORE_AGE_BIN=str(FAKE_AGE), MAIL_ARCHIVE_RESTORE_AGE_KEYGEN_BIN=str(FAKE_AGE)),
+            text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("RESTORE_PATH_INSIDE_FORBIDDEN_ROOT", result.stderr)
+
+    def test_restore_cleanup_errors_cannot_be_ignored(self):
+        source = RESTORE_SCRIPT.read_text(encoding="utf-8")
+        self.assertNotIn("ignore_errors=True", source)
+        self.assertIn("RESTORE_CLEANUP_FAILED", source)
 
 
 if __name__ == "__main__":

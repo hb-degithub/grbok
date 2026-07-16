@@ -154,7 +154,10 @@ function runJobTests() {
             return !state.get('reminder_sent_at') && state.get('reminder_attempts') < 3 && Date.parse(state.get('reminder_due_at')) <= Date.parse(params.now) && (!state.get('next_attempt_at') || Date.parse(state.get('next_attempt_at')) <= Date.parse(params.now));
           }
           if (filter.indexOf('cleanup_eligible_at') !== -1) {
-            return Date.parse(state.get('cleanup_eligible_at')) <= Date.parse(params.now);
+            var dueForCleanup = Date.parse(state.get('cleanup_eligible_at')) <= Date.parse(params.now);
+            if (filter.indexOf('reminder_sent_at != null') !== -1) return dueForCleanup && !!state.get('reminder_sent_at');
+            if (filter.indexOf('reminder_sent_at = null') !== -1) return dueForCleanup && !state.get('reminder_sent_at');
+            return dueForCleanup;
           }
           return state.get('user') === params.user;
         }).slice(0, limit);
@@ -206,14 +209,14 @@ function runJobTests() {
   assertEqual(retryState.get('reminder_attempts'), 3, 'reminder stops after three attempts');
   assertEqual(retention.runDueReminders(now + 10 * retention.DAY_MS, 20).selected, 0, 'no infinite retry after third attempt');
 
-  addAccount('verified', 60, true, false);
-  addAccount('related', 60, false, true);
+  addAccount('verified', 60, true, false).set('reminder_sent_at', new Date(now - retention.DAY_MS).toISOString());
+  addAccount('related', 60, false, true).set('reminder_sent_at', new Date(now - retention.DAY_MS).toISOString());
   var protectedSummary = retention.runDueCleanup(now, 20);
   assertEqual(protectedSummary.protected, 2, 'verified and business-related accounts are protected');
   assert(deleted.indexOf('user:verified') === -1 && deleted.indexOf('user:related') === -1, 'protected users remain');
 
   addAccount('day59', 59, false, false);
-  addAccount('day60', 60, false, false);
+  addAccount('day60', 60, false, false).set('reminder_sent_at', new Date(now - retention.DAY_MS).toISOString());
   var cleanup = retention.runDueCleanup(now, 20);
   assertEqual(cleanup.deleted, 1, 'day 60 deletes one eligible account');
   assert(deleted.indexOf('user:day60') !== -1 && deleted.indexOf('state:state-day60') !== -1, 'user and lifecycle state delete together');
@@ -221,7 +224,14 @@ function runJobTests() {
   assertEqual(retention.runDueCleanup(now, 20).deleted, 0, 'repeated cleanup is idempotent');
   assert(JSON.stringify(cleanup).indexOf('@') === -1, 'cleanup audit summary contains no email address');
 
+  var neverNotified = addAccount('never-notified', 60, false, false);
+  neverNotified.set('reminder_attempts', 3);
+  var notNotifiedCleanup = retention.runDueCleanup(now, 20);
+  assertEqual(notNotifiedCleanup.not_notified, 1, 'cleanup alerts when every reminder attempt failed');
+  assert(deleted.indexOf('user:never-notified') === -1 && deleted.indexOf('state:state-never-notified') === -1, 'account without a successful reminder is retained');
+
   var queryErrorState = addAccount('queryerror', 60, false, false);
+  queryErrorState.set('reminder_sent_at', new Date(now - retention.DAY_MS).toISOString());
   relationships.queryerror = 'error';
   var failedCleanup = retention.runDueCleanup(now, 20);
   assertEqual(failedCleanup.failed, 1, 'relationship query failure fails closed');

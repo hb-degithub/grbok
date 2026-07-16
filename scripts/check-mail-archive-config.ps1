@@ -61,6 +61,13 @@ foreach ($requiredText in @(
     'fingerprint',
     'rclone',
     'MAIL_ARCHIVE_RETENTION_MODE=s3-versioned',
+    'MAIL_ARCHIVE_WORK_DIR_MAX_BYTES',
+    'MAIL_ARCHIVE_COMMAND_TIMEOUT_SECONDS',
+    'restore-descriptor',
+    '--trusted-descriptor-sha256',
+    '--sync-root',
+    '--repo-root',
+    'MAIL_ARCHIVE_RESTORE_COMMAND_TIMEOUT_SECONDS',
     'verify-mail-archive-restore.py'
 )) {
     if ($runbook -notmatch [regex]::Escape($requiredText)) {

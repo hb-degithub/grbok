@@ -121,9 +121,15 @@ function run() {
     'sealed_at', 'uploaded_at', 'committed_at', 'last_error_class', 'archive_batch_id',
     'idx_mail_archive_nonce_expiry', 'idx_mail_delivery_logs_archive_batch',
   ].forEach(function (needle) { assert(migration.indexOf(needle) !== -1, 'archive migration missing ' + needle); });
+  var archiveDown = migration.split('}, (db) => {')[1] || '';
+  assert(archiveDown.indexOf('archive_batch_id') !== -1 && archiveDown.indexOf('removeField') !== -1, 'archive down migration removes archive_batch_id');
   var retentionMigration = read('pb_migrations/20260716122000_add_mail_archive_retention_state.pb.js');
   ['retention_confirmed_at', 'idx_mail_archive_batches_retention_due'].forEach(function (needle) {
     assert(retentionMigration.indexOf(needle) !== -1, 'archive retention migration missing ' + needle);
+  });
+  var activeMigration = read('pb_migrations/20260716123000_add_mail_archive_active_slot.pb.js');
+  ['active_slot', 'idx_mail_archive_batches_one_active', 'CREATE UNIQUE INDEX'].forEach(function (needle) {
+    assert(activeMigration.indexOf(needle) !== -1, 'archive active-slot migration missing ' + needle);
   });
 
   var dao = createDao();
@@ -178,6 +184,9 @@ function run() {
 
   var prepared = archive.prepareBatch(now, 9000);
   assertEqual(prepared.row_count, 5000, 'prepare enforces the 5000 row cap');
+  var repeatedPrepare = archive.prepareBatch(now, 9000);
+  assertEqual(repeatedPrepare.batch_id, prepared.batch_id, 'concurrent/repeated prepare reuses the one incomplete batch');
+  assertEqual(dao.tables.mail_archive_batches.length, 1, 'only one incomplete archive batch exists');
   assertEqual(dao.tables.mail_delivery_logs.filter(function (item) { return item.get('archive_batch_id') === prepared.batch_id; }).length, 5000, 'prepare reserves selected rows transactionally');
   assertEqual(dao.tables.mail_delivery_logs.filter(function (item) { return item.id === 'at-cutoff'; })[0].get('archive_batch_id'), '', 'cutoff is strict created less-than');
   assertEqual(archive.getPendingBatch().batch_id, prepared.batch_id, 'status returns the earliest incomplete batch for restart');
@@ -210,6 +219,10 @@ function run() {
   assertThrowsCode(function () { archive.commitBatch(prepared.batch_id, { cipher_sha256: sealedInput.cipher_sha256, object_key: 'wrong', manifest_sha256: uploadedInput.manifest_sha256 }, now); }, 'ARCHIVE_COMMIT_MISMATCH', 'different repeated commit is rejected');
   assertThrowsCode(function () { archive.exportBatch('unknown-batch'); }, 'ARCHIVE_BATCH_NOT_FOUND', 'unknown batch is rejected');
   assertEqual(archive.getPendingBatch(), null, 'committed batch is not returned as pending');
+  var restoreDescriptor = archive.restoreDescriptor(prepared.batch_id);
+  assertEqual(Object.keys(restoreDescriptor).sort().join(','), 'ageRecipientFingerprint,batchId,cipherSha256,cursor,manifestSha256,objectKey,rowCount', 'restore descriptor exposes only trusted committed fields');
+  assertEqual(restoreDescriptor.batchId, prepared.batch_id, 'restore descriptor identifies the committed batch');
+  assertEqual(restoreDescriptor.manifestSha256, uploadedInput.manifest_sha256, 'restore descriptor anchors the remote manifest hash');
 
   var retentionCutoff = '2026-04-16T12:00:00.000Z';
   for (var retentionIndex = 0; retentionIndex < 102; retentionIndex++) {
@@ -261,7 +274,7 @@ function run() {
 
   var routes = read('pb_hooks/mail_archive.pb.js');
   assert(routes.indexOf("var PREFIX = '/api/blog-internal/mail-archive/'") !== -1, 'archive route prefix is fixed');
-  ['status', 'prepare', 'export', 'seal', 'uploaded', 'commit', 'retention-due', 'retention-confirm'].forEach(function (route) {
+  ['status', 'prepare', 'export', 'seal', 'uploaded', 'commit', 'restore-descriptor', 'retention-due', 'retention-confirm'].forEach(function (route) {
     assert(routes.indexOf("route('" + route + "'") !== -1, 'missing archive route ' + route);
   });
   assert(routes.indexOf('MAIL_ARCHIVE_API_ENABLED') !== -1, 'archive API is environment gated');

@@ -208,10 +208,15 @@ function runDueCleanup(nowMs, limit) {
   var deps = dependencies();
   var nowIso = iso(nowMs);
   var due = deps.dao().findRecordsByFilter(
-    'account_retention_state', 'cleanup_eligible_at <= {:now}',
+    'account_retention_state', 'cleanup_eligible_at <= {:now} && reminder_sent_at != null',
     'cleanup_eligible_at,id', boundedLimit(limit), 0, { now: nowIso }
   ) || [];
-  var summary = { selected: due.length, deleted: 0, protected: 0, failed: 0, error_classes: {} };
+  var notNotified = deps.dao().findRecordsByFilter(
+    'account_retention_state', 'cleanup_eligible_at <= {:now} && reminder_sent_at = null',
+    'cleanup_eligible_at,id', boundedLimit(limit), 0, { now: nowIso }
+  ) || [];
+  var summary = { selected: due.length, deleted: 0, protected: 0, not_notified: notNotified.length, failed: 0, error_classes: {} };
+  if (notNotified.length) summary.error_classes.RETENTION_REMINDER_NOT_SENT = notNotified.length;
 
   for (var i = 0; i < due.length; i++) {
     (function (stateId) {
@@ -219,6 +224,11 @@ function runDueCleanup(nowMs, limit) {
         deps.runInTransaction(function (txDao) {
           var state = loadById(txDao, 'account_retention_state', stateId);
           if (Date.parse(String(state.get('cleanup_eligible_at'))) > nowMs) return;
+          if (!state.get('reminder_sent_at')) {
+            summary.not_notified++;
+            summary.error_classes.RETENTION_REMINDER_NOT_SENT = (summary.error_classes.RETENTION_REMINDER_NOT_SENT || 0) + 1;
+            return;
+          }
           var user = loadById(txDao, 'users', String(state.get('user')));
           if (recordVerified(user) || hasBusinessRelationship(txDao, user)) {
             txDao.deleteRecord(state);

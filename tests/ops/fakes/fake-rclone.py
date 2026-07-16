@@ -2,6 +2,8 @@ import os
 import pathlib
 import shutil
 import sys
+import json
+import re
 
 
 def remote_path(spec):
@@ -13,11 +15,13 @@ def remote_path(spec):
     return pathlib.Path(os.environ["FAKE_RCLONE_ROOT"]) / pathlib.PurePosixPath(relative)
 
 
-def all_remote_paths(spec):
-    current = remote_path(spec)
-    root = pathlib.Path(os.environ["FAKE_RCLONE_ROOT"])
-    relative = current.relative_to(root)
-    return [current, root / ".versions" / relative, root / ".trash" / relative]
+def version_marker_path(path):
+    stem, suffix = path.name.rsplit(".", 1)
+    return path.with_name(f"{stem}-v2099-01-01-000000-000.{suffix}")
+
+
+def is_version_name(name):
+    return re.search(r"-v\d{4}-\d{2}-\d{2}-\d{6}-\d{3}\.[^.]+$", name) is not None
 
 
 def main():
@@ -42,29 +46,30 @@ def main():
             return 3
         sys.stdout.buffer.write(source.read_bytes())
         return 0
+    if command == "deletefile" and len(args) == 4 and args[2:] == ["--s3-versions", "--s3-version-deleted"]:
+        if mode == "fail-retention-purge":
+            return 10
+        target = remote_path(args[1])
+        if target.exists():
+            target.unlink()
+            if not is_version_name(target.name):
+                marker = version_marker_path(target)
+                marker.parent.mkdir(parents=True, exist_ok=True)
+                marker.write_bytes(b"")
+        return 0
     if command == "deletefile" and len(args) == 2:
         target = remote_path(args[1])
         if target.exists():
             target.unlink()
         return 0
-    if command == "delete" and len(args) == 8 and args[2] == "--include":
-        if mode == "fail-retention-purge":
-            return 10
-        directory = args[1]
-        filename = args[3].lstrip("/")
-        spec = directory.rstrip("/") + "/" + filename
-        for target in all_remote_paths(spec):
-            if target.exists():
-                target.unlink()
-        return 0
-    if command == "lsjson" and len(args) == 4:
-        residual = [str(path) for path in all_remote_paths(args[1]) if path.exists()]
-        sys.stdout.write(__import__("json").dumps(residual))
-        return 0
-    if command == "cleanup" and len(args) == 2:
-        root = pathlib.Path(os.environ["FAKE_RCLONE_ROOT"]) / ".trash"
-        if root.exists():
-            shutil.rmtree(root)
+    if command == "lsjson" and len(args) == 5 and args[2:] == ["--s3-versions", "--s3-version-deleted", "--recursive"]:
+        directory = remote_path(args[1])
+        rows = []
+        if directory.is_dir():
+            for item in sorted(directory.rglob("*")):
+                if item.is_file():
+                    rows.append({"Path": item.relative_to(directory).as_posix(), "Name": item.name, "Size": item.stat().st_size, "IsDir": False})
+        sys.stdout.write(json.dumps(rows, separators=(",", ":")))
         return 0
     return 2
 

@@ -55,27 +55,44 @@ function projectLog(record) {
   return projected;
 }
 
+function findPendingBatch(dao) {
+  var rows = dao.findRecordsByFilter('mail_archive_batches', 'status != "committed"', 'created', 100, 0, {}) || [];
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].get('status')) !== 'committed') return rows[i];
+  }
+  return null;
+}
+
 function prepareBatch(nowMs, limit) {
   var deps = dependencies();
-  return deps.runInTransaction(function (txDao) {
-    var cutoff = iso(Number(nowMs) - 7 * DAY_MS);
-    var rows = txDao.findRecordsByFilter('mail_delivery_logs', 'archive_batch_id = null && created < {:cutoff}', 'created,event_id', boundedLimit(limit), 0, { cutoff: cutoff }) || [];
-    if (!rows.length) return null;
-    var batchId = deps.randomBatchId();
-    var batch = newRecord(txDao, txDao.findCollectionByNameOrId('mail_archive_batches'));
-    var first = rows[0]; var last = rows[rows.length - 1];
-    batch.set('batch_id', batchId);
-    batch.set('status', 'prepared');
-    batch.set('cursor', JSON.stringify({ created_at: last.get('created'), event_id: last.get('event_id') }));
-    batch.set('row_count', rows.length);
-    batch.set('min_created_at', iso(Date.parse(String(first.get('created')))));
-    batch.set('max_created_at', iso(Date.parse(String(last.get('created')))));
-    batch.set('prepared_at', iso(nowMs));
-    batch.set('last_error_class', '');
-    txDao.saveRecord(batch);
-    for (var i = 0; i < rows.length; i++) { rows[i].set('archive_batch_id', batchId); txDao.saveRecord(rows[i]); }
-    return { batch_id: batchId, status: 'prepared', row_count: rows.length, cursor: batch.get('cursor'), min_created_at: batch.get('min_created_at'), max_created_at: batch.get('max_created_at') };
-  });
+  try {
+    return deps.runInTransaction(function (txDao) {
+      var existing = findPendingBatch(txDao);
+      if (existing) return batchDescriptor(existing);
+      var cutoff = iso(Number(nowMs) - 7 * DAY_MS);
+      var rows = txDao.findRecordsByFilter('mail_delivery_logs', 'archive_batch_id = null && created < {:cutoff}', 'created,event_id', boundedLimit(limit), 0, { cutoff: cutoff }) || [];
+      if (!rows.length) return null;
+      var batchId = deps.randomBatchId();
+      var batch = newRecord(txDao, txDao.findCollectionByNameOrId('mail_archive_batches'));
+      var first = rows[0]; var last = rows[rows.length - 1];
+      batch.set('batch_id', batchId);
+      batch.set('status', 'prepared');
+      batch.set('active_slot', 'active');
+      batch.set('cursor', JSON.stringify({ created_at: last.get('created'), event_id: last.get('event_id') }));
+      batch.set('row_count', rows.length);
+      batch.set('min_created_at', iso(Date.parse(String(first.get('created')))));
+      batch.set('max_created_at', iso(Date.parse(String(last.get('created')))));
+      batch.set('prepared_at', iso(nowMs));
+      batch.set('last_error_class', '');
+      txDao.saveRecord(batch);
+      for (var i = 0; i < rows.length; i++) { rows[i].set('archive_batch_id', batchId); txDao.saveRecord(rows[i]); }
+      return batchDescriptor(batch);
+    });
+  } catch (error) {
+    var raced = getPendingBatch();
+    if (raced) return raced;
+    throw error;
+  }
 }
 
 function exportBatch(batchId) {
@@ -98,12 +115,12 @@ function batchDescriptor(batch) {
 }
 
 function getPendingBatch() {
-  var dao = dependencies().dao();
-  var rows = dao.findRecordsByFilter('mail_archive_batches', 'status != "committed"', 'created', 100, 0, {}) || [];
-  for (var i = 0; i < rows.length; i++) {
-    if (String(rows[i].get('status')) !== 'committed') return batchDescriptor(rows[i]);
-  }
-  return null;
+  var batch = findPendingBatch(dependencies().dao());
+  return batch ? batchDescriptor(batch) : null;
+}
+
+function getBatchStatus(batchId) {
+  return batchDescriptor(findBatch(dependencies().dao(), batchId));
 }
 
 function sealBatch(batchId, input, nowMs) {
@@ -151,9 +168,23 @@ function commitBatch(batchId, input, nowMs) {
     var logs = txDao.findRecordsByFilter('mail_delivery_logs', 'archive_batch_id = {:batch}', 'created,event_id', MAX_ROWS, 0, { batch: String(batchId) }) || [];
     if (logs.length !== Number(batch.get('row_count'))) throw archiveError('ARCHIVE_ROW_COUNT_MISMATCH');
     for (var i = 0; i < logs.length; i++) txDao.deleteRecord(logs[i]);
-    batch.set('status', 'committed'); batch.set('committed_at', iso(nowMs)); batch.set('last_error_class', ''); txDao.saveRecord(batch);
+    batch.set('status', 'committed'); batch.set('active_slot', ''); batch.set('committed_at', iso(nowMs)); batch.set('last_error_class', ''); txDao.saveRecord(batch);
     return { batch_id: String(batchId), status: 'committed', deleted: logs.length, idempotent: false };
   });
+}
+
+function restoreDescriptor(batchId) {
+  var batch = findBatch(dependencies().dao(), batchId);
+  if (String(batch.get('status')) !== 'committed') throw archiveError('ARCHIVE_RESTORE_NOT_COMMITTED');
+  return {
+    batchId: String(batch.get('batch_id')),
+    objectKey: requireObjectKey(batch.get('object_key')),
+    cipherSha256: requireHash(batch.get('cipher_sha256'), 'ARCHIVE_CIPHER_HASH_INVALID'),
+    manifestSha256: requireHash(batch.get('manifest_sha256'), 'ARCHIVE_MANIFEST_HASH_INVALID'),
+    ageRecipientFingerprint: String(batch.get('age_recipient_fingerprint') || ''),
+    rowCount: boundedInteger(batch.get('row_count'), 1, MAX_ROWS, 'ARCHIVE_ROW_COUNT_INVALID'),
+    cursor: String(batch.get('cursor') || ''),
+  };
 }
 
 function retentionLimit(value) {
@@ -210,8 +241,9 @@ function resetDependenciesForTests() { testDependencies = null; }
 
 module.exports = {
   ARCHIVE_KEYS: ARCHIVE_KEYS, projectLog: projectLog, prepareBatch: prepareBatch, exportBatch: exportBatch,
-  getPendingBatch: getPendingBatch,
+  getPendingBatch: getPendingBatch, getBatchStatus: getBatchStatus,
   sealBatch: sealBatch, markUploaded: markUploaded, commitBatch: commitBatch,
+  restoreDescriptor: restoreDescriptor,
   retentionDue: retentionDue, confirmRetention: confirmRetention,
   _setDependenciesForTests: setDependenciesForTests, _resetDependenciesForTests: resetDependenciesForTests,
 };

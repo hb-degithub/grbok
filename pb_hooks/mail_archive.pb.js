@@ -30,12 +30,13 @@ function route(name, operation) {
   }, $apis.bodyLimit(65536));
 }
 
-route('status', function () { return archive.getPendingBatch() || { empty: true }; });
+route('status', function (body) { return body.batch_id ? archive.getBatchStatus(body.batch_id) : (archive.getPendingBatch() || { empty: true }); });
 route('prepare', function (body) { return archive.prepareBatch(Date.now(), body.limit || 5000) || { empty: true }; });
 route('export', function (body) { return archive.exportBatch(body.batch_id); });
 route('seal', function (body) { return archive.sealBatch(body.batch_id, body, Date.now()); });
 route('uploaded', function (body) { return archive.markUploaded(body.batch_id, body, Date.now()); });
 route('commit', function (body) { return archive.commitBatch(body.batch_id, body, Date.now()); });
+route('restore-descriptor', function (body) { return archive.restoreDescriptor(body.batchId); });
 route('retention-due', function (body) { return archive.retentionDue(body.cutoffIso, body.limit, body.cursor || '', Date.now()); });
 route('retention-confirm', function (body) { return archive.confirmRetention(body, Date.now()); });
 

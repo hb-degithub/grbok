@@ -25,6 +25,8 @@ MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINT=replace-with-the-lowercase-sha256-fingerp
 MAIL_ARCHIVE_RCLONE_REMOTE=mail-archive
 MAIL_ARCHIVE_RCLONE_PREFIX=production/mail-audit
 MAIL_ARCHIVE_WORK_DIR=/var/lib/hlydwz/mail-archive
+MAIL_ARCHIVE_WORK_DIR_MAX_BYTES=1073741824
+MAIL_ARCHIVE_COMMAND_TIMEOUT_SECONDS=120
 MAIL_ARCHIVE_RETENTION_MODE=s3-versioned
 RCLONE_CONFIG=/etc/hlydwz/rclone.conf
 ```
@@ -53,7 +55,7 @@ Enable the task only after the PocketBase archive migration and signed internal 
 
 Use a storage region approved for the site's data residency obligations and record the provider data-processing review before first upload. Enable encryption at rest in addition to age encryption. Configure provider lifecycle rules so current ciphertext objects, manifests, prior versions, delete markers, and trash are all removed after 90 days. A version-history or trash policy that keeps recoverable copies beyond 90 days is not acceptable.
 
-The archive client requests retention candidates from the signed `retention-due` API. PocketBase returns only committed batches whose `max_created_at` is strictly older than 90 days, in stable pages of at most 100. The host verifies the current ciphertext hash and manifest identity, deletes the ciphertext and manifest with fixed rclone arguments, purges S3 versions and delete markers, verifies `lsjson --s3-versions --s3-version-deleted` is empty, and only then calls `retention-confirm`. PocketBase rechecks the committed state, event-time cutoff, object key, and cipher hash transactionally before marking metadata cleaned. A local host file is never authoritative for deletion.
+The archive client requests retention candidates from the signed `retention-due` API. PocketBase returns only committed batches whose `max_created_at` is strictly older than 90 days, in stable pages of at most 100. For each ciphertext and manifest, the host lists the flat month parent with `lsjson --s3-versions --s3-version-deleted --recursive`, accepts only the exact current filename or rclone's strict `-vYYYY-MM-DD-HHMMSS-mmm` version/delete-marker form, and deletes every returned path individually. It then repeats the listing until no current object, version, or delete marker matches. Only after this proof does it call `retention-confirm`. PocketBase rechecks the committed state, event-time cutoff, object key, and cipher hash transactionally before marking metadata cleaned. A local host file is never authoritative for deletion.
 
 `MAIL_ARCHIVE_RETENTION_MODE=s3-versioned` is the supported production mode for a versioned S3-compatible remote. Validate the selected provider against the pinned rclone release in staging before enabling deletion. The hourly `run` command performs both archive progress and due retention; the separate `retention` command exists for controlled retries. Provider lifecycle is a backstop, not the authority for early deletion. Review the bucket monthly for orphaned versions, trash, unexpected prefixes, public access, and policy drift.
 
@@ -66,21 +68,30 @@ Alert when any of these conditions occurs:
 - Online delivery rows older than 8 days remain uncommitted.
 - Ciphertext or manifest readback hashes differ.
 - The work directory contains `.jsonl` or `.jsonl.gz` after a run.
+- Temporary `.jsonl.tmp` or `.jsonl.gz.tmp` files cannot be removed at startup.
+- Work-directory usage exceeds `MAIL_ARCHIVE_WORK_DIR_MAX_BYTES`.
+- An age or rclone command reaches the fixed `MAIL_ARCHIVE_COMMAND_TIMEOUT_SECONDS` deadline.
 - Cloud objects, versions, or trash remain after their 90-day eligibility date.
 
 On failure, preserve the PocketBase rows and batch state. Do not manually delete online rows, overwrite a same-name remote object, print payloads, or copy plaintext out of the mode-`0700` work directory. Correct the configuration or provider fault and rerun the same job so it resumes the earliest incomplete batch.
 
 ## Monthly isolated restore drill
 
-Once each month, select one committed batch, download its ciphertext and manifest to a newly created isolated directory, and use the offline restore verifier with an explicitly supplied age identity. The restore directory must not be inside `/var/lib/hlydwz/mail-archive`, the rclone sync tree, or the repository.
+Once each month, select one committed batch and call the signed `restore-descriptor` route with its `batchId`. Save the exact seven-field response (`batchId`, `objectKey`, `cipherSha256`, `manifestSha256`, `ageRecipientFingerprint`, `rowCount`, and `cursor`) to offline media, record its SHA-256 independently, and only then download the ciphertext and manifest to a newly created isolated directory. The descriptor and its separately recorded hash are the trust anchor; the remote manifest is not. The restore directory must not be inside `/var/lib/hlydwz/mail-archive`, the rclone sync tree, or the repository.
 
 ```bash
 /usr/bin/python3 /opt/hlydwz/blog/scripts/verify-mail-archive-restore.py \
   --cipher /srv/isolated-restore/example.jsonl.gz.age \
   --manifest /srv/isolated-restore/example.jsonl.gz.age.manifest.json \
   --identity /media/offline-key/age-identity.txt \
+  --trusted-descriptor /media/offline-key/example.committed-descriptor.json \
+  --trusted-descriptor-sha256 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef \
   --archive-work-dir /var/lib/hlydwz/mail-archive \
+  --sync-root /srv/mail-archive-sync \
+  --repo-root /opt/hlydwz/blog \
   --restore-root /srv/isolated-restore/work
 ```
 
-Record only the batch identifier, verified row count, verification time, operator, and pass/fail result. Never record decrypted rows. The verifier must confirm cipher, gzip, and plaintext hashes, gzip integrity, JSONL schema, row count, and cursor, then remove all decrypted material on exit. Investigate any failure before the next scheduled deletion or retention purge.
+The verifier uses `/usr/bin/age-keygen -y` to derive the recipient from the supplied offline identity and requires its fingerprint to equal the committed descriptor. Record only the batch identifier, verified row count, verification time, operator, and pass/fail result. Never record decrypted rows. The verifier must confirm descriptor hash, manifest hash, cipher/gzip/plaintext hashes, recipient fingerprint, gzip integrity, every field's type/enum/bounds, row count, and cursor, then remove all decrypted material on exit. Cleanup failure is a failed drill and must alert. Investigate any failure before the next scheduled deletion or retention purge.
+
+Set `MAIL_ARCHIVE_RESTORE_COMMAND_TIMEOUT_SECONDS=120` in the isolated restore shell if the default must be made explicit. Values outside 1-600 seconds are rejected.

@@ -52,6 +52,8 @@ class Config:
     age_bin: str
     rclone_bin: str
     retention_mode: str
+    work_dir_max_bytes: int
+    command_timeout_seconds: int
     test_mode: bool
     test_fail_stage: str
 
@@ -91,6 +93,18 @@ class Config:
         retention_mode = os.environ.get("MAIL_ARCHIVE_RETENTION_MODE", "")
         if retention_mode != "s3-versioned":
             raise ArchiveError("ARCHIVE_RETENTION_MODE_UNSUPPORTED")
+        try:
+            work_dir_max_bytes = int(os.environ.get("MAIL_ARCHIVE_WORK_DIR_MAX_BYTES", str(1024 * 1024 * 1024)))
+        except ValueError as error:
+            raise ArchiveError("ARCHIVE_WORK_DIR_CAPACITY_INVALID") from error
+        if work_dir_max_bytes < 1:
+            raise ArchiveError("ARCHIVE_WORK_DIR_CAPACITY_INVALID")
+        try:
+            command_timeout_seconds = int(os.environ.get("MAIL_ARCHIVE_COMMAND_TIMEOUT_SECONDS", "120"))
+        except ValueError as error:
+            raise ArchiveError("ARCHIVE_COMMAND_TIMEOUT_INVALID") from error
+        if not 1 <= command_timeout_seconds <= 600:
+            raise ArchiveError("ARCHIVE_COMMAND_TIMEOUT_INVALID")
         return cls(
             api_url=api_url,
             hmac_secret=secret,
@@ -102,6 +116,8 @@ class Config:
             age_bin=age_bin,
             rclone_bin=rclone_bin,
             retention_mode=retention_mode,
+            work_dir_max_bytes=work_dir_max_bytes,
+            command_timeout_seconds=command_timeout_seconds,
             test_mode=test_mode,
             test_fail_stage=os.environ.get("MAIL_ARCHIVE_TEST_FAIL_STAGE", ""),
         )
@@ -149,13 +165,17 @@ def command_prefix(config, executable):
 
 def run_command(config, executable, args, capture=False, check=True):
     command = command_prefix(config, executable) + list(args)
-    completed = subprocess.run(
-        command,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE if capture else subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=config.command_timeout_seconds,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ArchiveError("ARCHIVE_COMMAND_TIMEOUT") from error
     if check and completed.returncode != 0:
         raise ArchiveError("ARCHIVE_COMMAND_FAILED")
     return completed
@@ -264,16 +284,85 @@ def commit_uploaded(api, config, batch):
     })
 
 
+def work_dir_size(work_dir):
+    total = 0
+    for path in pathlib.Path(work_dir).rglob("*"):
+        if path.is_symlink():
+            raise ArchiveError("ARCHIVE_WORK_DIR_SYMLINK_REJECTED")
+        if path.is_file():
+            total += path.stat().st_size
+    return total
+
+
+def require_capacity(config):
+    if work_dir_size(config.work_dir) > config.work_dir_max_bytes:
+        raise ArchiveError("ARCHIVE_WORK_DIR_CAPACITY_EXCEEDED")
+
+
+def cleanup_temporary_files(config):
+    pattern = re.compile(r"^[A-Za-z0-9_-]{8,100}\.jsonl(?:\.gz(?:\.age)?)?\.tmp$")
+    for path in config.work_dir.iterdir():
+        if path.is_symlink():
+            raise ArchiveError("ARCHIVE_WORK_DIR_SYMLINK_REJECTED")
+        if path.is_file() and pattern.fullmatch(path.name):
+            try:
+                path.unlink()
+            except OSError as error:
+                raise ArchiveError("ARCHIVE_TEMP_CLEANUP_FAILED") from error
+
+
+def cleanup_committed_ciphers(api, config, now):
+    cutoff = now - dt.timedelta(hours=24)
+    pattern = re.compile(r"^([A-Za-z0-9_-]{8,100})\.jsonl\.gz\.age$")
+    for path in config.work_dir.glob("*.jsonl.gz.age"):
+        match = pattern.fullmatch(path.name)
+        if not match:
+            raise ArchiveError("ARCHIVE_LOCAL_CIPHER_NAME_INVALID")
+        status = api.post("status", {"batch_id": match.group(1)})
+        if status.get("batch_id") != match.group(1):
+            raise ArchiveError("ARCHIVE_STATUS_BATCH_MISMATCH")
+        if status.get("status") != "committed":
+            continue
+        try:
+            committed_at = dt.datetime.fromisoformat(str(status.get("committed_at") or "").replace("Z", "+00:00"))
+        except ValueError as error:
+            raise ArchiveError("ARCHIVE_COMMITTED_AT_INVALID") from error
+        if committed_at <= cutoff:
+            try:
+                path.unlink()
+            except OSError as error:
+                raise ArchiveError("ARCHIVE_COMMITTED_CIPHER_CLEANUP_FAILED") from error
+
+
+def commit_and_remove_local_cipher(api, config, batch):
+    result = commit_uploaded(api, config, batch)
+    if result.get("status") != "committed":
+        raise ArchiveError("ARCHIVE_COMMIT_RESPONSE_INVALID")
+    cipher_path = config.work_dir / f"{batch['batch_id']}.jsonl.gz.age"
+    try:
+        cipher_path.unlink()
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        raise ArchiveError("ARCHIVE_COMMITTED_CIPHER_CLEANUP_FAILED") from error
+    return result
+
+
 def run_archive(config):
     api = ApiClient(config)
+    cleanup_temporary_files(config)
+    cleanup_committed_ciphers(api, config, dt.datetime.now(dt.timezone.utc))
+    require_capacity(config)
     pending = api.post("status", {})
     if pending.get("empty"):
         pending = api.post("prepare", {"limit": 5000})
     if pending.get("empty"):
         return {"empty": True}
+    if not pending.get("batch_id"):
+        raise ArchiveError("ARCHIVE_STATUS_BATCH_INVALID")
     status = pending.get("status")
     if status == "uploaded":
-        return commit_uploaded(api, config, pending)
+        return commit_and_remove_local_cipher(api, config, pending)
     if status == "sealed":
         batch = pending
     elif status == "prepared":
@@ -306,6 +395,7 @@ def run_archive(config):
                 except FileNotFoundError:
                     pass
             cipher_hash = sha256_file(cipher_path)
+            require_capacity(config)
             month = str(batch["max_created_at"])[:7]
             object_key = f"{month}/{batch_id}.jsonl.gz.age"
             seal_input = {
@@ -336,8 +426,10 @@ def run_archive(config):
         if sha256_bytes(cipher) != batch["cipher_sha256"]:
             raise ArchiveError("ARCHIVE_REMOTE_HASH_MISMATCH")
 
-    refreshed = api.post("status", {})
+    refreshed = api.post("status", {"batch_id": batch_id})
     if not refreshed.get("empty"):
+        if refreshed.get("batch_id") != batch_id:
+            raise ArchiveError("ARCHIVE_STATUS_BATCH_MISMATCH")
         batch.update(refreshed)
     manifest = manifest_for(batch)
     manifest_bytes = (canonical_json(manifest) + "\n").encode("utf-8")
@@ -358,7 +450,7 @@ def run_archive(config):
     api.post("uploaded", uploaded)
     batch.update(uploaded)
     batch["status"] = "uploaded"
-    return commit_uploaded(api, config, batch)
+    return commit_and_remove_local_cipher(api, config, batch)
 
 
 def utc_iso(value):
@@ -399,29 +491,53 @@ def verify_retention_manifest(raw, item):
         raise ArchiveError("ARCHIVE_RETENTION_MANIFEST_MISMATCH")
 
 
-def delete_s3_versions(config, object_key):
+def s3_version_name_matches(candidate, base_name):
+    if candidate == base_name:
+        return True
+    if "." not in base_name:
+        return False
+    stem, extension = base_name.rsplit(".", 1)
+    pattern = re.escape(stem) + r"-v\d{4}-\d{2}-\d{2}-\d{6}-\d{3}\." + re.escape(extension)
+    return re.fullmatch(pattern, candidate) is not None
+
+
+def list_s3_logical_paths(config, object_key):
     path = pathlib.PurePosixPath(object_key)
     parent = str(path.parent)
-    include = "/" + path.name
-    run_command(config, config.rclone_bin, [
-        "delete", remote_spec(config, parent), "--include", include,
-        "--s3-versions", "--s3-version-deleted", "--max-delete", "10",
-    ])
-
-
-def verify_s3_absent(config, object_key):
     completed = run_command(config, config.rclone_bin, [
-        "lsjson", remote_spec(config, object_key), "--s3-versions", "--s3-version-deleted",
-    ], capture=True, check=False)
-    if completed.returncode not in (0, 3):
-        raise ArchiveError("ARCHIVE_RETENTION_VERIFY_FAILED")
-    if completed.returncode == 0:
-        try:
-            residual = json.loads(completed.stdout.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise ArchiveError("ARCHIVE_RETENTION_VERIFY_FAILED") from error
-        if residual:
-            raise ArchiveError("ARCHIVE_RETENTION_RESIDUAL_OBJECT")
+        "lsjson", remote_spec(config, parent), "--s3-versions", "--s3-version-deleted", "--recursive",
+    ], capture=True)
+    try:
+        rows = json.loads(completed.stdout.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ArchiveError("ARCHIVE_RETENTION_LIST_INVALID") from error
+    if not isinstance(rows, list) or len(rows) > 10000:
+        raise ArchiveError("ARCHIVE_RETENTION_LIST_INVALID")
+    matches = []
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("Path"), str):
+            raise ArchiveError("ARCHIVE_RETENTION_LIST_INVALID")
+        listed = pathlib.PurePosixPath(row["Path"])
+        if listed.is_absolute() or len(listed.parts) != 1 or listed.parts[0] in ("", ".", ".."):
+            raise ArchiveError("ARCHIVE_RETENTION_LIST_UNSAFE")
+        if row.get("IsDir"):
+            continue
+        if s3_version_name_matches(listed.name, path.name):
+            matches.append(str(path.parent / listed.name))
+    return sorted(set(matches))
+
+
+def purge_s3_logical_object(config, object_key):
+    for _attempt in range(5):
+        matches = list_s3_logical_paths(config, object_key)
+        if not matches:
+            return
+        for exact_path in matches:
+            run_command(config, config.rclone_bin, [
+                "deletefile", remote_spec(config, exact_path), "--s3-versions", "--s3-version-deleted",
+            ])
+    if list_s3_logical_paths(config, object_key):
+        raise ArchiveError("ARCHIVE_RETENTION_RESIDUAL_OBJECT")
 
 
 def purge_retention_item(config, item):
@@ -435,10 +551,11 @@ def purge_retention_item(config, item):
     for object_key in (item["objectKey"], item["manifestObjectKey"]):
         if config.retention_mode != "s3-versioned":
             raise ArchiveError("ARCHIVE_RETENTION_MODE_UNSUPPORTED")
-        delete_s3_versions(config, object_key)
+        purge_s3_logical_object(config, object_key)
 
     for object_key in (item["objectKey"], item["manifestObjectKey"]):
-        verify_s3_absent(config, object_key)
+        if list_s3_logical_paths(config, object_key):
+            raise ArchiveError("ARCHIVE_RETENTION_RESIDUAL_OBJECT")
 
 
 def run_retention(config):
@@ -488,6 +605,9 @@ def main(argv=None):
         return 0
     except ArchiveError as error:
         print(str(error), file=sys.stderr)
+        return 1
+    except OSError:
+        print("ARCHIVE_LOCAL_IO_FAILED", file=sys.stderr)
         return 1
 
 
