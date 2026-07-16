@@ -6,6 +6,8 @@ export const MAIL_CATEGORIES = Object.freeze([
   'comment_new',
   'comment_approved',
   'comment_reply',
+  'comment_notification',
+  'account_retention_notice',
   'admin_test',
   'ops_alert',
 ]);

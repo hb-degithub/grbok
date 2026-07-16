@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { createMailService } from '../../src/mail/service.mjs';
 import { MailError } from '../../src/mail/errors.mjs';
+import { isMailCategory } from '../../src/mail/constants.mjs';
 
 const config = Object.freeze({
   configured: true, port: 587, fromDomain: 'example.net', tlsMode: 'auto',
@@ -43,6 +44,10 @@ function setup({ currentConfig = config, sendError, verifyError } = {}) {
 }
 
 describe('createMailService', () => {
+  it('accepts the outbox-owned comment and retention categories', () => {
+    assert.equal(isMailCategory('comment_notification'), true);
+    assert.equal(isMailCategory('account_retention_notice'), true);
+  });
   it('validates and sends configured payloads with a stable non-provider result', async () => {
     const { calls, service } = setup();
     assert.deepEqual(await service.send(payload), {
