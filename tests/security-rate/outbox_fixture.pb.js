@@ -48,6 +48,42 @@ routerAdd('GET', '/api/test/security-rate/outbox', function (c) {
     if (firstReclaimed.length !== 1 || outbox._renewLease(probeLeases[0].id, probeLeases[0].leaseToken, probeNow + 352000)) throw new Error('stale worker retained ownership after reclaim');
     var probeRows = $app.dao().findRecordsByFilter('mail_outbox', 'dedupe_key ~ "lease-probe:"', '', 20, 0);
     for (var pr = 0; pr < probeRows.length; pr++) $app.dao().deleteRecord(probeRows[pr]);
+
+    var crashProbe;
+    var crashFollower;
+    $app.dao().runInTransaction(function (txDao) {
+      crashProbe = outbox.enqueue(txDao, {
+        dedupeKey: 'crash-probe:terminal', category: 'comment_notification', recipient: 'crash@example.com',
+        templateKey: 'comment_new', variables: { postTitle: 'Crash', commenter: 'Worker', content: 'Sensitive crash payload', postUrl: 'http://localhost:4321/posts/crash' },
+      });
+      crashFollower = outbox.enqueue(txDao, {
+        dedupeKey: 'crash-probe:follower', category: 'comment_notification', recipient: 'follower@example.com',
+        templateKey: 'comment_new', variables: { postTitle: 'Follower', commenter: 'Worker', content: 'Pending', postUrl: 'http://localhost:4321/posts/follower' },
+      });
+    });
+    var crashNow = probeNow + 1000000;
+    for (var crashAttempt = 1; crashAttempt <= 5; crashAttempt++) {
+      var crashLeases = outbox._leaseBatch(crashNow + (crashAttempt - 1) * 181000, 1);
+      if (crashLeases.length !== 1 || crashLeases[0].id !== crashProbe.outboxId) throw new Error('crash probe was not leased for attempt ' + crashAttempt);
+      var crashAttemptRow = $app.dao().findRecordById('mail_outbox', crashProbe.outboxId);
+      if (crashAttemptRow.getInt('attempt') !== crashAttempt) throw new Error('crash probe attempt mismatch ' + crashAttemptRow.getInt('attempt'));
+    }
+    var afterCrashLimit = outbox._leaseBatch(crashNow + 5 * 181000, 1);
+    if (afterCrashLimit.length !== 1 || afterCrashLimit[0].id !== crashFollower.outboxId) throw new Error('terminal crash row blocked subsequent pending lease');
+    var terminalCrash = $app.dao().findRecordById('mail_outbox', crashProbe.outboxId);
+    var terminalVariables = terminalCrash.getString('variables_json');
+    if (terminalCrash.getString('status') !== 'failed' || terminalCrash.getInt('attempt') !== 5 ||
+        terminalCrash.getString('lease_until') || terminalCrash.getString('lease_token') || terminalCrash.getString('recipient') ||
+        (terminalVariables && terminalVariables !== '{}') || terminalCrash.getString('last_error_class') !== 'INTERNAL_ERROR') {
+      throw new Error('terminal crash row was not atomically sanitized at attempt five');
+    }
+    if (outbox._leaseBatch(crashNow + 5 * 181000, 1).length !== 0 || $app.dao().findRecordById('mail_outbox', crashProbe.outboxId).getInt('attempt') !== 5) {
+      throw new Error('terminal crash row was leased again or incremented past five');
+    }
+    for (var cp = 0; cp < 2; cp++) {
+      var crashRow = $app.dao().findRecordById('mail_outbox', cp === 0 ? crashProbe.outboxId : crashFollower.outboxId);
+      $app.dao().deleteRecord(crashRow);
+    }
     var probeBuckets = $app.dao().findRecordsByFilter('security_rate_buckets', 'id != ""', '', 500, 0);
     for (var pb = 0; pb < probeBuckets.length; pb++) $app.dao().deleteRecord(probeBuckets[pb]);
     var first;

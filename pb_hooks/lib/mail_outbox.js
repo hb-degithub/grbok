@@ -67,17 +67,27 @@ function enqueue(txDao, input) {
 function leaseBatch(nowMs, limit) {
   var leased = [];
   var batchSize = Math.max(1, Math.min(MAX_BATCH, Number(limit) || MAX_BATCH));
+  var now = new Date(nowMs).toISOString().replace('T', ' ');
   $app.dao().runInTransaction(function (txDao) {
-    var rows = txDao.findRecordsByFilter(
-      'mail_outbox',
-      'status = "pending" || (status = "retry" && next_attempt_at <= {:now}) || (status = "processing" && lease_until <= {:now})',
-      'created', batchSize, 0, { now: new Date(nowMs).toISOString().replace('T', ' ') }
-    );
-    for (var i = 0; i < rows.length; i++) {
-      var leaseToken = $security.randomStringWithAlphabet(32, ALPHABET);
-      rows[i].set('status', 'processing'); rows[i].set('lease_until', new Date(nowMs + LEASE_MS).toISOString()); rows[i].set('lease_token', leaseToken);
-      rows[i].set('attempt', rows[i].getInt('attempt') + 1); txDao.saveRecord(rows[i]);
-      leased.push({ id: rows[i].id, leaseToken: leaseToken });
+    while (leased.length < batchSize) {
+      var rows = txDao.findRecordsByFilter(
+        'mail_outbox',
+        'status = "pending" || (status = "retry" && next_attempt_at <= {:now}) || (status = "processing" && lease_until <= {:now})',
+        'created', batchSize - leased.length, 0, { now: now }
+      );
+      if (!rows.length) break;
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].getInt('attempt') >= 5) {
+          rows[i].set('status', 'failed'); rows[i].set('lease_until', ''); rows[i].set('lease_token', '');
+          rows[i].set('recipient', ''); rows[i].set('variables_json', {}); rows[i].set('last_error_class', 'INTERNAL_ERROR');
+          txDao.saveRecord(rows[i]);
+          continue;
+        }
+        var leaseToken = $security.randomStringWithAlphabet(32, ALPHABET);
+        rows[i].set('status', 'processing'); rows[i].set('lease_until', new Date(nowMs + LEASE_MS).toISOString()); rows[i].set('lease_token', leaseToken);
+        rows[i].set('attempt', rows[i].getInt('attempt') + 1); txDao.saveRecord(rows[i]);
+        leased.push({ id: rows[i].id, leaseToken: leaseToken });
+      }
     }
   });
   return leased;

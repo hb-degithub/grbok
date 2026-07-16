@@ -22,6 +22,7 @@ Require ($passwordLogin.Contains('MFA_UNSUPPORTED')) 'password login does not fa
 $proxyFiles=@{ Caddyfile=(Read 'Caddyfile'); 'Caddyfile.local'=(Read 'Caddyfile.local'); OpenResty=(Read 'docs\openresty-login-rate-limit.conf') }
 $openResty=$proxyFiles.OpenResty
 Require ($openResty.Contains('location ~ ^/api/collections/(users|_pb_users_auth_)/(records|request-password-reset|request-verification|request-email-change|request-otp|auth-with-otp)/?$')) 'OpenResty trailing-slash native auth deny regex missing'
+foreach($path in @('/api/blog-auth/mfa/otp/request','/api/blog-auth/mfa/otp/verify')){Require (-not $openResty.Contains($path)) "OpenResty still forwards unsupported MFA facade: $path"}
 $configs=($proxyFiles.Values -join "`n")
 foreach($path in @('/api/collections/users/records','/api/collections/users/request-password-reset','/api/collections/users/request-verification','/api/collections/users/request-email-change')){Require ($configs.Contains($path)) "native deny path missing: $path"}
 foreach($collection in @('users','_pb_users_auth_')){foreach($action in @('request-otp','auth-with-otp')){Require ($configs.Contains("/api/collections/$collection/$action")) "native OTP deny path missing: $collection/$action"}}
