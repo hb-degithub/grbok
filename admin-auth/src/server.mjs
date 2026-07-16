@@ -11,6 +11,7 @@ import { createMailRequestVerifier } from './mail/request-auth.mjs';
 import { createMailService } from './mail/service.mjs';
 import { createMailTransport } from './mail/transport.mjs';
 import { createVerifiedSessionRecord, isVerifiedSessionValid } from './session-policy.mjs';
+import { createStepUpCredential, verifyStepUpCredential } from './step-up-policy.mjs';
 import { createWebAuthnService } from './webauthn-service.mjs';
 
 export function createServer({
@@ -112,6 +113,32 @@ export function createServer({
           sendJson(res, 200, { verified: valid });
           return;
         }
+        case '/internal/step-up/issue': {
+          const { userId, clientSession, fingerprint, ip, userAgent } = body;
+          if (!hasRequiredStrings({ userId, clientSession, fingerprint, ip, userAgent })) {
+            sendJson(res, 400, { error: 'Invalid request' });
+            return;
+          }
+          result = createStepUpCredential(
+            { userId, clientSession, fingerprint, ip, userAgent },
+            { hashSecret: config.hashSecret, sessionTtlSeconds: config.sessionTtlSeconds },
+          );
+          break;
+        }
+        case '/internal/step-up/verify': {
+          const { record, userId, credential, clientSession, fingerprint, ip, userAgent } = body;
+          if (!record || !hasRequiredStrings({ userId, credential, clientSession, fingerprint, ip, userAgent })) {
+            sendJson(res, 400, { error: 'Invalid request' });
+            return;
+          }
+          const verified = verifyStepUpCredential(
+            record,
+            { userId, credential, clientSession, fingerprint, ip, userAgent },
+            config.hashSecret,
+          );
+          sendJson(res, 200, { verified });
+          return;
+        }
         case '/internal/webauthn/authentication/verify': {
           const { response, expectedChallenge, authenticator, userId, token, fingerprint, ip, userAgent } = body;
           result = await webauthnService.verifyAuthentication({ response, expectedChallenge, authenticator });
@@ -138,6 +165,10 @@ export function createServer({
       safelySendError(res, 500, { error: 'Internal server error' });
     }
   });
+}
+
+function hasRequiredStrings(values) {
+  return Object.values(values).every((value) => typeof value === 'string' && value.length > 0);
 }
 
 async function readJson(req) {

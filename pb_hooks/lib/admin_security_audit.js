@@ -1,0 +1,29 @@
+'use strict';
+
+function writeSecurityAudit(dao, secureContext, event) {
+  if (secureContext && secureContext.failAudit && String($os.getenv('ADMIN_SECURITY_TEST_MODE') || '') === 'true') {
+    throw new Error('fixture audit failure');
+  }
+  var collection = dao.findCollectionByNameOrId('admin_security_audits');
+  var record = new Record(collection);
+  var actorType = secureContext && secureContext.actorType
+    ? String(secureContext.actorType)
+    : (secureContext && secureContext.actorId ? 'user' : 'system');
+  record.set('actor', secureContext && secureContext.actorId ? secureContext.actorId : '');
+  record.set('actor_type', actorType);
+  record.set('actor_reference', secureContext && secureContext.actorReference ? String(secureContext.actorReference) : '');
+  record.set('action_code', String(event.actionCode || 'ADMIN_SECURITY_EVENT'));
+  record.set('target_type', String(event.targetType || 'admin_security'));
+  record.set('target_id', String(event.targetId || ''));
+  record.set('before_json', event.before || null);
+  record.set('after_json', event.after || null);
+  record.set('version', event.version || 1);
+  record.set('reference_id', secureContext && secureContext.referenceId
+    ? secureContext.referenceId
+    : $security.randomStringWithAlphabet(22, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'));
+  record.set('priority', event.priority === 'high' ? 'high' : 'normal');
+  dao.saveRecord(record);
+  return record;
+}
+
+module.exports = { writeSecurityAudit: writeSecurityAudit };

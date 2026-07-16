@@ -141,19 +141,12 @@ export interface Announcement {
 }
 
 
-export interface AdminPasskey {
+export interface AdminPasskeyDto {
   id: string;
-  owner: string;
   label: string;
-  credential_id: string;
-  public_key: string;
-  counter: number;
-  revoked_at: string | null;
+  revokedAt: string | null;
+  current: boolean;
   created: string;
-  updated: string;
-  expand?: {
-    owner?: User;
-  };
 }
 
 export interface MediaAsset {

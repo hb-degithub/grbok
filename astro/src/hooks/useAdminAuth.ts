@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getPocketBase } from '../lib/pocketbase';
+import { isServerConfirmedCredentialInvalid, revokeCurrentAdminCredential } from '../lib/admin-auth-lifecycle';
+import { clearAdminStepUp } from '../lib/admin-step-up';
 import type { User } from '../types/pocketbase';
 
 export type AdminRole = 'reader' | 'author' | 'admin' | 'super_admin';
@@ -42,10 +44,15 @@ export function useAdminAuth(): AdminAuthState {
           await pb.collection('users').authRefresh();
           if (mounted) setUser(pb.authStore.record as unknown as User);
         } catch (err) {
-          // Invalid token: clear the local auth store.
-          pb.authStore.clear();
-          if (mounted) setUser(null);
-          console.warn('Admin token is invalid and has been cleared.', err);
+          if (isServerConfirmedCredentialInvalid(err)) {
+            clearAdminStepUp({ includeClientSession: true });
+            pb.authStore.clear();
+            if (mounted) setUser(null);
+            console.warn('Admin token is invalid and has been cleared.', err);
+          } else {
+            if (mounted) setUser(pb.authStore.record as unknown as User);
+            console.warn('Admin session refresh failed; local credentials were retained.', err);
+          }
         }
       }
 
@@ -86,8 +93,9 @@ export function useAdminAuth(): AdminAuthState {
 
 export function useAdminLogout() {
   return {
-    logout: () => {
-      getPocketBase().authStore.clear();
+    logout: async () => {
+      const pb = getPocketBase();
+      await revokeCurrentAdminCredential(pb, () => clearAdminStepUp({ includeClientSession: true }));
       window.location.href = '/login';
     },
   };

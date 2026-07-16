@@ -1,4 +1,5 @@
 import PocketBase from 'pocketbase';
+import { installAdminStepUpHeaders } from './admin-step-up';
 
 /**
  * PocketBase 工厂函数
@@ -31,6 +32,7 @@ export function getPocketBase(): PocketBase {
   // 客户端：使用单例
   if (!clientInstance) {
     clientInstance = createPocketBase();
+    installAdminStepUpHeaders(clientInstance);
     // 禁用自动取消（Realtime 订阅需要）
     clientInstance.autoCancellation(false);
   }

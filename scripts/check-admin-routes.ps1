@@ -12,7 +12,10 @@ $ErrorActionPreference = 'Stop'
 $files = @('Caddyfile', 'Caddyfile.local')
 $requiredPaths = @('/admin*', '/_/*', '/api/admins/*', '/api/blog-admin/webauthn/*')
 $matcherName = '@blocked_admin_access'
-$respondPattern = 'respond @blocked_admin_access'
+$respondPatterns = @(
+    'respond\s+@blocked_admin_access\s+"?Forbidden"?\s+403',
+    'handle\s+@blocked_admin_access\s*\{[\s\S]*?respond\s+"?Forbidden"?\s+403[\s\S]*?\}'
+)
 
 $failures = @()
 
@@ -28,8 +31,12 @@ foreach ($file in $files) {
         $failures += "$file : missing matcher $matcherName"
     }
 
-    if ($content -notmatch [regex]::Escape($respondPattern)) {
-        $failures += "$file : missing '$respondPattern'"
+    $hasBlockedResponse = $false
+    foreach ($pattern in $respondPatterns) {
+        if ($content -match $pattern) { $hasBlockedResponse = $true; break }
+    }
+    if (-not $hasBlockedResponse) {
+        $failures += "$file : missing blocked admin 403 response"
     }
 
     foreach ($path in $requiredPaths) {
