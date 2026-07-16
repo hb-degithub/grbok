@@ -1,5 +1,6 @@
 import type PocketBase from 'pocketbase';
 import { getBrowserFingerprint } from './security';
+import { isAdminRecoveryHeaderPath } from './admin-recovery-header';
 
 const STEP_UP_KEY = 'blog.admin.step-up.v1';
 const CLIENT_SESSION_KEY = 'blog.admin.client-session.v1';
@@ -77,9 +78,9 @@ export function installAdminStepUpHeaders(pb: PocketBase): void {
   pb.beforeSend = async (url, options) => {
     const prior = originalBeforeSend ? await originalBeforeSend(url, options) : options;
     const next = prior || options;
-    let requestOrigin = '';
-    try { requestOrigin = new URL(url, pb.baseUrl).origin; } catch { return next; }
-    if (requestOrigin !== apiOrigin || typeof window === 'undefined') return next;
+    let requestUrl: URL;
+    try { requestUrl = new URL(url, pb.baseUrl); } catch { return next; }
+    if (requestUrl.origin !== apiOrigin || typeof window === 'undefined') return next;
 
     const headers = new Headers(next.headers as HeadersInit | undefined);
     headers.set('X-Admin-Session', getAdminClientSession());
@@ -89,7 +90,9 @@ export function installAdminStepUpHeaders(pb: PocketBase): void {
     const stored = readAdminStepUp();
     if (stored) headers.set('X-Admin-Step-Up', stored.credential);
     const recoveryCode = sessionStorage.getItem(RECOVERY_CODE_KEY);
-    if (recoveryCode) headers.set('X-Admin-Recovery-Code', recoveryCode);
+    if (recoveryCode && isAdminRecoveryHeaderPath(requestUrl.pathname)) {
+      headers.set('X-Admin-Recovery-Code', recoveryCode);
+    }
     next.headers = Object.fromEntries(headers.entries());
     return next;
   };

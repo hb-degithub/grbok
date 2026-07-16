@@ -1,6 +1,7 @@
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
 import { getPocketBase } from './pocketbase';
 import { clearAdminRecoveryCode, clearAdminStepUp, saveAdminStepUp } from './admin-step-up';
+import { shouldClearRecoveryCodeAfterRequestError, shouldClearRecoveryCodeAfterStatus } from './admin-recovery-header';
 
 const ADMIN_CAPABLE_ROLES = ['author', 'admin', 'super_admin'];
 
@@ -24,6 +25,7 @@ export async function fetchAdminVerificationStatus(): Promise<AdminVerificationS
   const pb = getPocketBase();
   const result = await pb.send('/api/blog-admin/step-up/status', { method: 'GET' }) as AdminVerificationStatus;
   if (result.status === 'binding_changed' || result.status === 'expired') clearAdminStepUp();
+  if (shouldClearRecoveryCodeAfterStatus(result.status)) clearAdminRecoveryCode();
   return result;
 }
 
@@ -47,15 +49,17 @@ export async function requestAdminPasskeyVerification(): Promise<AdminVerificati
 
 export async function registerAdminPasskey(label: string): Promise<{ verified: boolean; credentialId?: string }> {
   const pb = getPocketBase();
-
-  const options = await pb.send('/api/blog-admin/passkeys/registration/options', { method: 'POST' });
-
-  const attestation = await startRegistration({ optionsJSON: options });
-
-  const result = await pb.send('/api/blog-admin/passkeys/registration/verify', {
-    method: 'POST',
-    body: { response: attestation, label },
-  }) as { verified: boolean; item?: { id: string } };
-  if (result.verified) clearAdminRecoveryCode();
-  return { verified: result.verified, credentialId: result.item?.id };
+  try {
+    const options = await pb.send('/api/blog-admin/passkeys/registration/options', { method: 'POST' });
+    const attestation = await startRegistration({ optionsJSON: options });
+    const result = await pb.send('/api/blog-admin/passkeys/registration/verify', {
+      method: 'POST',
+      body: { response: attestation, label },
+    }) as { verified: boolean; item?: { id: string } };
+    if (result.verified) clearAdminRecoveryCode();
+    return { verified: result.verified, credentialId: result.item?.id };
+  } catch (error) {
+    if (shouldClearRecoveryCodeAfterRequestError(error)) clearAdminRecoveryCode();
+    throw error;
+  }
 }

@@ -21,3 +21,13 @@ test('both logout hooks await server revoke instead of directly clearing auth', 
   assert.doesNotMatch(admin, /finally\s*{[\s\S]*authStore\.clear\(\)/);
   assert.doesNotMatch(publicStatus, /const logout[\s\S]*authStore\.clear\(\)/);
 });
+
+test('recovery code is route-scoped and cleared on terminal status or registration result', async () => {
+  const headers = await source('../src/lib/admin-step-up.ts');
+  const passkeys = await source('../src/lib/admin-passkey.ts');
+  assert.match(headers, /isAdminRecoveryHeaderPath\(requestUrl\.pathname\)/);
+  assert.doesNotMatch(headers, /if \(recoveryCode\) headers\.set\('X-Admin-Recovery-Code'/);
+  assert.match(passkeys, /shouldClearRecoveryCodeAfterStatus\(result\.status\)/);
+  assert.match(passkeys, /shouldClearRecoveryCodeAfterRequestError\(error\)/);
+  assert.match(passkeys, /if \(result\.verified\) clearAdminRecoveryCode\(\)/);
+});
