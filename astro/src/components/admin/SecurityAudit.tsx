@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import PasskeyManager from './PasskeyManager';
+import SecurityRatePolicyForm from './SecurityRatePolicyForm';
 
 interface AuditItem { name: string; status: 'pass' | 'warn' | 'fail'; description: string; recommendation: string; }
 
@@ -34,6 +35,7 @@ export default function SecurityAudit() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-w-0 space-y-6">
       <PasskeyManager />
+      <SecurityRatePolicyForm />
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="card min-w-0 rounded-xl p-4 text-center"><p className="font-display text-2xl font-black text-success">{passCount}</p><p className="break-words font-mono text-[10px] uppercase tracking-widest text-muted [overflow-wrap:anywhere]">通过</p></div>
         <div className="card min-w-0 rounded-xl p-4 text-center"><p className="font-display text-2xl font-black text-warning">{warnCount}</p><p className="break-words font-mono text-[10px] uppercase tracking-widest text-muted [overflow-wrap:anywhere]">警告</p></div>
