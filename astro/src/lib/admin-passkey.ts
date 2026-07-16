@@ -10,6 +10,15 @@ export function isAdminCapableRole(role: unknown): boolean {
 
 export type AdminStepUpStatus = 'bootstrap_required' | 'verified' | 'expired' | 'binding_changed';
 export type AdminVerificationStatus = { status: AdminStepUpStatus; verified: boolean; expiresAt?: string };
+export type AdminPasskeyDto = { id: string; label: string; created: string; revokedAt: string | null; current: boolean };
+
+export async function listAdminPasskeys(): Promise<{ items: AdminPasskeyDto[] }> {
+  return getPocketBase().send('/api/blog-admin/passkeys', { method: 'GET' }) as Promise<{ items: AdminPasskeyDto[] }>;
+}
+
+export async function revokeAdminPasskey(id: string): Promise<{ item: AdminPasskeyDto }> {
+  return getPocketBase().send(`/api/blog-admin/passkeys/${encodeURIComponent(id)}/revoke`, { method: 'POST' }) as Promise<{ item: AdminPasskeyDto }>;
+}
 
 export async function fetchAdminVerificationStatus(): Promise<AdminVerificationStatus> {
   const pb = getPocketBase();

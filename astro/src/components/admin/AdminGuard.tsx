@@ -9,7 +9,7 @@ interface Props { children: React.ReactNode; requiredRole?: AdminRole; }
 
 export default function AdminGuard({ children, requiredRole = 'author' }: Props) {
   const { isAuthenticated, isLoading, hasPermission, user } = useAdminAuth();
-  const { isChecking: isVerifying, isVerified } = useAdminVerification();
+  const { isChecking: isVerifying, isVerified, status } = useAdminVerification();
   const { logout } = useAdminLogout();
 
   if (isLoading) return null;
@@ -40,7 +40,7 @@ export default function AdminGuard({ children, requiredRole = 'author' }: Props)
   if (!isVerified) return (
     <div className="flex min-h-[100svh] items-center justify-center bg-bg">
       <div className="card max-w-md rounded-lg p-8">
-        <AdminPasskeyStep onReturnToLogin={logout} />
+        <AdminPasskeyStep mode={status === 'bootstrap_required' ? 'bootstrap' : 'verify'} onReturnToLogin={logout} />
       </div>
     </div>
   );

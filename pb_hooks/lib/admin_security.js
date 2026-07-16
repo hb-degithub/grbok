@@ -115,7 +115,9 @@ function passkeyDto(record, currentCredentialId, activeCount) {
     label: record.getString('label') || 'Passkey',
     created: record.getString('created'),
     revokedAt: record.getString('revoked_at') || null,
-    current: currentCredentialId ? record.getString('credential_id') === currentCredentialId : activeCount === 1,
+    current: currentCredentialId
+      ? record.getString('credential_id') === currentCredentialId
+      : (!record.getString('revoked_at') && activeCount === 1),
   };
 }
 
