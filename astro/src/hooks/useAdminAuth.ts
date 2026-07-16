@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getPocketBase } from '../lib/pocketbase';
+import { clearAdminStepUp } from '../lib/admin-step-up';
 import type { User } from '../types/pocketbase';
 
 export type AdminRole = 'reader' | 'author' | 'admin' | 'super_admin';
@@ -31,6 +32,7 @@ export function useAdminAuth(): AdminAuthState {
     let mounted = true;
     const pb = getPocketBase();
     let unsubscribe: (() => void) | undefined;
+    let activeUserId = pb.authStore.record?.id || '';
 
     const checkAuth = async () => {
       // 1. Quickly check whether a local token exists and has not expired.
@@ -43,6 +45,7 @@ export function useAdminAuth(): AdminAuthState {
           if (mounted) setUser(pb.authStore.record as unknown as User);
         } catch (err) {
           // Invalid token: clear the local auth store.
+          clearAdminStepUp({ includeClientSession: true });
           pb.authStore.clear();
           if (mounted) setUser(null);
           console.warn('Admin token is invalid and has been cleared.', err);
@@ -52,6 +55,11 @@ export function useAdminAuth(): AdminAuthState {
       // 3. Listen for auth changes, including logout or another tab updating auth.
       unsubscribe = pb.authStore.onChange(() => {
         if (!mounted) return;
+        const nextUserId = pb.authStore.record?.id || '';
+        if (activeUserId && nextUserId !== activeUserId) {
+          clearAdminStepUp({ includeClientSession: true });
+        }
+        activeUserId = nextUserId;
         if (pb.authStore.isValid && pb.authStore.record) {
           setUser(pb.authStore.record as unknown as User);
         } else {
@@ -87,6 +95,7 @@ export function useAdminAuth(): AdminAuthState {
 export function useAdminLogout() {
   return {
     logout: () => {
+      clearAdminStepUp({ includeClientSession: true });
       getPocketBase().authStore.clear();
       window.location.href = '/login';
     },
