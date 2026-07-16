@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
+import { requestPasswordMfaOtp, verifyPasswordMfaOtp } from '../../lib/blog-auth-client';
 import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
 import AdminPasskeyStep from './AdminPasskeyStep';
@@ -109,8 +110,7 @@ export default function PasswordLoginForm() {
     setErrorMessage('');
 
     try {
-      const pb = getPocketBase();
-      const result = await withAuthRequestHeaders(pb, () => pb.collection('users').requestOTP(normalizedEmail));
+      const result = await requestPasswordMfaOtp(normalizedEmail, nextMfaId);
       setMfaId(nextMfaId);
       setOtpId(result.otpId);
       setOtpCode('');
@@ -141,8 +141,7 @@ export default function PasswordLoginForm() {
     setErrorMessage('');
 
     try {
-      const pb = getPocketBase();
-      const auth = await withAuthRequestHeaders(pb, () => pb.collection('users').authWithOTP(otpId, code, { mfaId }));
+      const auth = await verifyPasswordMfaOtp(otpId, code, mfaId);
       clearAuthFailures(key);
       handlePostLogin(auth.record?.role);
     } catch (err) {

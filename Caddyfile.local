@@ -44,7 +44,15 @@
         /api/collections/users/request-verification \
         /api/collections/users/request-verification/ \
         /api/collections/users/request-email-change \
-        /api/collections/users/request-email-change/
+        /api/collections/users/request-email-change/ \
+        /api/collections/users/request-otp \
+        /api/collections/users/request-otp/ \
+        /api/collections/users/auth-with-otp \
+        /api/collections/users/auth-with-otp/ \
+        /api/collections/_pb_users_auth_/request-otp \
+        /api/collections/_pb_users_auth_/request-otp/ \
+        /api/collections/_pb_users_auth_/auth-with-otp \
+        /api/collections/_pb_users_auth_/auth-with-otp/
     respond @blockedNativeAuth "Not Found" 404
 
     @pb_admin {

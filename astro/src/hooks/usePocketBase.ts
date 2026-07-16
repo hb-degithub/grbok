@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getPocketBase } from '../lib/pocketbase';
 import { normalizeAuthEmail, withAuthRequestHeaders } from '../lib/security';
-import { registerReader as registerReaderRequest, requestVerification as requestVerificationRequest } from '../lib/blog-auth-client';
+import { registerReader as registerReaderRequest, requestReaderOtp, requestVerification as requestVerificationRequest, verifyReaderOtp } from '../lib/blog-auth-client';
 import type { Post, PublicComment, ReaderRegisterData, User } from '../types/pocketbase';
 
 export function usePocketBase() {
@@ -53,8 +53,8 @@ export function usePocketBase() {
 
     requestOTP: useCallback(async (email: string) => {
       try {
-        const result = await withAuthRequestHeaders(pb, () => pb.collection('users').requestOTP(normalizeAuthEmail(email)));
-        return { data: result, error: null };
+        const result = await requestReaderOtp(email);
+        return { data: { otpId: result.challengeId }, error: null };
       } catch (err) {
         console.error('发送 OTP 验证码失败:', err);
         return { data: null, error: err };
@@ -63,7 +63,7 @@ export function usePocketBase() {
 
         authWithOTP: useCallback(async (otpId: string, code: string) => {
       try {
-        const result = await withAuthRequestHeaders(pb, () => pb.collection('users').authWithOTP<User>(otpId, code));
+        const result = await verifyReaderOtp(otpId, code);
         const role = result.record?.role;
 
         if (role === 'author' || role === 'admin' || role === 'super_admin') {
