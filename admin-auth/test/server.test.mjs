@@ -185,6 +185,72 @@ describe('server', () => {
     assert.equal(body.verified, true);
   });
 
+  it('POST /internal/step-up/issue issues a server-TTL credential with hashes only', async () => {
+    const res = await fetch(`${baseUrl}/internal/step-up/issue`, {
+      method: 'POST',
+      headers: { 'X-Internal-Secret': config.internalSecret, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: 'u1',
+        clientSession: 'client-session',
+        fingerprint: 'fp',
+        ip: '127.0.0.1',
+        userAgent: 'UA',
+        sessionTtlSeconds: 86400,
+      }),
+    });
+
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.match(body.credential, /^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+    assert.equal(body.record.user, 'u1');
+    assert.equal('secret' in body.record, false);
+    const ttlMs = Date.parse(body.record.expires_at) - Date.parse(body.record.verified_at);
+    assert.equal(ttlMs, config.sessionTtlSeconds * 1000);
+  });
+
+  it('POST /internal/step-up/verify returns only the verification result', async () => {
+    const issuedResponse = await fetch(`${baseUrl}/internal/step-up/issue`, {
+      method: 'POST',
+      headers: { 'X-Internal-Secret': config.internalSecret, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: 'u1',
+        clientSession: 'client-session',
+        fingerprint: 'fp',
+        ip: '127.0.0.1',
+        userAgent: 'UA',
+      }),
+    });
+    const issued = await issuedResponse.json();
+
+    const res = await fetch(`${baseUrl}/internal/step-up/verify`, {
+      method: 'POST',
+      headers: { 'X-Internal-Secret': config.internalSecret, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        record: issued.record,
+        userId: 'u1',
+        credential: issued.credential,
+        clientSession: 'client-session',
+        fingerprint: 'fp',
+        ip: '127.0.0.1',
+        userAgent: 'UA',
+      }),
+    });
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { verified: true });
+  });
+
+  it('rejects invalid step-up issue input with a stable response', async () => {
+    const res = await fetch(`${baseUrl}/internal/step-up/issue`, {
+      method: 'POST',
+      headers: { 'X-Internal-Secret': config.internalSecret, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: 'u1' }),
+    });
+
+    assert.equal(res.status, 400);
+    assert.deepEqual(await res.json(), { error: 'Invalid request' });
+  });
+
 });
 
 it('delegates mail routes before legacy auth without affecting health or WebAuthn', async () => {
