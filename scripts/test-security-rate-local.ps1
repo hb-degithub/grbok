@@ -44,6 +44,12 @@ function Start-TestPocketBase {
     $stderr = Join-Path $runRoot "pocketbase-$Port.err.log"
     $env:MAIL_HASH_SECRET = 'LOCAL_TEST_ONLY_MAIL_HASH_SECRET_0123456789'
     $env:MAIL_INTERNAL_SECRET = 'LOCAL_TEST_ONLY_MAIL_INTERNAL_SECRET_012345'
+    $env:MAIL_GATEWAY_ENABLED = 'true'
+    $env:MAIL_ACCOUNT_ENABLED = 'true'
+    $env:MAIL_OTP_ENABLED = 'true'
+    $env:MAIL_GATEWAY_INTERNAL_URL = "http://127.0.0.1:$Port"
+    $env:BLOG_AUTH_LOOPBACK_BASE = "http://127.0.0.1:$Port"
+    $env:PUBLIC_SITE_URL = 'http://localhost:4321'
     $args = @(
         'serve',
         "--dir=$dataRoot",
@@ -124,6 +130,67 @@ function Invoke-RateConcurrency {
     }
 }
 
+function Invoke-JsonPost {
+    param([int]$Port, [string]$Path, [hashtable]$Body)
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Method Post -Uri ("http://127.0.0.1:$Port" + $Path) -ContentType 'application/json' -Body ($Body | ConvertTo-Json -Compress) -TimeoutSec 20
+        return [pscustomobject]@{ Status = [int]$response.StatusCode; Body = ($response.Content | ConvertFrom-Json); ElapsedMs = $watch.ElapsedMilliseconds }
+    } catch {
+        $status = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 }
+        $raw = if ($_.ErrorDetails.Message) { $_.ErrorDetails.Message } else { '{}' }
+        return [pscustomobject]@{ Status = $status; Body = ($raw | ConvertFrom-Json); ElapsedMs = $watch.ElapsedMilliseconds }
+    } finally {
+        $watch.Stop()
+    }
+}
+
+function Assert-PublicMailResponse {
+    param($Response, [string]$Label)
+    if ($Response.Status -ne 202) { throw "$Label expected 202, got $($Response.Status): $($Response.Body | ConvertTo-Json -Compress -Depth 5)" }
+    $keys = @($Response.Body.PSObject.Properties.Name | Sort-Object)
+    $expected = @('accepted', 'code', 'message', 'referenceId')
+    if (($keys -join ',') -ne ($expected -join ',')) { throw "$Label response keys mismatch: $($keys -join ',')" }
+    if ($Response.Body.accepted -ne $true -or $Response.Body.code -ne 'MAIL_REQUEST_ACCEPTED') { throw "$Label response code mismatch" }
+    if ([string]$Response.Body.referenceId -notmatch '^[A-Za-z0-9_-]{22}$') { throw "$Label referenceId shape mismatch" }
+    if ($Response.ElapsedMs -lt 330) { throw "$Label completed too quickly: $($Response.ElapsedMs)ms" }
+}
+
+function Invoke-AccountMailScenarios {
+    param([int]$Port, $Setup)
+    $existing = Invoke-JsonPost -Port $Port -Path '/api/blog-auth/password-reset/request' -Body @{ email = [string]$Setup.existing }
+    $missing1 = Invoke-JsonPost -Port $Port -Path '/api/blog-auth/password-reset/request' -Body @{ email = 'missing@example.com' }
+    Assert-PublicMailResponse $existing 'existing'
+    Assert-PublicMailResponse $missing1 'missing'
+    if ($existing.Body.message.Length -ne $missing1.Body.message.Length) { throw 'existing/missing message byte shape differs' }
+
+    $missing2 = Invoke-JsonPost -Port $Port -Path '/api/blog-auth/verification/request' -Body @{ email = 'missing@example.com' }
+    $limited = Invoke-JsonPost -Port $Port -Path '/api/blog-auth/password-reset/request' -Body @{ email = 'missing@example.com' }
+    Assert-PublicMailResponse $missing2 'missing second quota'
+    Assert-PublicMailResponse $limited 'email limited'
+
+    $otp = Invoke-JsonPost -Port $Port -Path '/api/blog-auth/otp/request' -Body @{ email = 'unknown-otp@example.com' }
+    if ($otp.Status -ne 202 -or [string]$otp.Body.challengeId -notmatch '^[A-Za-z0-9_-]{32}$') { throw 'fake OTP response mismatch' }
+    if ($otp.ElapsedMs -lt 330) { throw "OTP completed too quickly: $($otp.ElapsedMs)ms" }
+
+    $state = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/account-mail/state" -TimeoutSec 10
+    if ($state.logs.Count -ne 1 -or $state.challenges -ne 0) { throw "decoy/limited request wrote persistent data: $($state | ConvertTo-Json -Compress -Depth 6)" }
+
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/account-mail/reset-buckets" -TimeoutSec 10 | Out-Null
+    $gatewayFailure = Invoke-JsonPost -Port $Port -Path '/api/blog-auth/password-reset/request' -Body @{ email = [string]$Setup.gatewayFailure }
+    Assert-PublicMailResponse $gatewayFailure 'gateway failure'
+    $state = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/account-mail/state" -TimeoutSec 10
+    if ($state.logs.Count -ne 2 -or $state.logs[1].result -ne 'failed') { throw 'real failed delivery was not minimally logged' }
+
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/account-mail/reset-buckets" -TimeoutSec 10 | Out-Null
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/account-mail/corrupt" -TimeoutSec 10 | Out-Null
+    $unavailable = Invoke-JsonPost -Port $Port -Path '/api/blog-auth/password-reset/request' -Body @{ email = 'corrupt@example.com' }
+    Assert-PublicMailResponse $unavailable 'SQLite unavailable'
+    $after = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/account-mail/state" -TimeoutSec 10
+    if ($after.logs.Count -ne 2 -or $after.challenges -ne 0) { throw 'unavailable request wrote log/challenge' }
+    Write-Host 'PASS account-mail parity, shared quotas, fake OTP, zero-write, and minimal logs'
+}
+
 try {
     Ensure-PocketBase
     New-Item -ItemType Directory -Force -Path $dataRoot, $hooksRoot, $migrationsRoot | Out-Null
@@ -155,6 +222,7 @@ try {
                 Write-Host 'PASS rate restart persistence: all three buckets retained 2 events'
             }
         }
+        if ($name -eq 'account_mail') { Invoke-AccountMailScenarios -Port $port -Setup $result }
         Stop-TestPocketBase
         Remove-Item -LiteralPath (Join-Path $hooksRoot 'security_rate_fixture.pb.js') -Force
     }
@@ -171,5 +239,11 @@ try {
     Stop-TestPocketBase
     Remove-Item Env:MAIL_HASH_SECRET -ErrorAction SilentlyContinue
     Remove-Item Env:MAIL_INTERNAL_SECRET -ErrorAction SilentlyContinue
+    Remove-Item Env:MAIL_GATEWAY_ENABLED -ErrorAction SilentlyContinue
+    Remove-Item Env:MAIL_ACCOUNT_ENABLED -ErrorAction SilentlyContinue
+    Remove-Item Env:MAIL_OTP_ENABLED -ErrorAction SilentlyContinue
+    Remove-Item Env:MAIL_GATEWAY_INTERNAL_URL -ErrorAction SilentlyContinue
+    Remove-Item Env:BLOG_AUTH_LOOPBACK_BASE -ErrorAction SilentlyContinue
+    Remove-Item Env:PUBLIC_SITE_URL -ErrorAction SilentlyContinue
     if (Test-Path -LiteralPath $runRoot) { Remove-Item -LiteralPath $runRoot -Recurse -Force }
 }
