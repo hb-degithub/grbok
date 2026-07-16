@@ -90,6 +90,15 @@ function recordVariables(record) {
 }
 function render(record) {
   var vars = recordVariables(record);
+  if (record.getString('template_key') === 'account_retention_notice') {
+    var displayName = string(vars.displayName, 80, 'displayName');
+    var cleanupDate = string(vars.cleanupDate, 80, 'cleanupDate');
+    return {
+      subject: '请验证你的博客账户',
+      html: '<h2>账户验证提醒</h2><p>' + templates.escapeHtml(displayName) + '，你的账户仍未完成邮箱验证。</p><p>如不再需要，该账户预计将在 ' + templates.escapeHtml(cleanupDate) + ' 后按保留规则清理。</p>',
+      text: '账户验证提醒\n' + displayName + '，你的账户仍未完成邮箱验证。\n如不再需要，该账户预计将在 ' + cleanupDate + ' 后按保留规则清理。',
+    };
+  }
   if (record.getString('template_key') !== 'comment_new') invalid('unsupported template');
   var subject = '新评论: ' + string(vars.postTitle, 160, 'postTitle');
   var html = '<h2>你的文章收到新评论</h2><p><strong>文章:</strong> ' + templates.escapeHtml(vars.postTitle) +

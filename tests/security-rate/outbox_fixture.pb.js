@@ -49,6 +49,19 @@ routerAdd('GET', '/api/test/security-rate/outbox', function (c) {
     var failedRow = $app.dao().findRecordById('mail_outbox', failed.outboxId);
     if (failedRow.getString('status') !== 'failed') throw new Error('permanent outbox row not failed');
 
+    var retention;
+    $app.dao().runInTransaction(function (txDao) {
+      retention = outbox.enqueue(txDao, {
+        dedupeKey: 'retention:user:test', category: 'account_retention_notice', recipient: 'reader@example.com',
+        templateKey: 'account_retention_notice', variables: { displayName: 'Reader', cleanupDate: '2026-09-14' },
+      });
+    });
+    var retentionResult = outbox.processBatch(Date.now(), 10);
+    if (retentionResult.sent !== 1 || $app.dao().findRecordById('mail_outbox', retention.outboxId).getString('status') !== 'sent') throw new Error('retention outbox contract failed');
+    var rateForReset = require(__hooks + '/lib/security_rate_limit.js');
+    var outboundRows = $app.dao().findRecordsByFilter('security_rate_buckets', 'policy = "outbound_global" && subject_hash = {:hash}', '', 10, 0, { hash: rateForReset._subjectHash('outbound_global', 'v1') });
+    for (var orow = 0; orow < outboundRows.length; orow++) $app.dao().deleteRecord(outboundRows[orow]);
+
     for (var q = 0; q < 58; q++) {
       $app.dao().runInTransaction(function (txDao) {
         var queued = outbox.enqueue(txDao, {
@@ -68,9 +81,9 @@ routerAdd('GET', '/api/test/security-rate/outbox', function (c) {
     });
     var afterDeniedRows = $app.dao().findRecordsByFilter('mail_outbox', 'id != ""', 'created', 500, 0).length;
     var afterDeniedLogs = $app.dao().findRecordsByFilter('mail_delivery_logs', 'id != ""', 'created', 500, 0).length;
-    if (!denied.limited || denied.outboxId !== null || beforeDeniedRows !== afterDeniedRows || afterDeniedLogs !== 2) throw new Error('quota denial wrote outbox/log state');
+    if (!denied.limited || denied.outboxId !== null || beforeDeniedRows !== afterDeniedRows || afterDeniedLogs !== 3) throw new Error('quota denial wrote outbox/log state');
 
-    return c.json(200, { ok: true, dedupe: true, lease: true, sent: sent.sent, failed: failureResult.failed, quotaDenied: true });
+    return c.json(200, { ok: true, dedupe: true, lease: true, sent: sent.sent, failed: failureResult.failed, retention: true, quotaDenied: true });
   } catch (error) {
     return c.json(500, { ok: false, error: String(error && error.message ? error.message : error) });
   }
