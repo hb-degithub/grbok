@@ -177,6 +177,26 @@ function stepUpStatus(c) {
   }
 }
 
+function revokeStepUp(c) {
+  requireAdmin(c, false);
+  var secure = stepUp.requireAdminStepUp(c, { requireVerifiedEmail: true });
+  $app.dao().runInTransaction(function (txDao) {
+    var found = records(txDao, 'admin_step_up_sessions', 'selector = {:selector}', '', 1, { selector: secure.selector });
+    if (!found.length || found[0].getString('revoked_at')) apiError(403, 'ADMIN_STEP_UP_REQUIRED');
+    found[0].set('revoked_at', new Date().toISOString());
+    txDao.saveRecord(found[0]);
+    audits.writeSecurityAudit(txDao, secure, {
+      actionCode: 'ADMIN_STEP_UP_REVOKED',
+      targetType: 'admin_step_up_session',
+      targetId: found[0].id,
+      before: { active: true },
+      after: { active: false },
+      version: 1,
+    });
+  });
+  return c.json(200, { revoked: true });
+}
+
 function authenticationOptions(c) {
   var user = requireAdmin(c, false);
   var clientSessionHmac = challengeClientSessionHmac(c);
@@ -312,4 +332,5 @@ module.exports = {
   authenticationVerify: authenticationVerify,
   registrationOptions: registrationOptions,
   registrationVerify: registrationVerify,
+  revokeStepUp: revokeStepUp,
 };

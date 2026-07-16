@@ -94,10 +94,17 @@ export function useAdminAuth(): AdminAuthState {
 
 export function useAdminLogout() {
   return {
-    logout: () => {
-      clearAdminStepUp({ includeClientSession: true });
-      getPocketBase().authStore.clear();
-      window.location.href = '/login';
+    logout: async () => {
+      const pb = getPocketBase();
+      try {
+        await pb.send('/api/blog-admin/step-up/revoke', { method: 'POST' });
+      } catch {
+        // Missing/expired step-up is equivalent to already revoked for logout.
+      } finally {
+        clearAdminStepUp({ includeClientSession: true });
+        pb.authStore.clear();
+        window.location.href = '/login';
+      }
     },
   };
 }

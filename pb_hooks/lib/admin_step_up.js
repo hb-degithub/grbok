@@ -124,7 +124,7 @@ function requireAdminStepUp(ctx, options) {
   }
 }
 
-function requireProtectedWrite(e) {
+function requireProtectedWrite(e, operation) {
   var collection = e.record && e.record.collection ? e.record.collection().name : '';
   if (PROTECTED_COLLECTIONS.indexOf(collection) === -1) return;
 
@@ -133,7 +133,7 @@ function requireProtectedWrite(e) {
   var role = String(actor.get('role') || '').trim();
   if (ADMIN_ROLES.indexOf(role) === -1) return;
 
-  if (collection === 'users' && e.record.id === actor.id) {
+  if (operation === 'update' && collection === 'users' && e.record.id === actor.id) {
     var stored = $app.dao().findRecordById('users', actor.id);
     var changedUnsafe = false;
     var fields = e.record.collection().schema.fields();

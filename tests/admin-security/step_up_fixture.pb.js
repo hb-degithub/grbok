@@ -127,8 +127,10 @@ routerAdd('GET', '/api/test/admin-step-up/run', function (c) {
     const suffix = $security.randomStringWithAlphabet(8, 'abcdefghijklmnopqrstuvwxyz0123456789');
     const userA = createUser('stepupa', suffix);
     const userB = createUser('stepupb', suffix);
+    const userC = createUser('stepupc', suffix);
     const tokenA = $tokens.recordAuthToken($app, userA);
     const tokenB = $tokens.recordAuthToken($app, userB);
+    const tokenC = $tokens.recordAuthToken($app, userC);
     createLegacySession(userA.id);
     createLegacySession(userB.id);
 
@@ -144,6 +146,13 @@ routerAdd('GET', '/api/test/admin-step-up/run', function (c) {
       userAgent: 'fixture-agent-a',
     };
     const stepUpA = createStepUp(userA.id, bindingA, hashSecret);
+    const bindingC = {
+      clientSession: $security.randomStringWithAlphabet(43, alphabet),
+      fingerprint: 'fixture-fingerprint-c',
+      ip: '127.0.0.1',
+      userAgent: 'fixture-agent-c',
+    };
+    const stepUpC = createStepUp(userC.id, bindingC, hashSecret);
     const passkeyA1 = createPasskey(userA.id, suffix, 'Primary');
     const passkeyA2 = createPasskey(userA.id, suffix, 'Backup');
     createPasskeyState(userA.id);
@@ -252,6 +261,17 @@ routerAdd('GET', '/api/test/admin-step-up/run', function (c) {
     if (lockedStatus.statusCode === 200 && String(lockedStatus.raw || '').indexOf('bootstrap_required') !== -1) {
       failures.push({ label: 'bootstrapped zero-passkey cannot bootstrap', expected: 'non-bootstrap status', actual: String(lockedStatus.raw || '') });
     }
+
+    expect('self delete without step-up denied', request('DELETE', '/api/collections/users/records/' + userC.id, tokenC, {}, undefined), 403, 'ADMIN_STEP_UP_REQUIRED');
+    expect('self delete with exact step-up', request('DELETE', '/api/collections/users/records/' + userC.id, tokenC, {
+      'X-Admin-Step-Up': stepUpC.credential,
+      'X-Admin-Session': bindingC.clientSession,
+      'X-Browser-Fingerprint': bindingC.fingerprint,
+      'User-Agent': bindingC.userAgent,
+    }, undefined), 204);
+
+    expect('revoke current step-up', request('POST', '/api/blog-admin/step-up/revoke', refreshedTokenA, secureHeaders, {}), 200);
+    expect('revoked credential immediately denied', writeWith(merge(valid, { token: refreshedTokenA })), 403, 'ADMIN_STEP_UP_REQUIRED');
 
     if (failures.length > 0) {
       return c.json(500, { code: 'FIXTURE_ASSERTION_FAILED', failures: failures, observed: observed });

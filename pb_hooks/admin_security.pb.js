@@ -9,6 +9,9 @@ routerAdd('POST', '/api/blog-admin/step-up/options', function (c) {
 routerAdd('POST', '/api/blog-admin/step-up/verify', function (c) {
   return require(__hooks + '/lib/admin_security.js').authenticationVerify(c);
 });
+routerAdd('POST', '/api/blog-admin/step-up/revoke', function (c) {
+  return require(__hooks + '/lib/admin_security.js').revokeStepUp(c);
+});
 routerAdd('GET', '/api/blog-admin/passkeys', function (c) {
   return require(__hooks + '/lib/admin_security.js').listPasskeys(c);
 });

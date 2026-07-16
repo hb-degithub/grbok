@@ -94,6 +94,7 @@ if (-not (Test-Path -LiteralPath $hookFile -PathType Leaf)) {
         '/api/blog-admin/step-up/status',
         '/api/blog-admin/step-up/options',
         '/api/blog-admin/step-up/verify',
+        '/api/blog-admin/step-up/revoke',
         '/api/blog-admin/passkeys',
         '/api/blog-admin/passkeys/registration/options',
         '/api/blog-admin/passkeys/registration/verify',
