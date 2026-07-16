@@ -1,6 +1,8 @@
 'use strict';
 
 var DAY_MS = 24 * 60 * 60 * 1000;
+var MAX_BATCH = 100;
+var testDependencies = null;
 
 function iso(value) { return new Date(value).toISOString(); }
 
@@ -85,6 +87,167 @@ function bindAuthenticatedComment(record, ownerUser, authRecord) {
   return true;
 }
 
+function dependencies() {
+  if (testDependencies) return testDependencies;
+  return {
+    dao: function () { return $app.dao(); },
+    runInTransaction: function (callback) { return $app.runInTransaction(callback); },
+    mailOutbox: require('./mail_outbox.js'),
+    siteUrl: String($os.getenv('PUBLIC_SITE_URL') || ''),
+  };
+}
+
+function boundedLimit(limit) {
+  var value = Math.floor(Number(limit));
+  if (!isFinite(value) || value < 1) return 1;
+  return Math.min(value, MAX_BATCH);
+}
+
+function recordVerified(user) {
+  if (!user) return false;
+  if (typeof user.verified === 'function') return !!user.verified();
+  return !!user.get('verified');
+}
+
+function stableErrorClass(value, fallback) {
+  var text = String(value || fallback || 'RETENTION_OPERATION_FAILED').toUpperCase();
+  text = text.replace(/[^A-Z0-9_]/g, '_').slice(0, 80);
+  return text || 'RETENTION_OPERATION_FAILED';
+}
+
+function retryDelay(attempt) {
+  if (attempt <= 1) return 6 * 60 * 60 * 1000;
+  if (attempt === 2) return 24 * 60 * 60 * 1000;
+  return 0;
+}
+
+function retentionNoticeInput(user, state, nowMs, siteUrl) {
+  if (!siteUrl || !/^https:\/\//.test(siteUrl)) throw new Error('RETENTION_SITE_URL_INVALID');
+  return {
+    policy: 'account_retention_notice',
+    template_key: 'account_retention_notice',
+    recipient: String(user.get('email') || ''),
+    variables: {
+      site_url: siteUrl,
+      cleanup_date: String(state.get('cleanup_eligible_at') || ''),
+    },
+    source_kind: 'account_retention',
+    source_record_id: recordId(user),
+    idempotency_key: 'account-retention:' + recordId(user),
+    requested_at: iso(nowMs),
+  };
+}
+
+function loadById(dao, targetCollection, id) {
+  return dao.findRecordById(targetCollection, id);
+}
+
+function runDueReminders(nowMs, limit) {
+  var deps = dependencies();
+  var nowIso = iso(nowMs);
+  var due = deps.dao().findRecordsByFilter(
+    'account_retention_state',
+    'reminder_sent_at = null && reminder_due_at <= {:now} && reminder_attempts < 3 && (next_attempt_at = null || next_attempt_at <= {:now})',
+    'reminder_due_at,id', boundedLimit(limit), 0, { now: nowIso }
+  ) || [];
+  var summary = { selected: due.length, queued: 0, cancelled: 0, failed: 0, error_classes: {} };
+
+  for (var i = 0; i < due.length; i++) {
+    (function (stateId) {
+      try {
+        deps.runInTransaction(function (txDao) {
+          var state = loadById(txDao, 'account_retention_state', stateId);
+          if (state.get('reminder_sent_at') || Number(state.get('reminder_attempts') || 0) >= 3) return;
+          if (Date.parse(String(state.get('reminder_due_at'))) > nowMs) return;
+          var user = loadById(txDao, 'users', String(state.get('user')));
+          if (recordVerified(user) || hasBusinessRelationship(txDao, user)) {
+            txDao.deleteRecord(state);
+            summary.cancelled++;
+            return;
+          }
+
+          var result;
+          try {
+            result = deps.mailOutbox.enqueue(txDao, retentionNoticeInput(user, state, nowMs, deps.siteUrl));
+          } catch (_) {
+            result = { queued: false, error_class: 'OUTBOX_UNAVAILABLE' };
+          }
+          var attempt = Number(state.get('reminder_attempts') || 0) + 1;
+          state.set('reminder_attempts', attempt);
+          if (result && result.queued) {
+            state.set('reminder_sent_at', nowIso);
+            state.set('next_attempt_at', null);
+            state.set('last_error_class', '');
+            summary.queued++;
+          } else {
+            var errorClass = stableErrorClass(result && result.error_class, 'RETENTION_REMINDER_FAILED');
+            state.set('last_error_class', errorClass);
+            state.set('next_attempt_at', attempt < 3 ? iso(nowMs + retryDelay(attempt)) : null);
+            summary.failed++;
+            summary.error_classes[errorClass] = (summary.error_classes[errorClass] || 0) + 1;
+          }
+          txDao.saveRecord(state);
+        });
+      } catch (_) {
+        summary.failed++;
+        summary.error_classes.RETENTION_TRANSACTION_FAILED = (summary.error_classes.RETENTION_TRANSACTION_FAILED || 0) + 1;
+        try {
+          deps.runInTransaction(function (txDao) {
+            var failedState = loadById(txDao, 'account_retention_state', stateId);
+            failedState.set('last_error_class', 'RETENTION_TRANSACTION_FAILED');
+            txDao.saveRecord(failedState);
+          });
+        } catch (_) {}
+      }
+    })(recordId(due[i]));
+  }
+  return summary;
+}
+
+function runDueCleanup(nowMs, limit) {
+  var deps = dependencies();
+  var nowIso = iso(nowMs);
+  var due = deps.dao().findRecordsByFilter(
+    'account_retention_state', 'cleanup_eligible_at <= {:now}',
+    'cleanup_eligible_at,id', boundedLimit(limit), 0, { now: nowIso }
+  ) || [];
+  var summary = { selected: due.length, deleted: 0, protected: 0, failed: 0, error_classes: {} };
+
+  for (var i = 0; i < due.length; i++) {
+    (function (stateId) {
+      try {
+        deps.runInTransaction(function (txDao) {
+          var state = loadById(txDao, 'account_retention_state', stateId);
+          if (Date.parse(String(state.get('cleanup_eligible_at'))) > nowMs) return;
+          var user = loadById(txDao, 'users', String(state.get('user')));
+          if (recordVerified(user) || hasBusinessRelationship(txDao, user)) {
+            txDao.deleteRecord(state);
+            summary.protected++;
+            return;
+          }
+          txDao.deleteRecord(state);
+          txDao.deleteRecord(user);
+          summary.deleted++;
+        });
+      } catch (_) {
+        summary.failed++;
+        summary.error_classes.RETENTION_RECHECK_FAILED = (summary.error_classes.RETENTION_RECHECK_FAILED || 0) + 1;
+        try {
+          deps.runInTransaction(function (txDao) {
+            var failedState = loadById(txDao, 'account_retention_state', stateId);
+            failedState.set('last_error_class', 'RETENTION_RECHECK_FAILED');
+            txDao.saveRecord(failedState);
+          });
+        } catch (_) {}
+      }
+    })(recordId(due[i]));
+  }
+  return summary;
+}
+
+function setDependenciesForTests(value) { testDependencies = value; }
+function resetDependenciesForTests() { testDependencies = null; }
+
 module.exports = {
   DAY_MS: DAY_MS,
   iso: iso,
@@ -93,5 +256,8 @@ module.exports = {
   cancelForVerifiedUser: cancelForVerifiedUser,
   bindAuthenticatedComment: bindAuthenticatedComment,
   hasBusinessRelationship: hasBusinessRelationship,
+  runDueReminders: runDueReminders,
+  runDueCleanup: runDueCleanup,
+  _setDependenciesForTests: setDependenciesForTests,
+  _resetDependenciesForTests: resetDependenciesForTests,
 };
-

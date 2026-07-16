@@ -32,6 +32,28 @@ function fakeRecord(collection) {
   };
 }
 
+function makeUser(id, email, verified) {
+  var record = fakeRecord({ name: 'users' });
+  record.id = id;
+  record.values.email = email;
+  record.values.verified = verified;
+  record.verified = function () { return !!this.values.verified; };
+  return record;
+}
+
+function makeState(id, userId, reminderDue, cleanupDue) {
+  var record = fakeRecord({ name: 'account_retention_state' });
+  record.id = id;
+  record.values.user = userId;
+  record.values.reminder_due_at = reminderDue;
+  record.values.cleanup_eligible_at = cleanupDue;
+  record.values.reminder_sent_at = null;
+  record.values.reminder_attempts = 0;
+  record.values.next_attempt_at = null;
+  record.values.last_error_class = '';
+  return record;
+}
+
 function runSchemaTests() {
   var retention = require(path.join(repoRoot, 'pb_hooks', 'lib', 'account_retention.js'));
   var migration = read('pb_migrations/20260716120000_create_account_retention_state.pb.js');
@@ -96,9 +118,130 @@ function runSchemaTests() {
   process.stdout.write('PASS account retention schema and trusted relationships\n');
 }
 
+function runJobTests() {
+  var retention = require(path.join(repoRoot, 'pb_hooks', 'lib', 'account_retention.js'));
+  var now = Date.UTC(2026, 6, 16, 0, 0, 0);
+  var queuedInputs = [];
+  var queueResults = [];
+  var deleted = [];
+  var relationships = {};
+  var users = {};
+  var states = [];
+
+  function addAccount(id, ageDays, verified, related) {
+    users[id] = makeUser(id, id + '@fixture.invalid', verified);
+    relationships[id] = !!related;
+    var created = now - ageDays * retention.DAY_MS;
+    var state = makeState('state-' + id, id, new Date(created + 45 * retention.DAY_MS).toISOString(), new Date(created + 60 * retention.DAY_MS).toISOString());
+    states.push(state);
+    return state;
+  }
+
+  var dao = {
+    findCollectionByNameOrId: function (name) { return { id: name, name: name }; },
+    findRecordById: function (collection, id) {
+      if (collection === 'users' && users[id] && deleted.indexOf('user:' + id) === -1) return users[id];
+      if (collection === 'account_retention_state') {
+        return states.filter(function (s) { return s.id === id && deleted.indexOf('state:' + id) === -1; })[0];
+      }
+      throw new Error('not found');
+    },
+    findRecordsByFilter: function (collection, filter, sort, limit, offset, params) {
+      if (collection === 'account_retention_state') {
+        return states.filter(function (state) {
+          if (deleted.indexOf('state:' + state.id) !== -1) return false;
+          if (filter.indexOf('reminder_due_at') !== -1) {
+            return !state.get('reminder_sent_at') && state.get('reminder_attempts') < 3 && Date.parse(state.get('reminder_due_at')) <= Date.parse(params.now) && (!state.get('next_attempt_at') || Date.parse(state.get('next_attempt_at')) <= Date.parse(params.now));
+          }
+          if (filter.indexOf('cleanup_eligible_at') !== -1) {
+            return Date.parse(state.get('cleanup_eligible_at')) <= Date.parse(params.now);
+          }
+          return state.get('user') === params.user;
+        }).slice(0, limit);
+      }
+      var userId = params && params.user;
+      if (userId && relationships[userId] === 'error') throw new Error('simulated relationship query failure');
+      if (userId && relationships[userId]) return [{ id: 'trusted-' + collection }];
+      return [];
+    },
+    saveRecord: function () {},
+    deleteRecord: function (record) {
+      var kind = record.collection && record.collection.name === 'users' ? 'user:' : 'state:';
+      deleted.push(kind + record.id);
+    },
+  };
+
+  retention._setDependenciesForTests({
+    dao: function () { return dao; },
+    runInTransaction: function (callback) { return callback(dao); },
+    mailOutbox: {
+      enqueue: function (txDao, input) {
+        queuedInputs.push(input);
+        return queueResults.length ? queueResults.shift() : { queued: true };
+      },
+    },
+    siteUrl: 'https://fixture.invalid',
+  });
+
+  var day44State = addAccount('day44', 44, false, false);
+  assertEqual(retention.runDueReminders(now, 20).queued, 0, 'day 44 does not remind');
+  day44State.set('reminder_sent_at', new Date(now).toISOString());
+  addAccount('day45', 45, false, false);
+  var firstReminder = retention.runDueReminders(now, 20);
+  assertEqual(firstReminder.queued, 1, 'day 45 queues one reminder');
+  assertEqual(queuedInputs[0].policy, 'account_retention_notice', 'retention uses isolated outbox policy');
+  assertEqual(queuedInputs[0].template_key, 'account_retention_notice', 'retention uses fixed template');
+  assertEqual(queuedInputs[0].variables.site_url, 'https://fixture.invalid', 'retention URL comes from trusted config');
+  assertEqual(retention.runDueReminders(now, 20).queued, 0, 'repeated reminder job is idempotent');
+
+  var retryState = addAccount('retry', 45, false, false);
+  queueResults.push({ queued: false, error_class: 'TRANSIENT_PROVIDER' });
+  assertEqual(retention.runDueReminders(now, 20).failed, 1, 'transient reminder failure is summarized');
+  assertEqual(retryState.get('reminder_attempts'), 1, 'failed enqueue consumes one bounded attempt');
+  var retryAt = Date.parse(retryState.get('next_attempt_at'));
+  assert(retryAt > now && retryAt <= now + 72 * 60 * 60 * 1000, 'retry remains inside 72 hour window');
+  queueResults.push({ queued: false, error_class: 'TRANSIENT_PROVIDER' }, { queued: false, error_class: 'TRANSIENT_PROVIDER' });
+  retention.runDueReminders(retryAt, 20);
+  retention.runDueReminders(Date.parse(retryState.get('next_attempt_at')), 20);
+  assertEqual(retryState.get('reminder_attempts'), 3, 'reminder stops after three attempts');
+  assertEqual(retention.runDueReminders(now + 10 * retention.DAY_MS, 20).selected, 0, 'no infinite retry after third attempt');
+
+  addAccount('verified', 60, true, false);
+  addAccount('related', 60, false, true);
+  var protectedSummary = retention.runDueCleanup(now, 20);
+  assertEqual(protectedSummary.protected, 2, 'verified and business-related accounts are protected');
+  assert(deleted.indexOf('user:verified') === -1 && deleted.indexOf('user:related') === -1, 'protected users remain');
+
+  addAccount('day59', 59, false, false);
+  addAccount('day60', 60, false, false);
+  var cleanup = retention.runDueCleanup(now, 20);
+  assertEqual(cleanup.deleted, 1, 'day 60 deletes one eligible account');
+  assert(deleted.indexOf('user:day60') !== -1 && deleted.indexOf('state:state-day60') !== -1, 'user and lifecycle state delete together');
+  assert(deleted.indexOf('user:day59') === -1, 'day 59 account remains');
+  assertEqual(retention.runDueCleanup(now, 20).deleted, 0, 'repeated cleanup is idempotent');
+  assert(JSON.stringify(cleanup).indexOf('@') === -1, 'cleanup audit summary contains no email address');
+
+  var queryErrorState = addAccount('queryerror', 60, false, false);
+  relationships.queryerror = 'error';
+  var failedCleanup = retention.runDueCleanup(now, 20);
+  assertEqual(failedCleanup.failed, 1, 'relationship query failure fails closed');
+  assert(deleted.indexOf('user:queryerror') === -1 && deleted.indexOf('state:state-queryerror') === -1, 'query failure keeps user and state');
+  assertEqual(queryErrorState.get('last_error_class'), 'RETENTION_RECHECK_FAILED', 'query failure records a stable aggregate error');
+
+  var hook = read('pb_hooks/account_retention.pb.js');
+  assert(hook.indexOf('ACCOUNT_RETENTION_REMINDER_ENABLED') !== -1, 'reminder schedule has an environment gate');
+  assert(hook.indexOf('ACCOUNT_RETENTION_DELETE_ENABLED') !== -1, 'deletion schedule has a separate environment gate');
+  assert(hook.indexOf("|| 'false'") !== -1, 'destructive schedules default disabled');
+
+  retention._resetDependenciesForTests();
+  process.stdout.write('PASS account retention reminder and cleanup jobs\n');
+}
+
 var fixture = process.argv[2] || 'schema';
 if (fixture === 'schema') {
   runSchemaTests();
+} else if (fixture === 'jobs') {
+  runJobTests();
 } else {
   fail('unknown fixture: ' + fixture);
 }
