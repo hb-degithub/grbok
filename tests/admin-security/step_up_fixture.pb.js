@@ -336,11 +336,12 @@ routerAdd('POST', '/api/test/admin-step-up/recovery/setup', function (c) {
   state.set('recovery_expires_at', '');
   $app.dao().saveRecord(state);
 
-  for (const label of ['Primary', 'Backup']) {
+  const expected = { passkeys: 121, stepUps: 123, legacySessions: 125 };
+  for (let index = 0; index < expected.passkeys; index++) {
     const passkey = new Record($app.dao().findCollectionByNameOrId('admin_passkeys'));
     passkey.set('owner', user.id);
-    passkey.set('label', label);
-    passkey.set('credential_id', 'recovery_' + suffix + '_' + label.toLowerCase());
+    passkey.set('label', 'Recovery ' + index);
+    passkey.set('credential_id', 'recovery_' + suffix + '_' + index);
     passkey.set('public_key', 'AQID');
     passkey.set('counter', 0);
     passkey.set('revoked_at', '');
@@ -351,20 +352,34 @@ routerAdd('POST', '/api/test/admin-step-up/recovery/setup', function (c) {
   const clientSession = $security.randomStringWithAlphabet(43, alphabet);
   const fingerprint = 'recovery-fingerprint-' + suffix;
   const userAgent = 'recovery-agent-' + suffix;
-  const selector = $security.randomStringWithAlphabet(24, alphabet);
-  const secret = $security.randomStringWithAlphabet(43, alphabet);
-  const session = new Record($app.dao().findCollectionByNameOrId('admin_step_up_sessions'));
-  session.set('user', user.id);
-  session.set('selector', selector);
-  session.set('secret_hmac', $security.hs256('step-up-secret:' + secret, hashSecret));
-  session.set('client_session_hmac', $security.hs256('step-up-client-session:' + clientSession, hashSecret));
-  session.set('fingerprint_hash', $security.hs256('step-up-fingerprint:' + fingerprint, hashSecret));
-  session.set('ip_hash', $security.hs256('step-up-ip:127.0.0.1', hashSecret));
-  session.set('user_agent_hash', $security.hs256('step-up-ua:' + userAgent, hashSecret));
-  session.set('verified_at', new Date().toISOString());
-  session.set('expires_at', new Date(Date.now() + 900000).toISOString());
-  session.set('revoked_at', '');
-  $app.dao().saveRecord(session);
+  for (let index = 0; index < expected.stepUps; index++) {
+    const selector = $security.randomStringWithAlphabet(24, alphabet);
+    const secret = $security.randomStringWithAlphabet(43, alphabet);
+    const session = new Record($app.dao().findCollectionByNameOrId('admin_step_up_sessions'));
+    session.set('user', user.id);
+    session.set('selector', selector);
+    session.set('secret_hmac', $security.hs256('step-up-secret:' + secret, hashSecret));
+    session.set('client_session_hmac', $security.hs256('step-up-client-session:' + clientSession + index, hashSecret));
+    session.set('fingerprint_hash', $security.hs256('step-up-fingerprint:' + fingerprint, hashSecret));
+    session.set('ip_hash', $security.hs256('step-up-ip:127.0.0.1', hashSecret));
+    session.set('user_agent_hash', $security.hs256('step-up-ua:' + userAgent, hashSecret));
+    session.set('verified_at', new Date().toISOString());
+    session.set('expires_at', new Date(Date.now() + 900000).toISOString());
+    session.set('revoked_at', '');
+    $app.dao().saveRecord(session);
+  }
+
+  for (let index = 0; index < expected.legacySessions; index++) {
+    const legacy = new Record($app.dao().findCollectionByNameOrId('admin_verified_sessions'));
+    legacy.set('user', user.id);
+    legacy.set('token_hash', $security.hs256('legacy-token:' + suffix + ':' + index, hashSecret));
+    legacy.set('fingerprint_hash', $security.hs256('legacy-fingerprint:' + suffix + ':' + index, hashSecret));
+    legacy.set('ip_hash', $security.hs256('legacy-ip:' + suffix + ':' + index, hashSecret));
+    legacy.set('verified_at', new Date().toISOString());
+    legacy.set('expires_at', new Date(Date.now() + 900000).toISOString());
+    legacy.set('revoked_at', '');
+    $app.dao().saveRecord(legacy);
+  }
 
   return c.json(200, {
     userId: user.id,
@@ -373,23 +388,40 @@ routerAdd('POST', '/api/test/admin-step-up/recovery/setup', function (c) {
     clientSession,
     fingerprint,
     userAgent,
+    expected,
   });
 });
 
 routerAdd('POST', '/api/test/admin-step-up/recovery/check', function (c) {
   const input = JSON.parse(readerToString(c.request().body, 4096) || '{}');
   const userId = String(input.userId || '');
-  const activePasskeys = $app.dao().findRecordsByFilter('admin_passkeys', 'owner = {:user} && revoked_at = null', '', 100, 0, { user: userId });
-  const activeStepUps = $app.dao().findRecordsByFilter('admin_step_up_sessions', 'user = {:user} && revoked_at = null', '', 100, 0, { user: userId });
+  function countAll(collection, filter, params) {
+    let offset = 0;
+    let count = 0;
+    while (true) {
+      const page = $app.dao().findRecordsByFilter(collection, filter, '+id', 40, offset, params);
+      count += page.length;
+      if (page.length < 40) return count;
+      offset += page.length;
+    }
+  }
+  const activePasskeys = countAll('admin_passkeys', 'owner = {:user} && revoked_at = null', { user: userId });
+  const activeStepUps = countAll('admin_step_up_sessions', 'user = {:user} && revoked_at = null', { user: userId });
+  const activeLegacy = countAll('admin_verified_sessions', 'user = {:user} && revoked_at = null', { user: userId });
   const states = $app.dao().findRecordsByFilter('admin_passkey_state', 'user = {:user}', '', 1, 0, { user: userId });
   const auditRows = $app.dao().findRecordsByFilter('admin_security_audits', 'target_id = {:user} && action_code = "ADMIN_LOCAL_RECOVERY" && priority = "high"', '', 100, 0, { user: userId });
   const state = states.length ? states[0] : null;
+  const auditBefore = auditRows.length ? auditRows[0].get('before_json') : null;
+  const auditAfter = auditRows.length ? auditRows[0].get('after_json') : null;
   return c.json(200, {
-    activePasskeys: activePasskeys.length,
-    activeStepUps: activeStepUps.length,
+    activePasskeys,
+    activeStepUps,
+    activeLegacy,
     bootstrapped: !!(state && state.getString('bootstrapped_at')),
     recoveryPending: !!(state && state.getString('recovery_nonce_hmac') && state.getString('recovery_expires_at')),
     audits: auditRows.length,
+    auditBefore,
+    auditAfter,
   });
 });
 

@@ -8,6 +8,7 @@ var HASH_SECRET = String($os.getenv('ADMIN_AUTH_HASH_SECRET') || '').trim();
 var ADMIN_ROLES = ['author', 'admin', 'super_admin'];
 var CHALLENGE_ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-';
 var CHALLENGE_BINDING_REQUIRED = 'ADMIN_STEP_UP_REQUIRED';
+var RECOVERY_PAGE_SIZE = 50;
 
 function apiError(status, code) {
   throw new ApiError(status, code);
@@ -84,6 +85,23 @@ function passkeyState(dao, userId) {
 
 function activePasskeys(dao, userId) {
   return records(dao, 'admin_passkeys', 'owner = {:user} && revoked_at = null', '-created', 100, { user: userId });
+}
+
+function revokeAllActivePages(dao, collection, filter, params, revokedAt, progress) {
+  var count = 0;
+  while (true) {
+    var page = dao.findRecordsByFilter(collection, filter, '+id', RECOVERY_PAGE_SIZE, 0, params || {});
+    if (!page.length) return count;
+    for (var i = 0; i < page.length; i++) {
+      page[i].set('revoked_at', revokedAt);
+      dao.saveRecord(page[i]);
+    }
+    count += page.length;
+    progress.page += 1;
+    if (progress.failPage === progress.page && String($os.getenv('ADMIN_SECURITY_TEST_MODE') || '') === 'true') {
+      throw new Error('fixture recovery page failure');
+    }
+  }
 }
 
 function recoveryCodeHmac(code) {
@@ -405,6 +423,7 @@ function localRecovery(c) {
   var referenceId = $security.randomStringWithAlphabet(22, CHALLENGE_ALPHABET);
   var expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
   var result = null;
+  var failPage = Number(header(c, 'X-Test-Fail-Recovery-Page') || 0);
 
   $app.dao().runInTransaction(function (txDao) {
     var users = records(txDao, 'users', 'email = {:email}', '', 1, { email: email });
@@ -414,12 +433,10 @@ function localRecovery(c) {
     var state = passkeyState(txDao, user.id);
     if (!state || !state.getString('bootstrapped_at')) apiError(409, 'PASSKEY_NOT_BOOTSTRAPPED');
     var now = new Date().toISOString();
-    var passkeys = activePasskeys(txDao, user.id);
-    for (var i = 0; i < passkeys.length; i++) { passkeys[i].set('revoked_at', now); txDao.saveRecord(passkeys[i]); }
-    var stepUps = records(txDao, 'admin_step_up_sessions', 'user = {:user} && revoked_at = null', '', 1000, { user: user.id });
-    for (var j = 0; j < stepUps.length; j++) { stepUps[j].set('revoked_at', now); txDao.saveRecord(stepUps[j]); }
-    var legacy = records(txDao, 'admin_verified_sessions', 'user = {:user} && revoked_at = null', '', 1000, { user: user.id });
-    for (var k = 0; k < legacy.length; k++) { legacy[k].set('revoked_at', now); txDao.saveRecord(legacy[k]); }
+    var progress = { page: 0, failPage: failPage };
+    var passkeyCount = revokeAllActivePages(txDao, 'admin_passkeys', 'owner = {:user} && revoked_at = null', { user: user.id }, now, progress);
+    var stepUpCount = revokeAllActivePages(txDao, 'admin_step_up_sessions', 'user = {:user} && revoked_at = null', { user: user.id }, now, progress);
+    var legacyCount = revokeAllActivePages(txDao, 'admin_verified_sessions', 'user = {:user} && revoked_at = null', { user: user.id }, now, progress);
     state.set('recovery_nonce_hmac', recoveryCodeHmac(recoveryCode));
     state.set('recovery_expires_at', expiresAt);
     txDao.saveRecord(state);
@@ -431,12 +448,12 @@ function localRecovery(c) {
       actionCode: 'ADMIN_LOCAL_RECOVERY',
       targetType: 'user',
       targetId: user.id,
-      before: { activePasskeys: passkeys.length, activeStepUps: stepUps.length },
-      after: { activePasskeys: 0, activeStepUps: 0, recoveryPending: true },
+      before: { activePasskeys: passkeyCount, activeStepUps: stepUpCount, activeLegacySessions: legacyCount },
+      after: { activePasskeys: 0, activeStepUps: 0, activeLegacySessions: 0, recoveryPending: true },
       version: 1,
       priority: 'high',
     });
-    result = { passkeys: passkeys.length, stepUps: stepUps.length, legacySessions: legacy.length };
+    result = { passkeys: passkeyCount, stepUps: stepUpCount, legacySessions: legacyCount };
   });
 
   return c.json(200, {

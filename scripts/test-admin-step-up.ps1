@@ -286,22 +286,38 @@ try {
         $baseUrl = "http://127.0.0.1:$Port"
         $setup = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/test/admin-step-up/recovery/setup"
         if ($setup.Status -ne 200) { throw "Recovery setup failed: $($setup.Raw)" }
+        $expectedPasskeys = [int]$setup.Json.expected.passkeys
+        $expectedStepUps = [int]$setup.Json.expected.stepUps
+        $expectedLegacy = [int]$setup.Json.expected.legacySessions
         $adminAuth = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/admins/auth-with-password" -Body @{ identity = $adminEmail; password = $adminPassword }
         if ($adminAuth.Status -ne 200) { throw 'Temporary admin authentication failed' }
         $adminToken = [string]$adminAuth.Json.token
 
+        $failedPageRecovery = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/local-recovery" -Token $adminToken -Headers @{ 'X-Test-Fail-Recovery-Page' = '2' } -Body @{ email = [string]$setup.Json.email }
+        if ($failedPageRecovery.Status -lt 400) { throw 'Recovery page failure injection did not fail recovery' }
+        $afterPageFailure = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/test/admin-step-up/recovery/check" -Body @{ userId = [string]$setup.Json.userId }
+        if ($afterPageFailure.Json.activePasskeys -ne $expectedPasskeys -or $afterPageFailure.Json.activeStepUps -ne $expectedStepUps -or $afterPageFailure.Json.activeLegacy -ne $expectedLegacy -or $afterPageFailure.Json.recoveryPending -or $afterPageFailure.Json.audits -ne 0) {
+            throw "Recovery page rollback failed: $($afterPageFailure.Raw)"
+        }
+
         $failedRecovery = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/local-recovery" -Token $adminToken -Headers @{ 'X-Test-Fail-Audit' = '1' } -Body @{ email = [string]$setup.Json.email }
         if ($failedRecovery.Status -lt 400) { throw 'Audit failure injection did not fail recovery' }
         $afterFailure = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/test/admin-step-up/recovery/check" -Body @{ userId = [string]$setup.Json.userId }
-        if ($afterFailure.Json.activePasskeys -ne 2 -or $afterFailure.Json.activeStepUps -ne 1 -or $afterFailure.Json.recoveryPending -or $afterFailure.Json.audits -ne 0) {
+        if ($afterFailure.Json.activePasskeys -ne $expectedPasskeys -or $afterFailure.Json.activeStepUps -ne $expectedStepUps -or $afterFailure.Json.activeLegacy -ne $expectedLegacy -or $afterFailure.Json.recoveryPending -or $afterFailure.Json.audits -ne 0) {
             throw "Recovery audit rollback failed: $($afterFailure.Raw)"
         }
 
         $recovery = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/local-recovery" -Token $adminToken -Body @{ email = [string]$setup.Json.email }
         if ($recovery.Status -ne 200 -or -not $recovery.Json.recoveryCode) { throw "Local recovery failed: $($recovery.Raw)" }
+        if ($recovery.Json.counts.passkeys -ne $expectedPasskeys -or $recovery.Json.counts.stepUps -ne $expectedStepUps -or $recovery.Json.counts.legacySessions -ne $expectedLegacy) {
+            throw "Local recovery returned inaccurate counts: $($recovery.Raw)"
+        }
         $afterRecovery = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/test/admin-step-up/recovery/check" -Body @{ userId = [string]$setup.Json.userId }
-        if ($afterRecovery.Json.activePasskeys -ne 0 -or $afterRecovery.Json.activeStepUps -ne 0 -or -not $afterRecovery.Json.bootstrapped -or -not $afterRecovery.Json.recoveryPending -or $afterRecovery.Json.audits -ne 1) {
+        if ($afterRecovery.Json.activePasskeys -ne 0 -or $afterRecovery.Json.activeStepUps -ne 0 -or $afterRecovery.Json.activeLegacy -ne 0 -or -not $afterRecovery.Json.bootstrapped -or -not $afterRecovery.Json.recoveryPending -or $afterRecovery.Json.audits -ne 1) {
             throw "Local recovery state invalid: $($afterRecovery.Raw)"
+        }
+        if ($afterRecovery.Json.auditBefore.activePasskeys -ne $expectedPasskeys -or $afterRecovery.Json.auditBefore.activeStepUps -ne $expectedStepUps -or $afterRecovery.Json.auditBefore.activeLegacySessions -ne $expectedLegacy) {
+            throw "Local recovery audit counts invalid: $($afterRecovery.Raw)"
         }
 
         $browserHeaders = @{
