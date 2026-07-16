@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
+import { runAfterAdminCredentialRevoked } from '../../lib/admin-auth-lifecycle';
+import { clearAdminStepUp } from '../../lib/admin-step-up';
 import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
 import AdminPasskeyStep from './AdminPasskeyStep';
@@ -142,7 +144,11 @@ export default function PasswordLoginForm() {
 
     try {
       const pb = getPocketBase();
-      const auth = await withAuthRequestHeaders(pb, () => pb.collection('users').authWithOTP(otpId, code, { mfaId }));
+      const auth = await runAfterAdminCredentialRevoked(
+        pb,
+        () => clearAdminStepUp({ includeClientSession: true }),
+        () => withAuthRequestHeaders(pb, () => pb.collection('users').authWithOTP(otpId, code, { mfaId })),
+      );
       clearAuthFailures(key);
       handlePostLogin(auth.record?.role);
     } catch (err) {
@@ -197,7 +203,11 @@ export default function PasswordLoginForm() {
 
     try {
       const pb = getPocketBase();
-      const auth = await withAuthRequestHeaders(pb, () => pb.collection('users').authWithPassword(normalizedEmail, password));
+      const auth = await runAfterAdminCredentialRevoked(
+        pb,
+        () => clearAdminStepUp({ includeClientSession: true }),
+        () => withAuthRequestHeaders(pb, () => pb.collection('users').authWithPassword(normalizedEmail, password)),
+      );
       clearAuthFailures(attemptKey);
       handlePostLogin(auth.record?.role);
     } catch (err: unknown) {

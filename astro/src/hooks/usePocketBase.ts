@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getPocketBase } from '../lib/pocketbase';
+import { revokeCurrentAdminCredential, runAfterAdminCredentialRevoked } from '../lib/admin-auth-lifecycle';
+import { clearAdminStepUp } from '../lib/admin-step-up';
 import { normalizeAuthEmail, withAuthRequestHeaders } from '../lib/security';
 import type { Post, PublicComment, ReaderRegisterData, User } from '../types/pocketbase';
 
@@ -62,11 +64,15 @@ export function usePocketBase() {
 
         authWithOTP: useCallback(async (otpId: string, code: string) => {
       try {
-        const result = await withAuthRequestHeaders(pb, () => pb.collection('users').authWithOTP<User>(otpId, code));
+        const result = await runAfterAdminCredentialRevoked(
+          pb,
+          () => clearAdminStepUp({ includeClientSession: true }),
+          () => withAuthRequestHeaders(pb, () => pb.collection('users').authWithOTP<User>(otpId, code)),
+        );
         const role = result.record?.role;
 
         if (role === 'author' || role === 'admin' || role === 'super_admin') {
-          pb.authStore.clear();
+          await revokeCurrentAdminCredential(pb, () => clearAdminStepUp({ includeClientSession: true }));
           return { success: false, data: null, error: new Error('高权限账户请使用密码登录，并在密码校验后完成二次验证。') };
         }
 
@@ -81,7 +87,11 @@ export function usePocketBase() {
       try {
         const payload: ReaderRegisterData = { ...data, email: normalizeAuthEmail(data.email), role: 'reader' };
         const record = await withAuthRequestHeaders(pb, () => pb.collection('users').create<User>(payload));
-        const auth = await withAuthRequestHeaders(pb, () => pb.collection('users').authWithPassword<User>(payload.email, data.password));
+        const auth = await runAfterAdminCredentialRevoked(
+          pb,
+          () => clearAdminStepUp({ includeClientSession: true }),
+          () => withAuthRequestHeaders(pb, () => pb.collection('users').authWithPassword<User>(payload.email, data.password)),
+        );
         return { success: true, data: { record, auth }, error: null };
       } catch (err) {
         console.error('注册 reader 用户失败:', err);

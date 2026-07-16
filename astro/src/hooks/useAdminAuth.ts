@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getPocketBase } from '../lib/pocketbase';
+import { isServerConfirmedCredentialInvalid, revokeCurrentAdminCredential } from '../lib/admin-auth-lifecycle';
 import { clearAdminStepUp } from '../lib/admin-step-up';
 import type { User } from '../types/pocketbase';
 
@@ -32,7 +33,6 @@ export function useAdminAuth(): AdminAuthState {
     let mounted = true;
     const pb = getPocketBase();
     let unsubscribe: (() => void) | undefined;
-    let activeUserId = pb.authStore.record?.id || '';
 
     const checkAuth = async () => {
       // 1. Quickly check whether a local token exists and has not expired.
@@ -44,22 +44,21 @@ export function useAdminAuth(): AdminAuthState {
           await pb.collection('users').authRefresh();
           if (mounted) setUser(pb.authStore.record as unknown as User);
         } catch (err) {
-          // Invalid token: clear the local auth store.
-          clearAdminStepUp({ includeClientSession: true });
-          pb.authStore.clear();
-          if (mounted) setUser(null);
-          console.warn('Admin token is invalid and has been cleared.', err);
+          if (isServerConfirmedCredentialInvalid(err)) {
+            clearAdminStepUp({ includeClientSession: true });
+            pb.authStore.clear();
+            if (mounted) setUser(null);
+            console.warn('Admin token is invalid and has been cleared.', err);
+          } else {
+            if (mounted) setUser(pb.authStore.record as unknown as User);
+            console.warn('Admin session refresh failed; local credentials were retained.', err);
+          }
         }
       }
 
       // 3. Listen for auth changes, including logout or another tab updating auth.
       unsubscribe = pb.authStore.onChange(() => {
         if (!mounted) return;
-        const nextUserId = pb.authStore.record?.id || '';
-        if (activeUserId && nextUserId !== activeUserId) {
-          clearAdminStepUp({ includeClientSession: true });
-        }
-        activeUserId = nextUserId;
         if (pb.authStore.isValid && pb.authStore.record) {
           setUser(pb.authStore.record as unknown as User);
         } else {
@@ -96,15 +95,8 @@ export function useAdminLogout() {
   return {
     logout: async () => {
       const pb = getPocketBase();
-      try {
-        await pb.send('/api/blog-admin/step-up/revoke', { method: 'POST' });
-      } catch {
-        // Missing/expired step-up is equivalent to already revoked for logout.
-      } finally {
-        clearAdminStepUp({ includeClientSession: true });
-        pb.authStore.clear();
-        window.location.href = '/login';
-      }
+      await revokeCurrentAdminCredential(pb, () => clearAdminStepUp({ includeClientSession: true }));
+      window.location.href = '/login';
     },
   };
 }

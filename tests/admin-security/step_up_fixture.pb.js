@@ -274,6 +274,8 @@ routerAdd('GET', '/api/test/admin-step-up/run', function (c) {
       'User-Agent': bindingC.userAgent,
     }, undefined), 204);
 
+    expect('revoke audit failure', request('POST', '/api/blog-admin/step-up/revoke', refreshedTokenA, merge(secureHeaders, { 'X-Test-Fail-Audit': '1' }), {}), 503, 'ADMIN_CREDENTIAL_REVOKE_FAILED');
+    expect('credential remains active after failed revoke', writeWith(merge(valid, { token: refreshedTokenA })), 200);
     expect('revoke current step-up', request('POST', '/api/blog-admin/step-up/revoke', refreshedTokenA, secureHeaders, {}), 200);
     expect('revoked credential immediately denied', writeWith(merge(valid, { token: refreshedTokenA })), 403, 'ADMIN_STEP_UP_REQUIRED');
 
