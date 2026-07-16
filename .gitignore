@@ -71,6 +71,7 @@ pb_local/
 
 # Superpowers local config
 .superpowers/
+.worktrees/
 
 # Playwright screenshots
 astro/screenshot-*.png
