@@ -30,6 +30,60 @@ if (-not $migration) {
     }
 }
 
+$stepUpMigration = Get-Item -LiteralPath 'pb_migrations/20260716100000_create_admin_step_up_security.pb.js' -ErrorAction SilentlyContinue
+if (-not $stepUpMigration) {
+    $failures += 'Missing migration pb_migrations/20260716100000_create_admin_step_up_security.pb.js'
+} else {
+    $stepUpContent = Get-Content -LiteralPath $stepUpMigration.FullName -Raw
+
+    $requiredCollections = @('admin_step_up_sessions', 'admin_passkey_state', 'admin_security_audits')
+    foreach ($name in $requiredCollections) {
+        if ($stepUpContent -notmatch [regex]::Escape($name)) {
+            $failures += "Step-up migration missing collection $name"
+        }
+    }
+
+    $requiredStepUpFields = @('user','selector','secret_hmac','client_session_hmac','fingerprint_hash','ip_hash','user_agent_hash','verified_at','expires_at','revoked_at')
+    foreach ($field in $requiredStepUpFields) {
+        if ($stepUpContent -notmatch [regex]::Escape($field)) {
+            $failures += "Step-up migration missing field $field"
+        }
+    }
+
+    $requiredChallengeContract = @('binding_selector', 'client_session_hmac', 'bootstrap_registration', 'add_registration', 'authentication')
+    foreach ($value in $requiredChallengeContract) {
+        if ($stepUpContent -notmatch [regex]::Escape($value)) {
+            $failures += "Step-up migration missing challenge contract $value"
+        }
+    }
+
+    $requiredIndexes = @(
+        'idx_admin_step_up_sessions_selector',
+        'idx_admin_step_up_sessions_expires',
+        'idx_admin_passkey_state_user',
+        'idx_webauthn_challenges_expires'
+    )
+    foreach ($index in $requiredIndexes) {
+        if ($stepUpContent -notmatch [regex]::Escape($index)) {
+            $failures += "Step-up migration missing index $index"
+        }
+    }
+
+    foreach ($collectionVariable in @('stepUpSessions', 'passkeyState', 'securityAudits')) {
+        foreach ($rule in @('listRule', 'viewRule', 'createRule', 'updateRule', 'deleteRule')) {
+            if ($stepUpContent -notmatch "(?m)^\s*$collectionVariable\.$rule\s*=\s*null;") {
+                $failures += "Step-up migration must set $collectionVariable.$rule to null"
+            }
+        }
+    }
+
+    foreach ($rule in @('listRule', 'viewRule', 'updateRule', 'deleteRule')) {
+        if ($stepUpContent -notmatch "(?m)^\s*passkeys\.$rule\s*=\s*null;") {
+            $failures += "Step-up migration must set admin_passkeys $rule to null"
+        }
+    }
+}
+
 
 $hookFile = 'pb_hooks/admin_webauthn.pb.js'
 if (-not (Test-Path -LiteralPath $hookFile -PathType Leaf)) {
