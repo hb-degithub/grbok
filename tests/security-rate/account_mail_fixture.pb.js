@@ -30,7 +30,7 @@ routerAdd('GET', '/api/test/security-rate/account-mail', function (c) {
     logs.delivery({
       event_id: eventId,
       category: 'admin_test',
-      source_kind: 'admin_test',
+      source_kind: 'admin',
       result: 'sent',
       duration_ms: 12,
       attempt: 1,

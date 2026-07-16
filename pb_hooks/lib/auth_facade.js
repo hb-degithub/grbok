@@ -75,7 +75,7 @@ function forwardAccountMail(category, e) {
   }
   try {
     logs.delivery({
-      event_id: eventId, category: category, source_kind: 'account_mail', result: result,
+      event_id: eventId, category: category, source_kind: 'account', result: result,
       duration_ms: Math.min(120000, Math.max(0, Date.now() - startedAt)), attempt: 1, error_class: errorClass,
     });
   } catch (_) {}

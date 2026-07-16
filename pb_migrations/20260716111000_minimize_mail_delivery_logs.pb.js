@@ -13,7 +13,7 @@ migrate((db) => {
   add({ name: 'event_id', type: 'text', required: false, options: { min: 0, max: 100, pattern: '' } });
   add({
     name: 'source_kind', type: 'select', required: false,
-    options: { maxSelect: 1, values: ['account_mail', 'otp', 'comment', 'retention', 'admin_test', 'operations', 'legacy'] },
+    options: { maxSelect: 1, values: ['account', 'reader', 'comment', 'admin', 'operations', 'retention', 'registration'] },
   });
   add({ name: 'archive_batch_id', type: 'text', required: false, options: { min: 0, max: 100, pattern: '' } });
   for (const name of ['source_record_id', 'recipient_masked', 'recipient_hash', 'request_ip_hash']) {
@@ -25,23 +25,32 @@ migrate((db) => {
   }
   dao.saveCollection(collection);
 
-  const rows = dao.findRecordsByFilter('mail_delivery_logs', 'id != ""', 'created', 100000, 0);
-  for (const row of rows) {
-    const source = row.getString('source_collection');
-    const category = row.getString('category');
-    let sourceKind = 'legacy';
-    if (category === 'reader_otp') sourceKind = 'otp';
-    else if (category.indexOf('account_') === 0) sourceKind = 'account_mail';
-    else if (source === 'comments') sourceKind = 'comment';
-    row.set('event_id', $security.randomStringWithAlphabet(22, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'));
-    row.set('source_kind', sourceKind);
-    row.set('result', row.getString('result') === 'sent' ? 'sent' : 'failed');
-    row.set('error_class', 'legacy_minimized');
-    row.set('source_record_id', '');
-    row.set('recipient_masked', '');
-    row.set('recipient_hash', '');
-    row.set('request_ip_hash', '');
-    dao.saveRecord(row);
+  const seenEventIds = {};
+  let offset = 0;
+  while (true) {
+    const rows = dao.findRecordsByFilter('mail_delivery_logs', 'id != ""', 'created,id', 500, offset);
+    for (const row of rows) {
+      const source = row.getString('source_collection');
+      const category = row.getString('category');
+      let sourceKind = 'account';
+      if (category === 'reader_otp') sourceKind = 'reader';
+      else if (source === 'comments' || category.indexOf('comment_') === 0) sourceKind = 'comment';
+      else if (category === 'admin_test') sourceKind = 'admin';
+      else if (category === 'ops_alert' || category === 'operations_alert') sourceKind = 'operations';
+      else if (category === 'account_retention_notice') sourceKind = 'retention';
+      else if (category.indexOf('registration_') === 0) sourceKind = 'registration';
+      let eventId = '';
+      do { eventId = $security.randomStringWithAlphabet(22, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'); } while (seenEventIds[eventId]);
+      seenEventIds[eventId] = true;
+      row.set('event_id', eventId);
+      row.set('source_kind', sourceKind);
+      row.set('result', row.getString('result') === 'sent' ? 'sent' : 'failed');
+      row.set('error_class', 'INTERNAL_ERROR');
+      row.set('source_record_id', ''); row.set('recipient_masked', ''); row.set('recipient_hash', ''); row.set('request_ip_hash', '');
+      dao.saveRecord(row);
+    }
+    offset += rows.length;
+    if (rows.length < 500) break;
   }
 
   for (const name of [
@@ -75,15 +84,17 @@ migrate((db) => {
   add({ name: 'recipient_hash', type: 'text', required: false, options: { min: 0, max: 255, pattern: '' } });
   add({ name: 'request_ip_hash', type: 'text', required: false, options: { min: 0, max: 255, pattern: '' } });
   dao.saveCollection(collection);
-  const rows = dao.findRecordsByFilter('mail_delivery_logs', 'id != ""', 'created', 100000, 0);
-  for (const row of rows) {
-    row.set('request_id', row.getString('event_id') || $security.randomStringWithAlphabet(22, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'));
-    row.set('source_collection', row.getString('source_kind') || 'legacy');
-    row.set('source_record_id', '');
-    row.set('recipient_masked', '');
-    row.set('recipient_hash', '');
-    row.set('request_ip_hash', '');
-    dao.saveRecord(row);
+  let offset = 0;
+  while (true) {
+    const rows = dao.findRecordsByFilter('mail_delivery_logs', 'id != ""', 'created,id', 500, offset);
+    for (const row of rows) {
+      row.set('request_id', row.getString('event_id') || $security.randomStringWithAlphabet(22, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'));
+      row.set('source_collection', row.getString('source_kind') || 'account');
+      row.set('source_record_id', ''); row.set('recipient_masked', ''); row.set('recipient_hash', ''); row.set('request_ip_hash', '');
+      dao.saveRecord(row);
+    }
+    offset += rows.length;
+    if (rows.length < 500) break;
   }
   for (const name of ['event_id', 'source_kind', 'archive_batch_id']) {
     const field = collection.schema.getFieldByName(name);

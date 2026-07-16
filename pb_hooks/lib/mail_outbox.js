@@ -121,9 +121,9 @@ function render(record) {
   return { subject: subject.slice(0, 255), html: html, text: text };
 }
 function stableError(error) {
-  var code = String(error && error.code || 'INTERNAL_ERROR').toLowerCase();
-  var allowed = { mail_not_configured: true, smtp_auth: true, smtp_connection: true, smtp_timeout: true, recipient_temporary: true, recipient_permanent: true, payload_invalid: true, rate_limited: true, internal_error: true };
-  return allowed[code] ? code : 'internal_error';
+  var code = String(error && error.code || 'INTERNAL_ERROR').toUpperCase();
+  var allowed = { MAIL_NOT_CONFIGURED: true, SMTP_AUTH: true, SMTP_CONNECTION: true, SMTP_TIMEOUT: true, RECIPIENT_TEMPORARY: true, RECIPIENT_PERMANENT: true, PAYLOAD_INVALID: true, RATE_LIMITED: true, INTERNAL_ERROR: true };
+  return allowed[code] ? code : 'INTERNAL_ERROR';
 }
 function finish(id, leaseToken, nowMs, result, errorClass, retryable) {
   var finished = false;
@@ -146,17 +146,17 @@ function processBatch(nowMs, limit) {
   for (var i = 0; i < leases.length; i++) {
     if (!renewLease(leases[i].id, leases[i].leaseToken, Date.now())) continue;
     var record = $app.dao().findRecordById('mail_outbox', leases[i].id);
-    var rendered; var result = 'failed'; var errorClass = 'internal_error'; var retryable = false;
+    var rendered; var result = 'failed'; var errorClass = 'INTERNAL_ERROR'; var retryable = false;
     try {
       rendered = render(record);
       gateway.send({ requestId: record.getString('event_id') + '_' + record.getInt('attempt'), messageId: record.getString('event_id'), category: record.getString('category'), to: record.getString('recipient'), subject: rendered.subject, html: rendered.html, text: rendered.text });
-      result = 'sent'; errorClass = 'none'; summary.sent++;
+      result = 'sent'; errorClass = 'NONE'; summary.sent++;
     } catch (error) {
       errorClass = stableError(error); retryable = Boolean(error && error.retryable);
       if (retryable && record.getInt('attempt') < 5) summary.retry++; else summary.failed++;
     }
     if (finish(record.id, leases[i].leaseToken, nowMs, result, errorClass, retryable)) {
-      try { logs.delivery({ event_id: $security.randomStringWithAlphabet(22, ALPHABET), category: record.getString('category'), source_kind: record.getString('category') === 'comment_notification' ? 'comment' : 'retention', result: result, duration_ms: 0, attempt: record.getInt('attempt'), error_class: errorClass }); } catch (_) {}
+      try { logs.delivery({ event_id: $security.randomStringWithAlphabet(22, ALPHABET), category: record.getString('category') === 'comment_notification' ? 'comment_new' : 'account_retention_notice', source_kind: record.getString('category') === 'comment_notification' ? 'comment' : 'retention', result: result, duration_ms: 0, attempt: record.getInt('attempt'), error_class: errorClass }); } catch (_) {}
     }
   }
   return summary;

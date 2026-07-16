@@ -5,16 +5,12 @@ var FIELD_SET = {};
 for (var f = 0; f < FIELDS.length; f++) FIELD_SET[FIELDS[f]] = true;
 var CATEGORIES = {
   account_verification: true, account_password_reset: true, account_email_change: true,
-  reader_otp: true, comment_notification: true, account_retention_notice: true,
-  admin_test: true, operations_alert: true,
+  reader_otp: true, comment_new: true, comment_approved: true, comment_reply: true,
+  admin_test: true, ops_alert: true, account_retention_notice: true,
 };
-var SOURCE_KINDS = { account_mail: true, otp: true, comment: true, retention: true, admin_test: true, operations: true };
+var SOURCE_KINDS = { account: true, reader: true, comment: true, admin: true, operations: true, retention: true, registration: true };
 var RESULTS = { sent: true, failed: true };
-var ERROR_CLASSES = {
-  none: true, mail_not_configured: true, smtp_auth: true, smtp_connection: true,
-  smtp_timeout: true, recipient_temporary: true, recipient_permanent: true,
-  payload_invalid: true, rate_limited: true, internal_error: true,
-};
+var ERROR_CLASSES = { NONE: true, MAIL_NOT_CONFIGURED: true, SMTP_AUTH: true, SMTP_CONNECTION: true, SMTP_TIMEOUT: true, RECIPIENT_TEMPORARY: true, RECIPIENT_PERMANENT: true, PAYLOAD_INVALID: true, RATE_LIMITED: true, INTERNAL_ERROR: true, GATEWAY_UNAVAILABLE: true, OUTBOX_UNAVAILABLE: true };
 
 function integer(value, min, max, name) {
   var number = Number(value);
@@ -31,7 +27,7 @@ function delivery(input) {
   var category = String(input.category || '');
   var sourceKind = String(input.source_kind || '');
   var result = String(input.result || '');
-  var errorClass = String(input.error_class || '').toLowerCase();
+  var errorClass = String(input.error_class || '').toUpperCase();
   if (!/^[A-Za-z0-9_-]{22,64}$/.test(eventId)) throw new Error('invalid event_id');
   if (!CATEGORIES[category] || !SOURCE_KINDS[sourceKind] || !RESULTS[result] || !ERROR_CLASSES[errorClass]) {
     throw new Error('invalid delivery enum');
@@ -43,7 +39,7 @@ function delivery(input) {
   record.set('source_kind', sourceKind);
   record.set('result', result);
   record.set('duration_ms', integer(input.duration_ms, 0, 120000, 'duration_ms'));
-  record.set('attempt', integer(input.attempt, 1, 100, 'attempt'));
+  record.set('attempt', integer(input.attempt, 1, 20, 'attempt'));
   record.set('error_class', errorClass);
   record.set('archive_batch_id', '');
   $app.dao().saveRecord(record);

@@ -119,7 +119,7 @@ function sendReservedChallenge(reservation) {
     console.error('[reader-otp] operation=request result=' + errorClass.toUpperCase());
   }
   try {
-    logs.delivery({ event_id: eventId, category: 'reader_otp', source_kind: 'otp', result: result, duration_ms: Math.min(120000, Date.now() - startedAt), attempt: 1, error_class: errorClass });
+    logs.delivery({ event_id: eventId, category: 'reader_otp', source_kind: 'reader', result: result, duration_ms: Math.min(120000, Date.now() - startedAt), attempt: 1, error_class: errorClass });
   } catch (_) {}
 }
 function requestOtp(e) {
