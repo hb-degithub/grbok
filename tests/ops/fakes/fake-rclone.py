@@ -13,6 +13,13 @@ def remote_path(spec):
     return pathlib.Path(os.environ["FAKE_RCLONE_ROOT"]) / pathlib.PurePosixPath(relative)
 
 
+def all_remote_paths(spec):
+    current = remote_path(spec)
+    root = pathlib.Path(os.environ["FAKE_RCLONE_ROOT"])
+    relative = current.relative_to(root)
+    return [current, root / ".versions" / relative, root / ".trash" / relative]
+
+
 def main():
     args = sys.argv[1:]
     if not args:
@@ -40,9 +47,27 @@ def main():
         if target.exists():
             target.unlink()
         return 0
+    if command == "delete" and len(args) == 8 and args[2] == "--include":
+        if mode == "fail-retention-purge":
+            return 10
+        directory = args[1]
+        filename = args[3].lstrip("/")
+        spec = directory.rstrip("/") + "/" + filename
+        for target in all_remote_paths(spec):
+            if target.exists():
+                target.unlink()
+        return 0
+    if command == "lsjson" and len(args) == 4:
+        residual = [str(path) for path in all_remote_paths(args[1]) if path.exists()]
+        sys.stdout.write(__import__("json").dumps(residual))
+        return 0
+    if command == "cleanup" and len(args) == 2:
+        root = pathlib.Path(os.environ["FAKE_RCLONE_ROOT"]) / ".trash"
+        if root.exists():
+            shutil.rmtree(root)
+        return 0
     return 2
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

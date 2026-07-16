@@ -12,6 +12,7 @@ import secrets
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -50,6 +51,7 @@ class Config:
     work_dir: pathlib.Path
     age_bin: str
     rclone_bin: str
+    retention_mode: str
     test_mode: bool
     test_fail_stage: str
 
@@ -86,6 +88,9 @@ class Config:
         rclone_bin = os.environ.get("MAIL_ARCHIVE_RCLONE_BIN", "/usr/bin/rclone")
         if not pathlib.Path(age_bin).is_absolute() or not pathlib.Path(rclone_bin).is_absolute():
             raise ArchiveError("ARCHIVE_BINARY_PATH_NOT_ABSOLUTE")
+        retention_mode = os.environ.get("MAIL_ARCHIVE_RETENTION_MODE", "")
+        if retention_mode not in ("s3-versioned", "drive-trash"):
+            raise ArchiveError("ARCHIVE_RETENTION_MODE_UNSUPPORTED")
         return cls(
             api_url=api_url,
             hmac_secret=secret,
@@ -96,6 +101,7 @@ class Config:
             work_dir=work_dir,
             age_bin=age_bin,
             rclone_bin=rclone_bin,
+            retention_mode=retention_mode,
             test_mode=test_mode,
             test_fail_stage=os.environ.get("MAIL_ARCHIVE_TEST_FAIL_STAGE", ""),
         )
@@ -109,7 +115,8 @@ class ApiClient:
         raw = canonical_json(payload).encode("utf-8")
         timestamp = str(int(dt.datetime.now(dt.timezone.utc).timestamp() * 1000))
         nonce = secrets.token_urlsafe(24)
-        path = "/api/internal/mail-archive/" + operation
+        base_path = urllib.parse.urlsplit(self.config.api_url).path.rstrip("/")
+        path = base_path + "/" + operation
         body_hash = sha256_bytes(raw)
         canonical = "\n".join([timestamp, nonce, "POST", path, body_hash]).encode("utf-8")
         signature = hmac.new(self.config.hmac_secret.encode("utf-8"), canonical, hashlib.sha256).hexdigest()
@@ -231,7 +238,7 @@ def upload_verified(config, local_path, object_key):
 
 def manifest_for(batch):
     keys = [
-        "batch_id", "min_created_at", "max_created_at", "row_count", "plaintext_sha256",
+        "batch_id", "cursor", "min_created_at", "max_created_at", "row_count", "plaintext_sha256",
         "gzip_sha256", "cipher_sha256", "cipher_size", "age_recipient_fingerprint",
         "object_key", "sealed_at",
     ]
@@ -354,14 +361,143 @@ def run_archive(config):
     return commit_uploaded(api, config, batch)
 
 
+def utc_iso(value):
+    return value.astimezone(dt.timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def validate_retention_item(item):
+    required = {"batchId", "maxCreatedAt", "objectKey", "cipherSha256", "manifestObjectKey"}
+    if not isinstance(item, dict) or set(item) != required:
+        raise ArchiveError("ARCHIVE_RETENTION_DTO_INVALID")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{16,100}", str(item["batchId"])):
+        raise ArchiveError("ARCHIVE_RETENTION_BATCH_INVALID")
+    object_key = str(item["objectKey"])
+    if not re.fullmatch(r"\d{4}-\d{2}/[A-Za-z0-9_-]+\.jsonl\.gz\.age", object_key):
+        raise ArchiveError("ARCHIVE_RETENTION_OBJECT_INVALID")
+    if item["manifestObjectKey"] != object_key + ".manifest.json":
+        raise ArchiveError("ARCHIVE_RETENTION_MANIFEST_INVALID")
+    if not re.fullmatch(r"[a-f0-9]{64}", str(item["cipherSha256"])):
+        raise ArchiveError("ARCHIVE_RETENTION_HASH_INVALID")
+    try:
+        dt.datetime.fromisoformat(str(item["maxCreatedAt"]).replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ArchiveError("ARCHIVE_RETENTION_DATE_INVALID") from error
+    return item
+
+
+def verify_retention_manifest(raw, item):
+    try:
+        manifest = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ArchiveError("ARCHIVE_RETENTION_MANIFEST_INVALID") from error
+    expected = {
+        "batch_id": item["batchId"],
+        "object_key": item["objectKey"],
+        "cipher_sha256": item["cipherSha256"],
+    }
+    if any(manifest.get(key) != value for key, value in expected.items()):
+        raise ArchiveError("ARCHIVE_RETENTION_MANIFEST_MISMATCH")
+
+
+def delete_s3_versions(config, object_key):
+    path = pathlib.PurePosixPath(object_key)
+    parent = str(path.parent)
+    include = "/" + path.name
+    run_command(config, config.rclone_bin, [
+        "delete", remote_spec(config, parent), "--include", include,
+        "--s3-versions", "--s3-version-deleted", "--max-delete", "10",
+    ])
+
+
+def delete_drive_trash(config, object_key):
+    run_command(config, config.rclone_bin, ["deletefile", remote_spec(config, object_key)], check=False)
+
+
+def verify_s3_absent(config, object_key):
+    completed = run_command(config, config.rclone_bin, [
+        "lsjson", remote_spec(config, object_key), "--s3-versions", "--s3-version-deleted",
+    ], capture=True, check=False)
+    if completed.returncode not in (0, 3):
+        raise ArchiveError("ARCHIVE_RETENTION_VERIFY_FAILED")
+    if completed.returncode == 0:
+        try:
+            residual = json.loads(completed.stdout.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ArchiveError("ARCHIVE_RETENTION_VERIFY_FAILED") from error
+        if residual:
+            raise ArchiveError("ARCHIVE_RETENTION_RESIDUAL_OBJECT")
+
+
+def purge_retention_item(config, item):
+    cipher = remote_bytes(config, item["objectKey"], allow_missing=True)
+    if cipher is not None and sha256_bytes(cipher) != item["cipherSha256"]:
+        raise ArchiveError("ARCHIVE_RETENTION_CIPHER_MISMATCH")
+    manifest = remote_bytes(config, item["manifestObjectKey"], allow_missing=True)
+    if manifest is not None:
+        verify_retention_manifest(manifest, item)
+
+    for object_key in (item["objectKey"], item["manifestObjectKey"]):
+        if config.retention_mode == "s3-versioned":
+            delete_s3_versions(config, object_key)
+        elif config.retention_mode == "drive-trash":
+            delete_drive_trash(config, object_key)
+        else:
+            raise ArchiveError("ARCHIVE_RETENTION_MODE_UNSUPPORTED")
+
+    if config.retention_mode == "s3-versioned":
+        for object_key in (item["objectKey"], item["manifestObjectKey"]):
+            verify_s3_absent(config, object_key)
+    else:
+        run_command(config, config.rclone_bin, ["cleanup", remote_spec(config, "")])
+        for object_key in (item["objectKey"], item["manifestObjectKey"]):
+            if remote_bytes(config, object_key, allow_missing=True) is not None:
+                raise ArchiveError("ARCHIVE_RETENTION_RESIDUAL_OBJECT")
+
+
+def run_retention(config):
+    api = ApiClient(config)
+    cutoff = utc_iso(dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=90))
+    cursor = None
+    deleted = 0
+    while True:
+        request = {"cutoffIso": cutoff, "limit": 100}
+        if cursor:
+            request["cursor"] = cursor
+        page = api.post("retention-due", request)
+        if not isinstance(page, dict) or not isinstance(page.get("items"), list):
+            raise ArchiveError("ARCHIVE_RETENTION_RESPONSE_INVALID")
+        for raw_item in page["items"]:
+            item = validate_retention_item(raw_item)
+            purge_retention_item(config, item)
+            api.post("retention-confirm", {
+                "batchId": item["batchId"],
+                "objectKey": item["objectKey"],
+                "cipherSha256": item["cipherSha256"],
+            })
+            deleted += 1
+        cursor = page.get("cursor")
+        if not cursor:
+            break
+        if not re.fullmatch(r"[A-Za-z0-9_-]{16,100}", str(cursor)):
+            raise ArchiveError("ARCHIVE_RETENTION_CURSOR_INVALID")
+    return {"retained": deleted}
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv != ["run"]:
-        print("usage: mail-archive.py run", file=sys.stderr)
+    if argv not in (["run"], ["retention"]):
+        print("usage: mail-archive.py {run|retention}", file=sys.stderr)
         return 2
     try:
-        result = run_archive(Config.from_env())
-        print(canonical_json({"status": result.get("status", "empty")}))
+        config = Config.from_env()
+        if argv == ["run"]:
+            result = run_archive(config)
+            retention = run_retention(config)
+            output = {"status": result.get("status", "empty"), "retained": retention["retained"]}
+        else:
+            result = run_retention(config)
+            output = {"retained": result["retained"]}
+        print(canonical_json(output))
         return 0
     except ArchiveError as error:
         print(str(error), file=sys.stderr)
@@ -370,4 +506,3 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

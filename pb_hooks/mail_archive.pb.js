@@ -3,7 +3,7 @@
 
 var archive = require(__hooks + '/lib/mail_archive.js');
 var auth = require(__hooks + '/lib/mail_archive_auth.js');
-var PREFIX = '/api/internal/mail-archive/';
+var PREFIX = '/api/blog-internal/mail-archive/';
 
 function enabled() { return String($os.getenv('MAIL_ARCHIVE_API_ENABLED') || 'false').toLowerCase() === 'true'; }
 function header(e, name) { try { return String(e.request().header.get(name) || ''); } catch (_) { return ''; } }
@@ -36,6 +36,8 @@ route('export', function (body) { return archive.exportBatch(body.batch_id); });
 route('seal', function (body) { return archive.sealBatch(body.batch_id, body, Date.now()); });
 route('uploaded', function (body) { return archive.markUploaded(body.batch_id, body, Date.now()); });
 route('commit', function (body) { return archive.commitBatch(body.batch_id, body, Date.now()); });
+route('retention-due', function (body) { return archive.retentionDue(body.cutoffIso, body.limit, body.cursor || '', Date.now()); });
+route('retention-confirm', function (body) { return archive.confirmRetention(body, Date.now()); });
 
 cronAdd('mail-archive-nonce-cleanup', '11 * * * *', function () {
   $app.runInTransaction(function (txDao) { auth.cleanupExpiredNonces(txDao, Date.now(), 500); });

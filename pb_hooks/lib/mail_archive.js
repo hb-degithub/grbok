@@ -2,6 +2,7 @@
 
 var DAY_MS = 24 * 60 * 60 * 1000;
 var MAX_ROWS = 5000;
+var MAX_RETENTION_ROWS = 100;
 var ARCHIVE_KEYS = ['schema_version','event_id','created_at','category','source_kind','result','duration_ms','attempt','error_class'];
 var CATEGORIES = ['account_verification','account_password_reset','account_email_change','reader_otp','comment_new','comment_approved','comment_reply','admin_test','ops_alert','account_retention_notice'];
 var SOURCE_KINDS = ['account','reader','comment','admin','operations','retention','registration'];
@@ -26,6 +27,9 @@ function boundedInteger(value, min, max, code) { var number = Number(value); if 
 function requiredEventId(record) { var value = String(record.get('event_id') || ''); if (!/^[A-Za-z0-9_-]{8,100}$/.test(value)) throw archiveError('ARCHIVE_INVALID_EVENT_ID'); return value; }
 function validHash(value) { return /^[a-f0-9]{64}$/.test(String(value || '')); }
 function requireHash(value, code) { if (!validHash(value)) throw archiveError(code); return String(value); }
+function requireBatchId(value) { var text = String(value || ''); if (!/^[A-Za-z0-9_-]{16,100}$/.test(text)) throw archiveError('ARCHIVE_BATCH_ID_INVALID'); return text; }
+function requireObjectKey(value) { var text = String(value || ''); if (!/^\d{4}-\d{2}\/[A-Za-z0-9_-]+\.jsonl\.gz\.age$/.test(text)) throw archiveError('ARCHIVE_OBJECT_KEY_INVALID'); return text; }
+function requireIso(value, code) { var text = String(value || ''); var parsed = Date.parse(text); if (!/^\d{4}-\d{2}-\d{2}T/.test(text) || !isFinite(parsed)) throw archiveError(code); return iso(parsed); }
 
 function findBatch(dao, batchId) {
   var rows = dao.findRecordsByFilter('mail_archive_batches', 'batch_id = {:batch}', '', 1, 0, { batch: String(batchId) }) || [];
@@ -152,6 +156,55 @@ function commitBatch(batchId, input, nowMs) {
   });
 }
 
+function retentionLimit(value) {
+  var number = Math.floor(Number(value));
+  return Math.max(1, Math.min(isFinite(number) ? number : MAX_RETENTION_ROWS, MAX_RETENTION_ROWS));
+}
+
+function retentionDue(cutoffIso, limit, cursor, nowMs) {
+  var cutoff = requireIso(cutoffIso, 'ARCHIVE_RETENTION_CUTOFF_INVALID');
+  var currentMs = Number(nowMs == null ? Date.now() : nowMs);
+  if (!isFinite(currentMs) || Date.parse(cutoff) > currentMs - 90 * DAY_MS) throw archiveError('ARCHIVE_RETENTION_CUTOFF_TOO_NEW');
+  var after = String(cursor || '');
+  if (after && !/^[A-Za-z0-9_-]{16,100}$/.test(after)) throw archiveError('ARCHIVE_RETENTION_CURSOR_INVALID');
+  var pageSize = retentionLimit(limit);
+  var filter = 'status = "committed" && retention_confirmed_at = null && max_created_at < {:cutoff}';
+  var params = { cutoff: cutoff };
+  if (after) { filter += ' && batch_id > {:cursor}'; params.cursor = after; }
+  var rows = dependencies().dao().findRecordsByFilter('mail_archive_batches', filter, 'batch_id', pageSize + 1, 0, params) || [];
+  var hasMore = rows.length > pageSize;
+  if (hasMore) rows = rows.slice(0, pageSize);
+  var items = rows.map(function (batch) {
+    var objectKey = requireObjectKey(batch.get('object_key'));
+    return {
+      batchId: requireBatchId(batch.get('batch_id')),
+      maxCreatedAt: requireIso(batch.get('max_created_at'), 'ARCHIVE_RETENTION_DATE_INVALID'),
+      objectKey: objectKey,
+      cipherSha256: requireHash(batch.get('cipher_sha256'), 'ARCHIVE_CIPHER_HASH_INVALID'),
+      manifestObjectKey: objectKey + '.manifest.json',
+    };
+  });
+  return { items: items, cursor: hasMore && items.length ? items[items.length - 1].batchId : null };
+}
+
+function confirmRetention(input, nowMs) {
+  var batchId = requireBatchId(input && input.batchId);
+  var objectKey = requireObjectKey(input && input.objectKey);
+  var cipherHash = requireHash(input && input.cipherSha256, 'ARCHIVE_CIPHER_HASH_INVALID');
+  return dependencies().runInTransaction(function (txDao) {
+    var batch = findBatch(txDao, batchId);
+    if (String(batch.get('status')) !== 'committed') throw archiveError('ARCHIVE_RETENTION_NOT_COMMITTED');
+    if (String(batch.get('object_key')) !== objectKey || String(batch.get('cipher_sha256')) !== cipherHash) throw archiveError('ARCHIVE_RETENTION_MISMATCH');
+    var maxCreatedMs = Date.parse(String(batch.get('max_created_at') || ''));
+    var currentMs = Number(nowMs);
+    if (!isFinite(maxCreatedMs) || !isFinite(currentMs) || maxCreatedMs >= currentMs - 90 * DAY_MS) throw archiveError('ARCHIVE_RETENTION_NOT_DUE');
+    if (batch.get('retention_confirmed_at')) return { batchId: batchId, status: 'retention_confirmed', idempotent: true };
+    batch.set('retention_confirmed_at', iso(currentMs));
+    txDao.saveRecord(batch);
+    return { batchId: batchId, status: 'retention_confirmed', idempotent: false };
+  });
+}
+
 function setDependenciesForTests(value) { testDependencies = value; }
 function resetDependenciesForTests() { testDependencies = null; }
 
@@ -159,5 +212,6 @@ module.exports = {
   ARCHIVE_KEYS: ARCHIVE_KEYS, projectLog: projectLog, prepareBatch: prepareBatch, exportBatch: exportBatch,
   getPendingBatch: getPendingBatch,
   sealBatch: sealBatch, markUploaded: markUploaded, commitBatch: commitBatch,
+  retentionDue: retentionDue, confirmRetention: confirmRetention,
   _setDependenciesForTests: setDependenciesForTests, _resetDependenciesForTests: resetDependenciesForTests,
 };

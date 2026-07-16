@@ -18,13 +18,14 @@ The age identity is deliberately absent from this host. Store the offline identi
 Use this environment-file shape, replacing every example value locally. Never commit the completed file:
 
 ```dotenv
-MAIL_ARCHIVE_API_URL=https://127.0.0.1:8090/api/internal/mail-archive
+MAIL_ARCHIVE_API_URL=https://127.0.0.1:8090/api/blog-internal/mail-archive
 MAIL_ARCHIVE_HMAC_SECRET=replace-with-a-random-secret-of-at-least-32-characters
 MAIL_ARCHIVE_AGE_RECIPIENT=age1replacewiththeapprovedpublicrecipient
 MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINT=replace-with-the-lowercase-sha256-fingerprint
 MAIL_ARCHIVE_RCLONE_REMOTE=mail-archive
 MAIL_ARCHIVE_RCLONE_PREFIX=production/mail-audit
 MAIL_ARCHIVE_WORK_DIR=/var/lib/hlydwz/mail-archive
+MAIL_ARCHIVE_RETENTION_MODE=s3-versioned
 RCLONE_CONFIG=/etc/hlydwz/rclone.conf
 ```
 
@@ -46,13 +47,15 @@ Create a Shell Script task in 1Panel with this exact command:
 
 Run it hourly at minute 17 (`17 * * * *`) as root. The wrapper applies `umask 077`, verifies the root-only environment file, and uses `flock` on `/var/lock/hlydwz-mail-archive.lock`; an overlapping invocation exits successfully without starting a second exporter.
 
-Enable the task only after the PocketBase archive migration and signed internal routes pass their local verification. Confirm that the public reverse proxy denies `/api/internal/mail-archive/`; only the host job may call it.
+Enable the task only after the PocketBase archive migration and signed internal routes pass their local verification. Confirm that the public reverse proxy denies `/api/blog-internal/mail-archive/`; only the host job may call it.
 
 ## Cloud retention and governance
 
 Use a storage region approved for the site's data residency obligations and record the provider data-processing review before first upload. Enable encryption at rest in addition to age encryption. Configure provider lifecycle rules so current ciphertext objects, manifests, prior versions, delete markers, and trash are all removed after 90 days. A version-history or trash policy that keeps recoverable copies beyond 90 days is not acceptable.
 
-The archive client makes its own committed-batch retention decision from `max_created_at`; provider lifecycle is a backstop. Review the bucket monthly for orphaned versions, trash, unexpected prefixes, public access, and policy drift.
+The archive client requests retention candidates from the signed `retention-due` API. PocketBase returns only committed batches whose `max_created_at` is strictly older than 90 days, in stable pages of at most 100. The host verifies the current ciphertext hash and manifest identity, deletes the ciphertext and manifest with fixed rclone arguments, purges S3 versions and delete markers, verifies `lsjson --s3-versions --s3-version-deleted` is empty, and only then calls `retention-confirm`. PocketBase rechecks the committed state, event-time cutoff, object key, and cipher hash transactionally before marking metadata cleaned. A local host file is never authoritative for deletion.
+
+`MAIL_ARCHIVE_RETENTION_MODE=s3-versioned` is the supported production mode for a versioned S3-compatible remote. Validate the selected provider against the pinned rclone release in staging before enabling deletion. The hourly `run` command performs both archive progress and due retention; the separate `retention` command exists for controlled retries. Provider lifecycle is a backstop, not the authority for early deletion. Review the bucket monthly for orphaned versions, trash, unexpected prefixes, public access, and policy drift.
 
 ## Monitoring and response
 
@@ -70,5 +73,14 @@ On failure, preserve the PocketBase rows and batch state. Do not manually delete
 ## Monthly isolated restore drill
 
 Once each month, select one committed batch, download its ciphertext and manifest to a newly created isolated directory, and use the offline restore verifier with an explicitly supplied age identity. The restore directory must not be inside `/var/lib/hlydwz/mail-archive`, the rclone sync tree, or the repository.
+
+```bash
+/usr/bin/python3 /opt/hlydwz/blog/scripts/verify-mail-archive-restore.py \
+  --cipher /srv/isolated-restore/example.jsonl.gz.age \
+  --manifest /srv/isolated-restore/example.jsonl.gz.age.manifest.json \
+  --identity /media/offline-key/age-identity.txt \
+  --archive-work-dir /var/lib/hlydwz/mail-archive \
+  --restore-root /srv/isolated-restore/work
+```
 
 Record only the batch identifier, verified row count, verification time, operator, and pass/fail result. Never record decrypted rows. The verifier must confirm cipher, gzip, and plaintext hashes, gzip integrity, JSONL schema, row count, and cursor, then remove all decrypted material on exit. Investigate any failure before the next scheduled deletion or retention purge.

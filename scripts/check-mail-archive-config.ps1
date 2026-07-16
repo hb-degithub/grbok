@@ -52,13 +52,16 @@ Require-Match $python 'MAIL_ARCHIVE_WORK_DIR' 'Python client must require a fixe
 Reject-Match $python 'MAIL_ARCHIVE_AGE_IDENTITY|--identity|-i\s' 'production Python client must not reference an age private identity'
 
 foreach ($requiredText in @(
+    '/api/blog-internal/mail-archive',
     '/etc/hlydwz/mail-archive.env',
     '0600',
     '0700',
     '90',
     'monthly',
     'fingerprint',
-    'rclone'
+    'rclone',
+    'MAIL_ARCHIVE_RETENTION_MODE=s3-versioned',
+    'verify-mail-archive-restore.py'
 )) {
     if ($runbook -notmatch [regex]::Escape($requiredText)) {
         $errors.Add("runbook missing required operational detail: $requiredText")

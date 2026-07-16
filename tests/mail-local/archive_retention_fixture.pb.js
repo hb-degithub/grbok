@@ -67,6 +67,11 @@ function createDao() {
         if (filter.indexOf('expires_at <') !== -1) rows = rows.filter(function (item) { return Date.parse(item.get('expires_at')) < Date.parse(params.now); });
       } else if (collection === 'mail_archive_batches') {
         if (filter.indexOf('batch_id =') !== -1) rows = rows.filter(function (item) { return item.get('batch_id') === params.batch; });
+        if (filter.indexOf('status = "committed"') !== -1) rows = rows.filter(function (item) { return item.get('status') === 'committed'; });
+        if (filter.indexOf('retention_confirmed_at = null') !== -1) rows = rows.filter(function (item) { return !item.get('retention_confirmed_at'); });
+        if (filter.indexOf('max_created_at <') !== -1) rows = rows.filter(function (item) { return Date.parse(item.get('max_created_at')) < Date.parse(params.cutoff); });
+        if (filter.indexOf('batch_id >') !== -1) rows = rows.filter(function (item) { return String(item.get('batch_id')) > String(params.cursor); });
+        if (sort === 'batch_id') rows.sort(function (a, b) { return String(a.get('batch_id')).localeCompare(String(b.get('batch_id'))); });
       } else if (collection === 'mail_delivery_logs') {
         if (filter.indexOf('archive_batch_id = null') !== -1) rows = rows.filter(function (item) { return !item.get('archive_batch_id'); });
         else if (filter.indexOf('archive_batch_id =') !== -1) rows = rows.filter(function (item) { return item.get('archive_batch_id') === params.batch; });
@@ -116,6 +121,10 @@ function run() {
     'sealed_at', 'uploaded_at', 'committed_at', 'last_error_class', 'archive_batch_id',
     'idx_mail_archive_nonce_expiry', 'idx_mail_delivery_logs_archive_batch',
   ].forEach(function (needle) { assert(migration.indexOf(needle) !== -1, 'archive migration missing ' + needle); });
+  var retentionMigration = read('pb_migrations/20260716122000_add_mail_archive_retention_state.pb.js');
+  ['retention_confirmed_at', 'idx_mail_archive_batches_retention_due'].forEach(function (needle) {
+    assert(retentionMigration.indexOf(needle) !== -1, 'archive retention migration missing ' + needle);
+  });
 
   var dao = createDao();
   var sec = security();
@@ -125,7 +134,7 @@ function run() {
   var auth = require(authPath);
   auth._setDependenciesForTests({ security: sec, secret: secret, runInTransaction: function (fn) { return fn(dao); } });
 
-  var valid = signedRequest(sec, secret, now, 'nonce-fixture-0001', 'POST', '/api/internal/mail-archive/prepare', '{"limit":5000}');
+  var valid = signedRequest(sec, secret, now, 'nonce-fixture-0001', 'POST', '/api/blog-internal/mail-archive/prepare', '{"limit":5000}');
   assertEqual(auth.authenticateSignedJson(dao, valid, now).limit, 5000, 'valid signed body authenticates');
   assertThrowsCode(function () { auth.authenticateSignedJson(dao, valid, now); }, 'ARCHIVE_NONCE_REPLAY', 'nonce replay is rejected');
 
@@ -134,9 +143,9 @@ function run() {
   auth._setDependenciesForTests({ security: sec, secret: secret, runInTransaction: function (fn) { return fn(dao); } });
   assertThrowsCode(function () { auth.authenticateSignedJson(dao, valid, now); }, 'ARCHIVE_NONCE_REPLAY', 'nonce replay survives process restart');
 
-  var stale = signedRequest(sec, secret, now - 301000, 'nonce-fixture-stale', 'POST', '/api/internal/mail-archive/prepare', '{}');
+  var stale = signedRequest(sec, secret, now - 301000, 'nonce-fixture-stale', 'POST', '/api/blog-internal/mail-archive/prepare', '{}');
   assertThrowsCode(function () { auth.authenticateSignedJson(dao, stale, now); }, 'ARCHIVE_TIMESTAMP_SKEW', 'timestamp skew is rejected');
-  var mismatch = signedRequest(sec, secret, now, 'nonce-fixture-mismatch', 'POST', '/api/internal/mail-archive/prepare', '{bad json');
+  var mismatch = signedRequest(sec, secret, now, 'nonce-fixture-mismatch', 'POST', '/api/blog-internal/mail-archive/prepare', '{bad json');
   mismatch.bodySha256 = sec.sha256('different body');
   assertThrowsCode(function () { auth.authenticateSignedJson(dao, mismatch, now); }, 'ARCHIVE_BODY_HASH_MISMATCH', 'body hash is checked before JSON parsing');
   var expiredNonce = record('mail_archive_request_nonces', 'expired-nonce-row', { nonce: 'nonce-expired-fixture', expires_at: new Date(now - 1).toISOString() });
@@ -202,9 +211,57 @@ function run() {
   assertThrowsCode(function () { archive.exportBatch('unknown-batch'); }, 'ARCHIVE_BATCH_NOT_FOUND', 'unknown batch is rejected');
   assertEqual(archive.getPendingBatch(), null, 'committed batch is not returned as pending');
 
+  var retentionCutoff = '2026-04-16T12:00:00.000Z';
+  for (var retentionIndex = 0; retentionIndex < 102; retentionIndex++) {
+    var suffix = String(retentionIndex).padStart(3, '0');
+    dao.tables.mail_archive_batches.push(record('mail_archive_batches', 'retention-' + suffix, {
+      batch_id: 'retention-batch-' + suffix,
+      status: 'committed',
+      max_created_at: '2026-03-01T00:00:00.000Z',
+      object_key: '2026-03/retention-batch-' + suffix + '.jsonl.gz.age',
+      cipher_sha256: String(retentionIndex % 10).repeat(64),
+      manifest_sha256: String((retentionIndex + 1) % 10).repeat(64),
+      retention_confirmed_at: '',
+    }));
+  }
+  dao.tables.mail_archive_batches.push(record('mail_archive_batches', 'retention-boundary', {
+    batch_id: 'retention-boundary', status: 'committed', max_created_at: retentionCutoff,
+    object_key: '2026-04/retention-boundary.jsonl.gz.age', cipher_sha256: 'a'.repeat(64),
+    manifest_sha256: 'b'.repeat(64), retention_confirmed_at: '',
+  }));
+  dao.tables.mail_archive_batches.push(record('mail_archive_batches', 'retention-uncommitted', {
+    batch_id: 'retention-uncommitted', status: 'uploaded', max_created_at: '2026-03-01T00:00:00.000Z',
+    object_key: '2026-03/retention-uncommitted.jsonl.gz.age', cipher_sha256: 'c'.repeat(64),
+    manifest_sha256: 'd'.repeat(64), retention_confirmed_at: '',
+  }));
+
+  var firstRetentionPage = archive.retentionDue(retentionCutoff, 500, '', now);
+  assertEqual(firstRetentionPage.items.length, 100, 'retention due hard-caps each page at 100');
+  assertEqual(firstRetentionPage.items[0].batchId, 'retention-batch-000', 'retention pagination is stable by batch ID');
+  assertEqual(Object.keys(firstRetentionPage.items[0]).sort().join(','), 'batchId,cipherSha256,manifestObjectKey,maxCreatedAt,objectKey', 'retention DTO exposes only fixed fields');
+  assertEqual(firstRetentionPage.items[0].manifestObjectKey, firstRetentionPage.items[0].objectKey + '.manifest.json', 'retention DTO derives the fixed manifest key');
+  var secondRetentionPage = archive.retentionDue(retentionCutoff, 100, firstRetentionPage.cursor, now);
+  assertEqual(secondRetentionPage.items.length, 2, 'retention cursor returns the remaining committed due rows');
+  assertEqual(secondRetentionPage.cursor, null, 'retention final page has no cursor');
+
+  var retentionTarget = firstRetentionPage.items[0];
+  var retentionConfirmInput = { batchId: retentionTarget.batchId, objectKey: retentionTarget.objectKey, cipherSha256: retentionTarget.cipherSha256 };
+  assertThrowsCode(function () {
+    archive.confirmRetention({ batchId: retentionTarget.batchId, objectKey: '2026-03/different-batch.jsonl.gz.age', cipherSha256: retentionTarget.cipherSha256 }, Date.parse('2026-06-01T00:00:00.000Z'));
+  }, 'ARCHIVE_RETENTION_MISMATCH', 'retention confirmation rechecks object identity');
+  var retentionConfirmed = archive.confirmRetention(retentionConfirmInput, Date.parse('2026-06-01T00:00:00.000Z'));
+  assertEqual(retentionConfirmed.status, 'retention_confirmed', 'retention confirmation marks metadata only after remote deletion');
+  assertEqual(archive.confirmRetention(retentionConfirmInput, Date.parse('2026-06-01T00:00:00.000Z')).idempotent, true, 'retention confirmation is idempotent');
+  assertThrowsCode(function () {
+    archive.confirmRetention({ batchId: 'retention-boundary', objectKey: '2026-04/retention-boundary.jsonl.gz.age', cipherSha256: 'a'.repeat(64) }, Date.parse('2026-07-15T12:00:00.000Z'));
+  }, 'ARCHIVE_RETENTION_NOT_DUE', 'retention confirmation uses a strict 90-day event-time cutoff');
+  assertThrowsCode(function () {
+    archive.confirmRetention({ batchId: 'retention-uncommitted', objectKey: '2026-03/retention-uncommitted.jsonl.gz.age', cipherSha256: 'c'.repeat(64) }, Date.parse('2026-06-01T00:00:00.000Z'));
+  }, 'ARCHIVE_RETENTION_NOT_COMMITTED', 'uncommitted batch can never be retention-confirmed');
+
   var routes = read('pb_hooks/mail_archive.pb.js');
-  assert(routes.indexOf("var PREFIX = '/api/internal/mail-archive/'") !== -1, 'archive route prefix is fixed');
-  ['status', 'prepare', 'export', 'seal', 'uploaded', 'commit'].forEach(function (route) {
+  assert(routes.indexOf("var PREFIX = '/api/blog-internal/mail-archive/'") !== -1, 'archive route prefix is fixed');
+  ['status', 'prepare', 'export', 'seal', 'uploaded', 'commit', 'retention-due', 'retention-confirm'].forEach(function (route) {
     assert(routes.indexOf("route('" + route + "'") !== -1, 'missing archive route ' + route);
   });
   assert(routes.indexOf('MAIL_ARCHIVE_API_ENABLED') !== -1, 'archive API is environment gated');

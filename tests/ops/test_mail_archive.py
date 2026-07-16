@@ -1,5 +1,6 @@
 import hashlib
 import http.server
+import gzip
 import json
 import os
 import pathlib
@@ -12,6 +13,7 @@ import unittest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "mail-archive.py"
+RESTORE_SCRIPT = REPO_ROOT / "scripts" / "verify-mail-archive-restore.py"
 FAKE_AGE = REPO_ROOT / "tests" / "ops" / "fakes" / "fake-age.py"
 FAKE_RCLONE = REPO_ROOT / "tests" / "ops" / "fakes" / "fake-rclone.py"
 
@@ -23,6 +25,8 @@ class ArchiveApiState:
         self.sealed = None
         self.uploaded = None
         self.commit_calls = 0
+        self.retention_items = []
+        self.retention_confirm_calls = []
         self.batch_id = "batch-fixture-0000000001"
         self.rows = [
             {
@@ -115,6 +119,16 @@ class ApiServer:
                     state.commit_calls += 1
                     state.status = "committed"
                     payload = {"batch_id": state.batch_id, "status": "committed", "deleted": len(state.rows)}
+                elif stage == "retention-due":
+                    limit = min(max(int(body.get("limit", 100)), 1), 100)
+                    cursor = body.get("cursor") or ""
+                    candidates = [item for item in state.retention_items if item["batchId"] > cursor]
+                    page = candidates[:limit]
+                    payload = {"items": page, "cursor": page[-1]["batchId"] if len(candidates) > limit else None}
+                elif stage == "retention-confirm":
+                    state.retention_confirm_calls.append(body)
+                    state.retention_items = [item for item in state.retention_items if item["batchId"] != body.get("batchId")]
+                    payload = {"batchId": body.get("batchId"), "status": "retention_confirmed", "idempotent": False}
                 else:
                     self.send_json(404, {"code": "NOT_FOUND"})
                     return
@@ -125,7 +139,7 @@ class ApiServer:
 
     @property
     def url(self):
-        return f"http://127.0.0.1:{self.httpd.server_port}/api/internal/mail-archive"
+        return f"http://127.0.0.1:{self.httpd.server_port}/api/blog-internal/mail-archive"
 
     def __enter__(self):
         self.thread.start()
@@ -163,6 +177,7 @@ class MailArchivePipelineTests(unittest.TestCase):
                 "MAIL_ARCHIVE_AGE_BIN": str(FAKE_AGE),
                 "MAIL_ARCHIVE_RCLONE_BIN": str(FAKE_RCLONE),
                 "FAKE_RCLONE_ROOT": str(self.remote),
+                "MAIL_ARCHIVE_RETENTION_MODE": "s3-versioned",
             }
         )
 
@@ -170,11 +185,11 @@ class MailArchivePipelineTests(unittest.TestCase):
         self.server.__exit__(None, None, None)
         self.temp.cleanup()
 
-    def run_archive(self, extra=None):
+    def run_archive(self, extra=None, args=None):
         env = self.env.copy()
         env.update(extra or {})
         return subprocess.run(
-            [sys.executable, str(SCRIPT), "run"],
+            [sys.executable, str(SCRIPT)] + list(args or ["run"]),
             cwd=REPO_ROOT,
             env=env,
             text=True,
@@ -256,6 +271,122 @@ class MailArchivePipelineTests(unittest.TestCase):
         self.assertEqual(second.returncode, 0, second.stderr)
         self.assertEqual(self.server.state.commit_calls, 1)
         self.assert_no_plaintext()
+
+    def test_retention_deletes_only_api_authorized_due_objects_versions_and_trash(self):
+        due_key = "2026-03/retention-due-0001.jsonl.gz.age"
+        due_cipher = b"due-ciphertext"
+        due_manifest_key = due_key + ".manifest.json"
+        due = {
+            "batchId": "retention-due-0001",
+            "maxCreatedAt": "2026-03-01T00:00:00.000Z",
+            "objectKey": due_key,
+            "cipherSha256": hashlib.sha256(due_cipher).hexdigest(),
+            "manifestObjectKey": due_manifest_key,
+        }
+        due_manifest = (json.dumps({
+            "schema_version": 1,
+            "batch_id": due["batchId"],
+            "object_key": due_key,
+            "cipher_sha256": due["cipherSha256"],
+        }, separators=(",", ":")) + "\n").encode("utf-8")
+        self.server.state.retention_items = [due]
+        protected = [
+            "2026-03/uncommitted-0001.jsonl.gz.age",
+            "2026-07/not-due-0001.jsonl.gz.age",
+        ]
+        for relative, payload in [(due_key, due_cipher), (due_manifest_key, due_manifest)]:
+            target = self.remote / "mail-audit" / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(payload)
+            for hidden in (".versions", ".trash"):
+                historical = self.remote / hidden / "mail-audit" / relative
+                historical.parent.mkdir(parents=True, exist_ok=True)
+                historical.write_bytes(payload + hidden.encode("ascii"))
+        for relative in protected:
+            target = self.remote / "mail-audit" / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"must-remain")
+
+        result = self.run_archive(args=["retention"])
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.server.state.retention_confirm_calls, [{
+            "batchId": due["batchId"], "objectKey": due_key, "cipherSha256": due["cipherSha256"],
+        }])
+        for relative in (due_key, due_manifest_key):
+            self.assertFalse((self.remote / "mail-audit" / relative).exists())
+            self.assertFalse((self.remote / ".versions" / "mail-audit" / relative).exists())
+            self.assertFalse((self.remote / ".trash" / "mail-audit" / relative).exists())
+        for relative in protected:
+            self.assertTrue((self.remote / "mail-audit" / relative).is_file())
+
+    def test_retention_failure_never_confirms_remote_deletion(self):
+        key = "2026-03/retention-failure-0001.jsonl.gz.age"
+        cipher = b"retention-failure"
+        target = self.remote / "mail-audit" / key
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(cipher)
+        manifest = target.with_name(target.name + ".manifest.json")
+        manifest.write_bytes(b"{}\n")
+        self.server.state.retention_items = [{
+            "batchId": "retention-failure-0001",
+            "maxCreatedAt": "2026-03-01T00:00:00.000Z",
+            "objectKey": key,
+            "cipherSha256": hashlib.sha256(cipher).hexdigest(),
+            "manifestObjectKey": key + ".manifest.json",
+        }]
+
+        result = self.run_archive({"FAKE_RCLONE_MODE": "fail-retention-purge"}, ["retention"])
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.server.state.retention_confirm_calls, [])
+
+    def test_restore_verifies_all_hashes_schema_count_and_cursor_then_cleans_plaintext(self):
+        archived = self.run_archive()
+        self.assertEqual(archived.returncode, 0, archived.stderr)
+        cipher = next(self.remote.rglob("*.jsonl.gz.age"))
+        manifest = next(self.remote.rglob("*.manifest.json"))
+        identity = self.root / "offline-age-identity.txt"
+        identity.write_text("AGE-SECRET-KEY-TEST-ONLY\n", encoding="utf-8")
+        restore_root = self.root / "isolated-restore"
+        restore_root.mkdir(mode=0o700)
+        env = self.env.copy()
+        env["MAIL_ARCHIVE_RESTORE_AGE_BIN"] = str(FAKE_AGE)
+
+        result = subprocess.run(
+            [sys.executable, str(RESTORE_SCRIPT), "--cipher", str(cipher), "--manifest", str(manifest),
+             "--identity", str(identity), "--archive-work-dir", str(self.workdir), "--restore-root", str(restore_root)],
+            cwd=REPO_ROOT, env=env, text=True, encoding="utf-8", errors="replace",
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), {"row_count": len(self.server.state.rows)})
+        self.assertEqual(list(restore_root.iterdir()), [])
+        cipher_bytes = cipher.read_bytes()
+        self.assertTrue(cipher_bytes.startswith(b"FAKE-AGE-V1\n"))
+        rows = [json.loads(line) for line in gzip.decompress(cipher_bytes.split(b"\n", 1)[1]).decode("utf-8").splitlines()]
+        allowed = {"schema_version", "event_id", "created_at", "category", "source_kind", "result", "duration_ms", "attempt", "error_class"}
+        self.assertTrue(all(set(row) == allowed for row in rows))
+        forbidden = ("secret@example.com", "s***@example.com", "email-hash-fixture", "ip-hash-fixture", "source-record-fixture", "token-fixture", "otp-fixture", "user-agent-fixture", "smtp-response-fixture", "free-text-fixture")
+        serialized = json.dumps(rows, ensure_ascii=False).lower()
+        self.assertFalse(any(term in serialized for term in forbidden))
+
+    def test_restore_refuses_identity_inside_archive_work_directory(self):
+        identity = self.workdir / "forbidden-identity.txt"
+        identity.write_text("AGE-SECRET-KEY-TEST-ONLY\n", encoding="utf-8")
+        cipher = self.root / "fixture.age"
+        manifest = self.root / "fixture.manifest.json"
+        cipher.write_bytes(b"invalid")
+        manifest.write_text("{}", encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, str(RESTORE_SCRIPT), "--cipher", str(cipher), "--manifest", str(manifest),
+             "--identity", str(identity), "--archive-work-dir", str(self.workdir), "--restore-root", str(self.root / "restore")],
+            cwd=REPO_ROOT, env=dict(self.env, MAIL_ARCHIVE_RESTORE_AGE_BIN=str(FAKE_AGE)),
+            text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("RESTORE_PATH_INSIDE_ARCHIVE_WORK_DIR", result.stderr)
 
 
 if __name__ == "__main__":
