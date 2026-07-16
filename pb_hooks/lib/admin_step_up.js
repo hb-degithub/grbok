@@ -61,8 +61,8 @@ function equal(left, right) {
   return $security.equal(left, right);
 }
 
-function findBySelector(selector) {
-  var records = $app.dao().findRecordsByFilter(
+function findBySelector(selector, dao) {
+  var records = (dao || $app.dao()).findRecordsByFilter(
     'admin_step_up_sessions',
     'selector = {:selector}',
     '',
@@ -98,7 +98,7 @@ function requireAdminStepUp(ctx, options) {
 
     var hashSecret = String($os.getenv('ADMIN_AUTH_HASH_SECRET') || '');
     if (hashSecret.length < 32) forbidden();
-    var record = findBySelector(selector);
+    var record = findBySelector(selector, options.dao);
     if (!record) forbidden();
     if (record.getString('user') !== actor.id) forbidden();
     if (record.getString('revoked_at')) forbidden();

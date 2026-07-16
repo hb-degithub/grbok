@@ -21,6 +21,14 @@ migrate((db) => {
   const challenges = dao.findCollectionByNameOrId('webauthn_challenges');
   const pendingChallenges = dao.findRecordsByFilter('webauthn_challenges', 'id != ""', '+created', 5000, 0);
   for (const challenge of pendingChallenges) dao.deleteRecord(challenge);
+  const purpose = challenges.schema.getFieldByName('purpose');
+  challenges.schema.addField(new SchemaField({
+    id: purpose.id,
+    name: 'purpose',
+    type: 'select',
+    required: true,
+    options: { values: ['bootstrap_registration', 'add_registration', 'recovery_registration', 'authentication'], maxSelect: 1 },
+  }));
   challenges.indexes = [
     'CREATE INDEX IF NOT EXISTS idx_webauthn_challenges_challenge ON webauthn_challenges(challenge)',
     'CREATE INDEX IF NOT EXISTS idx_webauthn_challenges_expires ON webauthn_challenges(expires_at)',
@@ -46,6 +54,14 @@ migrate((db) => {
 
   try {
     const challenges = dao.findCollectionByNameOrId('webauthn_challenges');
+    const purpose = challenges.schema.getFieldByName('purpose');
+    challenges.schema.addField(new SchemaField({
+      id: purpose.id,
+      name: 'purpose',
+      type: 'select',
+      required: true,
+      options: { values: ['bootstrap_registration', 'add_registration', 'authentication'], maxSelect: 1 },
+    }));
     challenges.indexes = [
       'CREATE INDEX IF NOT EXISTS idx_webauthn_challenges_challenge ON webauthn_challenges(challenge)',
       'CREATE INDEX IF NOT EXISTS idx_webauthn_challenges_expires ON webauthn_challenges(expires_at)',

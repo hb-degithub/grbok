@@ -69,6 +69,14 @@ function records(dao, collection, filter, sort, limit, params) {
   return dao.findRecordsByFilter(collection, filter, sort || '', limit || 100, 0, params || {});
 }
 
+function dateMillis(value) {
+  return Date.parse(String(value || '').replace(' ', 'T'));
+}
+
+function pbDate(value) {
+  return new Date(value).toISOString().replace('T', ' ');
+}
+
 function passkeyState(dao, userId) {
   var found = records(dao, 'admin_passkey_state', 'user = {:user}', '', 1, { user: userId });
   return found && found.length ? found[0] : null;
@@ -88,21 +96,23 @@ function invalidateChallenges(dao, userId, purpose) {
   for (var i = 0; i < found.length; i++) dao.deleteRecord(found[i]);
 }
 
-function saveChallenge(dao, input) {
-  invalidateChallenges(dao, input.userId, input.purpose);
-  var collection = dao.findCollectionByNameOrId('webauthn_challenges');
-  var record = new Record(collection);
-  record.set('user', input.userId);
-  record.set('challenge', input.challenge);
-  record.set('purpose', input.purpose);
-  record.set('binding_selector', input.bindingSelector || '');
-  record.set('client_session_hmac', input.clientSessionHmac || '');
-  record.set('expires_at', new Date(Date.now() + 5 * 60 * 1000).toISOString());
-  dao.saveRecord(record);
+function replaceChallenge(input) {
+  $app.dao().runInTransaction(function (txDao) {
+    invalidateChallenges(txDao, input.userId, input.purpose);
+    var collection = txDao.findCollectionByNameOrId('webauthn_challenges');
+    var record = new Record(collection);
+    record.set('user', input.userId);
+    record.set('challenge', input.challenge);
+    record.set('purpose', input.purpose);
+    record.set('binding_selector', input.bindingSelector || '');
+    record.set('client_session_hmac', input.clientSessionHmac || '');
+    record.set('expires_at', new Date(Date.now() + 5 * 60 * 1000).toISOString());
+    txDao.saveRecord(record);
+  });
 }
 
-function consumeChallenge(dao, userId, purpose) {
-  var now = new Date().toISOString();
+function findChallenge(dao, userId, purpose) {
+  var now = pbDate(Date.now());
   var found = records(
     dao,
     'webauthn_challenges',
@@ -112,8 +122,20 @@ function consumeChallenge(dao, userId, purpose) {
     { user: userId, purpose: purpose, now: now },
   );
   if (!found || !found.length) apiError(400, 'CHALLENGE_REQUIRED');
-  dao.deleteRecord(found[0]);
   return found[0];
+}
+
+function assertSameChallenge(current, snapshot) {
+  if (!current || !snapshot || current.id !== snapshot.id || current.getString('challenge') !== snapshot.getString('challenge')) {
+    apiError(400, 'CHALLENGE_REQUIRED');
+  }
+  if (dateMillis(current.getString('expires_at')) <= Date.now()) apiError(400, 'CHALLENGE_REQUIRED');
+}
+
+function assertChallengeBinding(challenge, c) {
+  if (challenge.getString('client_session_hmac') !== challengeClientSessionHmac(c)) {
+    apiError(403, CHALLENGE_BINDING_REQUIRED);
+  }
 }
 
 function passkeyDto(record, currentCredentialId, activeCount) {
@@ -207,7 +229,7 @@ function authenticationOptions(c) {
     challenge: challenge,
     allowCredentials: passkeys.map(function (item) { return { id: item.getString('credential_id'), type: 'public-key' }; }),
   });
-  saveChallenge($app.dao(), {
+  replaceChallenge({
     userId: user.id,
     purpose: 'authentication',
     challenge: challenge,
@@ -224,10 +246,8 @@ function authenticationVerify(c) {
   var userAgent = header(c, 'User-Agent');
   var ip = String(c.realIP() || '').trim();
   if (!clientSession || !fingerprint || !userAgent || !ip) apiError(400, 'INVALID_REQUEST');
-  var challenge = consumeChallenge($app.dao(), user.id, 'authentication');
-  if (challenge.getString('client_session_hmac') !== challengeClientSessionHmac(c)) {
-    apiError(403, CHALLENGE_BINDING_REQUIRED);
-  }
+  var challenge = findChallenge($app.dao(), user.id, 'authentication');
+  assertChallengeBinding(challenge, c);
   var credentialId = input.response && input.response.id ? String(input.response.id) : '';
   var found = records($app.dao(), 'admin_passkeys', 'owner = {:user} && credential_id = {:credential} && revoked_at = null', '', 1, { user: user.id, credential: credentialId });
   if (!found.length) apiError(400, 'PASSKEY_VERIFICATION_FAILED');
@@ -242,6 +262,12 @@ function authenticationVerify(c) {
   var issued = postInternal('/internal/step-up/issue', { userId: user.id, clientSession: clientSession, fingerprint: fingerprint, ip: ip, userAgent: userAgent });
   var saved;
   $app.dao().runInTransaction(function (txDao) {
+    var currentChallenge = findChallenge(txDao, user.id, 'authentication');
+    assertSameChallenge(currentChallenge, challenge);
+    assertChallengeBinding(currentChallenge, c);
+    txDao.deleteRecord(currentChallenge);
+    var currentPasskey = txDao.findRecordById('admin_passkeys', passkey.id);
+    if (currentPasskey.getString('owner') !== user.id || currentPasskey.getString('revoked_at')) apiError(400, 'PASSKEY_VERIFICATION_FAILED');
     var old = records(txDao, 'admin_step_up_sessions', 'user = {:user} && client_session_hmac = {:client} && revoked_at = null', '', 100, { user: user.id, client: issued.record.client_session_hmac });
     for (var i = 0; i < old.length; i++) { old[i].set('revoked_at', new Date().toISOString()); txDao.saveRecord(old[i]); }
     var collection = txDao.findCollectionByNameOrId('admin_step_up_sessions');
@@ -249,7 +275,7 @@ function authenticationVerify(c) {
     Object.keys(issued.record).forEach(function (key) { saved.set(key, issued.record[key]); });
     txDao.saveRecord(saved);
     if (verified.authenticationInfo && typeof verified.authenticationInfo.newCounter === 'number') {
-      passkey.set('counter', verified.authenticationInfo.newCounter); txDao.saveRecord(passkey);
+      currentPasskey.set('counter', verified.authenticationInfo.newCounter); txDao.saveRecord(currentPasskey);
     }
     audits.writeSecurityAudit(txDao, { actorId: user.id, referenceId: $security.randomStringWithAlphabet(22, CHALLENGE_ALPHABET) }, {
       actionCode: 'ADMIN_STEP_UP_VERIFIED', targetType: 'admin_step_up_session', targetId: saved.id,
@@ -272,7 +298,7 @@ function registrationOptions(c) {
     userName: user.getString('email') || user.getString('username') || user.id,
     challenge: challenge,
   });
-  saveChallenge($app.dao(), {
+  replaceChallenge({
     userId: user.id, purpose: mode, challenge: challenge,
     bindingSelector: secure ? secure.selector : '',
     clientSessionHmac: clientSessionHmac,
@@ -287,12 +313,9 @@ function registrationVerify(c) {
   var input = body(c);
   var mode = registrationMode($app.dao(), user.id);
   var clientSessionHmac = challengeClientSessionHmac(c);
-  var challenge;
+  var challenge = findChallenge($app.dao(), user.id, mode);
   var secure = null;
-  $app.dao().runInTransaction(function (txDao) { challenge = consumeChallenge(txDao, user.id, mode); });
-  if (challenge.getString('client_session_hmac') !== clientSessionHmac) {
-    apiError(403, CHALLENGE_BINDING_REQUIRED);
-  }
+  assertChallengeBinding(challenge, c);
   if (mode === 'add_registration') {
     secure = stepUp.requireAdminStepUp(c, { requireVerifiedEmail: true });
     if (challenge.getString('binding_selector') !== secure.selector || challenge.getString('client_session_hmac') !== secure.clientSessionHmac) {
@@ -306,7 +329,18 @@ function registrationVerify(c) {
   var credential = verified.registrationInfo.credential;
   var saved;
   $app.dao().runInTransaction(function (txDao) {
+    var currentChallenge = findChallenge(txDao, user.id, mode);
+    assertSameChallenge(currentChallenge, challenge);
+    assertChallengeBinding(currentChallenge, c);
+    var txSecure = null;
+    if (mode === 'add_registration') {
+      txSecure = stepUp.requireAdminStepUp(c, { requireVerifiedEmail: true, dao: txDao });
+      if (currentChallenge.getString('binding_selector') !== txSecure.selector || currentChallenge.getString('client_session_hmac') !== txSecure.clientSessionHmac) {
+        apiError(403, 'ADMIN_STEP_UP_REQUIRED');
+      }
+    }
     if (mode === 'bootstrap_registration' && passkeyState(txDao, user.id)) apiError(409, 'PASSKEY_ALREADY_BOOTSTRAPPED');
+    txDao.deleteRecord(currentChallenge);
     var collection = txDao.findCollectionByNameOrId('admin_passkeys');
     saved = new Record(collection);
     saved.set('owner', user.id); saved.set('label', String(input.label || 'Passkey').slice(0, 255));
@@ -316,7 +350,7 @@ function registrationVerify(c) {
       var state = new Record(txDao.findCollectionByNameOrId('admin_passkey_state'));
       state.set('user', user.id); state.set('bootstrapped_at', new Date().toISOString()); txDao.saveRecord(state);
     }
-    audits.writeSecurityAudit(txDao, secure || { actorId: user.id, referenceId: $security.randomStringWithAlphabet(22, CHALLENGE_ALPHABET) }, {
+    audits.writeSecurityAudit(txDao, txSecure || secure || { actorId: user.id, referenceId: $security.randomStringWithAlphabet(22, CHALLENGE_ALPHABET) }, {
       actionCode: 'ADMIN_PASSKEY_REGISTERED', targetType: 'admin_passkey', targetId: saved.id,
       before: null, after: { active: true, label: saved.getString('label') }, version: 1,
     });

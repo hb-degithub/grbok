@@ -130,9 +130,11 @@ routerAdd('GET', '/api/test/admin-step-up/run', function (c) {
     const userA = createUser('stepupa', suffix);
     const userB = createUser('stepupb', suffix);
     const userC = createUser('stepupc', suffix);
+    const userD = createUser('stepupd', suffix);
     const tokenA = $tokens.recordAuthToken($app, userA);
     const tokenB = $tokens.recordAuthToken($app, userB);
     const tokenC = $tokens.recordAuthToken($app, userC);
+    const tokenD = $tokens.recordAuthToken($app, userD);
     createLegacySession(userA.id);
     createLegacySession(userB.id);
 
@@ -274,6 +276,29 @@ routerAdd('GET', '/api/test/admin-step-up/run', function (c) {
 
     expect('revoke current step-up', request('POST', '/api/blog-admin/step-up/revoke', refreshedTokenA, secureHeaders, {}), 200);
     expect('revoked credential immediately denied', writeWith(merge(valid, { token: refreshedTokenA })), 403, 'ADMIN_STEP_UP_REQUIRED');
+
+    const bindingD = {
+      clientSession: $security.randomStringWithAlphabet(43, alphabet),
+      fingerprint: 'fixture-fingerprint-d',
+      userAgent: 'fixture-agent-d',
+    };
+    const headersD = {
+      'X-Admin-Session': bindingD.clientSession,
+      'X-Browser-Fingerprint': bindingD.fingerprint,
+      'User-Agent': bindingD.userAgent,
+    };
+    expect('bootstrap options first', request('POST', '/api/blog-admin/passkeys/registration/options', tokenD, headersD, {}), 200);
+    expect('bootstrap options replacement', request('POST', '/api/blog-admin/passkeys/registration/options', tokenD, headersD, {}), 200);
+    const bootstrapChallenges = $app.dao().findRecordsByFilter('webauthn_challenges', 'user = {:user} && purpose = "bootstrap_registration"', '', 10, 0, { user: userD.id });
+    if (bootstrapChallenges.length !== 1) failures.push({ label: 'one bootstrap challenge per user/purpose', expected: 1, actual: bootstrapChallenges.length });
+    expect('bootstrap verify succeeds once', request('POST', '/api/blog-admin/passkeys/registration/verify', tokenD, headersD, { response: { id: 'bootstrap_' + suffix }, label: 'Bootstrap' }), 200);
+    expect('bootstrap verify replay denied', request('POST', '/api/blog-admin/passkeys/registration/verify', tokenD, headersD, { response: { id: 'bootstrap_' + suffix }, label: 'Bootstrap' }), 400);
+
+    stepUpA.record.set('revoked_at', '');
+    $app.dao().saveRecord(stepUpA.record);
+    expect('add registration options bound to step-up', request('POST', '/api/blog-admin/passkeys/registration/options', refreshedTokenA, secureHeaders, {}), 200);
+    expect('add verify changed client session denied', request('POST', '/api/blog-admin/passkeys/registration/verify', refreshedTokenA, merge(secureHeaders, { 'X-Admin-Session': 'changed-add-session' }), { response: { id: 'add_' + suffix }, label: 'Added' }), 403, 'ADMIN_STEP_UP_REQUIRED');
+    expect('add verify original binding still succeeds', request('POST', '/api/blog-admin/passkeys/registration/verify', refreshedTokenA, secureHeaders, { response: { id: 'add_' + suffix }, label: 'Added' }), 200);
 
     if (failures.length > 0) {
       return c.json(500, { code: 'FIXTURE_ASSERTION_FAILED', failures: failures, observed: observed });

@@ -1,7 +1,8 @@
 #Requires -Version 5.1
 param(
     [string]$PocketBasePath = (Join-Path $env:TEMP 'pb-0.22.21-track-a\pocketbase.exe'),
-    [int]$Port = 18091
+    [int]$Port = 18091,
+    [int]$StubPort = 18092
 )
 
 $ErrorActionPreference = 'Stop'
@@ -10,17 +11,20 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $runRoot = Join-Path $env:TEMP 'blog-admin-step-up-e2e'
 $fixturePath = Join-Path $repoRoot 'tests\admin-security\step_up_fixture.pb.js'
 $legacySeedFixture = Join-Path $repoRoot 'tests\admin-security\legacy_session_seed.pb.js'
+$stubPath = Join-Path $repoRoot 'tests\admin-security\webauthn_stub.mjs'
 $migrationsPath = Join-Path $repoRoot 'pb_migrations'
 $hooksSource = Join-Path $repoRoot 'pb_hooks'
 $expectedZipSha256 = 'D459C5690ABFB8A3E220565671A1B53FDC6ADB21A50A7F553A78BD9EFF5287D5'
 $process = $null
+$stubProcess = $null
 $environmentNames = @(
     'ADMIN_AUTH_HASH_SECRET',
     'ADMIN_AUTH_INTERNAL_SECRET',
     'ADMIN_AUTH_INTERNAL_URL',
     'ADMIN_IP',
     'MAIL_HASH_SECRET',
-    'MAIL_INTERNAL_SECRET'
+    'MAIL_INTERNAL_SECRET',
+    'ADMIN_SECURITY_TEST_MODE'
 )
 $previousEnvironment = @{}
 
@@ -41,8 +45,10 @@ function Assert-SafeRunRoot {
 }
 
 function Assert-PortFree {
-    $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $Port)
-    try { $listener.Start() } finally { $listener.Stop() }
+    foreach ($candidate in @($Port, $StubPort)) {
+        $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $candidate)
+        try { $listener.Start() } finally { $listener.Stop() }
+    }
 }
 
 function Install-PocketBase {
@@ -100,6 +106,7 @@ Assert-PortFree
 
 if (-not (Test-Path -LiteralPath $fixturePath -PathType Leaf)) { throw "Missing fixture: $fixturePath" }
 if (-not (Test-Path -LiteralPath $legacySeedFixture -PathType Leaf)) { throw "Missing fixture: $legacySeedFixture" }
+if (-not (Test-Path -LiteralPath $stubPath -PathType Leaf)) { throw "Missing fixture: $stubPath" }
 $securityModule = Join-Path $hooksSource 'lib\admin_security.js'
 if (-not (Test-Path -LiteralPath $securityModule -PathType Leaf)) { throw "Missing security module: $securityModule" }
 $securityContract = Get-Content -LiteralPath $securityModule -Raw
@@ -126,10 +133,25 @@ foreach ($name in $environmentNames) { $previousEnvironment[$name] = [Environmen
 $hashSecret = New-RandomSecret
 [Environment]::SetEnvironmentVariable('ADMIN_AUTH_HASH_SECRET', $hashSecret, 'Process')
 [Environment]::SetEnvironmentVariable('ADMIN_AUTH_INTERNAL_SECRET', (New-RandomSecret), 'Process')
-[Environment]::SetEnvironmentVariable('ADMIN_AUTH_INTERNAL_URL', 'http://127.0.0.1:9', 'Process')
+[Environment]::SetEnvironmentVariable('ADMIN_AUTH_INTERNAL_URL', "http://127.0.0.1:$StubPort", 'Process')
 [Environment]::SetEnvironmentVariable('ADMIN_IP', '127.0.0.1', 'Process')
 [Environment]::SetEnvironmentVariable('MAIL_HASH_SECRET', (New-RandomSecret), 'Process')
 [Environment]::SetEnvironmentVariable('MAIL_INTERNAL_SECRET', (New-RandomSecret), 'Process')
+[Environment]::SetEnvironmentVariable('ADMIN_SECURITY_TEST_MODE', 'true', 'Process')
+
+$stubStdoutPath = Join-Path $resolvedRunRoot 'webauthn-stub.out.log'
+$stubStderrPath = Join-Path $resolvedRunRoot 'webauthn-stub.err.log'
+$stubProcess = Start-Process -FilePath 'node' -ArgumentList @($stubPath, $StubPort) -WindowStyle Hidden -RedirectStandardOutput $stubStdoutPath -RedirectStandardError $stubStderrPath -PassThru
+$stubDeadline = [DateTime]::UtcNow.AddSeconds(15)
+while ([DateTime]::UtcNow -lt $stubDeadline) {
+    if ($stubProcess.HasExited) { throw 'Deterministic WebAuthn stub exited early' }
+    try {
+        $stubHealth = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$StubPort/health" -TimeoutSec 1
+        if ($stubHealth.StatusCode -eq 200) { break }
+    } catch {}
+    Start-Sleep -Milliseconds 100
+}
+if (-not $stubHealth -or $stubHealth.StatusCode -ne 200) { throw 'Deterministic WebAuthn stub did not become ready' }
 
 $stdoutPath = Join-Path $resolvedRunRoot 'bootstrap.out.log'
 $stderrPath = Join-Path $resolvedRunRoot 'bootstrap.err.log'
@@ -207,6 +229,13 @@ finally {
             $process.WaitForExit()
         } catch {}
         $process.Dispose()
+    }
+    if ($null -ne $stubProcess) {
+        try {
+            if (-not $stubProcess.HasExited) { Stop-Process -Id $stubProcess.Id -Force }
+            $stubProcess.WaitForExit()
+        } catch {}
+        $stubProcess.Dispose()
     }
     foreach ($name in $environmentNames) {
         [Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], 'Process')
