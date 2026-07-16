@@ -30,6 +30,7 @@ function route(name, operation) {
   }, $apis.bodyLimit(65536));
 }
 
+route('status', function () { return archive.getPendingBatch() || { empty: true }; });
 route('prepare', function (body) { return archive.prepareBatch(Date.now(), body.limit || 5000) || { empty: true }; });
 route('export', function (body) { return archive.exportBatch(body.batch_id); });
 route('seal', function (body) { return archive.sealBatch(body.batch_id, body, Date.now()); });

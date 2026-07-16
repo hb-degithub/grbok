@@ -171,6 +171,7 @@ function run() {
   assertEqual(prepared.row_count, 5000, 'prepare enforces the 5000 row cap');
   assertEqual(dao.tables.mail_delivery_logs.filter(function (item) { return item.get('archive_batch_id') === prepared.batch_id; }).length, 5000, 'prepare reserves selected rows transactionally');
   assertEqual(dao.tables.mail_delivery_logs.filter(function (item) { return item.id === 'at-cutoff'; })[0].get('archive_batch_id'), '', 'cutoff is strict created less-than');
+  assertEqual(archive.getPendingBatch().batch_id, prepared.batch_id, 'status returns the earliest incomplete batch for restart');
 
   var exported = archive.exportBatch(prepared.batch_id);
   assertEqual(exported.rows.length, 5000, 'export returns the reserved batch only');
@@ -199,10 +200,11 @@ function run() {
   assertEqual(archive.commitBatch(prepared.batch_id, uploadedInput, now).idempotent, true, 'identical repeated commit returns prior success');
   assertThrowsCode(function () { archive.commitBatch(prepared.batch_id, { cipher_sha256: sealedInput.cipher_sha256, object_key: 'wrong', manifest_sha256: uploadedInput.manifest_sha256 }, now); }, 'ARCHIVE_COMMIT_MISMATCH', 'different repeated commit is rejected');
   assertThrowsCode(function () { archive.exportBatch('unknown-batch'); }, 'ARCHIVE_BATCH_NOT_FOUND', 'unknown batch is rejected');
+  assertEqual(archive.getPendingBatch(), null, 'committed batch is not returned as pending');
 
   var routes = read('pb_hooks/mail_archive.pb.js');
   assert(routes.indexOf("var PREFIX = '/api/internal/mail-archive/'") !== -1, 'archive route prefix is fixed');
-  ['prepare', 'export', 'seal', 'uploaded', 'commit'].forEach(function (route) {
+  ['status', 'prepare', 'export', 'seal', 'uploaded', 'commit'].forEach(function (route) {
     assert(routes.indexOf("route('" + route + "'") !== -1, 'missing archive route ' + route);
   });
   assert(routes.indexOf('MAIL_ARCHIVE_API_ENABLED') !== -1, 'archive API is environment gated');

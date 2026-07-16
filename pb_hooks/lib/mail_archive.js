@@ -86,6 +86,22 @@ function exportBatch(batchId) {
   };
 }
 
+function batchDescriptor(batch) {
+  var keys = ['batch_id','status','cursor','row_count','min_created_at','max_created_at','plaintext_sha256','gzip_sha256','cipher_sha256','cipher_size','age_recipient_fingerprint','object_key','manifest_sha256','prepared_at','sealed_at','uploaded_at','committed_at'];
+  var output = {};
+  for (var i = 0; i < keys.length; i++) output[keys[i]] = batch.get(keys[i]) || null;
+  return output;
+}
+
+function getPendingBatch() {
+  var dao = dependencies().dao();
+  var rows = dao.findRecordsByFilter('mail_archive_batches', 'status != "committed"', 'created', 100, 0, {}) || [];
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i].get('status')) !== 'committed') return batchDescriptor(rows[i]);
+  }
+  return null;
+}
+
 function sealBatch(batchId, input, nowMs) {
   return dependencies().runInTransaction(function (txDao) {
     var batch = findBatch(txDao, batchId);
@@ -141,7 +157,7 @@ function resetDependenciesForTests() { testDependencies = null; }
 
 module.exports = {
   ARCHIVE_KEYS: ARCHIVE_KEYS, projectLog: projectLog, prepareBatch: prepareBatch, exportBatch: exportBatch,
+  getPendingBatch: getPendingBatch,
   sealBatch: sealBatch, markUploaded: markUploaded, commitBatch: commitBatch,
   _setDependenciesForTests: setDependenciesForTests, _resetDependenciesForTests: resetDependenciesForTests,
 };
-
