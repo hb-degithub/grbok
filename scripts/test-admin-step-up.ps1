@@ -125,6 +125,35 @@ function Invoke-JsonRequest {
     }
 }
 
+function Start-JsonRequest {
+    param(
+        [Parameter(Mandatory)][Net.Http.HttpClient]$Client,
+        [Parameter(Mandatory)][string]$Method,
+        [Parameter(Mandatory)][string]$Url,
+        [string]$Token = '',
+        [hashtable]$Headers = @{},
+        $Body = $null
+    )
+    $message = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::new($Method), $Url)
+    if ($Token) { [void]$message.Headers.TryAddWithoutValidation('Authorization', $Token) }
+    foreach ($name in $Headers.Keys) { [void]$message.Headers.TryAddWithoutValidation($name, [string]$Headers[$name]) }
+    if ($null -ne $Body) {
+        $json = $Body | ConvertTo-Json -Depth 10 -Compress
+        $message.Content = [Net.Http.StringContent]::new($json, [Text.Encoding]::UTF8, 'application/json')
+    }
+    return [pscustomobject]@{ Message = $message; Task = $Client.SendAsync($message) }
+}
+
+function Complete-JsonRequest($Pending) {
+    try {
+        $response = $Pending.Task.GetAwaiter().GetResult()
+        $raw = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+        return [pscustomobject]@{ Status = [int]$response.StatusCode; Raw = $raw; Json = if ($raw) { $raw | ConvertFrom-Json } else { $null } }
+    } finally {
+        $Pending.Message.Dispose()
+    }
+}
+
 $resolvedRunRoot = Assert-SafeRunRoot
 Install-PocketBase
 Assert-PortFree
@@ -294,7 +323,34 @@ try {
             throw "Recovery reenrollment state invalid: $($afterReenroll.Raw)"
         }
 
-        Write-Host "PASS admin step-up fixture: $($result.observed.Count + 12) scenarios" -ForegroundColor Green
+        $bootstrapSetup = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/test/admin-step-up/bootstrap/setup"
+        $bootstrapHeaders = @{
+            'X-Admin-Session' = [string]$bootstrapSetup.Json.clientSession
+            'X-Browser-Fingerprint' = [string]$bootstrapSetup.Json.fingerprint
+            'User-Agent' = [string]$bootstrapSetup.Json.userAgent
+        }
+        $optionPending1 = Start-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/passkeys/registration/options" -Token ([string]$bootstrapSetup.Json.token) -Headers $bootstrapHeaders -Body @{}
+        $optionPending2 = Start-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/passkeys/registration/options" -Token ([string]$bootstrapSetup.Json.token) -Headers $bootstrapHeaders -Body @{}
+        $optionResult1 = Complete-JsonRequest $optionPending1
+        $optionResult2 = Complete-JsonRequest $optionPending2
+        if ($optionResult1.Status -ne 200 -and $optionResult2.Status -ne 200) { throw 'Concurrent bootstrap options both failed' }
+        $afterOptions = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/test/admin-step-up/bootstrap/check" -Body @{ userId = [string]$bootstrapSetup.Json.userId }
+        if ($afterOptions.Json.challenges -ne 1) { throw "Concurrent options left invalid challenge count: $($afterOptions.Raw)" }
+
+        $verifyBody = @{ response = @{ id = 'concurrent-bootstrap-credential' }; label = 'Concurrent' }
+        $verifyPending1 = Start-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/passkeys/registration/verify" -Token ([string]$bootstrapSetup.Json.token) -Headers $bootstrapHeaders -Body $verifyBody
+        $verifyPending2 = Start-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/blog-admin/passkeys/registration/verify" -Token ([string]$bootstrapSetup.Json.token) -Headers $bootstrapHeaders -Body $verifyBody
+        $verifyResult1 = Complete-JsonRequest $verifyPending1
+        $verifyResult2 = Complete-JsonRequest $verifyPending2
+        $verifySuccesses = 0
+        foreach ($verifyResult in @($verifyResult1, $verifyResult2)) { if ($verifyResult.Status -eq 200) { $verifySuccesses++ } }
+        if ($verifySuccesses -ne 1) { throw "Concurrent bootstrap expected one success, got $verifySuccesses ($($verifyResult1.Status),$($verifyResult2.Status))" }
+        $afterConcurrentVerify = Invoke-JsonRequest -Client $client -Method POST -Url "$baseUrl/api/test/admin-step-up/bootstrap/check" -Body @{ userId = [string]$bootstrapSetup.Json.userId }
+        if ($afterConcurrentVerify.Json.challenges -ne 0 -or $afterConcurrentVerify.Json.passkeys -ne 1 -or $afterConcurrentVerify.Json.states -ne 1 -or $afterConcurrentVerify.Json.audits -ne 1) {
+            throw "Concurrent bootstrap final state invalid: $($afterConcurrentVerify.Raw)"
+        }
+
+        Write-Host "PASS admin step-up fixture: $($result.observed.Count + 18) scenarios" -ForegroundColor Green
     } finally {
         $client.Dispose()
     }

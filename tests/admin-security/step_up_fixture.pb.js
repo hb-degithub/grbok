@@ -390,3 +390,34 @@ routerAdd('POST', '/api/test/admin-step-up/recovery/check', function (c) {
     audits: auditRows.length,
   });
 });
+
+routerAdd('POST', '/api/test/admin-step-up/bootstrap/setup', function (c) {
+  const suffix = $security.randomStringWithAlphabet(8, 'abcdefghijklmnopqrstuvwxyz0123456789');
+  const users = $app.dao().findCollectionByNameOrId('users');
+  const user = new Record(users);
+  user.set('email', 'concurrent_' + suffix + '@example.local');
+  user.set('username', 'concurrent_' + suffix);
+  user.set('password', 'Test12345!');
+  user.set('passwordConfirm', 'Test12345!');
+  user.set('role', 'super_admin');
+  user.set('verified', true);
+  user.refreshTokenKey();
+  $app.dao().saveRecord(user);
+  return c.json(200, {
+    userId: user.id,
+    token: $tokens.recordAuthToken($app, user),
+    clientSession: $security.randomStringWithAlphabet(43, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'),
+    fingerprint: 'concurrent-fingerprint-' + suffix,
+    userAgent: 'concurrent-agent-' + suffix,
+  });
+});
+
+routerAdd('POST', '/api/test/admin-step-up/bootstrap/check', function (c) {
+  const input = JSON.parse(readerToString(c.request().body, 4096) || '{}');
+  const userId = String(input.userId || '');
+  const challenges = $app.dao().findRecordsByFilter('webauthn_challenges', 'user = {:user}', '', 100, 0, { user: userId });
+  const passkeys = $app.dao().findRecordsByFilter('admin_passkeys', 'owner = {:user} && revoked_at = null', '', 100, 0, { user: userId });
+  const states = $app.dao().findRecordsByFilter('admin_passkey_state', 'user = {:user}', '', 10, 0, { user: userId });
+  const audits = $app.dao().findRecordsByFilter('admin_security_audits', 'actor = {:user} && action_code = "ADMIN_PASSKEY_REGISTERED"', '', 100, 0, { user: userId });
+  return c.json(200, { challenges: challenges.length, passkeys: passkeys.length, states: states.length, audits: audits.length });
+});
