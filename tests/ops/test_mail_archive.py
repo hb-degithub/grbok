@@ -1,6 +1,7 @@
 import hashlib
 import http.server
 import gzip
+import importlib.util
 import json
 import os
 import pathlib
@@ -16,6 +17,18 @@ SCRIPT = REPO_ROOT / "scripts" / "mail-archive.py"
 RESTORE_SCRIPT = REPO_ROOT / "scripts" / "verify-mail-archive-restore.py"
 FAKE_AGE = REPO_ROOT / "tests" / "ops" / "fakes" / "fake-age.py"
 FAKE_RCLONE = REPO_ROOT / "tests" / "ops" / "fakes" / "fake-rclone.py"
+
+
+def load_script_module(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+MAIL_ARCHIVE_MODULE = load_script_module("mail_archive_script", SCRIPT)
+RESTORE_MODULE = load_script_module("mail_archive_restore_script", RESTORE_SCRIPT)
 
 
 class ArchiveApiState:
@@ -57,12 +70,16 @@ class ArchiveApiState:
     def reset(self):
         self.__init__()
 
+    @property
+    def cursor(self):
+        return json.dumps({"created_at": self.rows[-1]["created_at"], "event_id": self.rows[-1]["event_id"]}, separators=(",", ":"))
+
     def prepared(self):
         payload = {
             "batch_id": self.batch_id,
             "status": self.status or "prepared",
             "row_count": len(self.rows),
-            "cursor": json.dumps({"created_at": self.rows[-1]["created_at"], "event_id": self.rows[-1]["event_id"]}, separators=(",", ":")),
+            "cursor": self.cursor,
             "min_created_at": self.rows[0]["created_at"],
             "max_created_at": self.rows[-1]["created_at"],
         }
@@ -158,6 +175,52 @@ class ApiServer:
         self.thread.join(timeout=5)
 
 
+class MailArchiveContractTests(unittest.TestCase):
+    def test_generated_manifest_uses_only_approved_public_keys(self):
+        batch = {
+            "batch_id": "batch-fixture-0000000001",
+            "cursor": '{"created_at":"2026-04-01T00:01:00.000Z","event_id":"event-fixture-0002"}',
+            "min_created_at": "2026-04-01T00:00:00.000Z",
+            "max_created_at": "2026-04-01T00:01:00.000Z",
+            "row_count": 2,
+            "plaintext_sha256": "1" * 64,
+            "gzip_sha256": "2" * 64,
+            "cipher_sha256": "3" * 64,
+            "cipher_size": 100,
+            "age_recipient_fingerprints": ["4" * 64],
+            "object_key": "2026-04/batch-fixture-0000000001.jsonl.gz.age",
+            "sealed_at": "2026-07-16T12:00:00.000Z",
+            "recipient_hash": "5" * 64,
+            "free_text": "must-not-enter-public-manifest",
+        }
+        manifest = MAIL_ARCHIVE_MODULE.manifest_for(batch)
+        self.assertEqual(set(manifest), {
+            "schema_version", "batch_id", "min_created_at", "max_created_at", "row_count",
+            "plaintext_sha256", "gzip_sha256", "cipher_sha256", "cipher_size",
+            "age_recipient_fingerprints", "object_key", "sealed_at",
+        })
+
+    def test_remote_and_restore_manifest_validators_reject_extra_keys(self):
+        batch = {
+            "batch_id": "batch-fixture-0000000001", "min_created_at": "2026-04-01T00:00:00.000Z",
+            "cursor": '{"created_at":"2026-04-01T00:01:00.000Z","event_id":"event-fixture-0002"}',
+            "max_created_at": "2026-04-01T00:01:00.000Z", "row_count": 2,
+            "plaintext_sha256": "1" * 64, "gzip_sha256": "2" * 64, "cipher_sha256": "3" * 64,
+            "cipher_size": 100, "age_recipient_fingerprints": ["4" * 64],
+            "object_key": "2026-04/batch-fixture-0000000001.jsonl.gz.age", "sealed_at": "2026-07-16T12:00:00.000Z",
+        }
+        manifest = dict(MAIL_ARCHIVE_MODULE.manifest_for(batch), cursor="forbidden")
+        raw = (json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
+        self.assertTrue(hasattr(MAIL_ARCHIVE_MODULE, "verify_remote_manifest"))
+        with self.assertRaises(MAIL_ARCHIVE_MODULE.ArchiveError):
+            MAIL_ARCHIVE_MODULE.verify_remote_manifest(raw, batch)
+        with tempfile.TemporaryDirectory() as root:
+            path = pathlib.Path(root) / "manifest.json"
+            path.write_bytes(raw)
+            with self.assertRaises(RESTORE_MODULE.RestoreError):
+                RESTORE_MODULE.load_manifest(path)
+
+
 class MailArchivePipelineTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -224,7 +287,7 @@ class MailArchivePipelineTests(unittest.TestCase):
             "manifestSha256": hashlib.sha256(pathlib.Path(manifest_path).read_bytes()).hexdigest(),
             "ageRecipientFingerprints": manifest["age_recipient_fingerprints"],
             "rowCount": manifest["row_count"],
-            "cursor": manifest["cursor"],
+            "cursor": self.server.state.cursor,
         }
         descriptor.update(overrides)
         path = self.root / ("trusted-descriptor-" + str(len(list(self.root.glob("trusted-descriptor-*.json")))) + ".json")
@@ -255,6 +318,15 @@ class MailArchivePipelineTests(unittest.TestCase):
         self.assertIn(self.server.state.batch_id, self.server.state.status_batch_queries)
         self.assertEqual(list(self.workdir.glob("*.jsonl.gz.age")), [], "committed local ciphertext is deleted immediately")
         self.assert_no_plaintext()
+
+        manifest_path = next(self.remote.rglob("*.manifest.json"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self.assertEqual(set(manifest), {
+            "schema_version", "batch_id", "min_created_at", "max_created_at", "row_count",
+            "plaintext_sha256", "gzip_sha256", "cipher_sha256", "cipher_size",
+            "age_recipient_fingerprints", "object_key", "sealed_at",
+        })
+        self.assertNotIn("cursor", manifest)
 
     def test_dual_recipient_rotation_encrypts_once_and_restores_with_either_trusted_identity(self):
         first_fingerprint = hashlib.sha256(self.recipient.encode()).hexdigest()
@@ -349,6 +421,23 @@ class MailArchivePipelineTests(unittest.TestCase):
         self.assertEqual(self.server.state.commit_calls, 1)
         self.assertEqual(list(self.workdir.glob("*.jsonl.gz.age")), [])
         self.assert_no_plaintext()
+
+    def test_uploaded_resume_rejects_remote_manifest_with_extra_key_even_when_database_hash_matches(self):
+        self.server.state.fail_stage = "commit"
+        first = self.run_archive()
+        self.assertNotEqual(first.returncode, 0)
+        manifest_path = next(self.remote.rglob("*.manifest.json"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["cursor"] = self.server.state.cursor
+        manifest_path.write_text(json.dumps(manifest, separators=(",", ":"), sort_keys=True) + "\n", encoding="utf-8")
+        self.server.state.uploaded["manifest_sha256"] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+        self.server.state.fail_stage = ""
+
+        resumed = self.run_archive()
+
+        self.assertNotEqual(resumed.returncode, 0)
+        self.assertIn("ARCHIVE_REMOTE_MANIFEST_INVALID", resumed.stderr)
+        self.assertEqual(self.server.state.commit_calls, 0)
 
     def test_work_directory_capacity_limit_fails_closed(self):
         (self.workdir / "unexpected-capacity.bin").write_bytes(b"12")
@@ -564,6 +653,40 @@ class MailArchivePipelineTests(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("RESTORE_MANIFEST_TRUST_MISMATCH", result.stderr)
+
+    def test_restore_rejects_every_unapproved_manifest_key(self):
+        archived = self.run_archive()
+        self.assertEqual(archived.returncode, 0, archived.stderr)
+        cipher = next(self.remote.rglob("*.jsonl.gz.age"))
+        original_manifest = next(self.remote.rglob("*.manifest.json"))
+        identity = self.root / "offline-identity-extra-key.txt"
+        identity.write_text(self.recipient + "\n", encoding="utf-8")
+
+        for extra_key, extra_value in (
+            ("cursor", self.server.state.cursor),
+            ("source_record_id", "business-record-fixture"),
+            ("recipient_hash", "0" * 64),
+            ("free_text", "must-not-enter-public-manifest"),
+        ):
+            with self.subTest(extra_key=extra_key):
+                data = json.loads(original_manifest.read_text(encoding="utf-8"))
+                data[extra_key] = extra_value
+                manifest = self.root / f"extra-{extra_key}.manifest.json"
+                manifest.write_text(json.dumps(data, separators=(",", ":"), sort_keys=True) + "\n", encoding="utf-8")
+                descriptor, descriptor_hash = self.trusted_descriptor(manifest)
+                restore_root = self.root / f"restore-extra-{extra_key}"
+                restore_root.mkdir(mode=0o700)
+                result = subprocess.run(
+                    [sys.executable, str(RESTORE_SCRIPT), "--cipher", str(cipher), "--manifest", str(manifest),
+                     "--identity", str(identity), "--trusted-descriptor", str(descriptor),
+                     "--trusted-descriptor-sha256", descriptor_hash, "--archive-work-dir", str(self.workdir),
+                     "--sync-root", str(self.sync_root), "--repo-root", str(REPO_ROOT), "--restore-root", str(restore_root)],
+                    cwd=REPO_ROOT,
+                    env=dict(self.env, MAIL_ARCHIVE_RESTORE_AGE_BIN=str(FAKE_AGE), MAIL_ARCHIVE_RESTORE_AGE_KEYGEN_BIN=str(FAKE_AGE)),
+                    text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("RESTORE_MANIFEST_INVALID", result.stderr)
 
     def test_restore_rejects_identity_for_a_different_recipient(self):
         archived = self.run_archive()

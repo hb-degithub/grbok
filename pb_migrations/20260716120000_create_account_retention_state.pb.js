@@ -41,20 +41,36 @@ migrate((db) => {
 
   // Historical comments have no durable authenticated-owner evidence. Leave
   // author_user empty rather than trusting email-only matches.
-  const existingUsers = dao.findRecordsByFilter('users', 'verified = false', 'created', 100000, 0, {});
-  for (let i = 0; i < existingUsers.length; i++) {
-    const user = existingUsers[i];
-    const createdMs = Date.parse(String(user.get('created') || ''));
-    if (!isFinite(createdMs)) throw new Error('ACCOUNT_RETENTION_INVALID_CREATED');
-    const state = new Record(dao.findCollectionByNameOrId('account_retention_state'));
-    state.set('user', user.id);
-    state.set('reminder_due_at', iso(Math.max(createdMs + 45 * DAY_MS, deployedAtMs)));
-    state.set('cleanup_eligible_at', iso(Math.max(createdMs + 60 * DAY_MS, deployedAtMs + 15 * DAY_MS)));
-    state.set('reminder_sent_at', null);
-    state.set('reminder_attempts', 0);
-    state.set('next_attempt_at', null);
-    state.set('last_error_class', '');
-    dao.saveRecord(state);
+  const stateCollection = dao.findCollectionByNameOrId('account_retention_state');
+  const pageSize = 500;
+  let cursorCreated = '';
+  let cursorId = '';
+  while (true) {
+    let filter = 'verified = false';
+    let params = {};
+    if (cursorCreated) {
+      filter += ' && (created > {:cursorCreated} || (created = {:cursorCreated} && id > {:cursorId}))';
+      params = { cursorCreated: cursorCreated, cursorId: cursorId };
+    }
+    const existingUsers = dao.findRecordsByFilter('users', filter, 'created,id', pageSize, 0, params) || [];
+    for (let i = 0; i < existingUsers.length; i++) {
+      const user = existingUsers[i];
+      const createdValue = String(user.get('created') || '');
+      const createdMs = Date.parse(createdValue);
+      if (!isFinite(createdMs)) throw new Error('ACCOUNT_RETENTION_INVALID_CREATED');
+      const state = new Record(stateCollection);
+      state.set('user', user.id);
+      state.set('reminder_due_at', iso(Math.max(createdMs + 45 * DAY_MS, deployedAtMs)));
+      state.set('cleanup_eligible_at', iso(Math.max(createdMs + 60 * DAY_MS, deployedAtMs + 15 * DAY_MS)));
+      state.set('reminder_sent_at', null);
+      state.set('reminder_attempts', 0);
+      state.set('next_attempt_at', null);
+      state.set('last_error_class', '');
+      dao.saveRecord(state);
+      cursorCreated = createdValue;
+      cursorId = user.id;
+    }
+    if (existingUsers.length < pageSize) break;
   }
 }, (db) => {
   const dao = new Dao(db);
@@ -67,4 +83,3 @@ migrate((db) => {
   } catch (_) {}
   try { dao.deleteCollection(dao.findCollectionByNameOrId('account_retention_state')); } catch (_) {}
 });
-

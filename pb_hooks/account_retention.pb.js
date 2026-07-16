@@ -28,4 +28,3 @@ onRecordAfterUpdateRequest(function (e) {
   if (typeof e.next === 'function') e.next();
 }, 'users');
 })();
-

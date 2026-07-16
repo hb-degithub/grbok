@@ -20,6 +20,13 @@ class ArchiveError(RuntimeError):
     pass
 
 
+MANIFEST_KEYS = frozenset({
+    "schema_version", "batch_id", "min_created_at", "max_created_at", "row_count",
+    "plaintext_sha256", "gzip_sha256", "cipher_sha256", "cipher_size",
+    "age_recipient_fingerprints", "object_key", "sealed_at",
+})
+
+
 def sha256_bytes(value):
     return hashlib.sha256(value).hexdigest()
 
@@ -281,7 +288,7 @@ def upload_verified(config, local_path, object_key):
 
 def manifest_for(batch):
     keys = [
-        "batch_id", "cursor", "min_created_at", "max_created_at", "row_count", "plaintext_sha256",
+        "batch_id", "min_created_at", "max_created_at", "row_count", "plaintext_sha256",
         "gzip_sha256", "cipher_sha256", "cipher_size", "age_recipient_fingerprints",
         "object_key", "sealed_at",
     ]
@@ -293,6 +300,18 @@ def manifest_for(batch):
     return manifest
 
 
+def verify_remote_manifest(raw, batch):
+    try:
+        manifest = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ArchiveError("ARCHIVE_REMOTE_MANIFEST_INVALID") from error
+    if not isinstance(manifest, dict) or set(manifest) != MANIFEST_KEYS:
+        raise ArchiveError("ARCHIVE_REMOTE_MANIFEST_INVALID")
+    if manifest != manifest_for(batch):
+        raise ArchiveError("ARCHIVE_REMOTE_MANIFEST_MISMATCH")
+    return manifest
+
+
 def commit_uploaded(api, config, batch):
     cipher = remote_bytes(config, batch["object_key"])
     if sha256_bytes(cipher) != batch["cipher_sha256"]:
@@ -301,6 +320,7 @@ def commit_uploaded(api, config, batch):
     manifest = remote_bytes(config, manifest_key)
     if sha256_bytes(manifest) != batch["manifest_sha256"]:
         raise ArchiveError("ARCHIVE_REMOTE_MANIFEST_MISMATCH")
+    verify_remote_manifest(manifest, batch)
     return api.post("commit", {
         "batch_id": batch["batch_id"], "cipher_sha256": batch["cipher_sha256"],
         "object_key": batch["object_key"], "manifest_sha256": batch["manifest_sha256"],

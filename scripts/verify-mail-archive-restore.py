@@ -22,6 +22,11 @@ SOURCE_KINDS = {"account", "reader", "comment", "admin", "operations", "retentio
 RESULTS = {"sent", "failed"}
 ERROR_CLASSES = {"NONE", "MAIL_NOT_CONFIGURED", "SMTP_AUTH", "SMTP_CONNECTION", "SMTP_TIMEOUT", "RECIPIENT_TEMPORARY", "RECIPIENT_PERMANENT", "PAYLOAD_INVALID", "RATE_LIMITED", "INTERNAL_ERROR", "GATEWAY_UNAVAILABLE", "OUTBOX_UNAVAILABLE"}
 DESCRIPTOR_KEYS = {"batchId", "objectKey", "cipherSha256", "manifestSha256", "ageRecipientFingerprints", "rowCount", "cursor"}
+MANIFEST_KEYS = {
+    "schema_version", "batch_id", "min_created_at", "max_created_at", "row_count",
+    "plaintext_sha256", "gzip_sha256", "cipher_sha256", "cipher_size",
+    "age_recipient_fingerprints", "object_key", "sealed_at",
+}
 
 
 class RestoreError(RuntimeError):
@@ -57,11 +62,7 @@ def load_manifest(path):
         manifest = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise RestoreError("RESTORE_MANIFEST_INVALID") from error
-    required = {
-        "batch_id", "cursor", "row_count", "plaintext_sha256", "gzip_sha256",
-        "cipher_sha256", "cipher_size", "object_key", "age_recipient_fingerprints",
-    }
-    if not isinstance(manifest, dict) or not required.issubset(manifest):
+    if not isinstance(manifest, dict) or set(manifest) != MANIFEST_KEYS:
         raise RestoreError("RESTORE_MANIFEST_INVALID")
     return manifest
 
@@ -105,7 +106,6 @@ def verify_manifest_trust(manifest_path, manifest, descriptor):
         "cipher_sha256": descriptor["cipherSha256"],
         "age_recipient_fingerprints": descriptor["ageRecipientFingerprints"],
         "row_count": descriptor["rowCount"],
-        "cursor": descriptor["cursor"],
     }
     if any(manifest.get(key) != value for key, value in expected.items()):
         raise RestoreError("RESTORE_MANIFEST_TRUST_MISMATCH")
@@ -158,7 +158,7 @@ def identity_fingerprint(identity):
     return hashlib.sha256(recipient.encode("utf-8")).hexdigest()
 
 
-def parse_rows(plain_path, manifest):
+def parse_rows(plain_path, manifest, descriptor):
     rows = []
     with pathlib.Path(plain_path).open("r", encoding="utf-8", newline="") as source:
         for line in source:
@@ -192,7 +192,7 @@ def parse_rows(plain_path, manifest):
     if not rows:
         raise RestoreError("RESTORE_ROW_COUNT_MISMATCH")
     try:
-        cursor = json.loads(manifest["cursor"])
+        cursor = json.loads(descriptor["cursor"])
     except (TypeError, json.JSONDecodeError) as error:
         raise RestoreError("RESTORE_CURSOR_INVALID") from error
     expected_cursor = {"created_at": rows[-1]["created_at"], "event_id": rows[-1]["event_id"]}
@@ -243,7 +243,7 @@ def verify_restore(args):
             raise RestoreError("RESTORE_GZIP_INVALID") from error
         if sha256_file(plain_path) != manifest["plaintext_sha256"]:
             raise RestoreError("RESTORE_PLAINTEXT_HASH_MISMATCH")
-        rows = parse_rows(plain_path, manifest)
+        rows = parse_rows(plain_path, manifest, descriptor)
         return {"row_count": len(rows)}
     finally:
         try:
