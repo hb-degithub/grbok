@@ -6,7 +6,7 @@
 - Branch: `codex/mail-security-rate`
 - Base: `e88e231`
 - Original report head: `8a55feb`
-- Reviewer remediation head before report refresh: `7f17762`
+- Reviewer remediation implementation head: `cff1786`
 
 Commits:
 
@@ -25,6 +25,7 @@ Commits:
 13. `7acf961 fix(mail): harden outbox worker leases`
 14. `d713fd9 fix(mail): paginate and normalize delivery log migration`
 15. `7f17762 fix(auth): expose safe authenticated mail limits`
+16. `cff1786 fix(proxy): deny trailing native auth aliases`
 
 ## Files changed
 
@@ -127,7 +128,7 @@ Result: no matches.
 
 - Locked exports are preserved: `registration_mode.getRegistrationMode`, `registration_mode.replaceRegistrationMode`, `security_rate_limit.consume`, `mail_outbox.enqueue`, and `mail_logs.delivery`.
 - `security_registration_mode` is now a private server-only singleton collection; the generic `settings` key is ignored even if retained or modified.
-- Reader OTP uses only `/api/blog-auth/otp/request` and `/api/blog-auth/otp/verify`. Native `request-otp`/`auth-with-otp` paths for both `users` and `_pb_users_auth_` are denied in every proxy configuration. Password MFA has explicit dedicated facade routes.
+- Reader OTP uses only `/api/blog-auth/otp/request` and `/api/blog-auth/otp/verify`. Native `request-otp`/`auth-with-otp` paths for both `users` and `_pb_users_auth_`, with or without trailing slashes, are denied in every proxy configuration. Password MFA has explicit dedicated facade routes.
 - Delivery logs now emit Track C's exact runtime contract: source kinds `account|reader|comment|admin|operations|retention|registration` and uppercase stable error classes. Track C does not need a `legacy` or `legacy_minimized` exception.
 - Registration calls the locked Track C interface `account_retention.initializeNewUser` in the user-create transaction. The Track C module is not present in this branch, so the merged branch must run the real integration test.
 - Admin routes import the locked Track A interfaces `admin_step_up.requireAdminStepUp` and `admin_security_audit.writeSecurityAudit`. Transaction behavior is covered with injected audit fixtures, but role/network/real-step-up black-box tests require Track A to be merged.
