@@ -23,6 +23,19 @@ onRecordBeforeCreateRequest((e) => {
   const record = e.record;
   if (!record) return;
 
+  let auth = e.auth || null;
+  if (!auth) {
+    try {
+      const requestInfo = $apis.requestInfo(e.httpContext);
+      auth = requestInfo.auth || requestInfo.authRecord || null;
+    } catch (_) {}
+  }
+  if (auth) {
+    record.set('user_id', auth.id);
+  } else if (String(record.get('user_id') || '').trim()) {
+    throw new BadRequestError('Anonymous reactions cannot set user_id');
+  }
+
   // Require fingerprint
   const fp = String(record.get('fingerprint') || '').trim();
   if (fp.length < 10) {
