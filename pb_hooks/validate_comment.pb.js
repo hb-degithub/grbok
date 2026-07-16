@@ -38,24 +38,11 @@ onRecordBeforeCreateRequest((e) => {
     return $app.dao().findRecordById(collection, id);
   };
 
-  const getHeader = (name) => {
-    try {
-      return e.httpContext?.request()?.header?.get(name) || '';
-    } catch (_) {
-      return '';
-    }
-  };
-
   const getClientIP = () => {
-    // Prefer PocketBase's trusted realIP() over spoofable X-Forwarded-For.
     try {
       const real = e.httpContext?.realIP?.();
       if (real && real.trim()) return real.trim();
     } catch (_) {}
-    const forwarded = getHeader('X-Forwarded-For');
-    if (forwarded) return forwarded.split(',')[0].trim();
-    const real = getHeader('X-Real-IP');
-    if (real) return real.trim();
     return '';
   };
 
@@ -110,6 +97,8 @@ onRecordBeforeCreateRequest((e) => {
   // pending moderation queue, with a response identical to the unregistered
   // anonymous path. The admin reviews it; it is never auto-published.
   let ownerUser = null;
+  let authenticatedOwner = null;
+  record.set('author_user', '');
   try {
     ownerUser = $app.dao().findFirstRecordByFilter('users', 'email = {:email}', { email: authorEmail.toLowerCase() });
   } catch (_) {
@@ -139,7 +128,13 @@ onRecordBeforeCreateRequest((e) => {
       // gate. No side-channel: the requester is the account owner and
       // already knows the email is registered.
       throw new BadRequestError('请先验证你的邮箱后再发表评论');
+    } else {
+      authenticatedOwner = authed;
     }
+  }
+
+  if (authenticatedOwner) {
+    record.set('author_user', ownerUser.id);
   }
 
   const post = findRecord('posts', postId);
@@ -181,6 +176,14 @@ onRecordBeforeCreateRequest((e) => {
   record.set('status', impersonationAttempt ? 'pending' : baseStatus);
   record.set('ip_address', ip || '');
 
+  if (typeof e.next === 'function') e.next();
+}, 'comments');
+
+onRecordBeforeUpdateRequest((e) => {
+  if (!e.record || !e.record.id) return;
+  const persisted = $app.dao().findRecordById('comments', e.record.id);
+  const originalAuthorUser = String(persisted.get('author_user') || '');
+  e.record.set('author_user', originalAuthorUser);
   if (typeof e.next === 'function') e.next();
 }, 'comments');
 })();
