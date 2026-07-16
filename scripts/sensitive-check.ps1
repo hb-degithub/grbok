@@ -11,8 +11,11 @@ $alwaysFiles = @(
     'admin-auth/src/config.mjs',
     'admin-auth/src/server.mjs',
     'admin-auth/src/session-policy.mjs',
+    'admin-auth/src/step-up-policy.mjs',
     'admin-auth/src/webauthn-service.mjs',
     'pb_hooks/admin_webauthn.pb.js',
+    'pb_hooks/admin_security.pb.js',
+    'pb_hooks/security_policy_admin.pb.js',
     'scripts/check-mail-config.ps1',
     'scripts/sensitive-check.ps1',
     'scripts/pre-deploy-check.ps1'
@@ -22,10 +25,10 @@ function Test-RelevantPath {
     param([Parameter(Mandatory)][string]$Path)
 
     if ($alwaysFiles -contains $Path) { return $true }
-    return $Path -match '^admin-auth/src/mail/.*\.mjs$' -or
-        $Path -match '^pb_hooks/lib/mail.*\.js$' -or
+    return $Path -match '^admin-auth/src/(?:mail/.*|step-up-policy)\.mjs$' -or
+        $Path -match '^pb_hooks/(?:lib/)?(?:admin|security|registration|mail|account_retention).*\.js$' -or
         $Path -match '^ops/' -or
-        $Path -match '^scripts/.*(?:mail|alert|monitor|deploy).*' -or
+        $Path -match '^scripts/.*(?:mail|archive|security|alert|monitor|deploy).*' -or
         $Path -match '^docs/superpowers/(?:plans|specs)/.*mail.*\.md$' -or
         $Path -match '^\.superpowers/sdd/(?:.*mail.*|gateway-task-.*)\.md$'
 }
@@ -37,7 +40,7 @@ function Add-HardcodedSecretIssues {
     )
 
     if ($Content.Length -eq 0) { return }
-    $names = 'ADMIN_AUTH_INTERNAL_SECRET|ADMIN_AUTH_HASH_SECRET|PB_ENCRYPTION_KEY|SMTP_PASSWORD|ALIYUN_SMTP_PASSWORD|MAIL_INTERNAL_SECRET|MAIL_HASH_SECRET'
+    $names = 'ADMIN_AUTH_INTERNAL_SECRET|ADMIN_AUTH_HASH_SECRET|PB_ENCRYPTION_KEY|SMTP_PASSWORD|ALIYUN_SMTP_PASSWORD|MAIL_INTERNAL_SECRET|MAIL_HASH_SECRET|MAIL_ARCHIVE_HMAC_SECRET'
     $prefix = '(?im)(?:^|[\(\[,{;])[\t ]*(?:(?:export)[\t ]+|\$env:|-[\t ]*)?[''"]?(?<name>' + $names + ')[''"]?[\t ]*[:=][\t ]*'
     $valueToken = '(?<value>"(?:\\.|[^"\r\n])*"|''(?:\\.|[^''\r\n])*''|\$\{[^}\r\n]*\}|[^,;#}\r\n]*)'
     $declarationPattern = '(?is)(?:\A|\r?\n)[\t ]*(?:const|let|var)[\t ]+[''"]?(?<name>' + $names + ')[''"]?[\t ]*[:=][\t \r\n]*(?<value>.{0,4096}?)(?:;|(?=\r?\n[\t ]*(?:const|let|var|export|function|class)\b)|\z)'
@@ -66,7 +69,7 @@ function Add-HardcodedSecretIssues {
                 $sourceReference -or
                 $value.StartsWith('REPLACE_WITH_') -or
                 $value -eq 'your_smtp_password_here' -or
-                $value -match '^(?:ADMIN_AUTH_INTERNAL_SECRET|ADMIN_AUTH_HASH_SECRET|PB_ENCRYPTION_KEY|SMTP_PASSWORD|ALIYUN_SMTP_PASSWORD|MAIL_INTERNAL_SECRET|MAIL_HASH_SECRET)$'
+                $value -match '^(?:ADMIN_AUTH_INTERNAL_SECRET|ADMIN_AUTH_HASH_SECRET|PB_ENCRYPTION_KEY|SMTP_PASSWORD|ALIYUN_SMTP_PASSWORD|MAIL_INTERNAL_SECRET|MAIL_HASH_SECRET|MAIL_ARCHIVE_HMAC_SECRET)$'
             if (-not $placeholder -and $value.Length -ge 16) {
                 $issues.Add("$SourceLabel contains a real-looking literal assignment for $name")
             }
@@ -83,6 +86,10 @@ function Add-GenericSecretIssues {
     if ($Content.Length -eq 0 -or $RelativePath -eq 'scripts/sensitive-check.ps1') { return }
     foreach ($entry in @(
         @{ Name = 'private key'; Pattern = 'PRIVATE KEY-----' },
+        @{ Name = 'age identity'; Pattern = 'AGE-SECRET-KEY-[A-Z0-9]{20,}' },
+        @{ Name = 'admin step-up credential'; Pattern = 'v1\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{32,}' },
+        @{ Name = 'admin client session'; Pattern = 'X-Admin-Session\s*[:=]\s*[A-Za-z0-9_-]{32,}' },
+        @{ Name = 'rclone credential'; Pattern = 'RCLONE_CONFIG_[A-Z0-9_]+_(?:TOKEN|PASS|PASSWORD|SECRET)\s*[:=]\s*[A-Za-z0-9_./+=:-]{16,}' },
         @{ Name = 'OpenAI-style token'; Pattern = 'sk-[a-zA-Z0-9]{20,}' },
         @{ Name = 'GitHub token'; Pattern = 'gh[po]_[a-zA-Z0-9]{36}' },
         @{ Name = 'Slack token'; Pattern = 'xox[baprs]-[a-zA-Z0-9-]{10,}' }
