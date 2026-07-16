@@ -6,6 +6,8 @@ var logs = require('./mail_logs.js');
 var templates = require('./mail_templates.js');
 var ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-';
 var BACKOFF_SECONDS = [60, 300, 1800, 7200, 43200];
+var LEASE_MS = 180000;
+var MAX_BATCH = 5;
 
 function invalid(message) { throw new Error(message || 'invalid outbox input'); }
 function string(value, max, name) {
@@ -53,7 +55,7 @@ function enqueue(txDao, input) {
   record.set('recipient', string(input.recipient, 320, 'recipient'));
   record.set('variables_json', variables(input.variables));
   record.set('attempt', 0); record.set('next_attempt_at', new Date().toISOString());
-  record.set('lease_until', ''); record.set('last_error_class', '');
+  record.set('lease_until', ''); record.set('lease_token', ''); record.set('last_error_class', '');
   try { txDao.saveRecord(record); }
   catch (error) {
     existing = findDedupe(txDao, dedupeKey);
@@ -70,17 +72,28 @@ function leaseBatch(nowMs, limit) {
   var leased = [];
   $app.dao().runInTransaction(function (txDao) {
     var rows = txDao.findRecordsByFilter('mail_outbox', 'status = "pending" || status = "retry" || status = "processing"', 'created', 100, 0);
-    for (var i = 0; i < rows.length && leased.length < Math.max(1, Math.min(25, Number(limit) || 10)); i++) {
+    for (var i = 0; i < rows.length && leased.length < Math.max(1, Math.min(MAX_BATCH, Number(limit) || MAX_BATCH)); i++) {
       var status = rows[i].getString('status');
       var eligible = status === 'pending' || (status === 'retry' && parseDate(rows[i].getString('next_attempt_at')) <= nowMs) ||
         (status === 'processing' && parseDate(rows[i].getString('lease_until')) <= nowMs);
       if (!eligible) continue;
-      rows[i].set('status', 'processing'); rows[i].set('lease_until', new Date(nowMs + 60000).toISOString());
+      var leaseToken = $security.randomStringWithAlphabet(32, ALPHABET);
+      rows[i].set('status', 'processing'); rows[i].set('lease_until', new Date(nowMs + LEASE_MS).toISOString()); rows[i].set('lease_token', leaseToken);
       rows[i].set('attempt', rows[i].getInt('attempt') + 1); txDao.saveRecord(rows[i]);
-      leased.push(rows[i].id);
+      leased.push({ id: rows[i].id, leaseToken: leaseToken });
     }
   });
   return leased;
+}
+function renewLease(id, leaseToken, nowMs) {
+  var renewed = false;
+  $app.dao().runInTransaction(function (txDao) {
+    var record;
+    try { record = txDao.findRecordById('mail_outbox', id); } catch (_) { return; }
+    if (record.getString('status') !== 'processing' || record.getString('lease_token') !== String(leaseToken || '')) return;
+    record.set('lease_until', new Date(nowMs + LEASE_MS).toISOString()); txDao.saveRecord(record); renewed = true;
+  });
+  return renewed;
 }
 function recordVariables(record) {
   var raw = record.getString('variables_json');
@@ -112,23 +125,27 @@ function stableError(error) {
   var allowed = { mail_not_configured: true, smtp_auth: true, smtp_connection: true, smtp_timeout: true, recipient_temporary: true, recipient_permanent: true, payload_invalid: true, rate_limited: true, internal_error: true };
   return allowed[code] ? code : 'internal_error';
 }
-function finish(id, nowMs, result, errorClass, retryable) {
+function finish(id, leaseToken, nowMs, result, errorClass, retryable) {
+  var finished = false;
   $app.dao().runInTransaction(function (txDao) {
     var record = txDao.findRecordById('mail_outbox', id);
+    if (record.getString('status') !== 'processing' || record.getString('lease_token') !== String(leaseToken || '')) return;
     var attempt = record.getInt('attempt');
     if (result === 'sent') record.set('status', 'sent');
     else if (retryable && attempt < 5) {
       record.set('status', 'retry'); record.set('next_attempt_at', new Date(nowMs + BACKOFF_SECONDS[attempt - 1] * 1000).toISOString());
     } else record.set('status', 'failed');
-    record.set('lease_until', ''); record.set('last_error_class', errorClass);
+    record.set('lease_until', ''); record.set('lease_token', ''); record.set('last_error_class', errorClass);
     if (record.getString('status') === 'sent' || record.getString('status') === 'failed') { record.set('recipient', ''); record.set('variables_json', {}); }
-    txDao.saveRecord(record);
+    txDao.saveRecord(record); finished = true;
   });
+  return finished;
 }
 function processBatch(nowMs, limit) {
-  var ids = leaseBatch(nowMs, limit); var summary = { leased: ids.length, sent: 0, failed: 0, retry: 0 };
-  for (var i = 0; i < ids.length; i++) {
-    var record = $app.dao().findRecordById('mail_outbox', ids[i]);
+  var leases = leaseBatch(nowMs, limit); var summary = { leased: leases.length, sent: 0, failed: 0, retry: 0 };
+  for (var i = 0; i < leases.length; i++) {
+    if (!renewLease(leases[i].id, leases[i].leaseToken, Date.now())) continue;
+    var record = $app.dao().findRecordById('mail_outbox', leases[i].id);
     var rendered; var result = 'failed'; var errorClass = 'internal_error'; var retryable = false;
     try {
       rendered = render(record);
@@ -138,9 +155,10 @@ function processBatch(nowMs, limit) {
       errorClass = stableError(error); retryable = Boolean(error && error.retryable);
       if (retryable && record.getInt('attempt') < 5) summary.retry++; else summary.failed++;
     }
-    finish(record.id, nowMs, result, errorClass, retryable);
-    try { logs.delivery({ event_id: $security.randomStringWithAlphabet(22, ALPHABET), category: record.getString('category'), source_kind: record.getString('category') === 'comment_notification' ? 'comment' : 'retention', result: result, duration_ms: 0, attempt: record.getInt('attempt'), error_class: errorClass }); } catch (_) {}
+    if (finish(record.id, leases[i].leaseToken, nowMs, result, errorClass, retryable)) {
+      try { logs.delivery({ event_id: $security.randomStringWithAlphabet(22, ALPHABET), category: record.getString('category'), source_kind: record.getString('category') === 'comment_notification' ? 'comment' : 'retention', result: result, duration_ms: 0, attempt: record.getInt('attempt'), error_class: errorClass }); } catch (_) {}
+    }
   }
   return summary;
 }
-module.exports = { enqueue: enqueue, processBatch: processBatch, _leaseBatch: leaseBatch, _render: render };
+module.exports = { enqueue: enqueue, processBatch: processBatch, _leaseBatch: leaseBatch, _renewLease: renewLease, _render: render };
