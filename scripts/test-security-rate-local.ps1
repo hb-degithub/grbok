@@ -89,7 +89,38 @@ function Invoke-Fixture {
         return Invoke-RestMethod -Method Get -Uri ("http://127.0.0.1:$Port" + $routes[$Name]) -TimeoutSec 60
     } catch {
         if ($_.ErrorDetails.Message) { Write-Host $_.ErrorDetails.Message }
+        Get-ChildItem -LiteralPath $runRoot -File -Filter 'pocketbase-*.out.log' -ErrorAction SilentlyContinue | ForEach-Object { Get-Content -LiteralPath $_.FullName }
+        Get-ChildItem -LiteralPath $runRoot -File -Filter 'pocketbase-*.err.log' -ErrorAction SilentlyContinue | ForEach-Object { Get-Content -LiteralPath $_.FullName }
         throw
+    }
+}
+
+function Invoke-RateConcurrency {
+    param([int]$Port)
+    Add-Type -AssemblyName System.Net.Http
+    $client = [Net.Http.HttpClient]::new()
+    try {
+        $uri = "http://127.0.0.1:$Port/api/test/security-rate/rate/consume"
+        $tasks = @()
+        for ($i = 0; $i -lt 20; $i++) {
+            $content = [Net.Http.StringContent]::new('{"email":"reader@example.com","ip":"192.0.2.10"}', [Text.Encoding]::UTF8, 'application/json')
+            $tasks += $client.PostAsync($uri, $content)
+        }
+        [Threading.Tasks.Task]::WaitAll([Threading.Tasks.Task[]]$tasks)
+        $allowed = 0
+        foreach ($task in $tasks) {
+            $raw = $task.Result.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+            $parsed = $raw | ConvertFrom-Json
+            if ($parsed.result.allowed) { $allowed++ }
+        }
+        if ($allowed -ne 2) { throw "concurrency oversold/undersold account_mail_email: expected 2, got $allowed" }
+        $summary = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/rate/summary?email=reader%40example.com&ip=192.0.2.10" -TimeoutSec 10
+        if ($summary.counts.account_mail_email -ne 2 -or $summary.counts.account_mail_ip -ne 2 -or $summary.counts.account_mail_global -ne 2) {
+            throw "partial bucket writes after concurrency: $($summary | ConvertTo-Json -Compress -Depth 5)"
+        }
+        Write-Host 'PASS rate concurrency: 2/20 allowed, all three buckets contain 2 events'
+    } finally {
+        $client.Dispose()
     }
 }
 
@@ -111,11 +142,24 @@ try {
         $result = Invoke-Fixture -Name $name -Port $port
         if (-not $result.ok) { throw "$name fixture returned failure" }
         Write-Host ("PASS {0}: {1}" -f $name, ($result | ConvertTo-Json -Compress -Depth 8))
+        if ($name -eq 'rate') {
+            Invoke-RateConcurrency -Port $port
+            if ($RestartPocketBase) {
+                Stop-TestPocketBase
+                $port = Get-FreePort
+                $process = Start-TestPocketBase -Port $port
+                $summary = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/rate/summary?email=reader%40example.com&ip=192.0.2.10" -TimeoutSec 10
+                if ($summary.counts.account_mail_email -ne 2 -or $summary.counts.account_mail_ip -ne 2 -or $summary.counts.account_mail_global -ne 2) {
+                    throw "rate buckets did not persist across restart: $($summary | ConvertTo-Json -Compress -Depth 5)"
+                }
+                Write-Host 'PASS rate restart persistence: all three buckets retained 2 events'
+            }
+        }
         Stop-TestPocketBase
         Remove-Item -LiteralPath (Join-Path $hooksRoot 'security_rate_fixture.pb.js') -Force
     }
 
-    if ($RestartPocketBase) {
+    if ($RestartPocketBase -and -not ($fixtures -contains 'rate')) {
         $port = Get-FreePort
         $process = Start-TestPocketBase -Port $port
         $health = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$port/api/health" -TimeoutSec 5
