@@ -89,7 +89,7 @@ class Config:
         if not pathlib.Path(age_bin).is_absolute() or not pathlib.Path(rclone_bin).is_absolute():
             raise ArchiveError("ARCHIVE_BINARY_PATH_NOT_ABSOLUTE")
         retention_mode = os.environ.get("MAIL_ARCHIVE_RETENTION_MODE", "")
-        if retention_mode not in ("s3-versioned", "drive-trash"):
+        if retention_mode != "s3-versioned":
             raise ArchiveError("ARCHIVE_RETENTION_MODE_UNSUPPORTED")
         return cls(
             api_url=api_url,
@@ -409,10 +409,6 @@ def delete_s3_versions(config, object_key):
     ])
 
 
-def delete_drive_trash(config, object_key):
-    run_command(config, config.rclone_bin, ["deletefile", remote_spec(config, object_key)], check=False)
-
-
 def verify_s3_absent(config, object_key):
     completed = run_command(config, config.rclone_bin, [
         "lsjson", remote_spec(config, object_key), "--s3-versions", "--s3-version-deleted",
@@ -437,21 +433,12 @@ def purge_retention_item(config, item):
         verify_retention_manifest(manifest, item)
 
     for object_key in (item["objectKey"], item["manifestObjectKey"]):
-        if config.retention_mode == "s3-versioned":
-            delete_s3_versions(config, object_key)
-        elif config.retention_mode == "drive-trash":
-            delete_drive_trash(config, object_key)
-        else:
+        if config.retention_mode != "s3-versioned":
             raise ArchiveError("ARCHIVE_RETENTION_MODE_UNSUPPORTED")
+        delete_s3_versions(config, object_key)
 
-    if config.retention_mode == "s3-versioned":
-        for object_key in (item["objectKey"], item["manifestObjectKey"]):
-            verify_s3_absent(config, object_key)
-    else:
-        run_command(config, config.rclone_bin, ["cleanup", remote_spec(config, "")])
-        for object_key in (item["objectKey"], item["manifestObjectKey"]):
-            if remote_bytes(config, object_key, allow_missing=True) is not None:
-                raise ArchiveError("ARCHIVE_RETENTION_RESIDUAL_OBJECT")
+    for object_key in (item["objectKey"], item["manifestObjectKey"]):
+        verify_s3_absent(config, object_key)
 
 
 def run_retention(config):

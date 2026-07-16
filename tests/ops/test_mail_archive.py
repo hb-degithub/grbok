@@ -341,6 +341,11 @@ class MailArchivePipelineTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.server.state.retention_confirm_calls, [])
 
+    def test_retention_rejects_unverified_provider_modes(self):
+        result = self.run_archive({"MAIL_ARCHIVE_RETENTION_MODE": "drive-trash"}, ["retention"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ARCHIVE_RETENTION_MODE_UNSUPPORTED", result.stderr)
+
     def test_restore_verifies_all_hashes_schema_count_and_cursor_then_cleans_plaintext(self):
         archived = self.run_archive()
         self.assertEqual(archived.returncode, 0, archived.stderr)
