@@ -68,6 +68,28 @@ routerAdd('GET', '/api/test/admin-step-up/run', function (c) {
     return record;
   }
 
+  function createPasskey(userId, suffix, label) {
+    const collection = $app.dao().findCollectionByNameOrId('admin_passkeys');
+    const record = new Record(collection);
+    record.set('owner', userId);
+    record.set('label', label);
+    record.set('credential_id', 'credential_' + suffix + '_' + label.toLowerCase());
+    record.set('public_key', 'private-fixture-public-key-' + suffix + '-' + label);
+    record.set('counter', 0);
+    record.set('revoked_at', '');
+    $app.dao().saveRecord(record);
+    return record;
+  }
+
+  function createPasskeyState(userId) {
+    const collection = $app.dao().findCollectionByNameOrId('admin_passkey_state');
+    const record = new Record(collection);
+    record.set('user', userId);
+    record.set('bootstrapped_at', new Date().toISOString());
+    $app.dao().saveRecord(record);
+    return record;
+  }
+
   function request(method, path, token, headers, body) {
     const requestHeaders = {
       Authorization: token,
@@ -122,6 +144,10 @@ routerAdd('GET', '/api/test/admin-step-up/run', function (c) {
       userAgent: 'fixture-agent-a',
     };
     const stepUpA = createStepUp(userA.id, bindingA, hashSecret);
+    const passkeyA1 = createPasskey(userA.id, suffix, 'Primary');
+    const passkeyA2 = createPasskey(userA.id, suffix, 'Backup');
+    createPasskeyState(userA.id);
+    createPasskeyState(userB.id);
     const setting = createSetting(suffix);
     let updateCount = 0;
 
@@ -193,6 +219,39 @@ routerAdd('GET', '/api/test/admin-step-up/run', function (c) {
       403,
       'ADMIN_STEP_UP_REQUIRED',
     );
+
+    expect('direct passkey list denied', request('GET', '/api/collections/admin_passkeys/records', refreshedTokenA, {}, undefined), 403);
+    expect('direct passkey update denied', request('PATCH', '/api/collections/admin_passkeys/records/' + passkeyA1.id, refreshedTokenA, {}, { label: 'Leaked update' }), 403);
+    expect('direct passkey delete denied', request('DELETE', '/api/collections/admin_passkeys/records/' + passkeyA1.id, refreshedTokenA, {}, undefined), 403);
+
+    const secureHeaders = {
+      'X-Admin-Step-Up': stepUpA.credential,
+      'X-Admin-Session': bindingA.clientSession,
+      'X-Browser-Fingerprint': bindingA.fingerprint,
+      'User-Agent': bindingA.userAgent,
+    };
+    const passkeyList = request('GET', '/api/blog-admin/passkeys', refreshedTokenA, secureHeaders, undefined);
+    expect('dedicated passkey list', passkeyList, 200);
+    if (passkeyList.statusCode === 200) {
+      const parsedList = JSON.parse(String(passkeyList.raw || '{}'));
+      const serialized = JSON.stringify(parsedList);
+      if (serialized.indexOf('credential_id') !== -1 || serialized.indexOf('public_key') !== -1 || serialized.indexOf('private-fixture') !== -1) {
+        failures.push({ label: 'sanitized passkey dto', expected: 'no credential material', actual: serialized.slice(0, 120) });
+      }
+    }
+
+    expect('revoke non-last passkey', request('POST', '/api/blog-admin/passkeys/' + passkeyA2.id + '/revoke', refreshedTokenA, secureHeaders, {}), 200);
+    expect('revoke last passkey denied', request('POST', '/api/blog-admin/passkeys/' + passkeyA1.id + '/revoke', refreshedTokenA, secureHeaders, {}), 409, 'LAST_PASSKEY_REQUIRED');
+
+    const lockedStatus = request('GET', '/api/blog-admin/step-up/status', tokenB, {
+      'X-Admin-Session': bindingA.clientSession,
+      'X-Browser-Fingerprint': bindingA.fingerprint,
+      'User-Agent': bindingA.userAgent,
+    }, undefined);
+    expect('bootstrapped zero-passkey cannot bootstrap', lockedStatus, 200);
+    if (lockedStatus.statusCode === 200 && String(lockedStatus.raw || '').indexOf('bootstrap_required') !== -1) {
+      failures.push({ label: 'bootstrapped zero-passkey cannot bootstrap', expected: 'non-bootstrap status', actual: String(lockedStatus.raw || '') });
+    }
 
     if (failures.length > 0) {
       return c.json(500, { code: 'FIXTURE_ASSERTION_FAILED', failures: failures, observed: observed });

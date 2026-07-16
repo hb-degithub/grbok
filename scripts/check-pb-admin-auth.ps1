@@ -85,17 +85,19 @@ if (-not $stepUpMigration) {
 }
 
 
-$hookFile = 'pb_hooks/admin_webauthn.pb.js'
+$hookFile = 'pb_hooks/admin_security.pb.js'
 if (-not (Test-Path -LiteralPath $hookFile -PathType Leaf)) {
     $failures += "Missing hook file: $hookFile"
 } else {
     $hookContent = Get-Content -LiteralPath $hookFile -Raw
     $requiredRoutes = @(
-        '/api/blog-admin/webauthn/register/options',
-        '/api/blog-admin/webauthn/register/verify',
-        '/api/blog-admin/webauthn/authenticate/options',
-        '/api/blog-admin/webauthn/authenticate/verify',
-        '/api/blog-admin/webauthn/session'
+        '/api/blog-admin/step-up/status',
+        '/api/blog-admin/step-up/options',
+        '/api/blog-admin/step-up/verify',
+        '/api/blog-admin/passkeys',
+        '/api/blog-admin/passkeys/registration/options',
+        '/api/blog-admin/passkeys/registration/verify',
+        '/api/blog-admin/passkeys/:id/revoke'
     )
     foreach ($route in $requiredRoutes) {
         if ($hookContent -notmatch [regex]::Escape($route)) {

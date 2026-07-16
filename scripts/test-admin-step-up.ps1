@@ -65,6 +65,10 @@ function Copy-Hooks {
     param([Parameter(Mandatory)][string]$Destination)
     New-Item -ItemType Directory -Force -Path $Destination | Out-Null
     Copy-Item -LiteralPath (Join-Path $hooksSource 'require_verified_session.pb.js') -Destination $Destination -Force
+    $securityHook = Join-Path $hooksSource 'admin_security.pb.js'
+    if (Test-Path -LiteralPath $securityHook -PathType Leaf) {
+        Copy-Item -LiteralPath $securityHook -Destination $Destination -Force
+    }
     Copy-Item -LiteralPath (Join-Path $hooksSource 'lib') -Destination $Destination -Recurse -Force
     Copy-Item -LiteralPath $fixturePath -Destination (Join-Path $Destination 'step_up_fixture.pb.js') -Force
 }
