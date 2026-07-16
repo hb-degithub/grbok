@@ -2,6 +2,15 @@
 
 migrate((db) => {
   const dao = new Dao(db);
+  const pageSize = 100;
+
+  function deleteAllPages(collection) {
+    while (true) {
+      const page = dao.findRecordsByFilter(collection, 'id != ""', '+id', pageSize, 0);
+      if (!page.length) return;
+      for (const record of page) dao.deleteRecord(record);
+    }
+  }
 
   const state = dao.findCollectionByNameOrId('admin_passkey_state');
   state.schema.addField(new SchemaField({
@@ -19,8 +28,7 @@ migrate((db) => {
   dao.saveCollection(state);
 
   const challenges = dao.findCollectionByNameOrId('webauthn_challenges');
-  const pendingChallenges = dao.findRecordsByFilter('webauthn_challenges', 'id != ""', '+created', 5000, 0);
-  for (const challenge of pendingChallenges) dao.deleteRecord(challenge);
+  deleteAllPages('webauthn_challenges');
   const purpose = challenges.schema.getFieldByName('purpose');
   challenges.schema.addField(new SchemaField({
     id: purpose.id,
@@ -36,8 +44,7 @@ migrate((db) => {
   ];
   dao.saveCollection(challenges);
 
-  const legacySessions = dao.findRecordsByFilter('admin_verified_sessions', 'id != ""', '+created', 5000, 0);
-  for (const session of legacySessions) dao.deleteRecord(session);
+  deleteAllPages('admin_verified_sessions');
 }, (db) => {
   const dao = new Dao(db);
 

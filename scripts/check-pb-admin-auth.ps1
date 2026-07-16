@@ -97,7 +97,7 @@ if (-not $cutoverMigration) {
     if ($cutoverContent -notmatch 'UNIQUE INDEX[\s\S]*webauthn_challenges[\s\S]*user[\s\S]*purpose') {
         $failures += 'Recovery cutover migration missing unique (user,purpose) challenge index'
     }
-    if ($cutoverContent -notmatch "findRecordsByFilter\('admin_verified_sessions'" -or $cutoverContent -notmatch 'deleteRecord') {
+    if ($cutoverContent -notmatch "deleteAllPages\('admin_verified_sessions'\)" -or $cutoverContent -notmatch 'deleteRecord') {
         $failures += 'Recovery cutover migration must delete all legacy admin_verified_sessions'
     }
 }

@@ -3,6 +3,25 @@
 migrate((db) => {
   const dao = new Dao(db);
   const usersId = dao.findCollectionByNameOrId('users').id;
+  const pageSize = 100;
+
+  function deleteAllPages(collection) {
+    while (true) {
+      const page = dao.findRecordsByFilter(collection, 'id != ""', '+id', pageSize, 0);
+      if (!page.length) return;
+      for (const record of page) dao.deleteRecord(record);
+    }
+  }
+
+  function forEachPage(collection, filter, sort, callback) {
+    let offset = 0;
+    while (true) {
+      const page = dao.findRecordsByFilter(collection, filter, sort, pageSize, offset);
+      if (!page.length) return;
+      for (const record of page) callback(record);
+      offset += page.length;
+    }
+  }
 
   function addField(collection, field) {
     collection.schema.addField(new SchemaField(field));
@@ -89,8 +108,7 @@ migrate((db) => {
   dao.saveCollection(securityAudits);
 
   const challenges = dao.findCollectionByNameOrId('webauthn_challenges');
-  const activeChallenges = dao.findRecordsByFilter('webauthn_challenges', 'id != ""', '+created', 5000, 0);
-  for (const challenge of activeChallenges) dao.deleteRecord(challenge);
+  deleteAllPages('webauthn_challenges');
   ensureField(challenges, {
     name: 'purpose',
     type: 'select',
@@ -115,17 +133,16 @@ migrate((db) => {
   dao.saveCollection(passkeys);
 
   const stateCollection = dao.findCollectionByNameOrId('admin_passkey_state');
-  const historical = dao.findRecordsByFilter('admin_passkeys', 'owner != ""', '+created', 5000, 0);
   const seen = {};
-  for (const passkey of historical) {
+  forEachPage('admin_passkeys', 'owner != ""', '+created', (passkey) => {
     const userId = passkey.get('owner');
-    if (seen[userId]) continue;
+    if (seen[userId]) return;
     seen[userId] = true;
     const state = new Record(stateCollection);
     state.set('user', userId);
     state.set('bootstrapped_at', passkey.get('created') || new Date().toISOString());
     dao.saveRecord(state);
-  }
+  });
 }, (db) => {
   const dao = new Dao(db);
 
