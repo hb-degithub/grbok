@@ -80,3 +80,6 @@
     return false;
   });
 })();
+  routerAdd('GET', '/api/blog-auth/mail/health', function (e) {
+    return e.json(200, { ok: true, facade: 'mail' });
+  });

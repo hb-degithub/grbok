@@ -36,6 +36,17 @@
         respond 403
     }
 
+    @blockedNativeAuth path \
+        /api/collections/users/records \
+        /api/collections/users/records/ \
+        /api/collections/users/request-password-reset \
+        /api/collections/users/request-password-reset/ \
+        /api/collections/users/request-verification \
+        /api/collections/users/request-verification/ \
+        /api/collections/users/request-email-change \
+        /api/collections/users/request-email-change/
+    respond @blockedNativeAuth "Not Found" 404
+
     @pb_admin {
         path /_/*
         not path /_astro/*

@@ -251,18 +251,19 @@ function Invoke-RegistrationScenarios {
     } finally { $client.Dispose() }
 
     Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/reset" -TimeoutSec 10 | Out-Null
+    $usersBeforeRegistration = (Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/state" -TimeoutSec 10).users
     $first = Invoke-RegistrationPost -Port $Port -Email 'registration-reader@example.com'
     $duplicate = Invoke-RegistrationPost -Port $Port -Email 'registration-reader@example.com' -Ip '192.0.2.11'
     if ($first.Status -ne 202 -or $duplicate.Status -ne 202 -or $first.Body.code -ne 'REGISTRATION_SUBMITTED' -or $duplicate.Body.code -ne 'REGISTRATION_SUBMITTED') { throw 'duplicate registration response parity failed' }
     $state = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/state" -TimeoutSec 10
-    if ($state.users -ne 1) { throw "duplicate registration created $($state.users) users" }
+    if ($state.users -ne ($usersBeforeRegistration + 1)) { throw "duplicate registration user delta mismatch: before=$usersBeforeRegistration after=$($state.users)" }
 
     Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/reset" -TimeoutSec 10 | Out-Null
     Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/prime-mail" -ContentType 'application/json' -Body '{"email":"mail-quota-full@example.com","ip":"192.0.2.90"}' -TimeoutSec 10 | Out-Null
     $logsBefore = (Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/state" -TimeoutSec 10).logs
     $suppressed = Invoke-RegistrationPost -Port $Port -Email 'mail-quota-full@example.com' -Ip '192.0.2.90'
     $suppressedState = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/state" -TimeoutSec 10
-    if ($suppressed.Status -ne 202 -or $suppressedState.users -ne 2 -or $suppressedState.logs -ne $logsBefore) { throw 'mail quota full did not preserve user while suppressing automatic verification' }
+    if ($suppressed.Status -ne 202 -or $suppressedState.users -ne ($usersBeforeRegistration + 2) -or $suppressedState.logs -ne $logsBefore) { throw 'mail quota full did not preserve user while suppressing automatic verification' }
 
     Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/corrupt" -ContentType 'application/json' -Body '{"ip":"192.0.2.250"}' -TimeoutSec 10 | Out-Null
     $before = (Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/state" -TimeoutSec 10).users

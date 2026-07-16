@@ -49,6 +49,8 @@
     }
 
     @blockedAccountMailRequests path \
+        /api/collections/users/records \
+        /api/collections/users/records/ \
         /api/collections/users/request-password-reset \
         /api/collections/users/request-password-reset/ \
         /api/collections/users/request-verification \
@@ -60,7 +62,9 @@
         /api/collections/_pb_users_auth_/request-verification \
         /api/collections/_pb_users_auth_/request-verification/ \
         /api/collections/_pb_users_auth_/request-email-change \
-        /api/collections/_pb_users_auth_/request-email-change/
+        /api/collections/_pb_users_auth_/request-email-change/ \
+        /api/collections/_pb_users_auth_/records \
+        /api/collections/_pb_users_auth_/records/
     respond @blockedAccountMailRequests 404
 
     handle /api/blog-internal/mail-archive/* {

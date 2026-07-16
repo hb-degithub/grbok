@@ -12,3 +12,6 @@
     return false;
   });
 })();
+  routerAdd('GET', '/api/blog-auth/registration/health', function (c) {
+    return c.json(200, { ok: true, facade: 'registration' });
+  });
