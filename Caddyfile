@@ -1,6 +1,6 @@
 {
     servers {
-        trusted_proxies static 127.0.0.1
+        trusted_proxies static {$OPENRESTY_TRUSTED_PROXY}
     }
 }
 :80 {
@@ -63,11 +63,15 @@
         /api/collections/_pb_users_auth_/request-email-change/
     respond @blockedAccountMailRequests 404
 
+    handle /api/blog-internal/mail-archive/* {
+        respond "Not Found" 404
+    }
+
     handle /api/admins/* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
         reverse_proxy pocketbase:8090 {
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP {client_ip}
+            header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
         }
     }
@@ -79,19 +83,19 @@
         handle @preflight {
             header Access-Control-Allow-Origin "https://hlydwz.com"
             header Access-Control-Allow-Methods "GET, POST, PATCH, DELETE, OPTIONS"
-            header Access-Control-Allow-Headers "Content-Type, Authorization, X-Browser-Fingerprint"
+            header Access-Control-Allow-Headers "Content-Type, Authorization, X-Admin-Step-Up, X-Admin-Session, X-Browser-Fingerprint"
             header Access-Control-Max-Age "86400"
             respond "" 204
         }
 
         reverse_proxy pocketbase:8090 {
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP {client_ip}
+            header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
 
             header_down Access-Control-Allow-Origin "https://hlydwz.com"
             header_down Access-Control-Allow-Methods "GET, POST, PATCH, DELETE, OPTIONS"
-            header_down Access-Control-Allow-Headers "Content-Type, Authorization, X-Browser-Fingerprint"
+            header_down Access-Control-Allow-Headers "Content-Type, Authorization, X-Admin-Step-Up, X-Admin-Session, X-Browser-Fingerprint"
             header_down Access-Control-Max-Age "86400"
         }
     }
@@ -103,8 +107,8 @@
     handle @pb_admin {
         header X-Robots-Tag "noindex, nofollow, noarchive"
         reverse_proxy pocketbase:8090 {
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP {client_ip}
+            header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
         }
     }

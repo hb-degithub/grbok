@@ -1,10 +1,13 @@
-﻿# Local test Caddy config.
+# Local test Caddy config.
 # The docker compose image is the standard caddy:2.8.4-alpine image, so do not
 # use third-party directives such as rate_limit here.
 
 {
     auto_https off
     admin off
+    servers {
+        trusted_proxies static 127.0.0.1/32 172.16.0.0/12
+    }
 }
 
 :80 {
@@ -39,8 +42,8 @@
     }
     handle @pb_admin {
         reverse_proxy pocketbase:8090 {
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP {client_ip}
+            header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
         }
     }
@@ -55,8 +58,8 @@
 
     handle /api/* {
         reverse_proxy pocketbase:8090 {
-            header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
+            header_up X-Real-IP {client_ip}
+            header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
         }
     }
