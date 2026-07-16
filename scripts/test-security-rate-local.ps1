@@ -131,10 +131,10 @@ function Invoke-RateConcurrency {
 }
 
 function Invoke-JsonPost {
-    param([int]$Port, [string]$Path, [hashtable]$Body)
+    param([int]$Port, [string]$Path, [hashtable]$Body, [hashtable]$Headers = @{})
     $watch = [Diagnostics.Stopwatch]::StartNew()
     try {
-        $response = Invoke-WebRequest -UseBasicParsing -Method Post -Uri ("http://127.0.0.1:$Port" + $Path) -ContentType 'application/json' -Body ($Body | ConvertTo-Json -Compress) -TimeoutSec 20
+        $response = Invoke-WebRequest -UseBasicParsing -Method Post -Uri ("http://127.0.0.1:$Port" + $Path) -Headers $Headers -ContentType 'application/json' -Body ($Body | ConvertTo-Json -Compress) -TimeoutSec 20
         return [pscustomobject]@{ Status = [int]$response.StatusCode; Body = ($response.Content | ConvertFrom-Json); ElapsedMs = $watch.ElapsedMilliseconds }
     } catch {
         $status = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 }
@@ -188,6 +188,30 @@ function Invoke-AccountMailScenarios {
     Assert-PublicMailResponse $unavailable 'SQLite unavailable'
     $after = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/account-mail/state" -TimeoutSec 10
     if ($after.logs.Count -ne 2 -or $after.challenges -ne 0) { throw 'unavailable request wrote log/challenge' }
+
+    function Assert-DetailedLimit($Response, [string]$Code) {
+        if ($Response.Status -ne 429 -or $Response.Body.code -ne $Code -or [int]$Response.Body.retryAfter -lt 1 -or [string]$Response.Body.referenceId -notmatch '^[A-Za-z0-9_-]{22}$' -or [string]$Response.Body.help -ne ("/help/mail-errors#" + $Code)) {
+            throw "detailed authenticated limit mismatch for $Code`: $($Response | ConvertTo-Json -Compress -Depth 6)"
+        }
+    }
+    $authHeaders = @{ Authorization = ('Bearer ' + [string]$Setup.authenticated.token) }
+    $verifyHeaders = @{ Authorization = ('Bearer ' + [string]$Setup.unverified.token) }
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/account-mail/reset-buckets" -TimeoutSec 10 | Out-Null
+    Invoke-JsonPost -Port $Port -Path '/api/test/security-rate/account-mail/prime' -Body @{ policyKey='account_mail_email'; subject=[string]$Setup.unverified.email; count=2 } | Out-Null
+    Assert-DetailedLimit (Invoke-JsonPost -Port $Port -Path '/api/blog-auth/verification/request' -Headers $verifyHeaders -Body @{ email=[string]$Setup.unverified.email }) 'EMAIL_RATE_LIMITED'
+    $publicStillUniform = Invoke-JsonPost -Port $Port -Path '/api/blog-auth/verification/request' -Body @{ email=[string]$Setup.unverified.email }
+    Assert-PublicMailResponse $publicStillUniform 'public verification remains uniform'
+
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/account-mail/reset-buckets" -TimeoutSec 10 | Out-Null
+    Invoke-JsonPost -Port $Port -Path '/api/test/security-rate/account-mail/prime' -Body @{ policyKey='account_mail_ip'; subject=[string]$Setup.requestIp; count=5 } | Out-Null
+    Assert-DetailedLimit (Invoke-JsonPost -Port $Port -Path '/api/blog-auth/email-change/request' -Headers $authHeaders -Body @{ newEmail='new-ip-limit@example.com' }) 'IP_RATE_LIMITED'
+
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/account-mail/reset-buckets" -TimeoutSec 10 | Out-Null
+    Invoke-JsonPost -Port $Port -Path '/api/test/security-rate/account-mail/prime' -Body @{ policyKey='account_mail_global'; subject='v1'; count=30 } | Out-Null
+    Assert-DetailedLimit (Invoke-JsonPost -Port $Port -Path '/api/blog-auth/email-change/request' -Headers $authHeaders -Body @{ newEmail='new-global-limit@example.com' }) 'GLOBAL_RATE_LIMITED'
+    Assert-PublicMailResponse (Invoke-JsonPost -Port $Port -Path '/api/blog-auth/password-reset/request' -Body @{ email=[string]$Setup.authenticated.email }) 'password reset remains uniform'
+    $uniformOtp = Invoke-JsonPost -Port $Port -Path '/api/blog-auth/otp/request' -Body @{ email='uniform-otp@example.com' }
+    if ($uniformOtp.Status -ne 202 -or $uniformOtp.Body.code -ne 'MAIL_REQUEST_ACCEPTED') { throw 'reader OTP no longer uniform under limit' }
     Write-Host 'PASS account-mail parity, shared quotas, fake OTP, zero-write, and minimal logs'
 }
 

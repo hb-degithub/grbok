@@ -14,6 +14,8 @@ foreach ($path in @('/api/blog-auth/register','/api/blog-auth/password-reset/req
 Require ($open -match 'location \^~ /api/blog-internal/mail-archive/') 'public archive deny location missing'
 Require (-not (($caddy + $local) -match '\{remote_host\}')) 'Caddy remote_host forwarding remains'
 Require ($caddy -match 'trusted_proxies static \{\$OPENRESTY_TRUSTED_PROXY\}') 'production trusted OpenResty peer placeholder missing'
+Require ($caddy -match 'client_ip_headers X-Forwarded-For X-Real-IP') 'production client_ip_headers order missing'
+Require ($local -match 'client_ip_headers X-Forwarded-For X-Real-IP') 'local client_ip_headers order missing'
 Require (($caddy + $local) -match 'header_up X-Real-IP \{client_ip\}') 'Caddy X-Real-IP client_ip missing'
 Require (($caddy + $local) -match 'header_up X-Forwarded-For \{client_ip\}') 'Caddy X-Forwarded-For client_ip missing'
 foreach ($header in @('X-Admin-Step-Up','X-Admin-Session','X-Browser-Fingerprint')) { Require ($caddy.Contains($header)) "CORS header missing: $header" }

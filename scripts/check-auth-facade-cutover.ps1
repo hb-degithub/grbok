@@ -14,10 +14,15 @@ Require ($register.Contains('/api/blog-auth/registration/health')) 'registration
 $readerFrontend=(Read 'astro\src\hooks\usePocketBase.ts')+(Read 'astro\src\components\auth\MagicLinkForm.tsx')+(Read 'astro\src\components\auth\PasswordLoginForm.tsx')
 Require (-not ($readerFrontend -match '\.requestOTP\(|\.authWithOTP\(')) 'frontend still calls native PocketBase OTP SDK paths'
 foreach($path in @('/api/blog-auth/otp/request','/api/blog-auth/otp/verify','/api/blog-auth/mfa/otp/request','/api/blog-auth/mfa/otp/verify')){Require ($auth.Contains($path)) "custom OTP facade route missing: $path"}
-$configs=(Read 'Caddyfile')+(Read 'Caddyfile.local')+(Read 'docs\openresty-login-rate-limit.conf')
+$proxyFiles=@{ Caddyfile=(Read 'Caddyfile'); 'Caddyfile.local'=(Read 'Caddyfile.local'); OpenResty=(Read 'docs\openresty-login-rate-limit.conf') }
+$configs=($proxyFiles.Values -join "`n")
 foreach($path in @('/api/collections/users/records','/api/collections/users/request-password-reset','/api/collections/users/request-verification','/api/collections/users/request-email-change')){Require ($configs.Contains($path)) "native deny path missing: $path"}
 foreach($collection in @('users','_pb_users_auth_')){foreach($action in @('request-otp','auth-with-otp')){Require ($configs.Contains("/api/collections/$collection/$action")) "native OTP deny path missing: $collection/$action"}}
+foreach($entry in $proxyFiles.GetEnumerator()){foreach($collection in @('users','_pb_users_auth_')){foreach($action in @('records','request-password-reset','request-verification','request-email-change','request-otp','auth-with-otp')){Require ($entry.Value.Contains("/api/collections/$collection/$action")) "$($entry.Key) native deny path missing: $collection/$action"}}}
 foreach($path in @('/api/collections/users/confirm-password-reset','/api/collections/users/confirm-verification','/api/collections/users/confirm-email-change')){Require ($configs.Contains($path)) "token confirmation route missing: $path"}
 Require ($configs.Contains('/api/blog-auth/register')) 'registration facade route missing'
 Require ($configs.Contains('/api/blog-auth/password-reset/request')) 'mail facade route missing'
+$registerUi=Read 'astro\src\components\auth\RegisterForm.tsx'; $welcomeUi=Read 'astro\src\components\effects\WelcomeOverlay.tsx'
+Require (-not (($registerUi+$welcomeUi) -match '\u6ce8\u518c\u6210\u529f|\u6ce8\u518c\u5e76\u767b\u5f55|\u90ae\u7bb1\u53ef\u80fd\u5df2\u88ab\u6ce8\u518c')) 'registration UI still implies account creation or login'
+Require (($registerUi -match '\u63d0\u4ea4\u6ce8\u518c') -and ($registerUi -match '\u8bf7\u9a8c\u8bc1\u90ae\u7bb1')) 'RegisterForm pending-verification wording missing'
 Write-Host 'PASS native registration/account-mail cutover preserves token confirmation routes'

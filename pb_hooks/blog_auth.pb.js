@@ -22,6 +22,7 @@
     try { facade.requestVerification(e); }
     catch (error) {
       if (facade.isInvalidRequest(error)) return e.json(400, { code: 'INVALID_REQUEST' });
+      if (facade.isDetailedRateLimit(error)) return e.json(429, publicErrors.detailedRateLimit(error.code, error.retryAfter, referenceId));
       console.error('[blog-auth] operation=verification result=INTERNAL_ERROR');
     }
     return e.json(202, publicErrors.accepted(startedAt, referenceId));
@@ -35,6 +36,7 @@
     try { facade.requestEmailChange(e); }
     catch (error) {
       if (facade.isInvalidRequest(error)) return e.json(400, { code: 'INVALID_REQUEST' });
+      if (facade.isDetailedRateLimit(error)) return e.json(429, publicErrors.detailedRateLimit(error.code, error.retryAfter, referenceId));
       console.error('[blog-auth] operation=email-change result=INTERNAL_ERROR');
     }
     return e.json(202, publicErrors.accepted(startedAt, referenceId));

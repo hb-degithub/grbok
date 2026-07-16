@@ -33,10 +33,15 @@ function registrationSubmitted(id) {
   return { accepted: true, code: 'REGISTRATION_SUBMITTED', referenceId: String(id) };
 }
 
+function detailedRateLimit(code, retryAfter, id) {
+  return { code: String(code), retryAfter: Math.max(1, Number(retryAfter) || 1), referenceId: String(id), help: '/help/mail-errors#' + String(code) };
+}
+
 module.exports = {
   referenceId: referenceId,
   waitForMinimum: waitForMinimum,
   accepted: accepted,
   otpAccepted: otpAccepted,
   registrationSubmitted: registrationSubmitted,
+  detailedRateLimit: detailedRateLimit,
 };

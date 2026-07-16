@@ -45,6 +45,17 @@ routerAdd('GET', '/api/test/security-rate/account-mail', function (c) {
       existing: fixtureCreateUser('mail_existing', true, 'reader'),
       gatewayFailure: fixtureCreateUser('gatewayfail', true, 'reader'),
       noneligible: fixtureCreateUser('mail_admin', true, 'admin'),
+      authenticated: (function () {
+        var email = fixtureCreateUser('mail_authenticated', true, 'reader');
+        var record = $app.dao().findFirstRecordByData('users', 'email', email);
+        return { email: email, token: $tokens.recordAuthToken($app, record) };
+      })(),
+      unverified: (function () {
+        var email = fixtureCreateUser('mail_unverified', false, 'reader');
+        var record = $app.dao().findFirstRecordByData('users', 'email', email);
+        return { email: email, token: $tokens.recordAuthToken($app, record) };
+      })(),
+      requestIp: String(c.realIP() || ''),
     });
   } catch (error) {
     return c.json(500, { ok: false, error: String(error && error.message ? error.message : error) });
@@ -83,6 +94,19 @@ routerAdd('POST', '/api/test/security-rate/account-mail/corrupt', function (c) {
   record.set('events_json', '{');
   record.set('expires_at', new Date(Date.now() + 900000).toISOString());
   $app.dao().saveRecord(record);
+  return c.json(200, { ok: true });
+});
+
+routerAdd('POST', '/api/test/security-rate/account-mail/prime', function (c) {
+  var input = JSON.parse(readerToString(c.request().body, 4096) || '{}');
+  var rate = require(__hooks + '/lib/security_rate_limit.js');
+  var count = Number(input.count || 0);
+  for (var i = 0; i < count; i++) {
+    $app.dao().runInTransaction(function (txDao) {
+      var result = rate.consume(txDao, { nowMs: Date.now(), entries: [{ policyKey: String(input.policyKey || ''), subject: String(input.subject || '') }] });
+      if (!result.allowed) throw new Error('prime denied early');
+    });
+  }
   return c.json(200, { ok: true });
 });
 

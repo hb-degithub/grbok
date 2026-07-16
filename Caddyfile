@@ -1,6 +1,7 @@
 {
     servers {
         trusted_proxies static {$OPENRESTY_TRUSTED_PROXY}
+        client_ip_headers X-Forwarded-For X-Real-IP
     }
 }
 :80 {

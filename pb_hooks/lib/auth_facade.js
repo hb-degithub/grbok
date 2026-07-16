@@ -94,6 +94,13 @@ function invalidRequestError() {
 }
 
 function isInvalidRequest(error) { return Boolean(error && error.code === 'INVALID_REQUEST'); }
+function detailedRateLimit(result) {
+  var codes = { account_mail_email: 'EMAIL_RATE_LIMITED', account_mail_ip: 'IP_RATE_LIMITED', account_mail_global: 'GLOBAL_RATE_LIMITED' };
+  var error = new Error(codes[result.limitedBy] || 'REQUEST_RATE_LIMITED');
+  error.name = 'DetailedRateLimitError'; error.code = codes[result.limitedBy] || 'REQUEST_RATE_LIMITED'; error.retryAfter = result.retryAfterSeconds;
+  return error;
+}
+function isDetailedRateLimit(error) { return Boolean(error && error.name === 'DetailedRateLimitError'); }
 
 function isValidEmail(email) {
   if (!email || email.length > 320 || email !== email.trim()) return false;
@@ -151,9 +158,12 @@ function processAccountRequest(e, kind) {
   var email = parseEmailBody(e, config.field);
   var ip = getClientIP(e);
   if (!ip) return;
-  var authHeader = kind === 'emailChange' ? getAuthorization(e) : '';
+  var authHeader = (kind === 'emailChange' || kind === 'verification') ? getAuthorization(e) : '';
+  var currentRecord = authHeader ? getCurrentRecord(e) : null;
+  var identityConfirmed = Boolean(currentRecord && authHeader && (kind === 'emailChange' || (kind === 'verification' && currentRecord.getString('email').trim().toLowerCase() === email)));
   var selected = null;
   var allowed = false;
+  var limited = null;
   try {
     $app.dao().runInTransaction(function (txDao) {
       var result = rateLimit.consume(txDao, {
@@ -164,11 +174,12 @@ function processAccountRequest(e, kind) {
           { policyKey: 'account_mail_global', subject: 'v1' },
         ],
       });
-      if (!result.allowed) return;
+      if (!result.allowed) { limited = result; return; }
       allowed = true;
-      selected = kind === 'emailChange' ? getCurrentRecord(e) : findUserByEmail(txDao, email);
+      selected = kind === 'emailChange' ? currentRecord : findUserByEmail(txDao, email);
     });
   } catch (_) { return; }
+  if (limited) { if (identityConfirmed) throw detailedRateLimit(limited); return; }
   if (!allowed || !eligible(kind, selected, authHeader)) return;
   var body = {}; body[config.field] = email;
   forwardToLoopback(config.path, body, authHeader);
@@ -188,4 +199,5 @@ module.exports = {
   requestVerification: requestVerification,
   requestEmailChange: requestEmailChange,
   isInvalidRequest: isInvalidRequest,
+  isDetailedRateLimit: isDetailedRateLimit,
 };

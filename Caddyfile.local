@@ -7,6 +7,7 @@
     admin off
     servers {
         trusted_proxies static 127.0.0.1/32 172.16.0.0/12
+        client_ip_headers X-Forwarded-For X-Real-IP
     }
 }
 
@@ -52,7 +53,15 @@
         /api/collections/_pb_users_auth_/request-otp \
         /api/collections/_pb_users_auth_/request-otp/ \
         /api/collections/_pb_users_auth_/auth-with-otp \
-        /api/collections/_pb_users_auth_/auth-with-otp/
+        /api/collections/_pb_users_auth_/auth-with-otp/ \
+        /api/collections/_pb_users_auth_/records \
+        /api/collections/_pb_users_auth_/records/ \
+        /api/collections/_pb_users_auth_/request-password-reset \
+        /api/collections/_pb_users_auth_/request-password-reset/ \
+        /api/collections/_pb_users_auth_/request-verification \
+        /api/collections/_pb_users_auth_/request-verification/ \
+        /api/collections/_pb_users_auth_/request-email-change \
+        /api/collections/_pb_users_auth_/request-email-change/
     respond @blockedNativeAuth "Not Found" 404
 
     @pb_admin {

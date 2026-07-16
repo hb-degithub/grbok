@@ -107,7 +107,7 @@ export default function RegisterForm() {
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-500/10">
             <svg className="h-7 w-7 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
           </div>
-          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">注册成功</p>
+          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">提交已受理，请验证邮箱</p>
         </motion.div>
       ) : (
     <motion.form
@@ -188,7 +188,7 @@ export default function RegisterForm() {
 
       <motion.div variants={itemVariants}>
         <PixelButton type="submit" loading={status === 'loading'} variant="primary">
-          {status === 'loading' ? '注册中...' : '注册并登录'}
+          {status === 'loading' ? '提交中...' : '提交注册'}
         </PixelButton>
       </motion.div>
     </motion.form>
