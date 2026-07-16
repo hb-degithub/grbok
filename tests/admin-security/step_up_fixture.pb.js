@@ -123,6 +123,8 @@ routerAdd('GET', '/api/test/admin-step-up/run', function (c) {
   try {
     const hashSecret = String($os.getenv('ADMIN_AUTH_HASH_SECRET') || '');
     if (hashSecret.length < 32) throw new Error('fixture hash secret missing');
+    const legacyAfterCutover = $app.dao().findRecordsByFilter('admin_verified_sessions', 'id != ""', '', 10, 0);
+    if (legacyAfterCutover.length !== 0) throw new Error('legacy verified sessions survived cutover');
 
     const suffix = $security.randomStringWithAlphabet(8, 'abcdefghijklmnopqrstuvwxyz0123456789');
     const userA = createUser('stepupa', suffix);

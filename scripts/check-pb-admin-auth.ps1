@@ -84,6 +84,24 @@ if (-not $stepUpMigration) {
     }
 }
 
+$cutoverMigration = Get-Item -LiteralPath 'pb_migrations/20260716100500_harden_admin_recovery_cutover.pb.js' -ErrorAction SilentlyContinue
+if (-not $cutoverMigration) {
+    $failures += 'Missing migration pb_migrations/20260716100500_harden_admin_recovery_cutover.pb.js'
+} else {
+    $cutoverContent = Get-Content -LiteralPath $cutoverMigration.FullName -Raw
+    foreach ($field in @('recovery_nonce_hmac', 'recovery_expires_at')) {
+        if ($cutoverContent -notmatch [regex]::Escape($field)) {
+            $failures += "Recovery cutover migration missing field $field"
+        }
+    }
+    if ($cutoverContent -notmatch 'UNIQUE INDEX[\s\S]*webauthn_challenges[\s\S]*user[\s\S]*purpose') {
+        $failures += 'Recovery cutover migration missing unique (user,purpose) challenge index'
+    }
+    if ($cutoverContent -notmatch "findRecordsByFilter\('admin_verified_sessions'" -or $cutoverContent -notmatch 'deleteRecord') {
+        $failures += 'Recovery cutover migration must delete all legacy admin_verified_sessions'
+    }
+}
+
 
 $hookFile = 'pb_hooks/admin_security.pb.js'
 if (-not (Test-Path -LiteralPath $hookFile -PathType Leaf)) {

@@ -9,6 +9,7 @@ Add-Type -AssemblyName System.Net.Http
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $runRoot = Join-Path $env:TEMP 'blog-admin-step-up-e2e'
 $fixturePath = Join-Path $repoRoot 'tests\admin-security\step_up_fixture.pb.js'
+$legacySeedFixture = Join-Path $repoRoot 'tests\admin-security\legacy_session_seed.pb.js'
 $migrationsPath = Join-Path $repoRoot 'pb_migrations'
 $hooksSource = Join-Path $repoRoot 'pb_hooks'
 $expectedZipSha256 = 'D459C5690ABFB8A3E220565671A1B53FDC6ADB21A50A7F553A78BD9EFF5287D5'
@@ -98,6 +99,7 @@ Install-PocketBase
 Assert-PortFree
 
 if (-not (Test-Path -LiteralPath $fixturePath -PathType Leaf)) { throw "Missing fixture: $fixturePath" }
+if (-not (Test-Path -LiteralPath $legacySeedFixture -PathType Leaf)) { throw "Missing fixture: $legacySeedFixture" }
 $securityModule = Join-Path $hooksSource 'lib\admin_security.js'
 if (-not (Test-Path -LiteralPath $securityModule -PathType Leaf)) { throw "Missing security module: $securityModule" }
 $securityContract = Get-Content -LiteralPath $securityModule -Raw
@@ -111,7 +113,13 @@ $dataPath = Join-Path $resolvedRunRoot 'pb_data'
 $hooksPath = Join-Path $resolvedRunRoot 'pb_hooks'
 $emptyMigrationsPath = Join-Path $resolvedRunRoot 'empty_migrations'
 $emptyHooksPath = Join-Path $resolvedRunRoot 'empty_hooks'
-New-Item -ItemType Directory -Force -Path $dataPath,$emptyMigrationsPath,$emptyHooksPath | Out-Null
+$preCutoverMigrationsPath = Join-Path $resolvedRunRoot 'pre_cutover_migrations'
+$preCutoverHooksPath = Join-Path $resolvedRunRoot 'pre_cutover_hooks'
+New-Item -ItemType Directory -Force -Path $dataPath,$emptyMigrationsPath,$emptyHooksPath,$preCutoverMigrationsPath,$preCutoverHooksPath | Out-Null
+Get-ChildItem -LiteralPath $migrationsPath -File -Filter '*.pb.js' |
+    Where-Object { $_.Name -ne '20260716100500_harden_admin_recovery_cutover.pb.js' } |
+    ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $preCutoverMigrationsPath -Force }
+Copy-Item -LiteralPath $legacySeedFixture -Destination (Join-Path $preCutoverHooksPath 'legacy_session_seed.pb.js') -Force
 Copy-Hooks -Destination $hooksPath
 
 foreach ($name in $environmentNames) { $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
@@ -137,6 +145,25 @@ try {
     )
     $process = Start-Process -FilePath $PocketBasePath -ArgumentList $bootstrapArguments -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru
     Wait-Ready
+    Stop-Process -Id $process.Id -Force
+    $process.WaitForExit()
+    $process.Dispose()
+    $process = $null
+
+    $stdoutPath = Join-Path $resolvedRunRoot 'pre-cutover.out.log'
+    $stderrPath = Join-Path $resolvedRunRoot 'pre-cutover.err.log'
+    $preCutoverArguments = @(
+        'serve',
+        "--dir=$dataPath",
+        "--migrationsDir=$preCutoverMigrationsPath",
+        "--hooksDir=$preCutoverHooksPath",
+        "--http=127.0.0.1:$Port",
+        '--dev=false'
+    )
+    $process = Start-Process -FilePath $PocketBasePath -ArgumentList $preCutoverArguments -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -PassThru
+    Wait-Ready
+    $seedResponse = Invoke-WebRequest -UseBasicParsing -Method POST -Uri "http://127.0.0.1:$Port/api/test/admin-step-up/seed-legacy"
+    if ($seedResponse.StatusCode -ne 200) { throw 'Failed to seed legacy verified session' }
     Stop-Process -Id $process.Id -Force
     $process.WaitForExit()
     $process.Dispose()
