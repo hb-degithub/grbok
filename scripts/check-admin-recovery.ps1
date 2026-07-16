@@ -24,7 +24,11 @@ if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
         '-AsSecureString',
         'admin_recovery_codes',
         'used_at',
-        'expires_at'
+        'expires_at',
+        'admin_step_up_sessions',
+        'ADMIN_LOCAL_RECOVERY',
+        'admin_security_audits',
+        "priority = 'high'"
     )
     foreach ($pattern in $requiredPatterns) {
         if ($content -notmatch [regex]::Escape($pattern)) {
@@ -35,6 +39,9 @@ if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
     # Recovery code must not be accepted as a plaintext command-line parameter
     if ($content -match '\\s-RecoveryCode\\b') {
         $failures += "$scriptPath : must not accept -RecoveryCode as a plaintext parameter"
+    }
+    if ($content -match '\\s-StepUp\\b|X-Admin-Step-Up') {
+        $failures += "$scriptPath : local recovery must never accept or send a step-up secret"
     }
 }
 

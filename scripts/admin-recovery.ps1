@@ -1,189 +1,143 @@
-﻿#!/usr/bin/env pwsh
+#!/usr/bin/env pwsh
 #Requires -Version 7.0
-<#
-.SYNOPSIS
-    服务器本地管理员恢复脚本
-.DESCRIPTION
-    通过一次性恢复码执行管理员账户恢复操作。必须在 PocketBase 服务器本地或受信网络内运行。
-    恢复码通过隐藏输入读取，禁止作为命令行参数传入，避免泄露到 shell history 或进程列表。
-.EXAMPLE
-    .\scripts\admin-recovery.ps1 -UserEmail admin@example.com -Action revoke-passkeys
-#>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)]
-    [string]$UserEmail,
-
-    [Parameter(Mandatory)]
-    [ValidateSet('issue-reenroll', 'revoke-passkeys', 'clear-sessions')]
-    [string]$Action,
-
+    [Parameter(Mandatory)][string]$UserEmail,
+    [Parameter(Mandatory)][ValidateSet('issue-reenroll', 'revoke-passkeys', 'clear-sessions')][string]$Action,
     [string]$PocketBaseUrl = 'http://localhost:8090'
 )
 
 $ErrorActionPreference = 'Stop'
+if ($env:POCKETBASE_URL) { $PocketBaseUrl = $env:POCKETBASE_URL }
 
-if ($env:POCKETBASE_URL) {
-    $PocketBaseUrl = $env:POCKETBASE_URL
+function New-ReferenceId {
+    $bytes = [byte[]]::new(16)
+    [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+    return [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
 }
 
-function Get-SHA256Hash($value) {
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes($value)
-    $hash = [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes)
-    return [BitConverter]::ToString($hash).Replace('-', '').ToLower()
-}
-
-function Get-PlainText($secureString) {
-    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureString)
-    try {
-        return [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
-    } finally {
-        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+function Assert-LocalPocketBaseUrl([string]$Value) {
+    $uri = [Uri]$Value
+    if ($uri.Scheme -notin @('http', 'https') -or $uri.UserInfo -or $uri.AbsolutePath -ne '/') {
+        throw 'invalid local PocketBase URL'
     }
+    $hostName = $uri.DnsSafeHost.ToLowerInvariant()
+    if ($hostName -ne 'localhost' -and $hostName -ne '::1' -and $hostName -notmatch '^127(?:\.\d{1,3}){3}$') {
+        throw 'PocketBase URL must resolve to loopback'
+    }
+}
+
+function Get-PlainText([Security.SecureString]$SecureString) {
+    $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecureString)
+    try { return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
+    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
 }
 
 function Get-AdminToken {
-    $token = $env:POCKETBASE_ADMIN_TOKEN
-    if ($token) { return $token }
-
-    $secureToken = Read-Host -Prompt '请输入 PocketBase admin token' -AsSecureString
-    if (-not $secureToken -or $secureToken.Length -eq 0) {
-        throw 'PocketBase admin token 不能为空'
-    }
-    return Get-PlainText $secureToken
+    if ($env:POCKETBASE_ADMIN_TOKEN) { return $env:POCKETBASE_ADMIN_TOKEN }
+    $value = Read-Host -Prompt 'PocketBase admin token' -AsSecureString
+    if (-not $value -or $value.Length -eq 0) { throw 'missing admin token' }
+    return Get-PlainText $value
 }
 
-function Invoke-PBApi($method, $path, $body = $null) {
-    $headers = @{ Authorization = "Bearer $script:adminToken" }
-    $uri = "$PocketBaseUrl$path"
+function Get-SHA256Hash([string]$Value) {
+    $bytes = [Text.Encoding]::UTF8.GetBytes($Value)
+    $hash = [Security.Cryptography.SHA256]::HashData($bytes)
+    return [Convert]::ToHexString($hash).ToLowerInvariant()
+}
 
+function Invoke-PBApi([string]$Method, [string]$Path, $Body = $null) {
     $params = @{
-        Uri = $uri
-        Method = $method
-        Headers = $headers
+        Uri = "$PocketBaseUrl$Path"
+        Method = $Method
+        Headers = @{ Authorization = "Bearer $script:AdminToken" }
     }
-
-    if ($body) {
+    if ($null -ne $Body) {
         $params.ContentType = 'application/json'
-        $params.Body = $body | ConvertTo-Json -Depth 10 -Compress
+        $params.Body = $Body | ConvertTo-Json -Depth 10 -Compress
     }
-
-    try {
-        return Invoke-RestMethod @params
-    } catch {
-        $message = if ($_.ErrorDetails.Message) { $_.ErrorDetails.Message } else { $_.Exception.Message }
-        throw "PocketBase API 请求失败: $message"
-    }
+    return Invoke-RestMethod @params
 }
 
-function Find-UserByEmail($email) {
-    $normalized = $email.ToLower().Trim()
-    $filter = [uri]::EscapeDataString("email = `"$normalized`"")
-    $result = Invoke-PBApi -method GET -path "/api/collections/users/records?filter=$filter&perPage=1"
-    if (-not $result.items -or $result.items.Count -eq 0) {
-        throw "找不到用户: $email"
-    }
+function Find-Record([string]$Collection, [string]$Filter) {
+    $escaped = [uri]::EscapeDataString($Filter)
+    $result = Invoke-PBApi GET "/api/collections/$Collection/records?filter=$escaped&perPage=1"
+    if (-not $result.items -or $result.items.Count -ne 1) { throw 'required record not found' }
     return $result.items[0]
 }
 
-function Validate-RecoveryCode($userId, $code) {
-    $codeHash = Get-SHA256Hash $code
-    $filter = [uri]::EscapeDataString("user = `"$userId`" && code_hash = `"$codeHash`"")
-    $result = Invoke-PBApi -method GET -path "/api/collections/admin_recovery_codes/records?filter=$filter&perPage=1"
-    if (-not $result.items -or $result.items.Count -eq 0) {
-        throw '恢复码无效'
-    }
+function Find-UserByEmail([string]$Email) {
+    $normalized = $Email.Trim().ToLowerInvariant().Replace('"', '\"')
+    return Find-Record 'users' "email = `"$normalized`""
+}
 
-    $record = $result.items[0]
-    $now = [DateTime]::UtcNow
-
-    if ($record.expires_at -and [DateTime]::Parse($record.expires_at).ToUniversalTime() -lt $now) {
-        throw '恢复码已过期'
+function Validate-RecoveryCode([string]$UserId, [string]$Code) {
+    $hash = Get-SHA256Hash $Code
+    $record = Find-Record 'admin_recovery_codes' "user = `"$UserId`" && code_hash = `"$hash`""
+    if ($record.used_at) { throw 'recovery code unavailable' }
+    if (-not $record.expires_at -or [DateTime]::Parse($record.expires_at).ToUniversalTime() -le [DateTime]::UtcNow) {
+        throw 'recovery code unavailable'
     }
-    if ($record.used_at) {
-        throw '恢复码已被使用'
-    }
-
     return $record
 }
 
-function Mark-CodeUsed($record) {
+function Revoke-Records([string]$Collection, [string]$OwnerField, [string]$UserId) {
+    $filter = [uri]::EscapeDataString("$OwnerField = `"$UserId`" && revoked_at = null")
+    $result = Invoke-PBApi GET "/api/collections/$Collection/records?filter=$filter&perPage=1000"
+    $count = 0
     $now = [DateTime]::UtcNow.ToString('o')
-    Invoke-PBApi -method PATCH -path "/api/collections/admin_recovery_codes/records/$($record.id)" -body @{ used_at = $now }
-}
-
-function Revoke-AllPasskeys($userId) {
-    $filter = [uri]::EscapeDataString("owner = `"$userId`" && revoked_at = null")
-    $result = Invoke-PBApi -method GET -path "/api/collections/admin_passkeys/records?filter=$filter&perPage=1000"
-    $now = [DateTime]::UtcNow.ToString('o')
-    foreach ($record in $result.items) {
-        Invoke-PBApi -method PATCH -path "/api/collections/admin_passkeys/records/$($record.id)" -body @{ revoked_at = $now }
+    foreach ($record in @($result.items)) {
+        Invoke-PBApi PATCH "/api/collections/$Collection/records/$($record.id)" @{ revoked_at = $now } | Out-Null
+        $count++
     }
+    return $count
 }
 
-function Clear-VerifiedSessions($userId) {
-    $filter = [uri]::EscapeDataString("user = `"$userId`" && revoked_at = null")
-    $result = Invoke-PBApi -method GET -path "/api/collections/admin_verified_sessions/records?filter=$filter&perPage=1000"
-    $now = [DateTime]::UtcNow.ToString('o')
-    foreach ($record in $result.items) {
-        Invoke-PBApi -method PATCH -path "/api/collections/admin_verified_sessions/records/$($record.id)" -body @{ revoked_at = $now }
-    }
-}
-
-function Invoke-RecoveryAction($userId, $action) {
-    switch ($action) {
-        'issue-reenroll' {
-            Revoke-AllPasskeys $userId
-            Clear-VerifiedSessions $userId
-            Write-Host '已撤销旧 Passkey 并清除验证会话，请重新注册 Passkey' -ForegroundColor Green
-        }
-        'revoke-passkeys' {
-            Revoke-AllPasskeys $userId
-            Write-Host '已撤销该用户的所有 Passkey' -ForegroundColor Green
-        }
-        'clear-sessions' {
-            Clear-VerifiedSessions $userId
-            Write-Host '已清除该用户的验证会话' -ForegroundColor Green
-        }
-    }
-}
-
-function Write-AuditLog($userId, $action, $email) {
-    $operator = if ($env:USER) { $env:USER } elseif ($env:USERNAME) { $env:USERNAME } else { 'unknown' }
-    $hostname = if ($env:COMPUTERNAME) { $env:COMPUTERNAME } elseif ($env:HOSTNAME) { $env:HOSTNAME } else { 'localhost' }
-    $summary = "Recovery action '$action' executed for user $email (operator: $operator, host: $hostname)"
-    Invoke-PBApi -method POST -path '/api/collections/audit_logs/records' -body @{
-        actor = 'recovery-script'
-        action = "recovery:$action"
-        target_collection = 'users'
-        target_id = $userId
-        summary = $summary
-    }
-}
-
-# 主流程
+$referenceId = New-ReferenceId
 $codePlain = $null
+$script:AdminToken = $null
 try {
-    $script:adminToken = Get-AdminToken
+    Assert-LocalPocketBaseUrl $PocketBaseUrl
+    $script:AdminToken = Get-AdminToken
     $user = Find-UserByEmail $UserEmail
-
-    $secureCode = Read-Host -Prompt '请输入恢复码' -AsSecureString
-    if (-not $secureCode -or $secureCode.Length -eq 0) {
-        throw '恢复码不能为空'
-    }
+    $secureCode = Read-Host -Prompt 'Recovery code' -AsSecureString
+    if (-not $secureCode -or $secureCode.Length -eq 0) { throw 'missing recovery code' }
     $codePlain = Get-PlainText $secureCode
+    $codeRecord = Validate-RecoveryCode $user.id $codePlain
 
-    $codeRecord = Validate-RecoveryCode -userId $user.id -code $codePlain
-    Invoke-RecoveryAction -userId $user.id -action $Action
-    Mark-CodeUsed $codeRecord
-    Write-AuditLog -userId $user.id -action $Action -email $UserEmail
+    $passkeyCount = 0
+    $verifiedSessionCount = 0
+    if ($Action -in @('issue-reenroll', 'revoke-passkeys')) {
+        $passkeyCount = Revoke-Records 'admin_passkeys' 'owner' $user.id
+    }
+    if ($Action -in @('issue-reenroll', 'clear-sessions')) {
+        $verifiedSessionCount = Revoke-Records 'admin_verified_sessions' 'user' $user.id
+    }
+    $stepUpSessionCount = Revoke-Records 'admin_step_up_sessions' 'user' $user.id
 
-    Write-Host '恢复操作完成' -ForegroundColor Green
+    $auditBody = @{
+        actor = ''
+        action_code = 'ADMIN_LOCAL_RECOVERY'
+        target_type = 'user'
+        target_id = $user.id
+        before_json = @{ action = $Action }
+        after_json = @{
+            passkeys_revoked = $passkeyCount
+            verified_sessions_revoked = $verifiedSessionCount
+            step_up_sessions_revoked = $stepUpSessionCount
+        }
+        version = 1
+        reference_id = $referenceId
+        priority = 'high'
+    }
+    Invoke-PBApi POST '/api/collections/admin_security_audits/records' $auditBody | Out-Null
+    Invoke-PBApi PATCH "/api/collections/admin_recovery_codes/records/$($codeRecord.id)" @{ used_at = [DateTime]::UtcNow.ToString('o') } | Out-Null
+
+    Write-Output "PASS reference=$referenceId passkeys=$passkeyCount verifiedSessions=$verifiedSessionCount stepUpSessions=$stepUpSessionCount audits=1"
 } catch {
-    Write-Host "ERROR: $_" -ForegroundColor Red
+    Write-Output "FAIL reference=$referenceId"
     exit 1
 } finally {
     $codePlain = $null
-    $script:adminToken = $null
+    $script:AdminToken = $null
 }
-
