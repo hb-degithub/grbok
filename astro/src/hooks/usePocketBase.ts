@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getPocketBase } from '../lib/pocketbase';
 import { normalizeAuthEmail, withAuthRequestHeaders } from '../lib/security';
+import { registerReader as registerReaderRequest, requestVerification as requestVerificationRequest } from '../lib/blog-auth-client';
 import type { Post, PublicComment, ReaderRegisterData, User } from '../types/pocketbase';
 
 export function usePocketBase() {
@@ -79,10 +80,8 @@ export function usePocketBase() {
 
     registerReader: useCallback(async (data: Omit<ReaderRegisterData, 'role'>) => {
       try {
-        const payload: ReaderRegisterData = { ...data, email: normalizeAuthEmail(data.email), role: 'reader' };
-        const record = await withAuthRequestHeaders(pb, () => pb.collection('users').create<User>(payload));
-        const auth = await withAuthRequestHeaders(pb, () => pb.collection('users').authWithPassword<User>(payload.email, data.password));
-        return { success: true, data: { record, auth }, error: null };
+        const accepted = await registerReaderRequest(data);
+        return { success: true, data: accepted, error: null };
       } catch (err) {
         console.error('注册 reader 用户失败:', err);
         return { success: false, data: null, error: err };
@@ -91,7 +90,7 @@ export function usePocketBase() {
 
     requestVerification: useCallback(async (email: string) => {
       try {
-        await pb.collection('users').requestVerification(normalizeAuthEmail(email));
+        await requestVerificationRequest(email);
         return { success: true, error: null };
       } catch (err) {
         console.error('发送验证邮件失败:', err);

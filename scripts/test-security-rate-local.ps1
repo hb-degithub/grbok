@@ -191,6 +191,87 @@ function Invoke-AccountMailScenarios {
     Write-Host 'PASS account-mail parity, shared quotas, fake OTP, zero-write, and minimal logs'
 }
 
+function Invoke-RegistrationPost {
+    param([int]$Port, [string]$Email, [string]$Ip = '192.0.2.10')
+    $headers = @{ 'X-Test-IP' = $Ip }
+    $body = @{ name = 'Reader'; email = $Email; password = 'Test12345!'; passwordConfirm = 'Test12345!' }
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/register" -Headers $headers -ContentType 'application/json' -Body ($body | ConvertTo-Json -Compress) -TimeoutSec 20
+        return [pscustomobject]@{ Status = [int]$response.StatusCode; Body = ($response.Content | ConvertFrom-Json) }
+    } catch {
+        $status = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 }
+        $raw = if ($_.ErrorDetails.Message) { $_.ErrorDetails.Message } else { '{}' }
+        return [pscustomobject]@{ Status = $status; Body = ($raw | ConvertFrom-Json) }
+    }
+}
+
+function Invoke-RegistrationConsume {
+    param([int]$Port, [string]$Ip, [long]$NowMs)
+    return Invoke-JsonPost -Port $Port -Path '/api/test/security-rate/registration/consume' -Body @{ ip = $Ip; nowMs = $NowMs }
+}
+
+function Invoke-RegistrationScenarios {
+    param([int]$Port)
+    $now = 1720828800000
+    for ($i = 1; $i -le 3; $i++) {
+        $result = Invoke-RegistrationConsume -Port $Port -Ip '192.0.2.10' -NowMs $now
+        if ($result.Status -ne 200) { throw "registration IPv4 request $i unexpectedly denied: $($result.Status) $($result.Body | ConvertTo-Json -Compress -Depth 5)" }
+    }
+    $fourth = Invoke-RegistrationConsume -Port $Port -Ip '192.0.2.10' -NowMs $now
+    if ($fourth.Status -ne 429 -or $fourth.Body.code -ne 'REGISTRATION_RATE_LIMITED') { throw 'registration IPv4 fourth request was not limited' }
+
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/reset" -TimeoutSec 10 | Out-Null
+    for ($i = 1; $i -le 10; $i++) {
+        $result = Invoke-RegistrationConsume -Port $Port -Ip ("2001:db8:abcd:42::{0}" -f $i) -NowMs $now
+        if ($result.Status -ne 200) { throw "registration IPv6 /64 request $i unexpectedly denied" }
+    }
+    $eleventh = Invoke-RegistrationConsume -Port $Port -Ip '2001:db8:abcd:42::11' -NowMs $now
+    if ($eleventh.Status -ne 429) { throw 'registration IPv6 /64 eleventh request was not limited' }
+
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/reset" -TimeoutSec 10 | Out-Null
+    for ($i = 1; $i -le 20; $i++) {
+        $result = Invoke-RegistrationConsume -Port $Port -Ip ("198.51.100.{0}" -f $i) -NowMs $now
+        if ($result.Status -ne 200) { throw "registration global request $i unexpectedly denied" }
+    }
+    $twentyFirst = Invoke-RegistrationConsume -Port $Port -Ip '203.0.113.21' -NowMs $now
+    if ($twentyFirst.Status -ne 429) { throw 'registration global twenty-first request was not limited' }
+
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/reset" -TimeoutSec 10 | Out-Null
+    Add-Type -AssemblyName System.Net.Http
+    $client = [Net.Http.HttpClient]::new()
+    try {
+        $tasks = @()
+        for ($i = 0; $i -lt 20; $i++) {
+            $content = [Net.Http.StringContent]::new('{"ip":"192.0.2.77","nowMs":1720828800000}', [Text.Encoding]::UTF8, 'application/json')
+            $tasks += $client.PostAsync("http://127.0.0.1:$Port/api/test/security-rate/registration/consume", $content)
+        }
+        [Threading.Tasks.Task]::WaitAll([Threading.Tasks.Task[]]$tasks)
+        $allowed = @($tasks | Where-Object { [int]$_.Result.StatusCode -eq 200 }).Count
+        if ($allowed -ne 3) { throw "registration concurrency expected exactly 3 successes, got $allowed" }
+    } finally { $client.Dispose() }
+
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/reset" -TimeoutSec 10 | Out-Null
+    $first = Invoke-RegistrationPost -Port $Port -Email 'registration-reader@example.com'
+    $duplicate = Invoke-RegistrationPost -Port $Port -Email 'registration-reader@example.com' -Ip '192.0.2.11'
+    if ($first.Status -ne 202 -or $duplicate.Status -ne 202 -or $first.Body.code -ne 'REGISTRATION_SUBMITTED' -or $duplicate.Body.code -ne 'REGISTRATION_SUBMITTED') { throw 'duplicate registration response parity failed' }
+    $state = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/state" -TimeoutSec 10
+    if ($state.users -ne 1) { throw "duplicate registration created $($state.users) users" }
+
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/reset" -TimeoutSec 10 | Out-Null
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/prime-mail" -ContentType 'application/json' -Body '{"email":"mail-quota-full@example.com","ip":"192.0.2.90"}' -TimeoutSec 10 | Out-Null
+    $logsBefore = (Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/state" -TimeoutSec 10).logs
+    $suppressed = Invoke-RegistrationPost -Port $Port -Email 'mail-quota-full@example.com' -Ip '192.0.2.90'
+    $suppressedState = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/state" -TimeoutSec 10
+    if ($suppressed.Status -ne 202 -or $suppressedState.users -ne 2 -or $suppressedState.logs -ne $logsBefore) { throw 'mail quota full did not preserve user while suppressing automatic verification' }
+
+    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/corrupt" -ContentType 'application/json' -Body '{"ip":"192.0.2.250"}' -TimeoutSec 10 | Out-Null
+    $before = (Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/state" -TimeoutSec 10).users
+    $unavailable = Invoke-RegistrationPost -Port $Port -Email 'store-failure@example.com' -Ip '192.0.2.250'
+    $after = (Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/api/test/security-rate/registration/state" -TimeoutSec 10).users
+    if ($unavailable.Status -ne 503 -or $unavailable.Body.code -ne 'REGISTRATION_UNAVAILABLE' -or $after -ne $before) { throw 'registration store failure did not fail closed' }
+    Write-Host 'PASS registration IPv4, IPv6 /64, global, concurrency, duplicate parity, mail suppression, and fail-closed storage'
+}
+
 try {
     Ensure-PocketBase
     New-Item -ItemType Directory -Force -Path $dataRoot, $hooksRoot, $migrationsRoot | Out-Null
@@ -223,15 +304,32 @@ try {
             }
         }
         if ($name -eq 'account_mail') { Invoke-AccountMailScenarios -Port $port -Setup $result }
+        if ($name -eq 'registration') { Invoke-RegistrationScenarios -Port $port }
         Stop-TestPocketBase
         Remove-Item -LiteralPath (Join-Path $hooksRoot 'security_rate_fixture.pb.js') -Force
     }
 
     if ($RestartPocketBase -and -not ($fixtures -contains 'rate')) {
+        if ($fixtures -contains 'registration') {
+            Copy-Item -LiteralPath (Join-Path $repoRoot 'tests\security-rate\registration_fixture.pb.js') -Destination (Join-Path $hooksRoot 'security_rate_fixture.pb.js') -Force
+        }
         $port = Get-FreePort
         $process = Start-TestPocketBase -Port $port
         $health = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$port/api/health" -TimeoutSec 5
         if ($health.code -ne 200) { throw 'PocketBase restart health check failed' }
+        if ($fixtures -contains 'registration') {
+            $restartNow = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+            for ($i = 1; $i -le 3; $i++) {
+                $persist = Invoke-RegistrationConsume -Port $port -Ip '203.0.113.99' -NowMs $restartNow
+                if ($persist.Status -ne 200) { throw 'registration restart setup failed' }
+            }
+            Stop-TestPocketBase
+            $port = Get-FreePort
+            $process = Start-TestPocketBase -Port $port
+            $persist = Invoke-RegistrationConsume -Port $port -Ip '203.0.113.99' -NowMs $restartNow
+            if ($persist.Status -ne 429) { throw 'registration quota did not persist across restart' }
+            Write-Host 'PASS registration restart persistence'
+        }
         Stop-TestPocketBase
         Write-Host 'PASS restart persistence process check'
     }
