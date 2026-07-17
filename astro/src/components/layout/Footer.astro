@@ -1,5 +1,6 @@
 ---
 import { SITE_CONFIG } from '../../config/site';
+import FooterFriendLinks from '../links/FooterFriendLinks';
 const currentYear = new Date().getFullYear();
 ---
 
@@ -36,6 +37,8 @@ const currentYear = new Date().getFullYear();
         ))}
       </div>
     </div>
+
+    <FooterFriendLinks client:visible />
 
     <!-- 备案链接 -->
     <div class="mt-8 flex flex-col items-center gap-3 border-t border-zinc-200/70 pt-6 dark:border-zinc-800/70 sm:flex-row sm:justify-center sm:gap-6">

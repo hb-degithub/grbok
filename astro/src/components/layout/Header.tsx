@@ -21,6 +21,7 @@ const navItems = [
 // 「更多」折叠栏条目：后续子项目（友链/留言板/相册/项目/订阅）逐个追加到这里
 const MORE_LINKS = [
   { href: '/stats', label: '访问统计', description: '全站访问数据与热门内容', icon: 'M3 3v18h18M7 14l4-4 3 3 5-6' },
+  { href: '/links', label: '友情链接', description: '朋友们的站点', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
 ];
 
 const themeOptions: Array<{ mode: ThemeMode; label: string; description: string; icon: string }> = [
