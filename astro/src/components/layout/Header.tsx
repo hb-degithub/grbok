@@ -18,6 +18,11 @@ const navItems = [
   { href: '/about', label: '关于', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
 ];
 
+// 「更多」折叠栏条目：后续子项目（友链/留言板/相册/项目/订阅）逐个追加到这里
+const MORE_LINKS = [
+  { href: '/stats', label: '访问统计', description: '全站访问数据与热门内容', icon: 'M3 3v18h18M7 14l4-4 3 3 5-6' },
+];
+
 const themeOptions: Array<{ mode: ThemeMode; label: string; description: string; icon: string }> = [
   { mode: 'system', label: '跟随系统', description: '手机和电脑系统设置', icon: 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364-.707-.707M6.343 6.343l-.707-.707m12.728 0-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z' },
   { mode: 'time', label: '按时间', description: '19:00 后自动暗色', icon: 'M12 6v6l4 2m5-2a9 9 0 11-18 0 9 9 0 0118 0z' },
@@ -50,9 +55,11 @@ export default function Header() {
   const [themeMode, setThemeMode] = useState<ThemeMode>('system');
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
   const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [sideNavOpen, setSideNavOpen] = useState(false);
   const lastScrollY = useRef(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const { scrollY } = useScroll();
   const { user, isAuthenticated, isLoading } = useAuthStatus();
 
@@ -65,12 +72,18 @@ export default function Header() {
     setCurrentPath(window.location.pathname);
     syncTheme();
 
+    // Header 被 transition:persist 持久化，ClientRouter 客户端导航时不会重挂载，
+    // 需要监听 astro:page-load 同步当前路径，否则 Dock 激活指示不随页面切换更新。
+    const syncPath = () => setCurrentPath(window.location.pathname);
+    document.addEventListener('astro:page-load', syncPath);
+
     const observer = new MutationObserver(syncTheme);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme-mode'] });
     window.addEventListener('storage', syncTheme);
     window.addEventListener('blog-theme-change', syncTheme);
 
     return () => {
+      document.removeEventListener('astro:page-load', syncPath);
       observer.disconnect();
       window.removeEventListener('storage', syncTheme);
       window.removeEventListener('blog-theme-change', syncTheme);
@@ -78,12 +91,16 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
-    if (!themeMenuOpen) return;
+    if (!themeMenuOpen && !moreMenuOpen) return;
     const handlePointerDown = (event: PointerEvent) => {
       if (!menuRef.current?.contains(event.target as Node)) setThemeMenuOpen(false);
+      if (!moreMenuRef.current?.contains(event.target as Node)) setMoreMenuOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setThemeMenuOpen(false);
+      if (event.key === 'Escape') {
+        setThemeMenuOpen(false);
+        setMoreMenuOpen(false);
+      }
     };
     document.addEventListener('pointerdown', handlePointerDown);
     document.addEventListener('keydown', handleKeyDown);
@@ -91,7 +108,7 @@ export default function Header() {
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [themeMenuOpen]);
+  }, [themeMenuOpen, moreMenuOpen]);
 
   useMotionValueEvent(scrollY, 'change', (latest) => {
     const delta = latest - lastScrollY.current;
@@ -137,10 +154,18 @@ export default function Header() {
       {
         icon: <Icon d={resolvedTheme === 'dark' ? 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z' : 'M12 3v2m0 14v2m7.071-16.071-1.414 1.414M6.343 17.657l-1.414 1.414M21 12h-2M5 12H3m16.071 7.071-1.414-1.414M6.343 6.343 4.929 4.929M16 12a4 4 0 11-8 0 4 4 0 018 0z'} />,
         label: `主题：${activeThemeLabel}`,
-        onClick: () => setThemeMenuOpen((open) => !open),
+        onClick: () => { setThemeMenuOpen((open) => !open); setMoreMenuOpen(false); },
         hasPopup: 'menu',
         expanded: themeMenuOpen,
         active: false,
+      },
+      {
+        icon: <Icon d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />,
+        label: '更多',
+        onClick: () => { setMoreMenuOpen((open) => !open); setThemeMenuOpen(false); },
+        hasPopup: 'menu',
+        expanded: moreMenuOpen,
+        active: MORE_LINKS.some((link) => isActive(link.href)),
       },
     ];
 
@@ -170,7 +195,7 @@ export default function Header() {
     }
     return items;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPath, openSearch, resolvedTheme, activeThemeLabel, themeMenuOpen, isLoading, isAuthenticated, user]);
+  }, [currentPath, openSearch, resolvedTheme, activeThemeLabel, themeMenuOpen, moreMenuOpen, isLoading, isAuthenticated, user]);
 
   return (
     <>
@@ -238,6 +263,44 @@ export default function Header() {
                     <span className="block text-xs leading-4 text-zinc-400 dark:text-zinc-500">{item.description}</span>
                   </span>
                 </button>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* More dropdown */}
+        <AnimatePresence>
+          {moreMenuOpen && (
+            <motion.div
+              ref={moreMenuRef}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="pointer-events-auto fixed top-20 left-1/2 -translate-x-1/2 w-[min(14rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-zinc-200 bg-white p-1.5 shadow-xl shadow-zinc-900/10 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/95"
+              role="menu"
+            >
+              {MORE_LINKS.map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMoreMenuOpen(false)}
+                  className={cn(
+                    'flex min-h-[44px] sm:min-h-[40px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left leading-snug transition-colors',
+                    isActive(item.href)
+                      ? 'bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-white'
+                      : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-white'
+                  )}
+                  role="menuitem"
+                >
+                  <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d={item.icon} />
+                  </svg>
+                  <span className="min-w-0 break-words">
+                    <span className="block text-sm font-semibold leading-5">{item.label}</span>
+                    <span className="block text-xs leading-4 text-zinc-400 dark:text-zinc-500">{item.description}</span>
+                  </span>
+                </a>
               ))}
             </motion.div>
           )}
