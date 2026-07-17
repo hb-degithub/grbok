@@ -6,7 +6,7 @@
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:4321';
 
-const ROUTES = ['/', '/posts', '/tags', '/archive', '/about', '/login', '/404'];
+const ROUTES = ['/', '/posts', '/tags', '/archive', '/about', '/stats', '/login', '/404'];
 
 const VIEWPORTS = [
   { name: '375x667', width: 375, height: 667 },

@@ -185,6 +185,26 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     <WelcomeOverlay client:load />
     <CursorGlow client:only="react" />
   <ToastContainer client:load />
+    <script define:vars={{ pbBase: import.meta.env.PUBLIC_POCKETBASE_URL || '' }}>
+  // 访问统计探针：页面浏览（含客户端导航）通过 sendBeacon 上报。
+  // 尊重 DNT；静默失败绝不影响页面；guard 防止 ClientRouter 重复挂监听。
+  (() => {
+    if (!pbBase) return;
+    const send = () => {
+      try {
+        if (navigator.doNotTrack === '1') return;
+        const body = JSON.stringify({ path: location.pathname, referrer: document.referrer || '' });
+        navigator.sendBeacon(`${pbBase}/api/track-view`, new Blob([body], { type: 'application/json' }));
+      } catch (_) {}
+    };
+    // astro:page-load 在首次加载与每次客户端导航都会触发，
+    // 挂一次监听器即可覆盖所有 pageview，不再单独立即 send（否则双倍计数）。
+    if (!window.__pvBeaconBound) {
+      window.__pvBeaconBound = true;
+      document.addEventListener('astro:page-load', send);
+    }
+  })();
+</script>
 </body>
 </html>
 
