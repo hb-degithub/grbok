@@ -81,7 +81,7 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
               <time dateTime={post.published_at}>{formattedDate}</time>
             </div>
 
-            <h3 className="mb-2 flex-1 break-words text-lg font-semibold leading-snug text-zinc-900 transition-colors duration-200 [overflow-wrap:anywhere] group-hover:text-zinc-600 dark:text-zinc-100 dark:group-hover:text-zinc-400">
+            <h3 className="mb-2 flex-1 break-words text-lg font-semibold leading-snug text-zinc-900 transition-colors duration-200 [overflow-wrap:anywhere] group-hover:text-teal-600 dark:text-zinc-100 dark:group-hover:text-teal-400">
               {post.title}
             </h3>
 

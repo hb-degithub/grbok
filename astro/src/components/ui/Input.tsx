@@ -51,9 +51,9 @@ export default function Input({
             'bg-white/90 text-zinc-900 placeholder-zinc-400',
             'transition-all duration-200 ease-out',
             error
-              ? 'border-red-400 focus-visible:border-red-500'
-              : 'border-zinc-200 focus-visible:border-zinc-500 dark:border-zinc-700 dark:focus-visible:border-zinc-400',
-            'outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/40 focus-visible:ring-offset-0',
+              ? 'border-red-400 focus-visible:border-red-500 focus-visible:ring-red-500/30'
+              : 'border-zinc-200 focus-visible:border-teal-500 dark:border-zinc-700 dark:focus-visible:border-teal-400 focus-visible:ring-teal-500/35',
+            'outline-none focus-visible:ring-2 focus-visible:ring-offset-0',
             'dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500',
             'disabled:cursor-not-allowed disabled:opacity-50',
             className

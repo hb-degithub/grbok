@@ -17,6 +17,7 @@ import AnnouncementBar from '../components/layout/AnnouncementBar';
 import DebugProtection from '../components/effects/DebugProtection';
 import SplashOverlay from '../components/effects/SplashOverlay';
 import WelcomeOverlay from '../components/effects/WelcomeOverlay';
+import CursorGlow from '../components/effects/CursorGlow';
 import ToastContainer from '../components/ui/Toast';
 import { SITE_CONFIG } from '../config/site';
 
@@ -182,6 +183,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     <DebugProtection client:load />
     <SplashOverlay client:load />
     <WelcomeOverlay client:load />
+    <CursorGlow client:only="react" />
   <ToastContainer client:load />
 </body>
 </html>

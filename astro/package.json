@@ -10,6 +10,7 @@
 		"build": "astro build && pagefind --site dist && node scripts/inject-sw-version.mjs",
 		"preview": "astro preview",
 		"check:mobile": "node scripts/mobile-viewport-check.mjs",
+		"check:visual": "node scripts/visual-check.mjs",
 		"astro": "astro"
 	},
 	"dependencies": {

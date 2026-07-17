@@ -8,6 +8,7 @@ import ProfileCard from '../components/sidebar/ProfileCard';
 import HotArticles from '../components/sidebar/HotArticles';
 import RecentComments from '../components/sidebar/RecentComments';
 import FriendLinks from '../components/sidebar/FriendLinks';
+import HomeSideNav from '../components/sidebar/HomeSideNav';
 import MagicBento from '../components/reactbits/MagicBento';
 import CountUp from '../components/reactbits/CountUp';
 import Carousel from '../components/reactbits/Carousel';
@@ -35,15 +36,13 @@ const [postsCount, tagsCount] = await Promise.all([
 ---
 
 <BaseLayout title="首页" description="欢迎来到胡巴的个人博客" mainClass="pt-0 sm:pt-0 sm:pb-8">
-  <aside class="floating-sidebar sidebar-left fixed left-6 top-28 z-30 hidden w-72 space-y-5 xl:block" aria-label="固定分区导航">
+  <aside class="floating-sidebar sidebar-left fixed top-28 z-30 hidden w-[clamp(15rem,20vw,18rem)] xl:block xl:left-[max(1.5rem,calc(50%-61.5rem))]" aria-label="固定分区导航">
+    <div class="sidebar-parallax-left space-y-5">
     <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
       <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">站内导航</h3>
-      <nav class="mt-4 grid gap-2 text-sm" aria-label="分区导航">
-        <a href="/" class="side-link flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>首页</span><span>01</span></a>
-        <a href="#latest" class="side-link flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>最新文章</span><span>02</span></a>
-        <a href="/posts" class="side-link flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>全部文章</span><span>03</span></a>
-        <a href="/tags" class="side-link flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>标签索引</span><span>04</span></a>
-      </nav>
+      <div class="mt-4">
+        <HomeSideNav client:visible />
+      </div>
     </section>
 
     <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
@@ -54,9 +53,28 @@ const [postsCount, tagsCount] = await Promise.all([
         <a href="/tags" class="topic-chip rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600 no-underline dark:bg-zinc-800 dark:text-zinc-300">部署运维</a>
       </div>
     </section>
+    </div>
   </aside>
 
-  <aside class="floating-sidebar sidebar-right fixed right-6 top-28 z-30 hidden w-72 space-y-5 xl:block" aria-label="固定资料侧栏">
+  <aside class="floating-sidebar fixed left-4 top-28 z-30 hidden lg:block xl:hidden" aria-label="快捷导航">
+    <nav class="side-panel flex flex-col gap-1 rounded-xl border border-zinc-200 bg-white p-2 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900" aria-label="分区导航">
+      <a href="/" title="首页" aria-label="首页" class="rail-link flex h-11 w-11 items-center justify-center rounded-lg text-zinc-500 transition-all hover:bg-zinc-900 hover:text-white dark:text-zinc-400 dark:hover:bg-zinc-100 dark:hover:text-zinc-950">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4m9-11v10a1 1 0 01-1 1h-4" /></svg>
+      </a>
+      <a href="#latest" title="最新文章" aria-label="最新文章" class="rail-link flex h-11 w-11 items-center justify-center rounded-lg text-zinc-500 transition-all hover:bg-zinc-900 hover:text-white dark:text-zinc-400 dark:hover:bg-zinc-100 dark:hover:text-zinc-950">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+      </a>
+      <a href="/posts" title="全部文章" aria-label="全部文章" class="rail-link flex h-11 w-11 items-center justify-center rounded-lg text-zinc-500 transition-all hover:bg-zinc-900 hover:text-white dark:text-zinc-400 dark:hover:bg-zinc-100 dark:hover:text-zinc-950">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2" /></svg>
+      </a>
+      <a href="/tags" title="标签索引" aria-label="标签索引" class="rail-link flex h-11 w-11 items-center justify-center rounded-lg text-zinc-500 transition-all hover:bg-zinc-900 hover:text-white dark:text-zinc-400 dark:hover:bg-zinc-100 dark:hover:text-zinc-950">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+      </a>
+    </nav>
+  </aside>
+
+  <aside class="floating-sidebar sidebar-right fixed top-28 z-30 hidden w-[clamp(15rem,20vw,18rem)] xl:block xl:right-[max(1.5rem,calc(50%-61.5rem))]" aria-label="固定资料侧栏">
+    <div class="sidebar-parallax-right space-y-5">
     <section class="side-panel overflow-hidden rounded-xl border border-zinc-200 bg-white p-6 shadow-2xl shadow-zinc-900/[0.06] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
       <div class="flex items-center gap-4">
         <div class="flex h-14 w-14 items-center justify-center rounded-lg bg-zinc-900 text-xl font-black text-white shadow-lg shadow-zinc-900/15 dark:bg-zinc-100 dark:text-zinc-950">B</div>
@@ -79,11 +97,12 @@ const [postsCount, tagsCount] = await Promise.all([
         <a href="/about" class="side-link group flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 text-sm font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>关于博主</span><svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></a>
       </div>
     </section>
+    </div>
   </aside>
 
-  <section class="journal-hero relative min-h-[var(--hero-min-h,100svh)] w-full overflow-hidden border-b border-zinc-200/70 px-[var(--page-pad,1rem)] pb-16 pt-[calc(var(--header-offset,4rem)+1.5rem)] shadow-sm dark:border-zinc-800/70 sm:px-6 lg:px-12 lg:pb-20 lg:pt-24 xl:px-16 xl:px-[21rem]">
+  <section class="journal-hero relative min-h-[var(--hero-min-h,100svh)] w-full overflow-hidden border-b border-zinc-200/70 px-[var(--page-pad,1rem)] pb-16 pt-[calc(var(--header-offset,4rem)+1.5rem)] shadow-sm dark:border-zinc-800/70 sm:px-6 lg:px-20 lg:pb-20 lg:pt-24 xl:px-[clamp(19rem,26vw,21rem)] min-[2016px]:px-[calc(50%-42rem)]">
 
-    <div class="absolute inset-0 overflow-hidden">
+    <div class="hero-particles absolute inset-0 overflow-hidden">
 
       <HomeParticlesBackground client:only="react" />
     </div>
@@ -121,9 +140,9 @@ const [postsCount, tagsCount] = await Promise.all([
     </div>
   </section>
 
-  <section id="latest" class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-12 xl:px-16 xl:px-[21rem]">
+  <section id="latest" class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-20 xl:px-[clamp(19rem,26vw,21rem)] min-[2016px]:px-[calc(50%-42rem)]">
     <div class="min-w-0">
-      <div class="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div class="section-head mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p class="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-400">Latest Notes</p>
           <h2 class="mt-2 text-3xl font-black tracking-tight text-zinc-950 dark:text-zinc-50"><ScrollFloat client:visible text="最新文章" /></h2>
@@ -172,8 +191,8 @@ const [postsCount, tagsCount] = await Promise.all([
     <ScrollVelocity client:visible text="胡巴的博客 · 技术与生活 · Huba's Blog · " baseVelocity={1} />
   </div>
 
-  <section class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-12 xl:px-16 xl:px-[21rem]">
-    <div class="mb-8">
+  <section class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-20 xl:px-[clamp(19rem,26vw,21rem)] min-[2016px]:px-[calc(50%-42rem)]">
+    <div class="section-head mb-8">
       <p class="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-400">探索</p>
       <h2 class="mt-2 text-3xl font-black tracking-tight text-zinc-950 dark:text-zinc-50"><ScrollFloat client:visible text="探索更多" /></h2>
       <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">发现博客的更多功能和内容。</p>
@@ -222,6 +241,11 @@ const [postsCount, tagsCount] = await Promise.all([
     </div>
   </section>
 </BaseLayout>
+
+<script>
+  import '../scripts/sidebar-motion';
+  import '../scripts/hero-motion';
+</script>
 
 <style>
   .journal-hero {
@@ -357,6 +381,13 @@ const [postsCount, tagsCount] = await Promise.all([
     transform: translateX(4px);
   }
 
+  .rail-link {
+    transform: translateX(0);
+  }
+  .rail-link:hover {
+    transform: translateX(3px);
+  }
+
   .topic-chip {
     display: inline-flex;
     align-items: center;
@@ -409,6 +440,7 @@ const [postsCount, tagsCount] = await Promise.all([
     .floating-sidebar,
     .side-panel,
     .side-link,
+    .rail-link,
     .topic-chip,
     .stat-tile {
       animation: none;

@@ -11,14 +11,14 @@ interface CursorGlowProps {
 /**
  * 鼠标跟随光标组件
  * 跟随鼠标移动的光晕效果
- * 触摸设备上返回 null（无鼠标可跟随）
+ * 触摸设备或 prefers-reduced-motion 开启时返回 null（无鼠标可跟随/动画豁免）
  */
 export default function CursorGlow({
   size = 300,
   color = 'rgba(120, 113, 108, 0.05)',
   className = '',
 }: CursorGlowProps) {
-  const { isMobile } = useBreakpoint();
+  const { isMobile, prefersReducedMotion } = useBreakpoint();
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isVisible, setIsVisible] = useState(false);
   const isVisibleRef = useRef(false);
@@ -26,7 +26,7 @@ export default function CursorGlow({
   const pendingPos = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-    if (isMobile) return;
+    if (isMobile || prefersReducedMotion) return;
 
     const flush = () => {
       rafRef.current = null;
@@ -57,9 +57,9 @@ export default function CursorGlow({
       document.removeEventListener('mouseleave', handleMouseLeave);
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
     };
-  }, [isMobile]);
+  }, [isMobile, prefersReducedMotion]);
 
-  if (isMobile) return null;
+  if (isMobile || prefersReducedMotion) return null;
 
   return (
     <motion.div

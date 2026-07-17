@@ -4,6 +4,7 @@ import ScrollReveal from '../components/ui/ScrollReveal';
 import Typewriter from '../components/ui/Typewriter';
 import GlareHover from '../components/reactbits/GlareHover';
 import BlurText from '../components/reactbits/BlurText';
+import ParticleField from '../components/effects/ParticleField';
 
 const techStack = [
   { name: 'Astro 6', desc: 'SSG 静态站点生成，群岛架构' },
@@ -33,7 +34,10 @@ const links = [
 ---
 
 <BaseLayout title="关于" description="关于这个博客和作者">
-  <div class="max-w-3xl mx-auto">
+  <div class="pointer-events-none fixed inset-0 z-0 hidden lg:block" aria-hidden="true">
+    <ParticleField client:visible count={36} speed={0.25} />
+  </div>
+  <div class="relative z-10 max-w-3xl mx-auto">
     <!-- 头部 -->
     <ScrollReveal client:visible>
       <div class="mb-16 text-center">

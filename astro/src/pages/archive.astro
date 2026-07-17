@@ -2,6 +2,7 @@
 import BaseLayout from "../layouts/BaseLayout.astro";
 import AnimatedContent from '../components/reactbits/AnimatedContent';
 import BlurText from '../components/reactbits/BlurText';
+import ParticleField from '../components/effects/ParticleField';
 const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || "http://localhost:8090";
 let posts = [];
 try {
@@ -21,13 +22,16 @@ for (const post of posts) {
 }
 ---
 <BaseLayout title="文章归档" description="按时间归档">
-<section class="mx-auto max-w-4xl px-5 py-16">
+<div class="pointer-events-none fixed inset-0 z-0 hidden lg:block" aria-hidden="true">
+  <ParticleField client:visible count={36} speed={0.25} />
+</div>
+<section class="relative z-10 mx-auto max-w-4xl px-5 py-16">
 <h1 class="text-3xl font-black"><BlurText client:visible text="文章归档" className="text-3xl font-black" /></h1>
 <p class="mt-2 text-zinc-500">共{posts.length}篇</p>
 {groups.map(y => <AnimatedContent client:visible>
   <div key={y.year}>
   <h2 class="mt-8 text-2xl font-bold">{y.year}</h2>
-  {y.months.map(m => <div key={m.month} class="ml-4 mt-4">
+  {y.months.map(m => <div key={m.month} class="archive-month ml-4 mt-4">
     <h3 class="text-sm font-mono text-zinc-400">{m.month}月</h3>
     <div class="mt-2 space-y-1">
       {m.posts.map(p => <a href={"/posts/" + p.slug} class="flex items-center gap-3 py-1.5 text-sm transition-all duration-200 hover:pl-2 hover:text-teal-600 dark:hover:text-teal-400">
@@ -39,4 +43,44 @@ for (const post of posts) {
   </div>
 </AnimatedContent>)}
 </section>
+<style>
+  .archive-month {
+    position: relative;
+    border-left: 1px solid rgba(161, 161, 170, 0.35);
+    padding-left: 1rem;
+  }
+  .archive-month a {
+    position: relative;
+  }
+  .archive-month a::before {
+    content: "";
+    position: absolute;
+    left: calc(-1rem - 3px);
+    top: 50%;
+    width: 5px;
+    height: 5px;
+    margin-top: -2.5px;
+    border-radius: 9999px;
+    background: #a1a1aa;
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  .archive-month a:hover::before {
+    background: #14b8a6;
+    transform: scale(1.5);
+  }
+  :global(.dark) .archive-month {
+    border-left-color: rgba(82, 82, 91, 0.6);
+  }
+  :global(.dark) .archive-month a::before {
+    background: #52525b;
+  }
+  :global(.dark) .archive-month a:hover::before {
+    background: #2dd4bf;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .archive-month a::before {
+      transition: none;
+    }
+  }
+</style>
 </BaseLayout>

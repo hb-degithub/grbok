@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ScrollReveal from '../components/ui/ScrollReveal';
 import GlowCard from '../components/ui/GlowCard';
+import ParticleField from '../components/effects/ParticleField';
 
 const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 
@@ -33,7 +34,10 @@ const tagColors = [
 ---
 
 <BaseLayout title="标签分类" description="按标签筛选文章">
-  <section class="mx-auto w-full max-w-5xl px-5 py-16 sm:px-8 lg:px-10">
+  <div class="pointer-events-none fixed inset-0 z-0 hidden lg:block" aria-hidden="true">
+    <ParticleField client:visible count={36} speed={0.25} />
+  </div>
+  <section class="relative z-10 mx-auto w-full max-w-5xl px-5 py-16 sm:px-8 lg:px-10">
     <div class="mb-10">
       <ScrollReveal client:visible>
         <div class="mb-4 flex items-center gap-3">
