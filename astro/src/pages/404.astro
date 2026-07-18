@@ -1,12 +1,16 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ScrollReveal from '../components/ui/ScrollReveal';
+import Starfield from '../components/effects/Starfield';
 ---
 
 <BaseLayout title="404" description="页面未找到">
-  <div class="flex flex-col items-center justify-center min-h-[60vh] text-center">
+  <div class="pointer-events-none fixed inset-0 z-0 hidden dark:block" aria-hidden="true">
+    <Starfield client:visible />
+  </div>
+  <div class="relative z-10 flex flex-col items-center justify-center min-h-[60vh] text-center">
     <ScrollReveal client:visible>
-      <div class="mb-8">
+      <div class="float-404 mb-8">
         <h1 class="font-display text-9xl font-black text-teal-500 dark:text-teal-400 animate-glow">
           404
         </h1>
@@ -33,6 +37,22 @@ import ScrollReveal from '../components/ui/ScrollReveal';
     @keyframes glow {
       0%, 100% { text-shadow: 0 0 8px rgba(20, 184, 166, 0.3); }
       50% { text-shadow: 0 0 20px rgba(20, 184, 166, 0.6), 0 0 40px rgba(20, 184, 166, 0.2); }
+    }
+    .animate-glow {
+      animation: glow 3s ease-in-out infinite;
+    }
+    @keyframes float-y {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+    .float-404 {
+      animation: float-y 5s ease-in-out infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .animate-glow,
+      .float-404 {
+        animation: none;
+      }
     }
   </style>
 </BaseLayout>

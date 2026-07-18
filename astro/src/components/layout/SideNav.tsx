@@ -18,6 +18,16 @@ const mainNavItems = [
   { href: '/about', label: '关于', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
 ];
 
+// 「更多功能」分组条目：后续子项目（友链/留言板等）逐个追加到这里
+const moreNavItems = [
+  { href: '/stats', label: '访问统计', icon: 'M3 3v18h18M7 14l4-4 3 3 5-6' },
+  { href: '/links', label: '友情链接', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
+  { href: '/guestbook', label: '留言板', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
+  { href: '/gallery', label: '相册', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
+  { href: '/projects', label: '项目', icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4' },
+  { href: '/subscribe', label: '订阅', icon: 'M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z' },
+];
+
 const adminNavItem = { href: '/admin', label: '管理后台', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' };
 const loginNavItem = { href: '/login', label: '登录', icon: 'M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1' };
 
@@ -201,6 +211,34 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
               >
                 <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">主导航</p>
                 {mainNavItems.map((item) => (
+                  <motion.a
+                    key={item.href}
+                    href={item.href}
+                    onClick={handleLinkClick}
+                    variants={staggerVariants.item}
+                    className={`flex min-h-[44px] min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium leading-snug transition-colors ${
+                      isActive(item.href)
+                        ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
+                        : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100'
+                    }`}
+                    aria-current={isActive(item.href) ? 'page' : undefined}
+                  >
+                    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
+                    </svg>
+                    <span className="min-w-0 break-words">{item.label}</span>
+                  </motion.a>
+                ))}
+              </motion.div>
+
+              <motion.div
+                className="mt-6 space-y-1"
+                variants={staggerVariants.container}
+                initial="hidden"
+                animate="visible"
+              >
+                <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">更多功能</p>
+                {moreNavItems.map((item) => (
                   <motion.a
                     key={item.href}
                     href={item.href}

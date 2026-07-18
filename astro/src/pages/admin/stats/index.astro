@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import StatsDashboard from '../../../components/stats/StatsDashboard';
+---
+
+<AdminLayout title="访问统计" requiredRole="author">
+  <StatsDashboard client:only="react" variant="admin" />
+</AdminLayout>

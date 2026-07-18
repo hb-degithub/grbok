@@ -4,6 +4,7 @@ import ScrollReveal from '../../components/ui/ScrollReveal';
 import ShareButton from '../../components/ui/ShareButton';
 import CommentSection from '../../components/comments/CommentSection';
 import TableOfContents from '../../components/posts/TableOfContents';
+import ReadingProgress from '../../components/effects/ReadingProgress';
 import { sanitizeHtml } from '../../lib/security';
 
 const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
@@ -83,6 +84,8 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
 
 <BaseLayout title={post?.title || '文章'} description={post?.excerpt || ''} image={post?.cover}>
   {post ? (
+    <>
+    <ReadingProgress client:load />
     <article class="mx-auto w-full max-w-5xl px-[var(--page-pad,1rem)] py-8 sm:py-10">
       <!-- Mobile TOC -->
       {headings.length > 0 && (
@@ -103,13 +106,13 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
       </ScrollReveal>
 
       <ScrollReveal delay={0.1} client:visible>
-        <header class="mb-12">
+        <header class="post-hero mb-12">
           <div class="mb-4 flex min-w-0 items-center gap-3">
             <span class="h-px w-8 bg-zinc-400 dark:bg-zinc-500"></span>
             <span class="font-mono text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Article</span>
           </div>
 
-          <h1 class="mb-6 break-words text-3xl font-black leading-tight tracking-normal text-zinc-900 [overflow-wrap:anywhere] dark:text-zinc-100 sm:text-4xl md:text-5xl">
+          <h1 class="post-title mb-6 break-words text-3xl font-black leading-tight tracking-normal text-zinc-900 [overflow-wrap:anywhere] dark:text-zinc-100 sm:text-4xl md:text-5xl">
             {post.title}
           </h1>
 
@@ -128,7 +131,7 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
           </div>
 
           {post.cover && (
-            <div class="mt-8 overflow-hidden rounded-xl border border-zinc-200 shadow-xl shadow-zinc-900/[0.04] dark:border-zinc-800">
+            <div class="post-cover mt-8 overflow-hidden rounded-xl border border-zinc-200 shadow-xl shadow-zinc-900/[0.04] dark:border-zinc-800">
               <img src={post.cover} alt={post.title} class="h-auto w-full object-cover opacity-0 transition-opacity duration-500" loading="lazy" onload="this.style.opacity='1'" />
             </div>
           )}
@@ -146,7 +149,7 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
             <div class="flex justify-center">
               <ShareButton client:visible />
             </div>
-            <nav class="grid gap-4 sm:grid-cols-2" aria-label="文章导航">
+            <nav class="post-footer-nav grid gap-4 sm:grid-cols-2" aria-label="文章导航">
               <a href="/posts" class="flex items-center gap-2 rounded-lg border border-zinc-200 p-4 text-sm text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-200">
                 <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -173,6 +176,7 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
         )}
       </div>
     </article>
+    </>
   ) : (
     <div class="flex flex-col items-center justify-center px-4 py-20 text-center">
       <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
@@ -187,7 +191,7 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
   )}
 </BaseLayout>
 
-<style>
+<style is:global>
   .reveal-content > div > * {
     opacity: 0;
     transform: translateY(12px);
@@ -197,11 +201,94 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
     opacity: 1;
     transform: translateY(0);
   }
+  .reveal-content h2 {
+    position: relative;
+    padding-left: 0.875rem;
+  }
+  .reveal-content h2::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0.18em;
+    bottom: 0.18em;
+    width: 3px;
+    border-radius: 9999px;
+    background: linear-gradient(to bottom, #14b8a6, #2dd4bf);
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .reveal-content h2.revealed::before {
+    transform: scaleY(1);
+  }
+  .reveal-content pre {
+    position: relative;
+  }
+  .code-copy-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(205, 214, 244, 0.16);
+    background: rgba(30, 30, 46, 0.85);
+    color: #a6adc8;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(-2px);
+    transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s ease;
+  }
+  .code-copy-btn svg {
+    width: 0.95rem;
+    height: 0.95rem;
+  }
+  .reveal-content pre:hover .code-copy-btn,
+  .code-copy-btn:focus-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .code-copy-btn:hover {
+    color: #cdd6f4;
+  }
+  .code-copy-btn.copied {
+    color: #a6e3a1;
+    opacity: 1;
+    transform: translateY(0);
+  }
+  @media (hover: none) {
+    .code-copy-btn {
+      opacity: 0.85;
+      transform: none;
+    }
+  }
+  .post-footer-nav a {
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, color 0.2s ease;
+  }
+  .post-footer-nav a:hover {
+    transform: translateY(-2px);
+  }
   @media (prefers-reduced-motion: reduce) {
     .reveal-content > div > * {
       opacity: 1;
       transform: none;
       transition: none;
+    }
+    .reveal-content h2::before {
+      transition: none;
+      transform: scaleY(1);
+    }
+    .code-copy-btn {
+      transition: none;
+    }
+    .post-footer-nav a {
+      transition: none;
+    }
+    .post-footer-nav a:hover {
+      transform: none;
     }
   }
 </style>
@@ -223,4 +310,41 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
     }, { rootMargin: '0px 0px -40px 0px', threshold: 0.1 });
     children.forEach(child => observer.observe(child));
   }
+
+  // 代码块悬浮复制按钮（正文是构建期注入的 HTML，用客户端脚本挂载）
+  function initCodeCopy() {
+    document.querySelectorAll<HTMLElement>('.reveal-content pre').forEach((pre) => {
+      if (pre.querySelector('.code-copy-btn')) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'code-copy-btn';
+      btn.setAttribute('aria-label', '复制代码');
+      const copyIcon =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+      const checkIcon =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>';
+      btn.innerHTML = copyIcon;
+      btn.addEventListener('click', async () => {
+        const code = pre.querySelector('code')?.innerText ?? pre.innerText;
+        try {
+          await navigator.clipboard.writeText(code);
+          btn.classList.add('copied');
+          btn.innerHTML = checkIcon;
+          window.setTimeout(() => {
+            btn.classList.remove('copied');
+            btn.innerHTML = copyIcon;
+          }, 1400);
+        } catch {
+          // 剪贴板不可用（非安全上下文等）时静默失败
+        }
+      });
+      pre.appendChild(btn);
+    });
+  }
+  initCodeCopy();
+  document.addEventListener('astro:page-load', initCodeCopy);
+</script>
+
+<script>
+  import '../../scripts/post-motion';
 </script>

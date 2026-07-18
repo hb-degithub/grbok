@@ -1,13 +1,11 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Starfield from '../../components/effects/Starfield';
-import GridFloor from '../../components/effects/GridFloor.astro';
 ---
 
 <BaseLayout title="示例文章" description="一篇用于展示博客排版和视觉效果的示例文章" noindex>
   <section class="relative -mx-6 -mt-12 min-h-screen overflow-hidden px-6 pt-24">
     <Starfield client:visible />
-    <GridFloor />
 
     <div class="pointer-events-none absolute left-[15%] top-[20%] h-64 w-64 rounded-full bg-zinc-200/50 blur-[100px] animate-float" aria-hidden="true"></div>
     <div class="pointer-events-none absolute bottom-[25%] right-[15%] h-80 w-80 rounded-full bg-zinc-200/50 blur-[120px] animate-float" style="animation-delay: -4s" aria-hidden="true"></div>
@@ -39,3 +37,14 @@ import GridFloor from '../../components/effects/GridFloor.astro';
     </article>
   </section>
 </BaseLayout>
+
+<style>
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-14px); }
+  }
+  .animate-float { animation: float 7s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-float { animation: none; }
+  }
+</style>

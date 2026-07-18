@@ -1,0 +1,112 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ParticleField from '../components/effects/ParticleField';
+import ScrollReveal from '../components/ui/ScrollReveal';
+import GlowCard from '../components/ui/GlowCard';
+import { projects, type Project } from '../config/projects';
+
+const featured = projects.filter((p) => p.featured);
+const regular = projects.filter((p) => !p.featured);
+
+const statusMeta: Record<Project['status'], { label: string; className: string }> = {
+  active: { label: '运营中', className: 'bg-teal-500/10 text-teal-600 dark:text-teal-400' },
+  wip: { label: '开发中', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
+  archived: { label: '已归档', className: 'bg-zinc-500/10 text-zinc-500 dark:text-zinc-400' },
+};
+---
+
+<BaseLayout title="项目" description="我做过的和正在做的项目">
+  <div class="pointer-events-none fixed inset-0 z-0 hidden lg:block" aria-hidden="true">
+    <ParticleField client:visible count={36} speed={0.25} />
+  </div>
+  <section class="relative z-10 mx-auto w-full max-w-5xl px-5 py-16 sm:px-8 lg:px-10">
+    <div class="mb-10">
+      <ScrollReveal client:visible>
+        <div class="mb-4 flex items-center gap-3">
+          <span class="h-px w-8 bg-zinc-400 dark:bg-zinc-500"></span>
+          <span class="font-mono text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Projects</span>
+        </div>
+        <h1 class="text-4xl font-black tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-5xl">项目</h1>
+        <p class="mt-3 max-w-xl text-zinc-500 dark:text-zinc-400">我做过的和正在做的东西。</p>
+      </ScrollReveal>
+    </div>
+
+    {projects.length === 0 ? (
+      <div class="rounded-xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+        还没有项目，去 src/config/projects.ts 添加第一个吧。
+      </div>
+    ) : (
+      <>
+        {featured.length > 0 && (
+          <div class="mb-8 grid gap-5">
+            {featured.map((project) => (
+              <ScrollReveal client:visible>
+                <GlowCard className="card rounded-xl p-6 sm:p-8" glowColor="rgba(20, 184, 166, 0.08)" client:visible>
+                  <div class="flex flex-wrap items-center gap-3">
+                    <h2 class="text-2xl font-black tracking-tight text-zinc-950 dark:text-zinc-50">{project.name}</h2>
+                    <span class={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusMeta[project.status].className}`}>
+                      {statusMeta[project.status].label}
+                    </span>
+                  </div>
+                  <p class="mt-2 text-sm font-semibold text-zinc-600 dark:text-zinc-300">{project.tagline}</p>
+                  <p class="mt-3 text-sm leading-7 text-zinc-500 dark:text-zinc-400">{project.description}</p>
+                  <div class="mt-4 flex flex-wrap gap-2">
+                    {project.tech.map((t) => (
+                      <span class="rounded-full bg-zinc-100 px-3 py-1 font-mono text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{t}</span>
+                    ))}
+                  </div>
+                  <div class="mt-5 flex flex-wrap gap-3">
+                    {project.links.demo && (
+                      <a href={project.links.demo} target="_blank" rel="noopener noreferrer" class="btn-primary inline-flex items-center gap-1.5 no-underline">在线访问</a>
+                    )}
+                    {project.links.github && (
+                      <a href={project.links.github} target="_blank" rel="noopener noreferrer" class="btn-ghost inline-flex items-center gap-1.5 no-underline">GitHub</a>
+                    )}
+                    {project.links.article && (
+                      <a href={project.links.article} class="btn-ghost inline-flex items-center gap-1.5 no-underline">相关文章</a>
+                    )}
+                  </div>
+                </GlowCard>
+              </ScrollReveal>
+            ))}
+          </div>
+        )}
+
+        {regular.length > 0 && (
+          <div class="grid gap-5 sm:grid-cols-2">
+            {regular.map((project, index) => (
+              <ScrollReveal delay={index * 0.08} client:visible>
+                <GlowCard className="card h-full rounded-xl p-5" glowColor="rgba(20, 184, 166, 0.08)" client:visible>
+                  <div class="flex flex-wrap items-center gap-2.5">
+                    <h3 class="text-lg font-bold tracking-tight text-zinc-950 dark:text-zinc-50">{project.name}</h3>
+                    <span class={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${statusMeta[project.status].className}`}>
+                      {statusMeta[project.status].label}
+                    </span>
+                  </div>
+                  <p class="mt-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">{project.tagline}</p>
+                  <p class="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">{project.description}</p>
+                  <div class="mt-3 flex flex-wrap gap-1.5">
+                    {project.tech.map((t) => (
+                      <span class="rounded-full bg-zinc-100 px-2.5 py-0.5 font-mono text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{t}</span>
+                    ))}
+                  </div>
+                  <div class="mt-4 flex flex-wrap gap-2.5">
+                    {project.links.demo && (
+                      <a href={project.links.demo} target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-teal-600 no-underline hover:underline dark:text-teal-400">在线访问 →</a>
+                    )}
+                    {project.links.github && (
+                      <a href={project.links.github} target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-teal-600 no-underline hover:underline dark:text-teal-400">GitHub →</a>
+                    )}
+                    {project.links.article && (
+                      <a href={project.links.article} class="text-sm font-semibold text-teal-600 no-underline hover:underline dark:text-teal-400">相关文章 →</a>
+                    )}
+                  </div>
+                </GlowCard>
+              </ScrollReveal>
+            ))}
+          </div>
+        )}
+      </>
+    )}
+  </section>
+</BaseLayout>

@@ -46,21 +46,18 @@ export default function SearchModal() {
           return;
         }
 
-        const script = document.createElement('script');
-        script.src = '/pagefind/pagefind.js';
-        script.async = true;
-        script.onload = () => {
-          (window as any).pagefind?.init?.();
-          setIsPagefindLoaded(true);
-        };
-        script.onerror = () => {
-          setLoadError(true);
-          setIsPagefindLoaded(false);
-        };
-        document.body.appendChild(script);
+        // pagefind.js 是 ESM（含 import.meta），classic <script> 加载会抛语法错误；
+        // 用动态 import 加载，挂到 window.pagefind 供搜索逻辑复用。
+        // 变量形式的路径避免 Vite 构建期静态解析（索引文件由 pagefind CLI 在构建后生成）。
+        const pagefindPath = '/pagefind/pagefind.js';
+        const pagefind = await import(/* @vite-ignore */ pagefindPath);
+        await pagefind.init?.();
+        (window as any).pagefind = pagefind;
+        setIsPagefindLoaded(true);
       } catch (error) {
         console.error('Pagefind 加载失败:', error);
         setLoadError(true);
+        setIsPagefindLoaded(false);
       }
     };
 

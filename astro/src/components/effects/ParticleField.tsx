@@ -26,13 +26,13 @@ export default function ParticleField({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const particlesRef = useRef<Particle[]>([]);
   const animationRef = useRef<number>();
-  const { prefersReducedMotion } = useBreakpoint();
+  const { isMobile, prefersReducedMotion } = useBreakpoint();
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    if (prefersReducedMotion) return;
+    if (isMobile || prefersReducedMotion) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -110,7 +110,7 @@ export default function ParticleField({
       window.removeEventListener('resize', resize);
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [count, color, speed, prefersReducedMotion]);
+  }, [count, color, speed, isMobile, prefersReducedMotion]);
 
   return <canvas ref={canvasRef} className={`pointer-events-none ${className}`} style={{ position: 'absolute', inset: 0 }} />;
 }

@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ScrollReveal from '../components/ui/ScrollReveal';
 import GlowCard from '../components/ui/GlowCard';
+import ParticleField from '../components/effects/ParticleField';
 
 const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 
@@ -25,6 +26,53 @@ async function fetchTags(): Promise<Tag[]> {
 
 const tags = await fetchTags();
 
+// ---- 标签文章聚合：按标签取最新 3 篇已发布文章 ----
+interface PostTagRecord {
+  tag_id: string;
+  expand?: {
+    post_id?: { title: string; slug: string; published_at: string; status: string };
+  };
+}
+
+interface TagPost {
+  title: string;
+  slug: string;
+  published_at: string;
+}
+
+async function fetchTagPostMap(): Promise<Map<string, { posts: TagPost[]; total: number }>> {
+  const map = new Map<string, { posts: TagPost[]; total: number }>();
+  try {
+    const res = await fetch(`${PB_URL}/api/collections/post_tags/records?perPage=500&expand=post_id&fields=tag_id,expand.post_id.title,expand.post_id.slug,expand.post_id.published_at,expand.post_id.status`);
+    if (!res.ok) throw new Error(`${res.status}`);
+    const data = await res.json();
+    const records: PostTagRecord[] = data.items ?? [];
+    for (const record of records) {
+      const post = record.expand?.post_id;
+      if (!post || post.status !== 'published') continue;
+      const entry = map.get(record.tag_id) ?? { posts: [], total: 0 };
+      entry.posts.push({ title: post.title, slug: post.slug, published_at: post.published_at });
+      entry.total += 1;
+      map.set(record.tag_id, entry);
+    }
+    // 每个标签按发布时间降序，只保留前 3 篇展示
+    for (const entry of map.values()) {
+      entry.posts.sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime());
+      entry.posts = entry.posts.slice(0, 3);
+    }
+  } catch {
+    // post_tags 拉取失败时按无文章处理，标签卡片仍正常渲染
+  }
+  return map;
+}
+
+const tagPostMap = await fetchTagPostMap();
+
+function formatMonthDay(iso: string): string {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+}
+
 const tagColors = [
   { bg: 'bg-zinc-100 dark:bg-zinc-800', text: 'text-zinc-700 dark:text-zinc-300', border: 'border-zinc-200 dark:border-zinc-700' },
   { bg: 'bg-zinc-100 dark:bg-zinc-800', text: 'text-zinc-700 dark:text-zinc-300', border: 'border-zinc-200 dark:border-zinc-700' },
@@ -33,7 +81,10 @@ const tagColors = [
 ---
 
 <BaseLayout title="标签分类" description="按标签筛选文章">
-  <section class="mx-auto w-full max-w-5xl px-5 py-16 sm:px-8 lg:px-10">
+  <div class="pointer-events-none fixed inset-0 z-0 hidden lg:block" aria-hidden="true">
+    <ParticleField client:visible count={36} speed={0.25} />
+  </div>
+  <section class="relative z-10 mx-auto w-full max-w-5xl px-5 py-16 sm:px-8 lg:px-10">
     <div class="mb-10">
       <ScrollReveal client:visible>
         <div class="mb-4 flex items-center gap-3">
@@ -65,28 +116,56 @@ const tagColors = [
           const color = tagColors[index % tagColors.length];
           return (
             <ScrollReveal delay={index * 0.1} client:visible>
-              <a href={`/tags/${tag.slug}`} class="block no-underline">
-                <GlowCard
-                  className="card cursor-pointer rounded-lg p-6 transition-transform hover:-translate-y-1"
-                  glowColor={'rgba(120, 113, 108, 0.10)'}
-                  client:visible
-                >
-                  <div class={`mb-4 inline-flex items-center gap-2 rounded-full border ${color.border} ${color.bg} px-3 py-1`}>
-                    <span class={`h-1.5 w-1.5 rounded-full bg-current ${color.text}`}></span>
-                    <span class={`font-mono text-xs uppercase tracking-wider ${color.text}`}>
-                      {tag.name}
-                    </span>
-                  </div>
-                  <h3 class="text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+              <GlowCard
+                className="card rounded-lg p-6 transition-transform hover:-translate-y-1"
+                glowColor={'rgba(120, 113, 108, 0.10)'}
+                client:visible
+              >
+                <div class={`mb-4 inline-flex items-center gap-2 rounded-full border ${color.border} ${color.bg} px-3 py-1`}>
+                  <span class={`h-1.5 w-1.5 rounded-full bg-current ${color.text}`}></span>
+                  <span class={`font-mono text-xs uppercase tracking-wider ${color.text}`}>
                     {tag.name}
-                  </h3>
-                  {tag.description && (
-                    <p class="mt-2 line-clamp-2 text-sm text-zinc-500 dark:text-zinc-400">
-                      {tag.description}
-                    </p>
-                  )}
-                </GlowCard>
-              </a>
+                  </span>
+                </div>
+                <h3 class="text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+                  <a href={`/tags/${tag.slug}`} class="no-underline transition-colors hover:text-teal-600 dark:hover:text-teal-400">
+                    {tag.name}
+                  </a>
+                </h3>
+                {tag.description && (
+                  <p class="mt-2 line-clamp-2 text-sm text-zinc-500 dark:text-zinc-400">
+                    {tag.description}
+                  </p>
+                )}
+                <div class="mt-4 border-t border-zinc-200/60 pt-3 dark:border-zinc-700/50">
+                  {(() => {
+                    const agg = tagPostMap.get(tag.id);
+                    if (!agg || agg.total === 0) {
+                      return <p class="text-xs text-zinc-400 dark:text-zinc-500">暂无文章</p>;
+                    }
+                    return (
+                      <>
+                        <div class="mb-2 text-xs font-semibold text-zinc-400 dark:text-zinc-500">{agg.total} 篇文章 · 最新</div>
+                        <ul class="space-y-1.5">
+                          {agg.posts.map((post) => (
+                            <li class="flex items-baseline gap-2 text-sm">
+                              <a href={`/posts/${post.slug}`} class="min-w-0 flex-1 truncate text-zinc-600 no-underline transition-colors hover:text-teal-600 dark:text-zinc-400 dark:hover:text-teal-400">
+                                {post.title}
+                              </a>
+                              <time datetime={post.published_at} class="shrink-0 text-[11px] text-zinc-400 dark:text-zinc-500">{formatMonthDay(post.published_at)}</time>
+                            </li>
+                          ))}
+                        </ul>
+                        {agg.total > 3 && (
+                          <a href={`/tags/${tag.slug}`} class="mt-2.5 inline-block text-xs font-semibold text-teal-600 no-underline hover:underline dark:text-teal-400">
+                            全部 {agg.total} 篇 →
+                          </a>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              </GlowCard>
             </ScrollReveal>
           );
         })}

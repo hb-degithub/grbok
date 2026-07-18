@@ -83,3 +83,70 @@ const requiredRoleLabel: Record<AdminRole, string> = {
     <ToastContainer client:load />
   </AdminGuard>
 </BaseLayout>
+
+<style is:global>
+  @keyframes admin-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* 页面主体入场（topbar 除外，保持定位稳定） */
+  .admin-shell main .mx-auto > :not(.admin-topbar) {
+    animation: admin-rise 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+
+  /* 表格行错峰入场（12 行封顶，避免长列表拖延） */
+  .admin-shell table tbody tr {
+    animation: admin-rise 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+  .admin-shell table tbody tr:nth-child(1) { animation-delay: 30ms; }
+  .admin-shell table tbody tr:nth-child(2) { animation-delay: 60ms; }
+  .admin-shell table tbody tr:nth-child(3) { animation-delay: 90ms; }
+  .admin-shell table tbody tr:nth-child(4) { animation-delay: 120ms; }
+  .admin-shell table tbody tr:nth-child(5) { animation-delay: 150ms; }
+  .admin-shell table tbody tr:nth-child(6) { animation-delay: 180ms; }
+  .admin-shell table tbody tr:nth-child(7) { animation-delay: 210ms; }
+  .admin-shell table tbody tr:nth-child(8) { animation-delay: 240ms; }
+  .admin-shell table tbody tr:nth-child(9) { animation-delay: 270ms; }
+  .admin-shell table tbody tr:nth-child(10) { animation-delay: 300ms; }
+  .admin-shell table tbody tr:nth-child(11) { animation-delay: 330ms; }
+  .admin-shell table tbody tr:nth-child(n+12) { animation-delay: 360ms; }
+
+  /* 侧边导航链接错峰入场 */
+  .admin-shell aside nav .space-y-1 a {
+    animation: admin-rise 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+  .admin-shell aside nav .space-y-1 a:nth-child(1) { animation-delay: 20ms; }
+  .admin-shell aside nav .space-y-1 a:nth-child(2) { animation-delay: 40ms; }
+  .admin-shell aside nav .space-y-1 a:nth-child(3) { animation-delay: 60ms; }
+  .admin-shell aside nav .space-y-1 a:nth-child(4) { animation-delay: 80ms; }
+  .admin-shell aside nav .space-y-1 a:nth-child(5) { animation-delay: 100ms; }
+  .admin-shell aside nav .space-y-1 a:nth-child(n+6) { animation-delay: 120ms; }
+
+  /* 按钮统一 hover / 按压反馈 */
+  .admin-shell button:not(:disabled) {
+    transition: transform 0.18s ease, background-color 0.18s ease, color 0.18s ease,
+      border-color 0.18s ease, box-shadow 0.18s ease;
+  }
+  .admin-shell button:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+  .admin-shell button:not(:disabled):active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .admin-shell main .mx-auto > :not(.admin-topbar),
+    .admin-shell table tbody tr,
+    .admin-shell aside nav .space-y-1 a {
+      animation: none;
+    }
+    .admin-shell button:not(:disabled) {
+      transition: none;
+    }
+    .admin-shell button:not(:disabled):hover,
+    .admin-shell button:not(:disabled):active {
+      transform: none;
+    }
+  }
+</style>
