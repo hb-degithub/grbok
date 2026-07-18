@@ -35,7 +35,7 @@ const Masonry = ({
       y: 0,
       transition: {
         duration: 0.4,
-        delay: i * 0.05,
+        delay: Math.min(i, 10) * 0.05,
         ease: [0.16, 1, 0.3, 1],
       },
     }),
