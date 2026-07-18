@@ -124,17 +124,15 @@ function retryDelay(attempt) {
 function retentionNoticeInput(user, nowMs, siteUrl, cleanupEligibleAt) {
   if (!siteUrl || !/^https:\/\//.test(siteUrl)) throw new Error('RETENTION_SITE_URL_INVALID');
   return {
-    policy: 'account_retention_notice',
-    template_key: 'account_retention_notice',
+    dedupeKey: 'account-retention:' + recordId(user),
+    category: 'account_retention_notice',
+    templateKey: 'account_retention_notice',
     recipient: String(user.get('email') || ''),
     variables: {
-      site_url: siteUrl,
-      cleanup_date: String(cleanupEligibleAt || ''),
+      displayName: String(user.get('name') || user.get('username') || '用户'),
+      cleanupDate: String(cleanupEligibleAt || ''),
+      siteUrl: siteUrl,
     },
-    source_kind: 'account_retention',
-    source_record_id: recordId(user),
-    idempotency_key: 'account-retention:' + recordId(user),
-    requested_at: iso(nowMs),
   };
 }
 

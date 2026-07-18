@@ -17,8 +17,8 @@
           variables: { postTitle: post.getString('title'), commenter: commenter || '读者', content: record.getString('content'), postUrl: base + '/posts/' + encodeURIComponent(post.getString('slug') || post.id) },
         });
       });
-    } catch (error) {
-      console.error('[comment-mail] enqueue failed:', String(error && error.message ? error.message : error));
+    } catch (_) {
+      console.error('[comment-mail] operation=enqueue result=INTERNAL_ERROR');
     }
     if (typeof e.next === 'function') e.next();
   }, 'comments');

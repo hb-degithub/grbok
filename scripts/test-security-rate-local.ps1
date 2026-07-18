@@ -4,7 +4,8 @@ param(
     [string]$Fixture = 'policy',
     [switch]$RestartPocketBase,
     [switch]$All,
-    [string]$PocketBasePath = 'C:\tmp\pocketbase-v0.22.21\pocketbase.exe'
+    [string]$PocketBasePath = 'C:\tmp\pocketbase-v0.22.21\pocketbase.exe',
+    [switch]$Offline
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,6 +18,7 @@ $process = $null
 
 function Ensure-PocketBase {
     if (Test-Path -LiteralPath $PocketBasePath -PathType Leaf) { return }
+    if ($Offline) { throw "PocketBase binary is unavailable in offline mode: $PocketBasePath" }
     $parent = Split-Path -Parent $PocketBasePath
     $zip = Join-Path $parent 'pocketbase.zip'
     New-Item -ItemType Directory -Force -Path $parent | Out-Null

@@ -61,6 +61,14 @@ routerAdd('GET', '/api/test/security-rate/outbox', function (c) {
         templateKey: 'comment_new', variables: { postTitle: 'Follower', commenter: 'Worker', content: 'Pending', postUrl: 'http://localhost:4321/posts/follower' },
       });
     });
+    var crashProbeRow = $app.dao().findRecordById('mail_outbox', crashProbe.outboxId);
+    var crashFollowerRow = $app.dao().findRecordById('mail_outbox', crashFollower.outboxId);
+    crashProbeRow.set('created', new Date(probeNow - 2000).toISOString());
+    crashFollowerRow.set('created', new Date(probeNow - 1000).toISOString());
+    $app.dao().saveRecord(crashProbeRow);
+    $app.dao().saveRecord(crashFollowerRow);
+
+    // Explicit timestamps keep this lease-order fixture deterministic on millisecond clocks.
     var crashNow = probeNow + 1000000;
     for (var crashAttempt = 1; crashAttempt <= 5; crashAttempt++) {
       var crashLeases = outbox._leaseBatch(crashNow + (crashAttempt - 1) * 181000, 1);
@@ -134,9 +142,15 @@ routerAdd('GET', '/api/test/security-rate/outbox', function (c) {
     $app.dao().runInTransaction(function (txDao) {
       retention = outbox.enqueue(txDao, {
         dedupeKey: 'retention:user:test', category: 'account_retention_notice', recipient: 'reader@example.com',
-        templateKey: 'account_retention_notice', variables: { displayName: 'Reader', cleanupDate: '2026-09-14' },
+        templateKey: 'account_retention_notice', variables: { displayName: 'Reader', cleanupDate: '2026-09-14', siteUrl: 'https://fixture.invalid/' },
       });
     });
+    var retentionRendered = outbox._render($app.dao().findRecordById('mail_outbox', retention.outboxId));
+    if (retentionRendered.html.indexOf('href="https://fixture.invalid/login"') === -1 ||
+        retentionRendered.text.indexOf('https://fixture.invalid/login') === -1 ||
+        /[?&](token|email)=/i.test(retentionRendered.html + '\n' + retentionRendered.text)) {
+      throw new Error('retention CTA must use the fixed trusted login route without account secrets');
+    }
     var retentionResult = outbox.processBatch(Date.now(), 10);
     if (retentionResult.sent !== 1 || $app.dao().findRecordById('mail_outbox', retention.outboxId).getString('status') !== 'sent') throw new Error('retention outbox contract failed');
     var rateForReset = require(__hooks + '/lib/security_rate_limit.js');

@@ -81,9 +81,11 @@ services:
     image: caddy:2.8.4-alpine
     container_name: blog-caddy-local
     ports:
-      - "80:80"
+      - "127.0.0.1:80:80"
     volumes:
       - ./Caddyfile.local:/etc/caddy/Caddyfile:ro
+    environment:
+      - ADMIN_IP=${ADMIN_IP:-127.0.0.1}
     depends_on:
       pocketbase:
         condition: service_healthy

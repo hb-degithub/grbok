@@ -2,7 +2,8 @@
 param(
     [string]$PocketBasePath = (Join-Path $env:TEMP 'pb-0.22.21-track-a\pocketbase.exe'),
     [int]$Port = 18091,
-    [int]$StubPort = 18092
+    [int]$StubPort = 18092,
+    [switch]$Offline
 )
 
 $ErrorActionPreference = 'Stop'
@@ -64,6 +65,7 @@ function Assert-PortFree {
 
 function Install-PocketBase {
     if (Test-Path -LiteralPath $PocketBasePath -PathType Leaf) { return }
+    if ($Offline) { throw "PocketBase binary is unavailable in offline mode: $PocketBasePath" }
     $downloadRoot = Split-Path -Parent $PocketBasePath
     New-Item -ItemType Directory -Force -Path $downloadRoot | Out-Null
     $zipPath = Join-Path $downloadRoot 'pocketbase.zip'

@@ -192,9 +192,11 @@ function runJobTests() {
   addAccount('day45', 45, false, false);
   var firstReminder = retention.runDueReminders(now, 20);
   assertEqual(firstReminder.queued, 1, 'day 45 queues one reminder');
-  assertEqual(queuedInputs[0].policy, 'account_retention_notice', 'retention uses isolated outbox policy');
-  assertEqual(queuedInputs[0].template_key, 'account_retention_notice', 'retention uses fixed template');
-  assertEqual(queuedInputs[0].variables.site_url, 'https://fixture.invalid', 'retention URL comes from trusted config');
+  assertEqual(queuedInputs[0].category, 'account_retention_notice', 'retention uses isolated outbox policy');
+  assertEqual(queuedInputs[0].templateKey, 'account_retention_notice', 'retention uses fixed template');
+  assertEqual(queuedInputs[0].dedupeKey, 'account-retention:day45', 'retention uses stable outbox dedupe');
+  assertEqual(queuedInputs[0].variables.siteUrl, 'https://fixture.invalid', 'retention URL comes from trusted config');
+  assertEqual(queuedInputs[0].variables.displayName, '用户', 'retention display name uses a safe fallback');
   assertEqual(retention.runDueReminders(now, 20).queued, 0, 'repeated reminder job is idempotent');
 
   var lateReminderState = addAccount('late-reminder', 60, false, false);
@@ -202,7 +204,7 @@ function runJobTests() {
   var extendedCleanup = new Date(now + 15 * retention.DAY_MS).toISOString();
   assertEqual(lateReminder.queued, 1, 'day 60 late reminder is queued once');
   assertEqual(lateReminderState.get('cleanup_eligible_at'), extendedCleanup, 'successful late reminder grants a fresh 15 day cleanup window');
-  assertEqual(queuedInputs[1].variables.cleanup_date, extendedCleanup, 'late reminder email uses the extended cleanup date');
+  assertEqual(queuedInputs[1].variables.cleanupDate, extendedCleanup, 'late reminder email uses the extended cleanup date');
   assertEqual(retention.runDueCleanup(now, 20).deleted, 0, 'late reminder cannot be cleaned on the enqueue day');
 
   var retryState = addAccount('retry', 45, false, false);

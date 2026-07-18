@@ -138,7 +138,8 @@ foreach ($composeName in @('docker-compose.yml', 'docker-compose.local.yml')) {
             foreach ($name in $environmentNames | Where-Object { $_ -match '^(?:SMTP_|ALIYUN_)' }) {
                 $issues.Add("$composeName $serviceName contains SMTP or Aliyun variable $name")
             }
-        }        if ($serviceName -ne 'pocketbase') {
+        }
+        if ($serviceName -ne 'pocketbase') {
             foreach ($name in $environmentNames | Where-Object { $pocketBaseOnlyNames -contains $_ }) {
                 $issues.Add("$composeName $serviceName contains PocketBase-only mail variable $name")
             }
@@ -205,7 +206,7 @@ else {
         $envText = ''
     }
 
-    $assignments = [regex]::Matches($envText, '(?m)^(?<name>[A-Z][A-Z0-9_]*)=(?<value>[^\r\n]*)$')
+    $assignments = [regex]::Matches($envText, '(?m)^(?<name>[A-Z][A-Z0-9_]*)=(?<value>[^\r\n]*)\r?$')
     $groups = $assignments | Group-Object { $_.Groups['name'].Value }
     foreach ($group in $groups) {
         if ($group.Count -gt 1) { $issues.Add(".env.example contains duplicate key $($group.Name)") }

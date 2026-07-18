@@ -28,8 +28,8 @@
     try {
       var account = require(__hooks + '/lib/auth_facade.js');
       account.requestVerificationFor(record);
-    } catch (err) {
-      console.error('[account-mail] registration auto-send failed:', String(err && err.message ? err.message : err));
+    } catch (_) {
+      console.error('[account-mail] operation=registration-auto-send result=INTERNAL_ERROR');
     }
     if (typeof e.next === 'function') e.next();
   }, 'users');

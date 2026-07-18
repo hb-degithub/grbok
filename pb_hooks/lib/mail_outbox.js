@@ -17,7 +17,7 @@ function string(value, max, name) {
 }
 function variables(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid('invalid variables');
-  var allowed = { postTitle: true, commenter: true, content: true, postUrl: true, displayName: true, cleanupDate: true };
+  var allowed = { postTitle: true, commenter: true, content: true, postUrl: true, displayName: true, cleanupDate: true, siteUrl: true };
   var result = {};
   var keys = Object.keys(value);
   if (!keys.length || keys.length > 6) invalid('invalid variables');
@@ -108,16 +108,26 @@ function recordVariables(record) {
   if (typeof value === 'string') value = JSON.parse(value || '{}');
   return value || {};
 }
+function trustedLoginUrl(value) {
+  var siteUrl = string(value, 500, 'siteUrl');
+  var match = /^https:\/\/([^\/?#\s]+)\/?$/i.exec(siteUrl);
+  if (!match || match[1].indexOf('@') !== -1) invalid('invalid siteUrl');
+  return siteUrl.replace(/\/+$/, '') + '/login';
+}
 function render(record) {
   var vars = recordVariables(record);
   if (record.getString('template_key') === 'account_retention_notice') {
     var displayName = string(vars.displayName, 80, 'displayName');
     var cleanupDate = string(vars.cleanupDate, 80, 'cleanupDate');
-    return {
+    var loginUrl = trustedLoginUrl(vars.siteUrl);
+    var message = {
       subject: '请验证你的博客账户',
       html: '<h2>账户验证提醒</h2><p>' + templates.escapeHtml(displayName) + '，你的账户仍未完成邮箱验证。</p><p>如不再需要，该账户预计将在 ' + templates.escapeHtml(cleanupDate) + ' 后按保留规则清理。</p>',
       text: '账户验证提醒\n' + displayName + '，你的账户仍未完成邮箱验证。\n如不再需要，该账户预计将在 ' + cleanupDate + ' 后按保留规则清理。',
     };
+    message.html += '<p><a href="' + templates.escapeHtml(loginUrl) + '">Verify account</a></p>';
+    message.text += '\n' + loginUrl;
+    return message;
   }
   if (record.getString('template_key') !== 'comment_new') invalid('unsupported template');
   var subject = '新评论: ' + string(vars.postTitle, 160, 'postTitle');
