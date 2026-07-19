@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import CountUp from '../reactbits/CountUp';
 import { fadeUp, staggerContainer } from '../../lib/motion';
+import { getPocketBase } from '../../lib/pocketbase';
 
 interface StatsData {
   range: string;
@@ -18,7 +19,6 @@ interface StatsDashboardProps {
   variant?: 'public' | 'admin';
 }
 
-const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || '';
 
 const CATEGORY_LABELS: Record<string, string> = {
   desktop: '桌面',
@@ -32,17 +32,15 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (!PB_URL) {
-      setError(true);
-      return;
-    }
-    const url = `${PB_URL}/api/blog-stats?range=30d${variant === 'admin' ? '&detail=1' : ''}`;
-    fetch(url, { credentials: 'include' })
-      .then((res) => {
-        if (!res.ok) throw new Error(String(res.status));
-        return res.json();
-      })
-      .then((json) => setData(json as StatsData))
+    setError(false);
+    const pb = getPocketBase();
+    pb.send<StatsData>('/api/blog-stats', {
+      method: 'GET',
+      query: variant === 'admin'
+        ? { range: '30d', detail: '1' }
+        : { range: '30d' },
+    })
+      .then(setData)
       .catch(() => setError(true));
   }, [variant]);
 
