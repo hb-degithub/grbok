@@ -3,11 +3,19 @@
 var CREDENTIAL_PATTERN = /^v1\.([A-Za-z0-9_-]{24})\.([A-Za-z0-9_-]{43})$/;
 var ADMIN_ROLES = ['author', 'admin', 'super_admin'];
 var REFERENCE_ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-';
+var GUESTBOOK_COLLECTION = 'guestbook_messages';
+var GALLERY_COLLECTION = 'gallery_items';
 var PROTECTED_COLLECTIONS = [
   'posts', 'comments', 'tags', 'post_tags', 'users', 'friend_links',
   'announcements', 'media_assets', 'settings', 'post_versions',
+  GUESTBOOK_COLLECTION, GALLERY_COLLECTION,
 ];
 var SAFE_SELF_PROFILE_FIELDS = ['name', 'username', 'avatar'];
+var ADMIN_MANAGED_COLLECTIONS = [
+  'posts', 'comments', 'tags', 'users', 'friend_links',
+  'announcements', 'media_assets',
+  GUESTBOOK_COLLECTION, GALLERY_COLLECTION,
+];
 
 function forbidden(code) {
   var referenceId = $security.randomStringWithAlphabet(22, REFERENCE_ALPHABET);
@@ -125,8 +133,8 @@ function requireAdminStepUp(ctx, options) {
       referenceId: $security.randomStringWithAlphabet(22, REFERENCE_ALPHABET),
       clientIp: ip,
     };
-  } catch (error) {
-    if (error && (error.message === 'ADMIN_STEP_UP_REQUIRED' || error.message === 'ADMIN_NETWORK_DENIED')) throw error;
+  } catch (caught) {
+    if (caught && (caught.message === 'ADMIN_STEP_UP_REQUIRED' || caught.message === 'ADMIN_NETWORK_DENIED')) throw caught;
     forbidden();
   }
 }
@@ -159,7 +167,98 @@ function requireProtectedWrite(e, operation) {
   requireAdminStepUp(e.httpContext || e, { requireVerifiedEmail: true });
 }
 
+function auditRoleOf(record) {
+  if (!record || typeof record.get !== 'function') return '';
+  return String(record.get('role') || '').trim();
+}
+
+function actingPrincipal(e) {
+  var user = currentActor(e);
+  if (user) {
+    return { actorId: user.id, role: auditRoleOf(user) };
+  }
+
+  var context = requestContext(e);
+  var info = null;
+  try { info = $apis.requestInfo(context); } catch (_) {}
+  var admin = info && info.admin ? info.admin : null;
+  try { admin = admin || (context && context.get('admin')) || null; } catch (_) {}
+  if (!admin) return null;
+
+  var secret = String($os.getenv('ADMIN_AUTH_HASH_SECRET') || '');
+  var adminId = String(
+    admin.id || (typeof admin.getId === 'function' ? admin.getId() : ''),
+  ).trim();
+  if (secret.length < 32 || !adminId) return null;
+  return {
+    actorId: 'pb_admin:' + $security.hs256('admin-audit-actor:' + adminId, secret),
+    role: 'pb_admin',
+  };
+}
+
+function redactAuditIp(ip) {
+  var value = String(ip || '').trim();
+  if (!value) return 'unknown';
+  var parts = value.split('.');
+  if (parts.length === 4) return parts[0] + '.' + parts[1] + '.*.*';
+
+  var secret = String($os.getenv('ADMIN_AUTH_HASH_SECRET') || '');
+  if (secret.length < 32) return 'unknown';
+  return 'hmac:' + $security.hs256('admin-audit-ip:' + value, secret).slice(0, 16);
+}
+
+function auditRecordLabel(collection, record) {
+  if (!record) return '';
+  if (collection === GUESTBOOK_COLLECTION) return record.id;
+  if (collection === GALLERY_COLLECTION) {
+    return String(record.get('title') || record.id).slice(0, 100);
+  }
+  if (collection === 'posts') return String(record.get('title') || record.id);
+  if (collection === 'tags') return String(record.get('name') || record.id);
+  if (collection === 'users') {
+    return String(record.get('name') || record.get('email') || record.id);
+  }
+  if (collection === 'comments') {
+    return String(record.get('content') || '').slice(0, 60) || record.id;
+  }
+  if (collection === 'friend_links') return String(record.get('name') || record.id);
+  if (collection === 'announcements') {
+    return String(record.get('title') || record.get('content') || '').slice(0, 60) || record.id;
+  }
+  if (collection === 'media_assets') {
+    return String(record.get('alt') || record.get('file') || record.id);
+  }
+  return record.id;
+}
+
+function auditManagedWrite(e, action) {
+  try {
+    var collection = e.record && e.record.collection ? e.record.collection().name : '';
+    if (ADMIN_MANAGED_COLLECTIONS.indexOf(collection) === -1) return;
+
+    var principal = actingPrincipal(e);
+    if (!principal) return;
+
+    var recordId = e.record ? e.record.id : '';
+    var label = auditRecordLabel(collection, e.record);
+    var summary = String(action) + ' ' + collection + ': ' + label;
+    var auditCollection = $app.dao().findCollectionByNameOrId('audit_logs');
+    var audit = new Record(auditCollection);
+    audit.set('actor', principal.actorId);
+    audit.set('action', String(action) + '_' + collection);
+    audit.set('target_collection', collection);
+    audit.set('target_id', recordId);
+    audit.set('summary', ('[' + principal.role + '] ' + summary).slice(0, 500));
+    audit.set('ip', redactAuditIp(clientIp(e)));
+    audit.set('user_agent', header(e, 'User-Agent').slice(0, 500));
+    $app.dao().saveRecord(audit);
+  } catch (_) {
+    console.error('[audit-write-failed] operation=write result=INTERNAL_ERROR');
+  }
+}
+
 module.exports = {
   requireAdminStepUp: requireAdminStepUp,
   requireProtectedWrite: requireProtectedWrite,
+  auditManagedWrite: auditManagedWrite,
 };
