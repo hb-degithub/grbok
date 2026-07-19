@@ -57,6 +57,7 @@ routerAdd('GET', '/api/test/security-rate/policy', function (c) {
         registration_ip: [3, 3600],
         registration_ipv6_64: [10, 3600],
         registration_global: [20, 60],
+        guestbook_ip: [5, 3600],
         admin_test_actor: [3, 3600],
         admin_test_global: [10, 86400],
         admin_security_write: [5, 3600],
