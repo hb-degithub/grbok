@@ -40,6 +40,9 @@ function Invoke-OfflineFixture {
 
 Invoke-OfflineFixture 'test-admin-step-up.ps1'
 Invoke-OfflineFixture 'test-security-rate-local.ps1'
+Invoke-OfflineFixture 'test-stats-friend-local.ps1'
+Invoke-OfflineFixture 'test-guestbook-local.ps1'
+Invoke-OfflineFixture 'test-gallery-local.ps1'
 
 $predeploy = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'pre-deploy-check.ps1') -Raw
 foreach ($required in @(
@@ -57,4 +60,7 @@ foreach ($required in @(
 
 Assert-True ($predeploy -match '(?s)test-admin-step-up.*?Offline') 'admin step-up stage does not receive offline mode'
 Assert-True ($predeploy -match '(?s)test-security-rate-local.*?Offline') 'security-rate stage does not receive offline mode'
+Assert-True ($predeploy -match '(?s)test-stats-friend-local.*?frontendBackendOfflineArguments') 'stats/friend stage does not receive offline mode'
+Assert-True ($predeploy -match '(?s)test-guestbook-local.*?frontendBackendOfflineArguments') 'guestbook stage does not receive offline mode'
+Assert-True ($predeploy -match '(?s)test-gallery-local.*?frontendBackendOfflineArguments') 'gallery stage does not receive offline mode'
 Write-Host 'PASS CI fixtures fail offline before download and aggregate gate stays loopback-only' -ForegroundColor Green

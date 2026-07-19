@@ -17,7 +17,7 @@ $failures = [System.Collections.Generic.List[string]]::new()
 $skips = [System.Collections.Generic.List[string]]::new()
 $passed = 0
 $stage = 0
-$totalStages = 25
+$totalStages = 28
 $isWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
 $isLinux = (-not $isWindows) -and (Test-Path -LiteralPath '/proc/sys/kernel/ostype')
 
@@ -234,6 +234,10 @@ Invoke-Stage 'python -m unittest tests.ops.test_mail_archive' $python @('-m', 'u
 Invoke-PowerShellStage 'check-real-ip-chain' 'check-real-ip-chain.ps1'
 Invoke-PowerShellStage 'check-auth-facade-cutover' 'check-auth-facade-cutover.ps1'
 Invoke-PowerShellStage 'check-mail-archive-config' 'check-mail-archive-config.ps1'
+$frontendBackendOfflineArguments = if ($Ci) { @('-Offline') } else { @() }
+Invoke-PowerShellStage 'stats/friend backend contracts' 'test-stats-friend-local.ps1' $frontendBackendOfflineArguments
+Invoke-PowerShellStage 'guestbook durable quota' 'test-guestbook-local.ps1' $frontendBackendOfflineArguments
+Invoke-PowerShellStage 'gallery passkey audit' 'test-gallery-local.ps1' $frontendBackendOfflineArguments
 
 $bashReady = $false
 if ($bash) { $bashReady = (Invoke-Capture $bash @('--version')).ExitCode -eq 0 }

@@ -11,7 +11,7 @@ function Assert-True {
     if (-not $Condition) { throw "PREDEPLOY_MANIFEST_TEST: $Message" }
 }
 
-Assert-True ($source -match '\$totalStages\s*=\s*25\b') 'aggregate stage count must be 25'
+Assert-True ($source -match '\$totalStages\s*=\s*28\b') 'aggregate stage count must be 28'
 Assert-True (-not $source.Contains('Read-Host')) 'aggregate gate must remain noninteractive'
 
 foreach ($required in @(
@@ -24,9 +24,17 @@ foreach ($required in @(
     "'test-security-rate-local -All'",
     "'check-real-ip-chain'",
     "'check-auth-facade-cutover'",
-    "'check-mail-archive-config'"
+    "'check-mail-archive-config'",
+    "'stats/friend backend contracts'",
+    "'test-stats-friend-local.ps1'",
+    "'guestbook durable quota'",
+    "'test-guestbook-local.ps1'",
+    "'gallery passkey audit'",
+    "'test-gallery-local.ps1'"
 )) {
     Assert-True ($source.Contains($required)) "aggregate gate is missing $required"
 }
+
+Assert-True ($source -match '\$frontendBackendOfflineArguments\s*=\s*if\s*\(\$Ci\)\s*\{\s*@\(''-Offline''\)\s*\}\s*else\s*\{\s*@\(\)\s*\}') 'frontend/backend fixtures must receive -Offline only in CI mode'
 
 Write-Host 'PASS pre-deploy manifest includes every security regression stage' -ForegroundColor Green
