@@ -59,6 +59,40 @@ interface VerifyData {
   checked_at: string;
 }
 
+interface TemplateItem {
+  id: string;
+  key: string;
+  name: string;
+  category: string;
+  version: number;
+  is_current: boolean;
+  builtin: boolean;
+  subject_template: string;
+  variables: string[];
+  required_variables: string[];
+}
+
+interface RulePolicy {
+  key: string;
+  limit: number;
+  window_seconds: number;
+  version: number;
+}
+
+interface RuleData {
+  policies: RulePolicy[];
+  system_sources: { key: string; label: string; source: string; editable: boolean }[];
+  note: string;
+}
+
+interface SuppressItem {
+  id: string;
+  category: string;
+  recipient_masked: string;
+  last_error_class: string;
+  created: string;
+}
+
 const STATUS_TONE: Record<string, string> = {
   pending: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
   processing: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
@@ -76,6 +110,9 @@ export default function MailCenter() {
   const [logItems, setLogItems] = useState<LogItem[]>([]);
   const [logResult, setLogResult] = useState('');
   const [verifyData, setVerifyData] = useState<VerifyData | null>(null);
+  const [templateItems, setTemplateItems] = useState<TemplateItem[]>([]);
+  const [ruleData, setRuleData] = useState<RuleData | null>(null);
+  const [suppressItems, setSuppressItems] = useState<SuppressItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -145,16 +182,61 @@ export default function MailCenter() {
     }
   }, [send]);
 
+  const loadTemplates = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await send<{ items: TemplateItem[] }>('/api/blog-admin/mail/templates');
+      setTemplateItems(data.items || []);
+    } catch (err: unknown) {
+      setError((err as Error)?.message || '无法读取邮件模板');
+    } finally {
+      setLoading(false);
+    }
+  }, [send]);
+
+  const loadRules = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await send<RuleData>('/api/blog-admin/mail/rules');
+      setRuleData(data);
+    } catch (err: unknown) {
+      setError((err as Error)?.message || '无法读取邮件规则');
+    } finally {
+      setLoading(false);
+    }
+  }, [send]);
+
+  const loadSuppress = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await send<{ items: SuppressItem[] }>('/api/blog-admin/mail/suppress');
+      setSuppressItems(data.items || []);
+    } catch (err: unknown) {
+      setError((err as Error)?.message || '无法读取抑制列表');
+    } finally {
+      setLoading(false);
+    }
+  }, [send]);
+
   useEffect(() => {
     if (tab === 'overview') loadOverview();
     else if (tab === 'queue') loadQueue();
     else if (tab === 'logs') loadLogs();
-  }, [tab, loadOverview, loadQueue, loadLogs]);
+    else if (tab === 'templates') loadTemplates();
+    else if (tab === 'rules') loadRules();
+    else if (tab === 'suppress') loadSuppress();
+  }, [tab, loadOverview, loadQueue, loadLogs, loadTemplates, loadRules, loadSuppress]);
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'overview', label: '概览' },
     { key: 'queue', label: '队列' },
     { key: 'logs', label: '日志' },
+    { key: 'templates', label: '模板' },
+    { key: 'rules', label: '规则' },
+    { key: 'suppress', label: '抑制' },
     { key: 'verify', label: '连接验证' },
   ];
 
@@ -357,6 +439,118 @@ export default function MailCenter() {
             </div>
           )}
           <p className="text-xs text-zinc-400 dark:text-zinc-500">日志只保存最小投递摘要，不包含正文、token、OTP 或 SMTP 原文。</p>
+        </div>
+      )}
+
+      {tab === 'templates' && !loading && (
+        <div className="space-y-4">
+          {templateItems.length === 0 ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">暂无模板</p>
+          ) : (
+            <div className="space-y-3">
+              {templateItems.map((item) => (
+                <div key={item.id} className="card rounded-xl p-4">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{item.name}</span>
+                      {item.builtin && <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">内置</span>}
+                    </div>
+                    <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">v{item.version}</span>
+                  </div>
+                  <p className="font-mono text-xs text-zinc-600 dark:text-zinc-400">键：{item.key}</p>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">分类：{item.category}</p>
+                  <p className="mt-2 break-words text-sm text-zinc-700 dark:text-zinc-300">主题模板：{item.subject_template}</p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {item.variables.map((v) => (
+                      <span key={v} className="rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">{v}</span>
+                    ))}
+                  </div>
+                  {item.required_variables.length > 0 && (
+                    <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">必需变量：{item.required_variables.join(', ')}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-xs text-zinc-400 dark:text-zinc-500">模板为只读视图；恢复默认需通过受保护的迁移或 CLI 操作。</p>
+        </div>
+      )}
+
+      {tab === 'rules' && !loading && (
+        <div className="space-y-4">
+          {ruleData && (
+            <>
+              <div className="card rounded-xl p-5">
+                <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">限流策略</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="border-b border-zinc-200 dark:border-zinc-800">
+                      <tr className="text-left text-zinc-500 dark:text-zinc-400">
+                        <th className="px-3 py-2">策略</th>
+                        <th className="px-3 py-2">限额</th>
+                        <th className="px-3 py-2">窗口(秒)</th>
+                        <th className="px-3 py-2">版本</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ruleData.policies.map((p) => (
+                        <tr key={p.key} className="border-b border-zinc-100 dark:border-zinc-900">
+                          <td className="px-3 py-2 font-mono text-xs text-zinc-700 dark:text-zinc-300">{p.key}</td>
+                          <td className="px-3 py-2 text-zinc-700 dark:text-zinc-300">{p.limit}</td>
+                          <td className="px-3 py-2 text-zinc-700 dark:text-zinc-300">{p.window_seconds}</td>
+                          <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">{p.version}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div className="card rounded-xl p-5">
+                <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">系统来源</h2>
+                <div className="space-y-2">
+                  {ruleData.system_sources.map((s) => (
+                    <div key={s.key} className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-zinc-700 dark:text-zinc-300">{s.label}</span>
+                      <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">{s.source}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">{ruleData.note}</p>
+            </>
+          )}
+        </div>
+      )}
+
+      {tab === 'suppress' && !loading && (
+        <div className="space-y-4">
+          {suppressItems.length === 0 ? (
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">暂无永久抑制记录</p>
+          ) : (
+            <div className="card overflow-x-auto rounded-xl">
+              <table className="w-full text-sm">
+                <thead className="border-b border-zinc-200 dark:border-zinc-800">
+                  <tr className="text-left text-zinc-500 dark:text-zinc-400">
+                    <th className="px-3 py-2">分类</th>
+                    <th className="px-3 py-2">收件人</th>
+                    <th className="px-3 py-2">错误</th>
+                    <th className="px-3 py-2">时间</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {suppressItems.map((item) => (
+                    <tr key={item.id} className="border-b border-zinc-100 dark:border-zinc-900">
+                      <td className="px-3 py-2 text-zinc-700 dark:text-zinc-300">{item.category}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-zinc-600 dark:text-zinc-400">{item.recipient_masked}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-red-600 dark:text-red-400">{item.last_error_class}</td>
+                      <td className="px-3 py-2 text-zinc-600 dark:text-zinc-400">{fmtDate(item.created)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="text-xs text-zinc-400 dark:text-zinc-500">仅展示因永久地址错误而最终失败的记录；解除抑制需重新触发合法业务事件。</p>
         </div>
       )}
 

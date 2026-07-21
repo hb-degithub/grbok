@@ -17,3 +17,15 @@ routerAdd('GET', '/api/blog-admin/mail/logs', function (c) {
 routerAdd('POST', '/api/blog-admin/mail/verify', function (c) {
   return mailAdmin.verify(c);
 });
+
+routerAdd('GET', '/api/blog-admin/mail/templates', function (c) {
+  return mailAdmin.templates(c);
+});
+
+routerAdd('GET', '/api/blog-admin/mail/rules', function (c) {
+  return mailAdmin.rules(c);
+});
+
+routerAdd('GET', '/api/blog-admin/mail/suppress', function (c) {
+  return mailAdmin.suppress(c);
+});

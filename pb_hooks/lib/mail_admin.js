@@ -213,6 +213,100 @@ function verify(c) {
   });
 }
 
+function templates(c) {
+  stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
+
+  var rows = [];
+  try {
+    rows = $app.dao().findRecordsByFilter('mail_templates', 'is_current = true', 'category,key', 100, 0, {});
+  } catch (_) {}
+
+  var items = rows.map(function (r) {
+    var variablesJson = '';
+    var requiredVariablesJson = '';
+    try { variablesJson = r.getString('variables_json') || ''; } catch (_) {}
+    try { requiredVariablesJson = r.getString('required_variables_json') || ''; } catch (_) {}
+    var variables = [];
+    var required = [];
+    try { variables = JSON.parse(variablesJson); } catch (_) {}
+    try { required = JSON.parse(requiredVariablesJson); } catch (_) {}
+    return {
+      id: r.id,
+      key: r.getString('key'),
+      name: r.getString('name'),
+      category: r.getString('category'),
+      version: r.getInt('version'),
+      is_current: r.getBool('is_current'),
+      builtin: r.getBool('builtin'),
+      subject_template: r.getString('subject_template') || '',
+      variables: Array.isArray(variables) ? variables : [],
+      required_variables: Array.isArray(required) ? required : [],
+    };
+  });
+
+  return c.json(200, { items: items });
+}
+
+function rules(c) {
+  stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
+
+  var dao = $app.dao();
+  var policies = [];
+  try {
+    var policyRows = dao.findRecordsByFilter('security_rate_policies', 'id != ""', 'key', 100, 0, {});
+    policies = policyRows.map(function (r) {
+      return {
+        key: r.getString('key'),
+        limit: r.getInt('limit'),
+        window_seconds: r.getInt('window_seconds'),
+        version: r.getInt('version'),
+      };
+    });
+  } catch (_) {}
+
+  var mailPolicies = policies.filter(function (p) {
+    return p.key.indexOf('mail') !== -1 || p.key.indexOf('outbound') !== -1 || p.key.indexOf('guestbook') !== -1 || p.key.indexOf('comment') !== -1;
+  });
+
+  return c.json(200, {
+    policies: mailPolicies,
+    system_sources: [
+      { key: 'comment_new', label: '新评论通知', source: 'Outbox', editable: false },
+      { key: 'account_retention_notice', label: '账户保留提醒', source: 'Outbox', editable: false },
+      { key: 'account_verification', label: '注册验证', source: '同步', editable: false },
+      { key: 'account_password_reset', label: '密码重置', source: '同步', editable: false },
+      { key: 'account_email_change', label: '邮箱变更', source: '同步', editable: false },
+      { key: 'reader_otp', label: 'Reader 验证码', source: '同步', editable: false },
+      { key: 'ops_alert', label: '运维告警', source: '宿主机 CLI', editable: false },
+    ],
+    note: '当前为只读视图；规则写入需通过安全策略端点在硬边界内修改。',
+  });
+}
+
+function suppress(c) {
+  stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
+
+  var rows = [];
+  try {
+    rows = $app.dao().findRecordsByFilter(
+      'mail_outbox',
+      'status = "failed" && last_error_class = "RECIPIENT_PERMANENT"',
+      '-created', 100, 0, {}
+    );
+  } catch (_) {}
+
+  var items = rows.map(function (r) {
+    return {
+      id: r.id,
+      category: r.getString('category'),
+      recipient_masked: maskRecipient(r.getString('recipient')),
+      last_error_class: r.getString('last_error_class') || '',
+      created: r.getString('created') || '',
+    };
+  });
+
+  return c.json(200, { items: items, note: '仅展示因永久地址错误而最终失败的记录；解除抑制需重新触发合法业务事件。' });
+}
 module.exports = {
   overview: overview,
   queue: queue,
