@@ -12,6 +12,13 @@ function apiError(status, code) {
   throw new ApiError(status, code);
 }
 
+function requireTrustedAdminIp(c) {
+  var actual = '';
+  try { actual = String(c.realIP() || '').trim(); } catch (_) {}
+  var configured = String($os.getenv('ADMIN_IP') || '').split(/[\s,]+/).filter(Boolean);
+  if (!actual || configured.indexOf(actual) === -1) apiError(403, 'ADMIN_NETWORK_DENIED');
+}
+
 function integerParam(value, fallback, min, max) {
   var num = Number(value);
   if (!Number.isSafeInteger(num) || num < min || num > max) return fallback;
@@ -58,6 +65,7 @@ function countByFilter(dao, collection, filter, params) {
 }
 
 function overview(c) {
+  requireTrustedAdminIp(c);
   stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
 
   var dao = $app.dao();
@@ -116,6 +124,7 @@ function overview(c) {
 }
 
 function queue(c) {
+  requireTrustedAdminIp(c);
   stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
 
   var page = integerParam(c.queryParam('page'), 1, 1, 1000);
@@ -155,6 +164,7 @@ function queue(c) {
 }
 
 function logs(c) {
+  requireTrustedAdminIp(c);
   stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
 
   var page = integerParam(c.queryParam('page'), 1, 1, 1000);
@@ -195,6 +205,7 @@ function logs(c) {
 }
 
 function verify(c) {
+  requireTrustedAdminIp(c);
   stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
 
   var status = null;
@@ -214,6 +225,7 @@ function verify(c) {
 }
 
 function templates(c) {
+  requireTrustedAdminIp(c);
   stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
 
   var rows = [];
@@ -248,6 +260,7 @@ function templates(c) {
 }
 
 function rules(c) {
+  requireTrustedAdminIp(c);
   stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
 
   var dao = $app.dao();
@@ -284,6 +297,7 @@ function rules(c) {
 }
 
 function suppress(c) {
+  requireTrustedAdminIp(c);
   stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
 
   var rows = [];
