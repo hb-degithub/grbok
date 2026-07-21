@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import GalleryManager from '../../components/admin/GalleryManager';
+---
+
+<AdminLayout title="相册管理" description="管理相册图片" requiredRole="author">
+  <GalleryManager client:load />
+</AdminLayout>

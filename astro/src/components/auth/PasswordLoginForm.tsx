@@ -187,6 +187,11 @@ export default function PasswordLoginForm() {
                 {status === 'loading' ? '登录中...' : '登录'}
               </PixelButton>
             </motion.div>
+            <motion.div variants={itemVariants} className="flex justify-end">
+              <a href="/forgot-password" className="text-xs text-zinc-500 no-underline transition-colors hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400">
+                忘记密码？
+              </a>
+            </motion.div>
           </motion.form>
         </motion.div>
       )}

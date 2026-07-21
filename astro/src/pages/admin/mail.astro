@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import MailCenter from '../../components/admin/MailCenter';
+---
+
+<AdminLayout title="邮件中心" description="邮件运营治理面板" requiredRole="super_admin">
+  <MailCenter client:load />
+</AdminLayout>

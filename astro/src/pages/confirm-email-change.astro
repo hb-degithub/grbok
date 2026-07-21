@@ -1,0 +1,8 @@
+---
+import AuthLayout from '../layouts/AuthLayout.astro';
+import ConfirmEmailChangeForm from '../components/auth/ConfirmEmailChangeForm';
+---
+
+<AuthLayout title="确认邮箱变更" description="确认新邮箱地址" noindex>
+  <ConfirmEmailChangeForm client:load />
+</AuthLayout>

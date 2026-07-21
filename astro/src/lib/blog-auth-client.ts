@@ -42,3 +42,51 @@ export async function verifyReaderOtp(challengeId: string, code: string): Promis
   pb.authStore.save(result.token, result.record);
   return result;
 }
+
+export interface MailRequestAcceptedResponse {
+  accepted: true;
+  code: 'MAIL_REQUEST_ACCEPTED';
+  referenceId: string;
+  message?: string;
+  retryAfterSeconds?: number;
+}
+
+export interface DetailedRateLimitResponse {
+  accepted: false;
+  code: 'EMAIL_RATE_LIMITED' | 'IP_RATE_LIMITED' | 'GLOBAL_RATE_LIMITED' | 'REQUEST_RATE_LIMITED';
+  referenceId: string;
+  message?: string;
+  retryAfterSeconds?: number;
+}
+
+export type AccountMailResponse = MailRequestAcceptedResponse | DetailedRateLimitResponse;
+
+export function isAccountMailRateLimited(response: AccountMailResponse): response is DetailedRateLimitResponse {
+  return response.accepted === false;
+}
+
+export async function requestPasswordReset(email: string): Promise<AccountMailResponse> {
+  const pb = getPocketBase();
+  return withAuthRequestHeaders(pb, () => pb.send<AccountMailResponse>('/api/blog-auth/password-reset/request', {
+    method: 'POST',
+    body: { email: normalizeAuthEmail(email) },
+  }));
+}
+
+export async function requestEmailChange(newEmail: string): Promise<AccountMailResponse> {
+  const pb = getPocketBase();
+  return withAuthRequestHeaders(pb, () => pb.send<AccountMailResponse>('/api/blog-auth/email-change/request', {
+    method: 'POST',
+    body: { newEmail: normalizeAuthEmail(newEmail) },
+  }));
+}
+
+export async function confirmPasswordResetToken(token: string, password: string, passwordConfirm: string): Promise<void> {
+  const pb = getPocketBase();
+  await withAuthRequestHeaders(pb, () => pb.collection('users').confirmPasswordReset(token, password, passwordConfirm));
+}
+
+export async function confirmEmailChangeToken(token: string, password: string): Promise<void> {
+  const pb = getPocketBase();
+  await withAuthRequestHeaders(pb, () => pb.collection('users').confirmEmailChange(token, password));
+}

@@ -129,9 +129,19 @@ export default function AuthStatusControl() {
               <span aria-hidden="true">→</span>
             </a>
           )}
+          <a
+            href="/account/email-change"
+            ref={setMenuItemRef(canAccessAdmin ? 1 : 0)}
+            tabIndex={-1}
+            className="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 no-underline transition-colors hover:bg-zinc-100 hover:text-zinc-950 focus:bg-zinc-100 focus:text-zinc-950 focus:outline-none dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white dark:focus:bg-zinc-800 dark:focus:text-white"
+            role="menuitem"
+          >
+            <span>变更邮箱</span>
+            <span aria-hidden="true">↣</span>
+          </a>
           <button
             type="button"
-            ref={setMenuItemRef(canAccessAdmin ? 1 : 0)}
+            ref={setMenuItemRef(canAccessAdmin ? 2 : 1)}
             tabIndex={-1}
             onClick={() => logout('/')}
             className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 focus:bg-red-50 focus:outline-none dark:text-red-300 dark:hover:bg-red-950/40 dark:focus:bg-red-950/40"
