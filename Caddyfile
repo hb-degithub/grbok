@@ -24,10 +24,11 @@
         Cross-Origin-Resource-Policy "same-site"
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
-        # CSP: style-src omits 'unsafe-inline' — TailwindCSS 4 + Astro emit scoped external CSS, no inline <style> needed.
-        # script-src retains 'unsafe-inline' — Astro islands (client:load/visible) and is:inline scripts require it;
+        # CSP: style-src allows 'unsafe-inline' - Framer Motion drives animations via inline styles at runtime;
+        # without it, all JS-set styles are blocked and islands render broken (stacked/hidden).
+        # script-src retains 'unsafe-inline' - Astro islands (client:load/visible) and is:inline scripts require it;
         # removing it would break React hydration and theme/viewport init scripts.
-        Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: https:; style-src 'self' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://hlydwz.com wss://hlydwz.com https://www.beian.gov.cn"
+        Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://hlydwz.com wss://hlydwz.com https://www.beian.gov.cn"
         -Server
         -X-Powered-By
     }
@@ -40,8 +41,16 @@
         respond "Forbidden" 403
     }
 
+    # Service worker must never be cached long-term: browsers revalidate it on every
+    # navigation, and a stale sw.js breaks deploys (cached old assets/HTML).
+    handle /sw.js {
+        header Cache-Control "no-cache, no-store, must-revalidate"
+        file_server
+    }
+
     @static {
         path /_astro/* /pagefind/* *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.webp *.avif *.woff *.woff2 *.ttf *.eot
+        not path /sw.js
     }
     handle @static {
         header Cache-Control "public, max-age=31536000, immutable"

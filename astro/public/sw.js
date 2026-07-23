@@ -1,6 +1,9 @@
-﻿const CACHE_VERSION = '__CACHE_VERSION__';
+const CACHE_VERSION = '__CACHE_VERSION__';
 const CACHE_NAME = 'huba-blog-' + CACHE_VERSION;
-const CORE_ASSETS = ['/', '/offline/', '/favicon.svg', '/favicon.ico'];
+// NOTE: do NOT cache '/' or any HTML here. Caching HTML pages lets stale
+// pages resurface forever (esp. via client-side router fetches).
+const CORE_ASSETS = ['/offline/', '/favicon.svg', '/favicon.ico'];
+const STATIC_EXT = /\.(css|js|mjs|woff2?|ttf|eot|png|jpe?g|gif|svg|ico|webp|avif)$/i;
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -19,6 +22,12 @@ self.addEventListener('activate', e => {
   );
 });
 
+function isStaticAsset(url) {
+  return url.pathname.startsWith('/_astro/') ||
+         url.pathname.startsWith('/pagefind/') ||
+         STATIC_EXT.test(url.pathname);
+}
+
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
@@ -27,7 +36,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Never cache API requests - always network-first
+  // Never cache API requests - always network
   if (url.pathname.startsWith('/api/')) {
     e.respondWith(fetch(e.request).catch(() => caches.match('/offline/')));
     return;
@@ -41,25 +50,28 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Static assets: stale-while-revalidate (return cached immediately, refresh in background)
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const fetchPromise = fetch(e.request).then(resp => {
-        if (resp.ok && (url.pathname.startsWith('/_astro/') || url.pathname.match(/\.(css|js|woff2?|png|jpg|jpeg|gif|svg|ico|webp)$/))) {
-          const clone = resp.clone();
-          caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
-        }
-        return resp;
-      }).catch(() => cached);
-      return cached || fetchPromise;
-    })
-  );
-});
+  // Static assets only: stale-while-revalidate.
+  // IMPORTANT: HTML/document requests (e.g. Astro ClientRouter page fetches)
+  // must NEVER be served from cache - always go to network.
+  if (e.request.destination === 'document') {
+    return;
+  }
 
-self.addEventListener('push', e => {
-  const data = e.data ? e.data.json() : {};
-  self.registration.showNotification(data.title || '', {
-    body: data.body || '',
-    icon: '/favicon.svg'
-  });
+  if (isStaticAsset(url)) {
+    e.respondWith(
+      caches.match(e.request).then(cached => {
+        const fetchPromise = fetch(e.request).then(resp => {
+          if (resp.ok) {
+            const clone = resp.clone();
+            caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
+          }
+          return resp;
+        }).catch(() => cached);
+        return cached || fetchPromise;
+      })
+    );
+    return;
+  }
+
+  // Everything else: plain network passthrough (no caching)
 });

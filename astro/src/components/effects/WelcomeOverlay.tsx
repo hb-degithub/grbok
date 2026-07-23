@@ -66,7 +66,10 @@ export default function WelcomeOverlay() {
   }, [isMobile]);
 
   useEffect(() => {
-    if (!hasBeenWelcomed()) {
+    // Never show the welcome guide on auth/admin pages - it would block login.
+    const path = window.location.pathname;
+    const skipOverlay = path.startsWith('/login') || path.startsWith('/admin');
+    if (!hasBeenWelcomed() && !skipOverlay) {
       const pb = getPocketBase();
       setIsLoggedIn(pb.authStore.isValid && !!pb.authStore.record);
       setVisible(true);
@@ -358,7 +361,7 @@ export default function WelcomeOverlay() {
                         </button>
 
                         <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
-                          已有账户？<a href="/login" className="text-teal-600 hover:underline dark:text-teal-400">登录</a>
+                          已有账户？<a href="/login" onClick={dismiss} className="text-teal-600 hover:underline dark:text-teal-400">登录</a>
                           <span className="mx-1.5">·</span>
                           <button type="button" onClick={() => setShowSkipConfirm(true)} className="text-teal-600 hover:underline dark:text-teal-400">跳过注册</button>
                         </p>
