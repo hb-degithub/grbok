@@ -55,7 +55,7 @@ astro/                    # Astro frontend (npm workspace)
 
 pb_hooks/                 # PocketBase server-side hooks (.pb.js suffix required)
   guard_user_role.pb.js   # Enforce user role on create/update
-  login_security.pb.js.disabled  # Disabled (caused login 400 errors)
+  login_security.pb.js           # Per-IP/per-email password-login rate limiting (re-enabled & fixed)
   send_email_comment.pb.js       # Email notification on new comments
   validate_comment.pb.js         # Server-side comment validation + email verification gate
   configure_smtp.pb.js           # Auto-configure SMTP from ALIYUN_SMTP_* env vars on startup
@@ -92,7 +92,7 @@ tmp/                      # Temporary deployment artifacts
 - `security.ts` provides browser fingerprint, CSRF, and rate limiting utilities.
 - Admin pages are guarded by `AdminGuard` (server-side token validation + email verification + passkey MFA).
 - Caddy handles: HSTS, CSP, X-Frame-Options, directory-scan blocking, admin UI IP whitelist.
-- `login_security.pb.js` is DISABLED — dont re-enable without testing login flow.
+- `login_security.pb.js` is ENABLED — per-IP (10/15min) + per-email (5/15min) password-login rate limiting. It uses `realIP()` (not the spoofable `X-Forwarded-For`) and a `globalThis`-persisted bucket, which fixed the 400-error regression that originally forced it to be disabled.
 - `validate_comment.pb.js` logs IP address but excludes it from public API responses; also enforces email verification for registered commenters.
 - `configure_smtp.pb.js` auto-configures SMTP on PB startup from `ALIYUN_SMTP_*` env vars (only if SMTP not already enabled).
 
@@ -183,7 +183,7 @@ Static files are served from `astro/dist/`, mounted read-only at `/srv` in Caddy
 6. Bug fixes — hydration issues, encoding, Chinese error messages, CSS aliases
 
 ## Gotchas
-- Dont touch `login_security.pb.js.disabled` — re-enabling breaks login.
+- `login_security.pb.js` was previously disabled (`.disabled` suffix) because an early version caused login 400 errors. The current version is re-enabled and fixed (uses `realIP()` + `globalThis` bucket). If you change its rate-limiting logic, test the password login flow for both `users` and `admins` auth.
 - React components must use `export default`, never named exports.
 - Chinese text in PocketBase rules requires exact matching (past encoding issues).
 - `pagefind` runs as a post-build step in `npm run build`.

@@ -18,6 +18,8 @@ pb_data/
 .vscode/
 .idea/
 .claude/settings.local.json
+.codex/
+.qoder/
 *.swp
 *.swo
 
