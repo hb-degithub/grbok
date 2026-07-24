@@ -1,0 +1,7 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import VersionHistory from '../../../components/admin/VersionHistory';
+---
+<AdminLayout title="版本历史" requiredRole="admin">
+  <VersionHistory client:only="react" />
+</AdminLayout>

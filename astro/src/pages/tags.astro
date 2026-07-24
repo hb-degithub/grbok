@@ -15,7 +15,7 @@ interface Tag {
 
 async function fetchTags(): Promise<Tag[]> {
   try {
-    const res = await fetch(`${PB_URL}/api/collections/tags/records?sort=-created`);
+    const res = await fetch(`${PB_URL}/api/collections/tags/records?sort=-created`, { signal: AbortSignal.timeout(3000) });
     if (!res.ok) throw new Error(`${res.status}`);
     const data = await res.json();
     return data.items ?? [];
@@ -43,7 +43,7 @@ interface TagPost {
 async function fetchTagPostMap(): Promise<Map<string, { posts: TagPost[]; total: number }>> {
   const map = new Map<string, { posts: TagPost[]; total: number }>();
   try {
-    const res = await fetch(`${PB_URL}/api/collections/post_tags/records?perPage=500&expand=post_id&fields=tag_id,expand.post_id.title,expand.post_id.slug,expand.post_id.published_at,expand.post_id.status`);
+    const res = await fetch(`${PB_URL}/api/collections/post_tags/records?perPage=500&expand=post_id&fields=tag_id,expand.post_id.title,expand.post_id.slug,expand.post_id.published_at,expand.post_id.status`, { signal: AbortSignal.timeout(3000) });
     if (!res.ok) throw new Error(`${res.status}`);
     const data = await res.json();
     const records: PostTagRecord[] = data.items ?? [];

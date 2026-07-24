@@ -20,7 +20,9 @@ const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 async function fetchCount(collection: string, filter?: string): Promise<number> {
   try {
     const qs = filter ? `?filter=${encodeURIComponent(filter)}&perPage=1` : '?perPage=1';
-    const res = await fetch(`${PB_URL}/api/collections/${collection}/records${qs}`);
+    const res = await fetch(`${PB_URL}/api/collections/${collection}/records${qs}`, {
+      signal: AbortSignal.timeout(3000),
+    });
     if (!res.ok) throw new Error(`${res.status}`);
     const data = await res.json();
     return data.totalItems ?? 0;

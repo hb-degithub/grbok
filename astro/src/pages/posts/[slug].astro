@@ -13,7 +13,7 @@ export async function getStaticPaths() {
   try {
     const pbUrl = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
     const filter = encodeURIComponent('status="published"');
-    const res = await fetch(`${pbUrl}/api/collections/posts/records?filter=${filter}&fields=slug&perPage=200`);
+    const res = await fetch(`${pbUrl}/api/collections/posts/records?filter=${filter}&fields=slug&perPage=200`, { signal: AbortSignal.timeout(3000) });
     if (!res.ok) return [];
     const data = await res.json();
     return (data.items || [])
@@ -47,7 +47,7 @@ async function fetchPost(postSlug: string): Promise<Post | null> {
   try {
     const safeSlug = postSlug.replace(/["\\]/g, '');
     const filter = `slug="${safeSlug}" && status="published"`;
-    const res = await fetch(`${PB_URL}/api/collections/posts/records?filter=${encodeURIComponent(filter)}&expand=author`);
+    const res = await fetch(`${PB_URL}/api/collections/posts/records?filter=${encodeURIComponent(filter)}&expand=author`, { signal: AbortSignal.timeout(3000) });
     if (!res.ok) throw new Error(`${res.status}`);
     const data = await res.json();
     return data.items?.[0] ?? null;

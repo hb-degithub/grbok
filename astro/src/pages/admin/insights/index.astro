@@ -1,0 +1,7 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import InsightsDashboard from '../../../components/admin/InsightsDashboard';
+---
+<AdminLayout title="数据洞察" requiredRole="admin">
+  <InsightsDashboard client:only="react" />
+</AdminLayout>
