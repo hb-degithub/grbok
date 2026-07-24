@@ -1,7 +1,7 @@
 ﻿{
   "name": "admin-auth",
   "version": "1.0.0",
-  "description": "Internal admin authentication and WebAuthn service",
+  "description": "Internal admin authentication and mail gateway service",
   "type": "module",
   "scripts": {
     "start": "node src/server.mjs",
@@ -9,7 +9,6 @@
     "mail:cli": "node src/mail/cli.mjs"
   },
   "dependencies": {
-    "@simplewebauthn/server": "^11.0.0",
     "nodemailer": "9.0.3"
   },
   "engines": {

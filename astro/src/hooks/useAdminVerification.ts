@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchAdminVerificationStatus } from '../lib/admin-passkey';
-import type { AdminStepUpStatus } from '../lib/admin-passkey';
+import { fetchAdminVerificationStatus } from '../lib/admin-totp';
+import type { AdminStepUpStatus } from '../lib/admin-totp';
 
 export interface AdminVerificationState {
   isChecking: boolean;

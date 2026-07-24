@@ -1,7 +1,7 @@
 const RECOVERY_HEADER_PATHS = new Set([
   '/api/blog-admin/step-up/status',
-  '/api/blog-admin/passkeys/registration/options',
-  '/api/blog-admin/passkeys/registration/verify',
+  '/api/blog-admin/totp/setup',
+  '/api/blog-admin/totp/confirm',
 ]);
 
 type StatusBearingError = {

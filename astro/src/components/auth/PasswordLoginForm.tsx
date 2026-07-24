@@ -5,7 +5,7 @@ import { runAfterAdminCredentialRevoked } from '../../lib/admin-auth-lifecycle';
 import { clearAdminStepUp } from '../../lib/admin-step-up';
 import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
-import AdminPasskeyStep from './AdminPasskeyStep';
+import TotpStepGate from './TotpStepGate';
 import {
   RateLimiter,
   clearAuthFailures,
@@ -70,7 +70,7 @@ export default function PasswordLoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
-  const [passkeyStep, setPasskeyStep] = useState(false);
+  const [totpStep, setTotpStep] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [success, setSuccess] = useState(false);
 
@@ -88,7 +88,7 @@ export default function PasswordLoginForm() {
 
   const handlePostLogin = (role: unknown) => {
     if (adminRoles.has(String(role))) {
-      setPasskeyStep(true);
+      setTotpStep(true);
       setStatus('idle');
       return;
     }
@@ -151,11 +151,11 @@ export default function PasswordLoginForm() {
   };
 
 
-  if (passkeyStep) {
+  if (totpStep) {
     return (
-      <AdminPasskeyStep
+      <TotpStepGate
         onReturnToLogin={() => {
-          setPasskeyStep(false);
+          setTotpStep(false);
           setStatus('idle');
         }}
       />

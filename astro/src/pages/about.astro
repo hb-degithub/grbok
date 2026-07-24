@@ -60,13 +60,13 @@ const techStack = [
     ],
   },
   {
-    name: 'WebAuthn',
-    desc: '管理员 Passkey 双因素认证',
-    detail: '管理后台采用 Passkey（WebAuthn）无密码认证，配合独立 admin-auth 服务完成挑战校验。',
+    name: 'TOTP',
+    desc: '管理员 TOTP 双因素认证',
+    detail: '管理后台采用 TOTP（RFC 6238）动态码二次验证，兼容 Google Authenticator 等主流认证器。',
     points: [
-      '生物识别 / 安全密钥登录，免疫钓鱼与撞库',
-      '敏感操作二次验证（step-up auth）',
-      '挑战与浏览器会话绑定，事务化签发防重放',
+      '扫码绑定，6 位动态码 30 秒轮换，防重放水线保护',
+      '敏感操作二次验证（step-up auth），会话绑定浏览器指纹',
+      '密钥加密存储，宿主机恢复码兜底防锁定',
     ],
   },
   {
@@ -104,11 +104,11 @@ const features = [
   },
   {
     title: '管理员体系',
-    desc: 'RBAC 四级角色，WebAuthn Passkey 二次验证，服务端认证守卫，IP 白名单',
+    desc: 'RBAC 四级角色，TOTP 动态码二次验证，服务端认证守卫，IP 白名单',
     detail: '管理后台独立认证服务，敏感操作强制二次验证，从身份到网络多层收窄入口。',
     points: [
       '四级角色：读者 / 作者 / 管理员 / 超级管理员',
-      '删号、改密等敏感操作需 Passkey step-up 验证',
+      '删号、改密等敏感操作需 TOTP step-up 验证',
       'Caddy 层管理路径 IP 白名单，未授权直接 403',
     ],
   },

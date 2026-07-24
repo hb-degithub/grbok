@@ -2,7 +2,6 @@ import { createServer as createHttpServer } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
 import { argv, env } from 'node:process';
 import { pathToFileURL } from 'node:url';
-import * as simpleWebAuthnAdapter from '@simplewebauthn/server';
 import nodemailer from 'nodemailer';
 import { createConfig } from './config.mjs';
 import { createMailConfig } from './mail/config.mjs';
@@ -10,13 +9,11 @@ import { createMailHttpHandler } from './mail/http.mjs';
 import { createMailRequestVerifier } from './mail/request-auth.mjs';
 import { createMailService } from './mail/service.mjs';
 import { createMailTransport } from './mail/transport.mjs';
-import { createVerifiedSessionRecord, isVerifiedSessionValid } from './session-policy.mjs';
+import { isVerifiedSessionValid } from './session-policy.mjs';
 import { createStepUpCredential, verifyStepUpCredential } from './step-up-policy.mjs';
-import { createWebAuthnService } from './webauthn-service.mjs';
 
 export function createServer({
   config,
-  webauthnService,
   mailHttpHandler = { handle: async () => false },
   logger = console,
 }) {
@@ -92,21 +89,6 @@ export function createServer({
       let result;
 
       switch (url.pathname) {
-        case '/internal/webauthn/registration/options': {
-          const { userId, userName, challenge } = body;
-          result = await webauthnService.registrationOptions({ userId, userName, challenge });
-          break;
-        }
-        case '/internal/webauthn/registration/verify': {
-          const { response, expectedChallenge } = body;
-          result = await webauthnService.verifyRegistration({ response, expectedChallenge });
-          break;
-        }
-        case '/internal/webauthn/authentication/options': {
-          const { challenge, allowCredentials } = body;
-          result = await webauthnService.authenticationOptions({ challenge, allowCredentials });
-          break;
-        }
         case '/internal/session/verify': {
           const { record, token, fingerprint, ip, userAgent } = body;
           const valid = isVerifiedSessionValid(record, { token, fingerprint, ip, userAgent }, config.hashSecret);
@@ -138,17 +120,6 @@ export function createServer({
           );
           sendJson(res, 200, { verified });
           return;
-        }
-        case '/internal/webauthn/authentication/verify': {
-          const { response, expectedChallenge, authenticator, userId, token, fingerprint, ip, userAgent } = body;
-          result = await webauthnService.verifyAuthentication({ response, expectedChallenge, authenticator });
-          if (result.verified) {
-            result.session = createVerifiedSessionRecord(
-              { userId, token, fingerprint, ip, userAgent },
-              { hashSecret: config.hashSecret, sessionTtlSeconds: config.sessionTtlSeconds }
-            );
-          }
-          break;
         }
         default:
           sendJson(res, 404, { error: 'Not found' });
@@ -239,7 +210,6 @@ function sendJson(res, status, body) {
 
 export function startServer({
   config = createConfig(),
-  adapter = simpleWebAuthnAdapter,
   // Bind to 0.0.0.0 so the PocketBase container can reach this service over
   // the Docker bridge network (PB connects to http://admin-auth:8787). This
   // is NOT a host exposure: docker-compose uses `expose:` (not `ports:`), so
@@ -249,13 +219,12 @@ export function startServer({
   host = env.HOST || '0.0.0.0',
   port = parseInt(env.PORT || '8787', 10),
 } = {}) {
-  const webauthnService = createWebAuthnService(adapter, config);
   const mailConfig = createMailConfig(env);
   const mailTransport = createMailTransport({ config: mailConfig, nodemailer });
   const mailService = createMailService({ config: mailConfig, transport: mailTransport });
   const mailVerifier = createMailRequestVerifier({ secret: config.mailInternalSecret });
   const mailHttpHandler = createMailHttpHandler({ verifier: mailVerifier, service: mailService, config: mailConfig });
-  const server = createServer({ config, webauthnService, mailHttpHandler });
+  const server = createServer({ config, mailHttpHandler });
 
   server.listen(port, host, () => {
     console.log(`admin-auth listening on ${host}:${port}`);

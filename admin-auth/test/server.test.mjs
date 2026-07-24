@@ -50,26 +50,7 @@ describe('server', () => {
   let calls = [];
 
   before(async () => {
-    const webauthnService = {
-      registrationOptions: async ({ userId, userName, challenge }) => {
-        calls.push({ method: 'registrationOptions', args: { userId, userName, challenge } });
-        return { challenge, user: { id: userId, name: userName } };
-      },
-      verifyRegistration: async ({ response, expectedChallenge }) => {
-        calls.push({ method: 'verifyRegistration', args: { response, expectedChallenge } });
-        return { verified: true, registrationInfo: { credential: { id: 'cred-id', publicKey: new Uint8Array([1, 2, 3]) } } };
-      },
-      authenticationOptions: async ({ challenge, allowCredentials }) => {
-        calls.push({ method: 'authenticationOptions', args: { challenge, allowCredentials } });
-        return { challenge, allowCredentials };
-      },
-      verifyAuthentication: async ({ response, expectedChallenge, authenticator }) => {
-        calls.push({ method: 'verifyAuthentication', args: { response, expectedChallenge, authenticator } });
-        return { verified: true, authenticationInfo: {} };
-      },
-    };
-
-    server = createServer({ config, webauthnService });
+    server = createServer({ config });
     baseUrl = await listenOnFetchSafePort(server);
   });
 
@@ -85,12 +66,12 @@ describe('server', () => {
   });
 
   it('rejects missing internal secret', async () => {
-    const res = await fetch(`${baseUrl}/internal/webauthn/registration/options`, { method: 'POST' });
+    const res = await fetch(`${baseUrl}/internal/step-up/issue`, { method: 'POST' });
     assert.equal(res.status, 403);
   });
 
   it('rejects invalid internal secret', async () => {
-    const res = await fetch(`${baseUrl}/internal/webauthn/registration/options`, {
+    const res = await fetch(`${baseUrl}/internal/step-up/issue`, {
       method: 'POST',
       headers: { 'X-Internal-Secret': 'wrong', 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
@@ -99,7 +80,7 @@ describe('server', () => {
   });
 
   it('rejects request bodies larger than 1 MiB', async () => {
-    const res = await fetch(`${baseUrl}/internal/webauthn/registration/options`, {
+    const res = await fetch(`${baseUrl}/internal/step-up/issue`, {
       method: 'POST',
       headers: { 'X-Internal-Secret': config.internalSecret, 'Content-Type': 'application/json' },
       body: JSON.stringify({ payload: 'x'.repeat(1024 * 1024) }),
@@ -108,43 +89,15 @@ describe('server', () => {
     assert.deepEqual(await res.json(), { error: 'Request body too large' });
   });
 
-  it('POST /internal/webauthn/registration/options forwards to service', async () => {
-    calls.length = 0;
+  it('POST /internal/webauthn/* routes are removed (404)', async () => {
     const res = await fetch(`${baseUrl}/internal/webauthn/registration/options`, {
       method: 'POST',
       headers: { 'X-Internal-Secret': config.internalSecret, 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: 'u1', userName: 'a@b.com', challenge: 'c1' }),
     });
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.challenge, 'c1');
-    assert.equal(calls[0].method, 'registrationOptions');
+    assert.equal(res.status, 404);
   });
 
-  it('POST /internal/webauthn/authentication/verify creates verified session record', async () => {
-    calls.length = 0;
-    const res = await fetch(`${baseUrl}/internal/webauthn/authentication/verify`, {
-      method: 'POST',
-      headers: { 'X-Internal-Secret': config.internalSecret, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        response: { id: 'cred' },
-        expectedChallenge: 'c2',
-        authenticator: { id: 'cred' },
-        userId: 'u1',
-        token: 'tok',
-        fingerprint: 'fp',
-        ip: '127.0.0.1',
-        userAgent: 'UA',
-      }),
-    });
-    assert.equal(res.status, 200);
-    const body = await res.json();
-    assert.equal(body.verified, true);
-    assert.equal(body.session.user_id, 'u1');
-    assert.equal(typeof body.session.token_hash, 'string');
-    assert.equal(typeof body.session.fingerprint_hash, 'string');
-    assert.equal(calls[0].method, 'verifyAuthentication');
-  });
   it('POST /internal/session/verify validates binding hashes', async () => {
     calls.length = 0;
     const res = await fetch(`${baseUrl}/internal/session/verify`, {
@@ -253,8 +206,7 @@ describe('server', () => {
 
 });
 
-it('delegates mail routes before legacy auth without affecting health or WebAuthn', async () => {
-  const webauthnService = { registrationOptions: async ({ challenge }) => ({ challenge }) };
+it('delegates mail routes before legacy auth without affecting health or step-up', async () => {
   const mailHttpHandler = {
     async handle(req, res, url) {
       assert.equal(url.pathname, '/internal/mail/status');
@@ -263,19 +215,19 @@ it('delegates mail routes before legacy auth without affecting health or WebAuth
       return true;
     },
   };
-  const isolated = createServer({ config, webauthnService, mailHttpHandler });
+  const isolated = createServer({ config, mailHttpHandler });
   const url = await listenOnFetchSafePort(isolated);
   try {
     assert.equal((await fetch(`${url}/health`)).status, 200);
     for (let index = 0; index < 31; index += 1) {
       assert.equal((await fetch(`${url}/internal/mail/status`)).status, 418);
     }
-    const response = await fetch(`${url}/internal/webauthn/registration/options`, {
+    const response = await fetch(`${url}/internal/step-up/issue`, {
       method: 'POST', headers: { 'X-Internal-Secret': config.internalSecret, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ challenge: 'still-works' }),
+      body: JSON.stringify({ userId: 'u1', clientSession: 'cs', fingerprint: 'fp', ip: '127.0.0.1', userAgent: 'UA' }),
     });
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { challenge: 'still-works' });
+    assert.equal(typeof (await response.json()).credential, 'string');
   } finally { await new Promise((resolve) => isolated.close(resolve)); }
 
   const throwingMailHandler = createMailHttpHandler({
@@ -285,17 +237,17 @@ it('delegates mail routes before legacy auth without affecting health or WebAuth
     },
     config: {},
   });
-  const isolatedFromMail = createServer({ config, webauthnService, mailHttpHandler: throwingMailHandler });
+  const isolatedFromMail = createServer({ config, mailHttpHandler: throwingMailHandler });
   const isolatedUrl = await listenOnFetchSafePort(isolatedFromMail);
   try {
     assert.equal((await fetch(`${isolatedUrl}/internal/mail/status`)).status, 500);
     assert.equal((await fetch(`${isolatedUrl}/health`)).status, 200);
-    const response = await fetch(`${isolatedUrl}/internal/webauthn/registration/options`, {
+    const response = await fetch(`${isolatedUrl}/internal/step-up/issue`, {
       method: 'POST', headers: { 'X-Internal-Secret': config.internalSecret, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ challenge: 'mail-isolated' }),
+      body: JSON.stringify({ userId: 'u1', clientSession: 'cs', fingerprint: 'fp', ip: '127.0.0.1', userAgent: 'UA' }),
     });
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { challenge: 'mail-isolated' });
+    assert.equal(typeof (await response.json()).credential, 'string');
   } finally { await new Promise((resolve) => isolatedFromMail.close(resolve)); }
 });
 
@@ -305,7 +257,6 @@ it('contains hostile top-level handler errors in a stable 500 response', async (
   });
   const isolated = createServer({
     config,
-    webauthnService: {},
     mailHttpHandler: { async handle() { throw hostile; } },
     logger: { error() {} },
   });

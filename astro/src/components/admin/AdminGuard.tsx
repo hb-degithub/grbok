@@ -1,7 +1,8 @@
 import React from 'react';
 import { useAdminAuth, type AdminRole } from '../../hooks/useAdminAuth';
 import { useAdminVerification } from '../../hooks/useAdminVerification';
-import AdminPasskeyStep from '../auth/AdminPasskeyStep';
+import TotpSetupStep from '../auth/TotpSetupStep';
+import TotpVerifyStep from '../auth/TotpVerifyStep';
 import AdminEmailVerificationRequired from './AdminEmailVerificationRequired';
 import { useAdminLogout } from '../../hooks/useAdminAuth';
 
@@ -24,7 +25,7 @@ export default function AdminGuard({ children, requiredRole = 'author' }: Props)
     return null;
   }
 
-  // Admin must verify email before passkey step
+  // Admin must verify email before TOTP step
   if (user && !user.emailVerified) {
     return (
       <div className="flex min-h-[100svh] items-center justify-center bg-bg">
@@ -37,13 +38,18 @@ export default function AdminGuard({ children, requiredRole = 'author' }: Props)
 
   if (isVerifying) return null;
 
-  if (!isVerified) return (
-    <div className="flex min-h-[100svh] items-center justify-center bg-bg">
-      <div className="card max-w-md rounded-lg p-8">
-        <AdminPasskeyStep mode={status === 'bootstrap_required' ? 'bootstrap' : status === 'recovery_reenroll' ? 'recovery' : 'verify'} onReturnToLogin={logout} />
+  if (!isVerified) {
+    const needsSetup = status === 'totp_setup_required' || status === 'recovery_reenroll';
+    return (
+      <div className="flex min-h-[100svh] items-center justify-center bg-bg">
+        <div className="card max-w-md rounded-lg p-8">
+          {needsSetup
+            ? <TotpSetupStep mode={status === 'recovery_reenroll' ? 'recovery' : 'setup'} onReturnToLogin={logout} />
+            : <TotpVerifyStep onReturnToLogin={logout} />}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return <>{children}</>;
 }
