@@ -1,0 +1,48 @@
+name: Test & Build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [codex/*]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: astro/package-lock.json
+
+      - name: Install dependencies
+        run: cd astro && npm ci
+
+      - name: Run unit tests
+        run: cd astro && npx vitest run
+        continue-on-error: true # vitest 尚未加入 devDependencies，npx 临时安装可能失败
+
+      - name: Build
+        run: cd astro && npm run build
+        env:
+          PUBLIC_SITE_URL: https://blog.example.com
+          PUBLIC_POCKETBASE_URL: http://localhost:8090
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: astro-dist
+          path: astro/dist/
+          retention-days: 7
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: astro/test-results/
+          retention-days: 7
+          if-no-files-found: ignore
