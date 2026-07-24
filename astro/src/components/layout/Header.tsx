@@ -37,8 +37,12 @@ const themeOptions: Array<{ mode: ThemeMode; label: string; description: string;
 
 function readThemeMode(): ThemeMode {
   if (typeof window === 'undefined') return 'system';
-  const saved = window.localStorage.getItem(THEME_STORAGE_KEY) as ThemeMode | null;
-  return themeOptions.some((item) => item.mode === saved) ? saved : 'system';
+  try {
+    const saved = window.localStorage.getItem(THEME_STORAGE_KEY) as ThemeMode | null;
+    return themeOptions.some((item) => item.mode === saved) ? (saved as ThemeMode) : 'system';
+  } catch {
+    return 'system';
+  }
 }
 
 function readResolvedTheme(): 'light' | 'dark' {
@@ -126,7 +130,11 @@ export default function Header() {
   const activeThemeLabel = useMemo(() => themeOptions.find((item) => item.mode === themeMode)?.label ?? '跟随系统', [themeMode]);
 
   const setMode = (mode: ThemeMode) => {
-    window.localStorage.setItem(THEME_STORAGE_KEY, mode);
+    try {
+      window.localStorage.setItem(THEME_STORAGE_KEY, mode);
+    } catch {
+      // Storage blocked (Safari private mode etc.) — still apply theme for this session.
+    }
     (window as unknown as { __blogApplyTheme?: () => void }).__blogApplyTheme?.();
     window.dispatchEvent(new Event('blog-theme-change'));
     setThemeMenuOpen(false);

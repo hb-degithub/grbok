@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 interface FeedCopyButtonProps {
@@ -9,12 +9,17 @@ interface FeedCopyButtonProps {
 /** 复制订阅地址按钮：成功显示对勾 1.5s */
 export default function FeedCopyButton({ url }: FeedCopyButtonProps) {
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+  }, []);
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+      timerRef.current = window.setTimeout(() => setCopied(false), 1500);
     } catch {
       // 剪贴板不可用时静默（按钮仍可用）
     }

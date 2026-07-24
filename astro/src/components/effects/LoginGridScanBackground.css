@@ -37,7 +37,7 @@
 
 /*
  * Night (dark) theme
- * Deep vignette with faint cyan/indigo glow at corners.
+ * Deep vignette with faint cyan/teal glow at corners.
  */
 .login-gridscan-bg--night .gridscan::before {
   content: "";

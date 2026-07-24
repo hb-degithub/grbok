@@ -113,7 +113,7 @@ export default function GitHubRepoCard({ owner, repo, className }: Props) {
         rel="noopener noreferrer"
         className={`gh-repo-card block rounded-xl border border-zinc-200 p-5 no-underline transition-colors hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700 ${className || ''}`}
       >
-        <span className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+        <span className="text-sm font-semibold text-teal-600 dark:text-teal-400">
           {owner}/{repo}
         </span>
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">在 GitHub 上查看 →</p>

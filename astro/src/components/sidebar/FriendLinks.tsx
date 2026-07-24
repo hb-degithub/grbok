@@ -19,7 +19,7 @@ export default function FriendLinks() {
   useEffect(() => {
     const pb = getPocketBase();
     pb.collection('friend_links').getList<FriendLink>(1, 20, { sort: 'sort_order,-created' })
-      .then(r => setLinks(r.items.filter(i => i.status === 'show')))
+      .then(r => setLinks(r.items.filter(i => i.status === 'show' && isSafeLinkUrl(i.url))))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -41,7 +41,7 @@ export default function FriendLinks() {
       <div className="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">友情链接</div>
       <div className="flex flex-wrap gap-2">
         {links.map((link) => (
-          <a key={link.id} href={isSafeLinkUrl(link.url) ? link.url : '#'} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm text-zinc-500 dark:text-zinc-400 transition-all hover:border-teal-600 dark:hover:border-teal-400 hover:text-teal-600 dark:hover:text-teal-400 hover:shadow-sm">
+          <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm text-zinc-500 dark:text-zinc-400 transition-all hover:border-teal-600 dark:hover:border-teal-400 hover:text-teal-600 dark:hover:text-teal-400 hover:shadow-sm">
             {link.name}
           </a>
         ))}

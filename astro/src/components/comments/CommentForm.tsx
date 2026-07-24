@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -42,7 +42,7 @@ interface CommentFormProps {
   userEmailVerified?: boolean;
 }
 
-/** 共享 textarea 样式 - 玻璃底 + indigo focus-visible */
+/** 共享 textarea 样式 - 玻璃底 + teal focus-visible */
 const textareaClass =
   'w-full rounded-xl border border-zinc-200 bg-white/70 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 transition-all duration-200 ease-out outline-none focus-visible:border-zinc-500 focus-visible:ring-2 focus-visible:ring-zinc-500/30 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus-visible:border-zinc-400';
 
@@ -61,6 +61,10 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
   });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const statusTimerRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (statusTimerRef.current !== null) window.clearTimeout(statusTimerRef.current);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,7 +99,8 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
     if (success) {
       setStatus('success');
       setFormData({ author_name: '', author_email: '', content: '', parent_id: null });
-      setTimeout(() => setStatus('idle'), 2000);
+      if (statusTimerRef.current !== null) window.clearTimeout(statusTimerRef.current);
+      statusTimerRef.current = window.setTimeout(() => setStatus('idle'), 2000);
     } else {
       setStatus('error');
       setErrorMessage('提交失败，请重试');
@@ -141,7 +146,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
             type="button"
             onClick={handleResendVerification}
             disabled={verifyResendStatus === 'sending'}
-            className="focus-ring inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+            className="focus-ring inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:opacity-50"
           >
             {verifyResendStatus === 'sending' ? '发送中...' : '重新发送验证邮件'}
           </button>

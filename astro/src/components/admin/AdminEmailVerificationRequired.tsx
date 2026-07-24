@@ -58,7 +58,7 @@ export default function AdminEmailVerificationRequired({ user, onReturnToLogin }
             type="button"
             onClick={handleResend}
             disabled={status === 'sending'}
-            className="focus-ring inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+            className="focus-ring inline-flex items-center gap-2 rounded-xl bg-teal-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:opacity-50"
           >
             {status === 'sending' ? '正在发送...' : '重新发送验证邮件'}
           </button>

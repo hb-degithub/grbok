@@ -2,13 +2,10 @@
 import { ClientRouter } from 'astro:transitions';
 import '@fontsource/geist-sans/400.css';
 import '@fontsource/geist-sans/500.css';
-import '@fontsource/geist-sans/600.css';
 import '@fontsource/geist-sans/700.css';
 import '@fontsource/geist-mono/400.css';
-import '@fontsource/geist-mono/500.css';
 import '@fontsource/noto-sans-sc/400.css';
 import '@fontsource/noto-sans-sc/500.css';
-import '@fontsource/noto-sans-sc/600.css';
 import '@fontsource/noto-sans-sc/700.css';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer.astro';
@@ -170,21 +167,21 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 </script>
 </head>
   <body class="min-h-[100svh] bg-white font-sans text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-50">
-    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-indigo-600 focus:text-white focus:rounded-md">跳转到主要内容</a>
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[70] focus:px-4 focus:py-2 focus:bg-teal-600 focus:text-white focus:rounded-md">跳转到主要内容</a>
     {showChrome && <Header transition:persist="header" client:load />}
-    {showChrome && <SearchModal client:load />}
-    {showChrome && <AnnouncementBar client:load />}
+    {showChrome && <SearchModal client:idle />}
+    {showChrome && <AnnouncementBar client:idle />}
 
     <main id="main-content" class:list={["w-full overflow-x-clip", mainClass]}>
       <slot />
     </main>
 
     {showChrome && <Footer transition:persist="footer" />}
-    <DebugProtection client:load />
-    <SplashOverlay client:load />
-    <WelcomeOverlay client:load />
+    <DebugProtection client:idle />
+    <SplashOverlay client:idle />
+    <WelcomeOverlay client:idle />
     <CursorGlow client:only="react" />
-  <ToastContainer client:load />
+  <ToastContainer client:idle />
     <script define:vars={{ pbBase: import.meta.env.PUBLIC_POCKETBASE_URL || '' }}>
   // 访问统计探针：页面浏览（含客户端导航）通过 sendBeacon 上报。
   // 尊重 DNT；静默失败绝不影响页面；guard 防止 ClientRouter 重复挂监听。

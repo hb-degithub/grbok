@@ -172,7 +172,7 @@ export default function VersionHistory() {
                         <button
                           onClick={() => setCompareLeft(v.id === compareLeft ? null : v.id)}
                           className={`h-6 w-6 rounded text-xs font-bold ${
-                            compareLeft === v.id ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'
+                            compareLeft === v.id ? 'bg-teal-600 text-white' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'
                           }`}
                           title="设为左侧对比"
                         >L</button>
@@ -191,7 +191,7 @@ export default function VersionHistory() {
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => restoreVersion(v)}
-                        className="rounded-md px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/30"
+                        className="rounded-md px-3 py-1 text-xs font-medium text-teal-600 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-950/30"
                       >恢复</button>
                     </td>
                   </tr>

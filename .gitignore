@@ -78,3 +78,6 @@ pb_local/
 # Playwright screenshots
 astro/screenshot-*.png
 astro/pw-screenshot.cjs
+
+# ZCode session workspace
+.zcode/

@@ -574,6 +574,75 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
 }
 
 /* ===========================
+   Glass surfaces
+   =========================== */
+
+.glass {
+  background-color: rgb(255 255 255 / 0.72);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  border: 1px solid rgb(228 228 231 / 0.6);
+  box-shadow:
+    0 4px 24px -1px rgb(0 0 0 / 0.08),
+    inset 0 1px 0 rgb(255 255 255 / 0.6);
+}
+
+.dark .glass {
+  background-color: rgb(24 24 27 / 0.72);
+  border-color: rgb(63 63 70 / 0.5);
+  box-shadow:
+    0 4px 24px -1px rgb(0 0 0 / 0.3),
+    inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+.glass-strong {
+  background-color: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid rgb(228 228 231 / 0.8);
+  box-shadow:
+    0 8px 40px -4px rgb(0 0 0 / 0.12),
+    0 2px 8px -2px rgb(0 0 0 / 0.06),
+    inset 0 1px 0 rgb(255 255 255 / 0.7);
+}
+
+.dark .glass-strong {
+  background-color: rgb(24 24 27 / 0.88);
+  border-color: rgb(63 63 70 / 0.6);
+  box-shadow:
+    0 8px 40px -4px rgb(0 0 0 / 0.45),
+    0 2px 8px -2px rgb(0 0 0 / 0.2),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+/* Glass overlay — modal backdrop dimmer */
+.glass-overlay {
+  background-color: rgb(9 9 11 / 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.dark .glass-overlay {
+  background-color: rgb(0 0 0 / 0.6);
+}
+
+/* Side panel card - reusable surface for homepage sidebar blocks */
+.side-panel-card {
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  padding: 1.25rem;
+  box-shadow: 0 8px 24px -4px rgb(9 9 11 / 0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.dark .side-panel-card {
+  border-color: var(--color-dark-border);
+  background-color: var(--color-dark-bg-secondary);
+}
+
+/* ===========================
    Entry animations
    =========================== */
 

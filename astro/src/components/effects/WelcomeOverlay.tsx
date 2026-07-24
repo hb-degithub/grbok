@@ -51,6 +51,19 @@ export default function WelcomeOverlay() {
   // explicit "skip registration" confirmation.
   const stepperRef = useRef(null);
 
+  // Track all pending timeouts so they can be cancelled on unmount — otherwise
+  // they fire setState on a torn-down component (dev-mode warning, stepper
+  // advance on an unmounted Stepper).
+  const timersRef = useRef<number[]>([]);
+  useEffect(() => {
+    const timers = timersRef.current;
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, []);
+  const scheduleTimeout = useCallback((fn: () => void, ms: number) => {
+    const id = window.setTimeout(fn, ms);
+    timersRef.current.push(id);
+  }, []);
+
   // Step 4 is the registration step (only present for logged-out users).
   // The email-verification step that follows only renders after regStatus ===
   // 'success', so the registration step number stays 4 regardless.
@@ -151,7 +164,7 @@ export default function WelcomeOverlay() {
       // Auto-advance to the email-verification step now that the registration
       // step's success UI has rendered. Deferred so the success state paints
       // before the slide transition kicks in.
-      setTimeout(() => {
+      scheduleTimeout(() => {
         stepperRef.current?.next();
       }, 600);
     } else {
@@ -166,9 +179,9 @@ export default function WelcomeOverlay() {
     const { success } = await requestVerification(registeredEmail);
     setResendStatus(success ? 'sent' : 'idle');
     if (success) {
-      setTimeout(() => setResendStatus('idle'), 5000);
+      scheduleTimeout(() => setResendStatus('idle'), 5000);
     }
-  }, [registeredEmail, requestVerification]);
+  }, [registeredEmail, requestVerification, scheduleTimeout]);
 
   if (!visible) return null;
 

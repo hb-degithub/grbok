@@ -142,7 +142,7 @@ export default function InsightsDashboard() {
               key={r}
               onClick={() => setTimeRange(r)}
               className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                timeRange === r ? 'bg-indigo-600 text-white' : 'text-zinc-500 hover:text-text'
+                timeRange === r ? 'bg-teal-600 text-white' : 'text-zinc-500 hover:text-text'
               }`}
             >
               {r === '7d' ? '近 7 天' : '近 30 天'}
@@ -154,10 +154,10 @@ export default function InsightsDashboard() {
       {/* 概览卡片 */}
       <div className="grid gap-4 sm:grid-cols-4">
         {[
-          { label: '总浏览量', value: stats?.totalViews ?? 0, icon: '👁', color: 'text-blue-600' },
-          { label: '今日浏览', value: stats?.todayViews ?? 0, icon: '📊', color: 'text-cyan-600' },
-          { label: '独立访客', value: stats?.uniqueVisitors ?? 0, icon: '👤', color: 'text-violet-600' },
-          { label: '已审评论', value: totalComments, icon: '💬', color: 'text-emerald-600' },
+          { label: '总浏览量', value: stats?.totalViews ?? 0, icon: '👁', color: 'text-teal-600 dark:text-teal-400' },
+          { label: '今日浏览', value: stats?.todayViews ?? 0, icon: '📊', color: 'text-teal-600 dark:text-teal-400' },
+          { label: '独立访客', value: stats?.uniqueVisitors ?? 0, icon: '👤', color: 'text-teal-600 dark:text-teal-400' },
+          { label: '已审评论', value: totalComments, icon: '💬', color: 'text-teal-600 dark:text-teal-400' },
         ].map((stat) => (
           <div key={stat.label} className="rounded-xl border border-border bg-white p-5 shadow-sm dark:bg-zinc-900">
             <div className="flex items-center justify-between">
@@ -195,7 +195,7 @@ export default function InsightsDashboard() {
                     <span className="ml-2 shrink-0 text-xs text-zinc-500">{p.views} 次</span>
                   </div>
                   <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-                    <div className="h-full rounded-full bg-indigo-500" style={{ width: `${(p.views / maxViews) * 100}%` }} />
+                    <div className="h-full rounded-full bg-teal-500" style={{ width: `${(p.views / maxViews) * 100}%` }} />
                   </div>
                 </div>
               </div>
@@ -232,7 +232,7 @@ export default function InsightsDashboard() {
                     <td className="px-3 py-2 text-right text-zinc-500">{p.views}</td>
                     <td className="px-3 py-2 text-right text-zinc-500">{p.reactions}</td>
                     <td className="px-3 py-2 text-right text-zinc-500">{p.comments}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-indigo-600 dark:text-indigo-400">{p.score.toFixed(1)}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-teal-600 dark:text-teal-400">{p.score.toFixed(1)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react';
-import Particles from '../reactbits/Particles';
+import { useEffect, useState, lazy, Suspense } from 'react';
 import useBreakpoint from '../../hooks/useBreakpoint';
+
+// Lazy-load Particles so the ogl (~100KB) vendor chunk streams in AFTER the
+// hero text renders. The particle field is decorative; the hero copy is the
+// LCP content and must paint first.
+const Particles = lazy(() => import('../reactbits/Particles'));
 
 type Theme = 'light' | 'dark';
 
@@ -48,23 +52,25 @@ export default function HomeParticlesBackground() {
 
   return (
     <div className="home-particles-bg" aria-hidden="true">
-      <Particles
-        particleCount={particleCount}
-        particleSpread={12}
-        speed={0.15}
-        particleColors={isDark
-          ? ['#22d3ee', '#38bdf8', '#818cf8', '#e0f2fe']
-          : ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd']
-        }
-        moveParticlesOnHover={moveParticlesOnHover}
-        particleHoverFactor={2}
-        alphaParticles={true}
-        particleBaseSize={isDark ? 120 : 90}
-        sizeRandomness={1.5}
-        cameraDistance={20}
-        disableRotation={false}
-        pixelRatio={pixelRatio}
-      />
+      <Suspense fallback={null}>
+        <Particles
+          particleCount={particleCount}
+          particleSpread={12}
+          speed={0.15}
+          particleColors={isDark
+            ? ['#22d3ee', '#38bdf8', '#818cf8', '#e0f2fe']
+            : ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd']
+          }
+          moveParticlesOnHover={moveParticlesOnHover}
+          particleHoverFactor={2}
+          alphaParticles={true}
+          particleBaseSize={isDark ? 120 : 90}
+          sizeRandomness={1.5}
+          cameraDistance={20}
+          disableRotation={false}
+          pixelRatio={pixelRatio}
+        />
+      </Suspense>
     </div>
   );
 }

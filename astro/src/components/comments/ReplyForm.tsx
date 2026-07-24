@@ -24,7 +24,7 @@ interface ReplyFormProps {
   moderationEnabled?: boolean;
 }
 
-/** 共享 textarea 样式 - 玻璃底 + indigo focus-visible */
+/** 共享 textarea 样式 - 玻璃底 + teal focus-visible */
 const textareaClass =
   'w-full rounded-xl border border-zinc-200 bg-white/70 px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 transition-all duration-200 ease-out outline-none focus-visible:border-zinc-500 focus-visible:ring-2 focus-visible:ring-zinc-500/30 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus-visible:border-zinc-400';
 

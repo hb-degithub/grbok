@@ -43,8 +43,8 @@ const highlightVariants = {
  * 单条评论组件
  *
  * 设计决策：
- * 1. 玻璃卡片承载评论，hover 时跟随鼠标的 indigo 径向光晕强化「玻璃透光」感。
- * 2. 新评论用 indigo ring + 短暂背景渐隐高亮，3 秒后消退（由父组件控制 isNew）。
+ * 1. 玻璃卡片承载评论，hover 时跟随鼠标的 teal 径向光晕强化「玻璃透光」感。
+ * 2. 新评论用 teal ring + 短暂背景渐隐高亮，3 秒后消退（由父组件控制 isNew）。
  * 3. 回复按钮带 aria-expanded/aria-controls，屏幕阅读器可知展开状态。
  */
 export default function CommentItem({
@@ -86,7 +86,7 @@ export default function CommentItem({
 
   const getAvatarLetter = (name: string) => name.charAt(0).toUpperCase();
 
-  /** 头像配色 - indigo/violet 系，与整体玻璃风格协调 */
+  /** 头像配色 - teal/violet 系，与整体玻璃风格协调 */
   const getAvatarColor = (seed: string) => {
     const colors = [
       'bg-zinc-500',
@@ -181,7 +181,7 @@ export default function CommentItem({
         />
       </motion.div>
 
-      {/* 子评论（递归渲染） - indigo 竖线引导嵌套关系 */}
+      {/* 子评论（递归渲染） - teal 竖线引导嵌套关系 */}
       {comment.children.length > 0 && (
         <div className="mt-3 space-y-3 border-l-2 border-zinc-200 pl-3 dark:border-zinc-800/60 sm:pl-6">
           {comment.children.map((child) => (

@@ -128,7 +128,7 @@ export default function FeatureFlagsPanel() {
         <button
           onClick={saveFlags}
           disabled={saving}
-          className="inline-flex min-h-10 items-center rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-50"
+          className="inline-flex min-h-10 items-center rounded-lg bg-teal-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-teal-700 disabled:opacity-50"
         >
           {saving ? '保存中...' : '保存配置'}
         </button>
@@ -163,7 +163,7 @@ export default function FeatureFlagsPanel() {
                 aria-label={`启用 ${SECTION_LABELS[section]}`}
                 onClick={() => toggleFlag(section)}
                 className={`relative h-7 w-12 rounded-full transition-colors ${
-                  config.enabled ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-700'
+                  config.enabled ? 'bg-teal-600' : 'bg-zinc-300 dark:bg-zinc-700'
                 }`}
               >
                 <span
@@ -184,7 +184,7 @@ export default function FeatureFlagsPanel() {
                         type="text"
                         value={config.endpoint}
                         onChange={(e) => updateFlag(section, 'endpoint', e.target.value)}
-                        className="min-h-9 w-full rounded-md border border-border bg-white px-3 py-1.5 text-sm text-text outline-none focus:border-indigo-400 dark:bg-zinc-800"
+                        className="min-h-9 w-full rounded-md border border-border bg-white px-3 py-1.5 text-sm text-text outline-none focus:border-teal-400 dark:bg-zinc-800"
                       />
                     </div>
                     <div>
@@ -193,7 +193,7 @@ export default function FeatureFlagsPanel() {
                         value={config.faqs_json}
                         onChange={(e) => updateFlag(section, 'faqs_json', e.target.value)}
                         rows={3}
-                        className="w-full rounded-md border border-border bg-white px-3 py-1.5 text-sm text-text outline-none focus:border-indigo-400 dark:bg-zinc-800"
+                        className="w-full rounded-md border border-border bg-white px-3 py-1.5 text-sm text-text outline-none focus:border-teal-400 dark:bg-zinc-800"
                         placeholder='[{"q":"如何订阅？","a":"访问 /subscribe"}]'
                       />
                     </div>

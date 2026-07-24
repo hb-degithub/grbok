@@ -85,7 +85,7 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
 <BaseLayout title={post?.title || '文章'} description={post?.excerpt || ''} image={post?.cover}>
   {post ? (
     <>
-    <ReadingProgress client:load />
+    <ReadingProgress client:visible />
     <article class="mx-auto w-full max-w-5xl px-[var(--page-pad,1rem)] py-8 sm:py-10">
       <!-- Mobile TOC -->
       {headings.length > 0 && (

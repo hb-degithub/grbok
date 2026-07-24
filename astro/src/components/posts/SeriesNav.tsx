@@ -55,12 +55,12 @@ export default function SeriesNav({ seriesId, currentSlug }: { seriesId: string;
                 aria-current={isCurrent ? 'page' : undefined}
                 className={
                   isCurrent
-                    ? 'text-sm font-semibold text-indigo-600 dark:text-indigo-400'
-                    : 'text-sm text-zinc-600 hover:text-indigo-600 hover:underline dark:text-zinc-400 dark:hover:text-indigo-400'
+                    ? 'text-sm font-semibold text-teal-600 dark:text-teal-400'
+                    : 'text-sm text-zinc-600 hover:text-teal-600 hover:underline dark:text-zinc-400 dark:hover:text-teal-400'
                 }
               >
                 {i + 1}. {entry.title}
-                {isCurrent && <span className="ml-1.5 text-xs text-indigo-500">（当前）</span>}
+                {isCurrent && <span className="ml-1.5 text-xs text-teal-500">（当前）</span>}
               </a>
             </li>
           );

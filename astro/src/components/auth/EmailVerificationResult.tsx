@@ -66,7 +66,7 @@ export default function EmailVerificationResult() {
       >
         {status === 'loading' && (
           <>
-            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-zinc-200 border-t-indigo-500" />
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-zinc-200 border-t-teal-500" />
             <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">正在验证邮箱...</h2>
           </>
         )}
@@ -104,7 +104,7 @@ export default function EmailVerificationResult() {
             </div>
             <h2 className="text-xl font-bold text-red-700 dark:text-red-300">验证失败</h2>
             <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">{errorMessage}</p>
-            <a href="/login" className="mt-4 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white no-underline transition-colors hover:bg-indigo-700">
+            <a href="/login" className="mt-4 inline-block rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white no-underline transition-colors hover:bg-teal-700">
               返回登录
             </a>
           </>

@@ -74,10 +74,14 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
           {/* 内容 */}
           <div className="flex flex-1 flex-col p-5">
             <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400 dark:text-zinc-500">
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                技术
-              </span>
-              <span aria-hidden="true">·</span>
+              {(post.expand as any)?.['post_tags(post_id)']?.[0]?.name && (
+                <>
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                    {(post.expand as any)['post_tags(post_id)'][0].name}
+                  </span>
+                  <span aria-hidden="true">·</span>
+                </>
+              )}
               <time dateTime={post.published_at}>{formattedDate}</time>
             </div>
 
