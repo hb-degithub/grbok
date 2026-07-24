@@ -92,3 +92,12 @@ astro/pw-screenshot.cjs
 
 # ZCode session workspace
 .zcode/
+
+# 历史遗留临时/备份/日志文件
+original-*
+.add_seo.py
+rewrite-dev-*.js
+PHASE1_VERIFICATION.md
+pb_migrations/data.db
+pb_migrations/types.d.ts
+pb_hooks/*.disabled

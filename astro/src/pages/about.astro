@@ -5,25 +5,153 @@ import Typewriter from '../components/ui/Typewriter';
 import GlareHover from '../components/reactbits/GlareHover';
 import BlurText from '../components/reactbits/BlurText';
 import ParticleField from '../components/effects/ParticleField';
+import TechCard from '../components/ui/TechCard';
+import FeatureCard from '../components/ui/FeatureCard';
 
 const techStack = [
-  { name: 'Astro 6', desc: 'SSG 静态站点生成，群岛架构' },
-  { name: 'React 19', desc: '交互组件 + Framer Motion 动效' },
-  { name: 'TailwindCSS 4', desc: '原子化样式，深色主题设计系统' },
-  { name: 'PocketBase', desc: 'BaaS 后端 — Auth / DB / API / 文件存储' },
-  { name: 'Caddy 2', desc: '反向代理，自动 HTTPS，安全响应头' },
-  { name: 'WebAuthn', desc: '管理员 Passkey 双因素认证' },
-  { name: 'Pagefind', desc: '离线全文搜索索引' },
-  { name: 'Docker Compose', desc: '容器化编排与部署' },
+  {
+    name: 'Astro 6',
+    desc: 'SSG 静态站点生成，群岛架构',
+    detail: '以静态生成为主的元框架，页面默认零 JS 输出，仅在需要的交互"岛屿"中按需水合 React 组件。',
+    points: [
+      '群岛架构：静态 HTML + 按需水合，首屏 JS 体积最小化',
+      'client:visible / client:idle 分级水合策略，非首屏组件延迟加载',
+      'MDX 内容管线：文章支持内嵌交互组件与代码高亮',
+    ],
+  },
+  {
+    name: 'React 19',
+    desc: '交互组件 + Framer Motion 动效',
+    detail: '所有客户端交互岛屿由 React 驱动，动效层使用 Framer Motion 声明式编排。',
+    points: [
+      '评论系统、搜索弹窗、后台面板等交互岛屿',
+      'Framer Motion 驱动滚动揭示、页面过渡与微交互',
+      'lazy() 拆包：OGL 粒子等重组件按需加载',
+    ],
+  },
+  {
+    name: 'TailwindCSS 4',
+    desc: '原子化样式，深色主题设计系统',
+    detail: '基于 Tailwind 4 的原子化样式体系，配合 CSS 变量实现明暗双主题无缝切换。',
+    points: [
+      'zinc 中性色 + teal 强调色的统一设计令牌',
+      '玻璃态工具类：glass / glass-strong / glass-overlay',
+      'Vite 插件零配置集成，构建时 purge 未用样式',
+    ],
+  },
+  {
+    name: 'PocketBase',
+    desc: 'BaaS 后端 — Auth / DB / API / 文件存储',
+    detail: '单文件 Go 后端，内嵌 SQLite，提供认证、数据库、实时订阅与文件存储的完整 BaaS 能力。',
+    points: [
+      'pb_hooks JS 钩子扩展服务端业务逻辑（限流、邮件、审计）',
+      '迁移文件版本化管理数据库结构',
+      'Realtime 订阅驱动评论实时更新',
+    ],
+  },
+  {
+    name: 'Caddy 2',
+    desc: '反向代理，自动 HTTPS，安全响应头',
+    detail: '边缘入口网关，统一处理 TLS 终结、安全响应头、静态资源缓存策略与 API 反向代理。',
+    points: [
+      'CSP / HSTS / X-Frame-Options 等全套安全响应头',
+      'HTML 短缓存 + hash 静态资源 immutable 长缓存分级策略',
+      '管理路径 IP 白名单与恶意路径拦截',
+    ],
+  },
+  {
+    name: 'WebAuthn',
+    desc: '管理员 Passkey 双因素认证',
+    detail: '管理后台采用 Passkey（WebAuthn）无密码认证，配合独立 admin-auth 服务完成挑战校验。',
+    points: [
+      '生物识别 / 安全密钥登录，免疫钓鱼与撞库',
+      '敏感操作二次验证（step-up auth）',
+      '挑战与浏览器会话绑定，事务化签发防重放',
+    ],
+  },
+  {
+    name: 'Pagefind',
+    desc: '离线全文搜索索引',
+    detail: '构建时对静态产物建立全文搜索索引，搜索完全在浏览器端运行，零服务器依赖。',
+    points: [
+      '构建后自动索引 31 个页面',
+      '中文分词支持，结果关键词高亮',
+      '索引文件按 hash 长缓存，搜索毫秒级响应',
+    ],
+  },
+  {
+    name: 'Docker Compose',
+    desc: '容器化编排与部署',
+    detail: 'Caddy + PocketBase + admin-auth 三容器编排，一条命令完成全栈部署。',
+    points: [
+      '容器权限最小化，服务间内网通信',
+      '数据卷持久化 SQLite 与上传文件',
+      '本地 / 生产双 compose 配置，环境变量注入密钥',
+    ],
+  },
 ];
 
 const features = [
-  { title: '安全加固', desc: 'CSP / HSTS / CORS 严格策略，多层速率限制，DOMPurify 防注入，Docker 容器权限最小化' },
-  { title: '管理员体系', desc: 'RBAC 四级角色，WebAuthn Passkey 二次验证，服务端认证守卫，IP 白名单' },
-  { title: '交互体验', desc: '粒子背景、网格扫描、Dock 导航、Bento 卡片、阅读进度、滚动揭示动效' },
-  { title: 'SEO & PWA', desc: 'RSS 订阅、站点地图、Open Graph、Service Worker 离线缓存、Manifest' },
-  { title: '评论系统', desc: '嵌套回复、服务端校验、邮件通知、速率限制、实时订阅更新' },
-  { title: '全文搜索', desc: 'Pagefind 离线索引，即时搜索结果高亮，零服务器依赖' },
+  {
+    title: '安全加固',
+    desc: 'CSP / HSTS / CORS 严格策略，多层速率限制，DOMPurify 防注入，Docker 容器权限最小化',
+    detail: '从边缘到容器逐层设防，覆盖注入、XSS、暴力破解与滥用四大攻击面。',
+    points: [
+      'CSP 白名单精确到源，script-src 收紧至 self + inline 岛屿',
+      '评论 / 登录 / 邮件多层速率限制，桶过期自动清理',
+      'UGC 内容 DOMPurify 服务端 + 客户端双重净化',
+    ],
+  },
+  {
+    title: '管理员体系',
+    desc: 'RBAC 四级角色，WebAuthn Passkey 二次验证，服务端认证守卫，IP 白名单',
+    detail: '管理后台独立认证服务，敏感操作强制二次验证，从身份到网络多层收窄入口。',
+    points: [
+      '四级角色：读者 / 作者 / 管理员 / 超级管理员',
+      '删号、改密等敏感操作需 Passkey step-up 验证',
+      'Caddy 层管理路径 IP 白名单，未授权直接 403',
+    ],
+  },
+  {
+    title: '交互体验',
+    desc: '粒子背景、网格扫描、Dock 导航、Bento 卡片、阅读进度、滚动揭示动效',
+    detail: '全站动效系统以"克制的华丽"为原则，视觉丰富但不牺牲性能。',
+    points: [
+      'OGL 粒子与网格扫描按需懒加载，非首屏延迟水合',
+      'macOS 风格 Dock 导航，客户端路由同步激活态',
+      '阅读进度条 + 滚动揭示，长文阅读节奏引导',
+    ],
+  },
+  {
+    title: 'SEO & PWA',
+    desc: 'RSS 订阅、站点地图、Open Graph、Service Worker 离线缓存、Manifest',
+    detail: '完整的 SEO 元信息体系与 PWA 离线能力，可安装到主屏当 App 用。',
+    points: [
+      '文章页 Open Graph / Twitter Card 自动注入',
+      'SW 版本号构建时注入，部署后缓存自动失效',
+      '离线兜底页 + 静态资源预缓存',
+    ],
+  },
+  {
+    title: '评论系统',
+    desc: '嵌套回复、服务端校验、邮件通知、速率限制、实时订阅更新',
+    detail: '自建评论体系，数据完全自有，支持嵌套对话与实时更新。',
+    points: [
+      'PocketBase Realtime 订阅，新评论即时出现',
+      '发表评论触发邮件通知（限流防轰炸）',
+      '订阅竞态防护，页面导航后残留监听自动清理',
+    ],
+  },
+  {
+    title: '全文搜索',
+    desc: 'Pagefind 离线索引，即时搜索结果高亮，零服务器依赖',
+    detail: '搜索完全运行在浏览器端，无需后端查询，离线也能用。',
+    points: [
+      '玻璃态搜索弹窗，骨架屏加载与空状态引导',
+      '键盘导航：↑↓ 选择、Enter 跳转、Esc 关闭',
+      '中文内容索引，关键词上下文高亮',
+    ],
+  },
 ];
 
 const links = [
@@ -79,13 +207,14 @@ const links = [
         <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-6">
           技术栈
         </h2>
+        <p class="mb-4 text-xs text-zinc-400 dark:text-zinc-500">
+          <span class="hidden [@media(hover:hover)]:inline">鼠标悬停查看技术细节</span>
+          <span class="[@media(hover:hover)]:hidden">点击卡片查看技术细节</span>
+        </p>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {techStack.map((tech) => (
             <GlareHover client:visible glareColor="rgba(20, 184, 166, 0.08)">
-              <div class="flex items-center gap-3 rounded-md border border-zinc-200 dark:border-zinc-700/50 px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-500/30">
-                <span class="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{tech.name}</span>
-                <span class="text-xs text-zinc-400 dark:text-zinc-500 truncate">{tech.desc}</span>
-              </div>
+              <TechCard client:visible tech={tech} />
             </GlareHover>
           ))}
         </div>
@@ -100,10 +229,7 @@ const links = [
         </h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {features.map((f) => (
-            <div>
-              <h3 class="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{f.title}</h3>
-              <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">{f.desc}</p>
-            </div>
+            <FeatureCard client:visible feature={f} />
           ))}
         </div>
       </div>
