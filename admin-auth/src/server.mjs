@@ -134,7 +134,7 @@ export function createServer({
         safelySendError(res, 413, { error: 'Request body too large' });
         return;
       }
-      safelyLogServerError(logger);
+      safelyLogServerError(logger, err);
       safelySendError(res, 500, { error: 'Internal server error' });
     }
   });
@@ -167,9 +167,12 @@ function hasErrorMessage(error, expected) {
   }
 }
 
-function safelyLogServerError(logger) {
+function safelyLogServerError(logger, err) {
   try {
-    if (logger && typeof logger.error === 'function') logger.error('admin-auth server error');
+    if (logger && typeof logger.error === 'function') {
+      const msg = err && typeof err.message === 'string' ? err.message : 'unknown';
+      logger.error(`admin-auth server error: ${msg}`);
+    }
   } catch {
     // Logging must not change the response or process outcome.
   }

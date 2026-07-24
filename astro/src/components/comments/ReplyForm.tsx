@@ -7,6 +7,10 @@ import type { CommentFormData } from '../../types/pocketbase';
 
 const replyLimiter = new RateLimiter(3, 1/12);
 
+const NAME_MAX = 30;
+const CONTENT_MAX = 500;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 interface ReplyFormProps {
   /** 是否显示回复框 */
   isOpen: boolean;
@@ -46,6 +50,18 @@ export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, 
     if (!formData.author_name || !formData.author_email || !formData.content) {
       setStatus('error');
       setErrorMessage('请填写所有必填字段');
+      return;
+    }
+
+    if (!EMAIL_RE.test(formData.author_email)) {
+      setStatus('error');
+      setErrorMessage('邮箱格式不正确');
+      return;
+    }
+
+    if (formData.author_name.length > NAME_MAX || formData.content.length > CONTENT_MAX) {
+      setStatus('error');
+      setErrorMessage(`昵称不超过 ${NAME_MAX} 字，回复不超过 ${CONTENT_MAX} 字`);
       return;
     }
 
@@ -139,6 +155,7 @@ export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, 
                     value={formData.author_name}
                     onChange={(e) => setFormData((prev) => ({ ...prev, author_name: e.target.value }))}
                     required
+                    maxLength={NAME_MAX}
                     autoComplete="name"
                   />
                   <Input
@@ -148,6 +165,7 @@ export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, 
                     value={formData.author_email}
                     onChange={(e) => setFormData((prev) => ({ ...prev, author_email: e.target.value }))}
                     required
+                    maxLength={100}
                     autoComplete="email"
                   />
                 </div>
@@ -165,6 +183,7 @@ export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, 
                     }}
                     placeholder="写下你的回复..."
                     rows={3}
+                    maxLength={CONTENT_MAX}
                     className={textareaClass}
                     required
                   />

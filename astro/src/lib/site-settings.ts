@@ -1,4 +1,5 @@
 import { getPocketBase } from './pocketbase';
+import { DEFAULT_FEATURE_FLAGS, type FeatureFlags } from '../config/feature-flags';
 
 export interface SiteSettings {
   site_title: string;
@@ -8,6 +9,7 @@ export interface SiteSettings {
   enable_comments: boolean;
   comment_moderation: boolean;
   debug_protection_enabled: boolean;
+  feature_flags: FeatureFlags;
 }
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -18,6 +20,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   enable_comments: true,
   comment_moderation: true,
   debug_protection_enabled: false,
+  feature_flags: DEFAULT_FEATURE_FLAGS,
 };
 
 type SettingRecord = {
@@ -29,6 +32,19 @@ const PUBLIC_SETTING_KEYS = Object.keys(DEFAULT_SITE_SETTINGS) as Array<keyof Si
 
 function normalizeValue(key: keyof SiteSettings, value: unknown): SiteSettings[keyof SiteSettings] {
   const fallback = DEFAULT_SITE_SETTINGS[key];
+
+  // feature_flags 是对象类型，直接合并默认值
+  if (key === 'feature_flags') {
+    const stored = value as Partial<FeatureFlags> | string;
+    let parsed: Partial<FeatureFlags>;
+    if (typeof stored === 'string') {
+      try { parsed = JSON.parse(stored || '{}'); }
+      catch { return DEFAULT_FEATURE_FLAGS; }
+    } else {
+      parsed = stored || {};
+    }
+    return { ...DEFAULT_FEATURE_FLAGS, ...parsed };
+  }
 
   if (typeof fallback === 'boolean') {
     return value === true || value === 'true';

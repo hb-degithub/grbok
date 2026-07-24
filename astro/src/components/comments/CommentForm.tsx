@@ -8,6 +8,10 @@ import type { CommentFormData } from '../../types/pocketbase';
 
 const commentLimiter = new RateLimiter(3, 1/12); // 每分钟最多3条
 
+const NAME_MAX = 30;
+const CONTENT_MAX = 1000;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const containerVariants = {
   hidden: { opacity: 0, y: 30 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, staggerChildren: 0.1 } },
@@ -64,6 +68,18 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
     if (!formData.author_name || !formData.author_email || !formData.content) {
       setStatus('error');
       setErrorMessage('请填写所有必填字段');
+      return;
+    }
+
+    if (!EMAIL_RE.test(formData.author_email)) {
+      setStatus('error');
+      setErrorMessage('邮箱格式不正确');
+      return;
+    }
+
+    if (formData.author_name.length > NAME_MAX || formData.content.length > CONTENT_MAX) {
+      setStatus('error');
+      setErrorMessage(`昵称不超过 ${NAME_MAX} 字，评论不超过 ${CONTENT_MAX} 字`);
       return;
     }
 
@@ -213,6 +229,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
                 value={formData.author_name}
                 onChange={(e) => setFormData((prev) => ({ ...prev, author_name: e.target.value }))}
                 required
+                maxLength={NAME_MAX}
                 autoComplete="name"
               />
               <Input
@@ -222,6 +239,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
                 value={formData.author_email}
                 onChange={(e) => setFormData((prev) => ({ ...prev, author_email: e.target.value }))}
                 required
+                maxLength={100}
                 autoComplete="email"
               />
             </motion.div>
@@ -239,6 +257,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
                 }}
                 placeholder="写下你的想法..."
                 rows={4}
+                maxLength={CONTENT_MAX}
                 className={textareaClass}
                 whileFocus={{ scale: 1.005 }}
                 transition={{ duration: 0.15 }}

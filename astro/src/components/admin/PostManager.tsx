@@ -95,7 +95,7 @@ export default function PostManager() {
   useEffect(() => {
     if (!editing) return;
     const timer = setTimeout(() => {
-      try { localStorage.setItem(draftKey, JSON.stringify(editing)); } catch {}
+      try { localStorage.setItem(draftKey, JSON.stringify(editing)); } catch (e) { console.warn('draft auto-save failed:', e); }
     }, 2000);
     return () => clearTimeout(timer);
   }, [editing, draftKey]);
@@ -116,7 +116,9 @@ export default function PostManager() {
       setAllTags(r.items.map((item) => ({ id: item.id, name: item.name, slug: item.slug })));
     }).catch(() => {});
     if (editing.id) {
-      pb.collection("post_tags").getList(1, 100).then(r => {
+      pb.collection("post_tags").getList(1, 100, {
+        filter: pb.filter('post_id = {:postId}', { postId: editing.id }),
+      }).then(r => {
         setSelectedTagIds(r.items.map((item) => item.tag_id));
       }).catch(() => {});
     } else setSelectedTagIds([]);
@@ -134,7 +136,7 @@ export default function PostManager() {
           setDraftRestored(true);
           setDirty(true);
         }
-      } catch {}
+      } catch (e) { console.warn('draft restore failed:', e); }
     }
   }, [draftRestored, editing]);
 
@@ -243,7 +245,7 @@ export default function PostManager() {
   };
 
   const clearSavedDraft = () => {
-    try { localStorage.removeItem(draftKey); } catch {}
+    try { localStorage.removeItem(draftKey); } catch (e) { console.warn('draft clear failed:', e); }
   };
   const startCreate = () => { setPreviewMode(false); setEditing({ id: '', title: '', slug: '', excerpt: '', content: '', cover: '', status: 'draft' }); };
 
