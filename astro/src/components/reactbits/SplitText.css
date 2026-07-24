@@ -1,0 +1,21 @@
+.splittext {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+.splittext__char {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+
+.dark .splittext__char {
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splittext,
+  .splittext * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

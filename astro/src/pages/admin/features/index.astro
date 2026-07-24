@@ -1,0 +1,7 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import FeatureFlagsPanel from '../../../components/admin/FeatureFlagsPanel';
+---
+<AdminLayout title="功能开关" requiredRole="admin">
+  <FeatureFlagsPanel client:only="react" />
+</AdminLayout>

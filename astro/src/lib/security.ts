@@ -1,6 +1,7 @@
 import DOMPurify from 'dompurify';
+import createDOMPurify from 'isomorphic-dompurify';
 
-const ALLOWED_TAGS = ['p', 'br', 'strong', 'em', 'a', 'code', 'pre', 'blockquote', 'ul', 'ol', 'li', 'h3', 'h4', 'img', 'hr'];
+const ALLOWED_TAGS = ['p', 'br', 'strong', 'em', 'a', 'code', 'pre', 'blockquote', 'ul', 'ol', 'li', 'h3', 'h4', 'img', 'hr', 'mark'];
 const VOID_TAGS = new Set(['br', 'hr', 'img']);
 const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'title', 'target', 'rel']);
 const URL_ATTRS = new Set(['href', 'src']);
@@ -37,13 +38,13 @@ function escapeAttribute(value: string): string {
     .replace(/>/g, '&gt;');
 }
 
-function isSafeUrl(value: string): boolean {
+export function isSafeUrl(value: string): boolean {
   const trimmed = value.trim().replace(/[\u0000-\u001f\u007f\s]+/g, '');
   if (!trimmed) return false;
   if (trimmed.startsWith('#') || trimmed.startsWith('/') || trimmed.startsWith('./') || trimmed.startsWith('../')) return true;
 
   try {
-    const url = new URL(trimmed, 'https://hlydwz.com');
+    const url = new URL(trimmed, 'https://example.com');
     return url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'mailto:';
   } catch {
     return false;
@@ -133,9 +134,26 @@ function normalizeBeforeSendResult(result: BeforeSendResult, url: string, option
   return { url, options: result };
 }
 
-/** Sanitize HTML for safe rendering */
+/** Sanitize HTML for safe rendering.
+ *
+ * In the browser, use the real DOMPurify. In SSR (Astro build time) the old
+ * code fell back to a hand-rolled regex stripper which cannot reliably parse
+ * HTML and is bypassable. We now use `isomorphic-dompurify` (which wraps
+ * jsdom) so SSR output matches client behaviour. The regex fallback is kept
+ * only as a last resort if the isomorphic factory fails to initialise. */
+const ssrDOMPurify = typeof window === 'undefined' ? createDOMPurify() : null;
+
 export function sanitizeHtml(html: string): string {
-  if (typeof window === 'undefined') return sanitizeHtmlFallback(html);
+  if (typeof window === 'undefined') {
+    if (ssrDOMPurify) {
+      return ssrDOMPurify.sanitize(html, {
+        ALLOWED_TAGS,
+        ALLOWED_ATTR: Array.from(ALLOWED_ATTRS),
+        ALLOW_DATA_ATTR: false,
+      });
+    }
+    return sanitizeHtmlFallback(html);
+  }
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS,
     ALLOWED_ATTR: Array.from(ALLOWED_ATTRS),
@@ -143,11 +161,20 @@ export function sanitizeHtml(html: string): string {
   });
 }
 
-/** Strip all HTML tags */
+/** Strip all HTML tags, leaving text safe for rendering.
+ *
+ * Previously this decoded entities (&lt; → <) AFTER stripping tags, which
+ * re-introduced raw angle brackets and could turn encoded payloads
+ * (&lt;img src=x onerror=...&gt;) back into live markup. It also decoded
+ * &amp; before &lt; / &gt;, corrupting double-encoded entities.
+ *
+ * The safe behaviour for a "plain text" API is to strip tags and leave HTML
+ * entities intact — React text nodes already render entities correctly, and
+ * any caller that builds an HTML string keeps them escaped. */
 export function sanitizeText(text: string): string {
-  let cleaned = text.replace(/<[^>]*>/g, '');
-  cleaned = cleaned.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"');
-  return cleaned.trim();
+  return String(text || '')
+    .replace(/<[^>]*>/g, '')
+    .trim();
 }
 
 export function normalizeAuthEmail(email: string): string {

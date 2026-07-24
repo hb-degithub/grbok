@@ -14,6 +14,7 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
   const [comments, setComments] = useState<NestedComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const buildCommentTree = useCallback((flatComments: PublicComment[]): NestedComment[] => {
     const commentMap = new Map<string, NestedComment>();
@@ -88,16 +89,22 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
     };
 
     let unsubscribe: (() => void) | null = null;
+    let cancelled = false;
 
     const subscribe = async () => {
       try {
         const pb = getPocketBase();
-        unsubscribe = await pb.collection('public_comments').subscribe('*', (e) => {
+        const unsub = await pb.collection('public_comments').subscribe('*', (e) => {
           handleRealtimeEvent({
             action: e.action as 'create' | 'update' | 'delete',
             record: e.record as PublicComment,
           });
         });
+        if (cancelled) {
+          unsub();
+        } else {
+          unsubscribe = unsub;
+        }
       } catch (err) {
         console.error('Failed to subscribe to public comments:', err);
       }
@@ -106,14 +113,17 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
     subscribe();
 
     return () => {
+      cancelled = true;
       if (unsubscribe) unsubscribe();
     };
   }, [postId, fetchComments, enabled]);
 
   const submitComment = useCallback(
     async (data: CommentFormData): Promise<boolean> => {
+      if (isSubmitting) return false;
       try {
         if (!enabled) return false;
+        setIsSubmitting(true);
         const pb = getPocketBase();
         await pb.collection('comments').create({
           post_id: postId,
@@ -127,15 +137,18 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
       } catch (err) {
         console.error('Failed to submit comment:', err);
         return false;
+      } finally {
+        setIsSubmitting(false);
       }
     },
-    [postId, enabled]
+    [postId, enabled, isSubmitting]
   );
 
   return {
     comments,
     loading,
     error,
+    isSubmitting,
     submitComment,
     refresh: fetchComments,
   };

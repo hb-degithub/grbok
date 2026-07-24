@@ -1,11 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { RateLimiter } from '../../lib/security';
+import { getPocketBase } from '../../lib/pocketbase';
 import type { CommentFormData } from '../../types/pocketbase';
 
 const commentLimiter = new RateLimiter(3, 1/12); // 每分钟最多3条
+
+const NAME_MAX = 30;
+const CONTENT_MAX = 1000;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const containerVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, staggerChildren: 0.1 } },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
+};
+
+const successVariants = {
+  hidden: { scale: 0, opacity: 0 },
+  visible: {
+    scale: 1,
+    opacity: 1,
+    transition: { type: 'spring' as const, stiffness: 500, damping: 15 },
+  },
+};
 
 interface CommentFormProps {
   /** 文章 ID */
@@ -14,11 +38,13 @@ interface CommentFormProps {
   onSubmit: (data: CommentFormData) => Promise<boolean>;
   /** 是否启用人工审核 */
   moderationEnabled?: boolean;
+  /** 当前登录用户是否已验证邮箱（undefined = 未登录 / 不强制） */
+  userEmailVerified?: boolean;
 }
 
-/** 共享 textarea 样式 - 玻璃底 + indigo focus-visible */
+/** 共享 textarea 样式 - 玻璃底 + teal focus-visible */
 const textareaClass =
-  'w-full rounded-xl border border-stone-200 bg-white/70 px-4 py-3 text-sm text-stone-900 placeholder-stone-400 transition-all duration-200 ease-out outline-none focus-visible:border-stone-500 focus-visible:ring-2 focus-visible:ring-stone-500/30 dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-100 dark:placeholder-stone-500 dark:focus-visible:border-stone-400';
+  'w-full rounded-xl border border-zinc-200 bg-white/70 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 transition-all duration-200 ease-out outline-none focus-visible:border-zinc-500 focus-visible:ring-2 focus-visible:ring-zinc-500/30 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus-visible:border-zinc-400';
 
 /**
  * 主评论表单组件
@@ -26,7 +52,7 @@ const textareaClass =
  * 设计决策：glass-strong 容器保证表单文字对比度；textarea 用 id 关联 label，
  * 支持 `aria-describedby` 错误播报；成功态用 emerald 打勾动画。
  */
-export default function CommentForm({ postId, onSubmit, moderationEnabled = true }: CommentFormProps) {
+export default function CommentForm({ postId, onSubmit, moderationEnabled = true, userEmailVerified }: CommentFormProps) {
   const [formData, setFormData] = useState<CommentFormData>({
     author_name: '',
     author_email: '',
@@ -35,6 +61,10 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
   });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const statusTimerRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (statusTimerRef.current !== null) window.clearTimeout(statusTimerRef.current);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,6 +72,18 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
     if (!formData.author_name || !formData.author_email || !formData.content) {
       setStatus('error');
       setErrorMessage('请填写所有必填字段');
+      return;
+    }
+
+    if (!EMAIL_RE.test(formData.author_email)) {
+      setStatus('error');
+      setErrorMessage('邮箱格式不正确');
+      return;
+    }
+
+    if (formData.author_name.length > NAME_MAX || formData.content.length > CONTENT_MAX) {
+      setStatus('error');
+      setErrorMessage(`昵称不超过 ${NAME_MAX} 字，评论不超过 ${CONTENT_MAX} 字`);
       return;
     }
 
@@ -57,38 +99,68 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
     if (success) {
       setStatus('success');
       setFormData({ author_name: '', author_email: '', content: '', parent_id: null });
-      setTimeout(() => setStatus('idle'), 2000);
+      if (statusTimerRef.current !== null) window.clearTimeout(statusTimerRef.current);
+      statusTimerRef.current = window.setTimeout(() => setStatus('idle'), 2000);
     } else {
       setStatus('error');
       setErrorMessage('提交失败，请重试');
     }
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0, y: 30 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5, staggerChildren: 0.1 } },
-  };
+  const [verifyResendStatus, setVerifyResendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 15 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
-  };
+  const handleResendVerification = useCallback(async () => {
+    const pb = getPocketBase();
+    const email = pb.authStore.record?.email;
+    if (!email) return;
+    setVerifyResendStatus('sending');
+    try {
+      await pb.collection('users').requestVerification(email);
+      setVerifyResendStatus('sent');
+    } catch {
+      setVerifyResendStatus('error');
+    }
+  }, []);
 
-  const successVariants = {
-    hidden: { scale: 0, opacity: 0 },
-    visible: {
-      scale: 1,
-      opacity: 1,
-      transition: { type: 'spring' as const, stiffness: 500, damping: 15 },
-    },
-  };
+  // Logged-in user with unverified email — show prompt instead of form
+  if (userEmailVerified === false) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-strong flex flex-col items-center gap-3 rounded-lg p-8 text-center"
+      >
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+          <svg className="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <h4 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">请先验证邮箱</h4>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">验证邮箱后即可发表评论</p>
+        {verifyResendStatus === 'sent' ? (
+          <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">验证邮件已发送，请检查收件箱</p>
+        ) : verifyResendStatus === 'error' ? (
+          <p className="text-sm text-red-600 dark:text-red-400">发送失败，请稍后重试</p>
+        ) : (
+          <button
+            type="button"
+            onClick={handleResendVerification}
+            disabled={verifyResendStatus === 'sending'}
+            className="focus-ring inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:opacity-50"
+          >
+            {verifyResendStatus === 'sending' ? '发送中...' : '重新发送验证邮件'}
+          </button>
+        )}
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="glass-strong rounded-2xl p-6 sm:p-7"
+      className="glass-strong rounded-lg p-6 sm:p-7"
     >
       <AnimatePresence mode="wait">
         {status === 'success' ? (
@@ -149,8 +221,8 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
             noValidate
           >
             <motion.div variants={itemVariants}>
-              <h3 className="text-lg font-semibold text-stone-900 dark:text-white">发表评论</h3>
-              <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">发表评论</h3>
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                 {moderationEnabled ? '你的邮箱不会被公开显示，评论审核后展示' : '你的邮箱不会被公开显示'}
               </p>
             </motion.div>
@@ -162,6 +234,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
                 value={formData.author_name}
                 onChange={(e) => setFormData((prev) => ({ ...prev, author_name: e.target.value }))}
                 required
+                maxLength={NAME_MAX}
                 autoComplete="name"
               />
               <Input
@@ -171,15 +244,16 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
                 value={formData.author_email}
                 onChange={(e) => setFormData((prev) => ({ ...prev, author_email: e.target.value }))}
                 required
+                maxLength={100}
                 autoComplete="email"
               />
             </motion.div>
 
             <motion.div variants={itemVariants}>
-              <label htmlFor="comment-content" className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-stone-300">
+              <label htmlFor="comment-content" className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                 评论内容
               </label>
-              <textarea
+              <motion.textarea
                 id="comment-content"
                 value={formData.content}
                 onChange={(e) => {
@@ -188,7 +262,10 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
                 }}
                 placeholder="写下你的想法..."
                 rows={4}
+                maxLength={CONTENT_MAX}
                 className={textareaClass}
+                whileFocus={{ scale: 1.005 }}
+                transition={{ duration: 0.15 }}
                 required
               />
             </motion.div>

@@ -1,0 +1,19 @@
+.masonry-root {
+  display: flex;
+  width: 100%;
+}
+
+.masonry-column {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.masonry-item {
+  overflow: hidden;
+}
+
+.dark .masonry-root {
+  color: inherit;
+}

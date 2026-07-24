@@ -7,6 +7,13 @@
       "runtimeArgs": ["--prefix", "astro", "run", "dev", "--", "--host", "0.0.0.0"],
       "port": 4321,
       "autoPort": true
+    },
+    {
+      "name": "astro-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "astro", "run", "preview", "--", "--host", "0.0.0.0"],
+      "port": 4321,
+      "autoPort": true
     }
   ]
 }

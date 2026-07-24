@@ -4,11 +4,50 @@
 # ⚠️ 此文件仅用于本地测试，禁止上传至服务器
 
 services:
+  admin-auth:
+    build:
+      context: ./admin-auth
+    container_name: blog-admin-auth-local
+    expose:
+      - "8787"
+    environment:
+      - NODE_ENV=production
+      - ADMIN_AUTH_INTERNAL_SECRET=${ADMIN_AUTH_INTERNAL_SECRET}
+      - ADMIN_AUTH_HASH_SECRET=${ADMIN_AUTH_HASH_SECRET}
+      - ADMIN_AUTH_RP_ID=${ADMIN_AUTH_RP_ID:-localhost}
+      - ADMIN_AUTH_ORIGIN=${ADMIN_AUTH_ORIGIN:-http://localhost}
+      - ADMIN_AUTH_SESSION_TTL_SECONDS=${ADMIN_AUTH_SESSION_TTL_SECONDS:-900}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS:-}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-}
+      - SMTP_TLS_MODE=${SMTP_TLS_MODE:-auto}
+      - SMTP_CONNECTION_TIMEOUT_MS=${SMTP_CONNECTION_TIMEOUT_MS:-10000}
+      - SMTP_SOCKET_TIMEOUT_MS=${SMTP_SOCKET_TIMEOUT_MS:-30000}
+      - MAIL_PROVIDER_LABEL=${MAIL_PROVIDER_LABEL:-Standard SMTP}
+      - MAIL_ALERT_RECIPIENTS=${MAIL_ALERT_RECIPIENTS:-}
+      - MAIL_INTERNAL_SECRET=${MAIL_INTERNAL_SECRET}
+      - PUBLIC_SITE_URL=${PUBLIC_SITE_URL:-https://hlydwz.com}
+      - ALIYUN_SMTP_HOST=${ALIYUN_SMTP_HOST:-}
+      - ALIYUN_SMTP_PORT=${ALIYUN_SMTP_PORT:-}
+      - ALIYUN_SMTP_USER=${ALIYUN_SMTP_USER:-}
+      - ALIYUN_SMTP_PASSWORD=${ALIYUN_SMTP_PASSWORD:-}
+      - ALIYUN_FROM_EMAIL=${ALIYUN_FROM_EMAIL:-}
+      - ALIYUN_FROM_NAME=${ALIYUN_FROM_NAME:-}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8787/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
   pocketbase:
     image: ghcr.io/muchobien/pocketbase:0.22.21
     container_name: blog-pocketbase-local
     ports:
-      - "8090:8090"
+      - "127.0.0.1:8090:8090"
     volumes:
       - pb_data:/pb/pb_data
       - pb_migrations:/pb/pb_migrations
@@ -16,6 +55,16 @@ services:
     environment:
       - PB_ENCRYPTION_KEY=${PB_ENCRYPTION_KEY}
       - TZ=${TZ:-Asia/Shanghai}
+      - ADMIN_AUTH_INTERNAL_URL=http://admin-auth:8787
+      - ADMIN_AUTH_INTERNAL_SECRET=${ADMIN_AUTH_INTERNAL_SECRET}
+      - ADMIN_AUTH_HASH_SECRET=${ADMIN_AUTH_HASH_SECRET}
+      - MAIL_INTERNAL_SECRET=${MAIL_INTERNAL_SECRET}
+      - MAIL_HASH_SECRET=${MAIL_HASH_SECRET}
+      - MAIL_GATEWAY_INTERNAL_URL=http://admin-auth:8787
+      - MAIL_GATEWAY_ENABLED=${MAIL_GATEWAY_ENABLED:-false}
+      - MAIL_ACCOUNT_ENABLED=${MAIL_ACCOUNT_ENABLED:-false}
+      - MAIL_OTP_ENABLED=${MAIL_OTP_ENABLED:-false}
+      - PUBLIC_SITE_URL=${PUBLIC_SITE_URL:-https://hlydwz.com}
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/api/health"]
       interval: 5s

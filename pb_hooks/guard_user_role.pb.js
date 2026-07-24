@@ -1,3 +1,4 @@
+(function () {
 const USER_ROLES = ['reader', 'author', 'admin', 'super_admin'];
 
 function next(e) {
@@ -45,6 +46,19 @@ function storedUserRole(id) {
   }
 }
 
+// Count current super_admin users. Used to prevent the last super_admin from
+// being demoted or deleted, which would lock everyone out of full admin.
+function superAdminCount() {
+  try {
+    if ($app.findRecordsByFilter) {
+      return $app.findRecordsByFilter('users', 'role = "super_admin"').length;
+    }
+    return $app.dao().findRecordsByFilter('users', 'role = "super_admin"').length;
+  } catch (_) {
+    return 0; // fail closed — treat as "cannot confirm a super_admin exists"
+  }
+}
+
 onRecordBeforeCreateRequest((e) => {
   const requestedRole = roleOf(e.record) || 'reader';
 
@@ -67,6 +81,22 @@ onRecordBeforeUpdateRequest((e) => {
     throw new BadRequestError('Invalid or unauthorized user role change.');
   }
 
+  // Prevent demoting the last super_admin. This is a server-side guarantee
+  // independent of the frontend UserManager guard.
+  if (oldRole === 'super_admin' && requestedRole !== 'super_admin' && superAdminCount() <= 1) {
+    throw new BadRequestError('无法降级最后一位超级管理员，请先提升其他用户为超级管理员。');
+  }
+
   e.record.set('role', requestedRole);
   next(e);
 }, 'users');
+
+// Prevent deleting the last super_admin.
+onRecordBeforeDeleteRequest((e) => {
+  const oldRole = storedUserRole(e.record.id);
+  if (oldRole === 'super_admin' && superAdminCount() <= 1) {
+    throw new BadRequestError('无法删除最后一位超级管理员，请先提升其他用户为超级管理员。');
+  }
+  next(e);
+}, 'users');
+})();

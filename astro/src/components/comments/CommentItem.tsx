@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import type { NestedComment, CommentFormData } from '../../types/pocketbase';
-import { ReplyForm } from './ReplyForm';
+import ReplyForm from './ReplyForm';
 import { cn } from '../../lib/utils';
+import { sanitizeText } from '../../lib/security';
 
 interface CommentItemProps {
   /** 评论数据（含嵌套子评论） */
@@ -19,12 +20,31 @@ interface CommentItemProps {
   moderationEnabled?: boolean;
 }
 
+const itemVariants = {
+  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] },
+  },
+};
+
+/** 新评论高亮 - stone 背景渐隐 */
+const highlightVariants = {
+  initial: { backgroundColor: 'rgba(120, 113, 108, 0.15)' },
+  animate: {
+    backgroundColor: 'rgba(120, 113, 108, 0)',
+    transition: { duration: 2, ease: 'easeOut' },
+  },
+};
+
 /**
  * 单条评论组件
  *
  * 设计决策：
- * 1. 玻璃卡片承载评论，hover 时跟随鼠标的 indigo 径向光晕强化「玻璃透光」感。
- * 2. 新评论用 indigo ring + 短暂背景渐隐高亮，3 秒后消退（由父组件控制 isNew）。
+ * 1. 玻璃卡片承载评论，hover 时跟随鼠标的 teal 径向光晕强化「玻璃透光」感。
+ * 2. 新评论用 teal ring + 短暂背景渐隐高亮，3 秒后消退（由父组件控制 isNew）。
  * 3. 回复按钮带 aria-expanded/aria-controls，屏幕阅读器可知展开状态。
  */
 export default function CommentItem({
@@ -66,37 +86,18 @@ export default function CommentItem({
 
   const getAvatarLetter = (name: string) => name.charAt(0).toUpperCase();
 
-  /** 头像配色 - indigo/violet 系，与整体玻璃风格协调 */
+  /** 头像配色 - teal/violet 系，与整体玻璃风格协调 */
   const getAvatarColor = (seed: string) => {
     const colors = [
-      'bg-stone-500',
-      'bg-stone-600',
-      'bg-stone-400',
-      'bg-stone-500',
-      'bg-stone-600',
-      'bg-stone-400',
+      'bg-zinc-500',
+      'bg-zinc-600',
+      'bg-zinc-400',
+      'bg-zinc-500',
+      'bg-zinc-600',
+      'bg-zinc-400',
     ];
     const index = seed.charCodeAt(0) % colors.length;
     return colors[index];
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20, scale: 0.98 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      scale: 1,
-      transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] },
-    },
-  };
-
-  /** 新评论高亮 - stone 背景渐隐 */
-  const highlightVariants = {
-    initial: { backgroundColor: 'rgba(120, 113, 108, 0.15)' },
-    animate: {
-      backgroundColor: 'rgba(120, 113, 108, 0)',
-      transition: { duration: 2, ease: 'easeOut' },
-    },
   };
 
   const canReply = depth < maxDepth;
@@ -113,15 +114,15 @@ export default function CommentItem({
     >
       <motion.div
         className={cn(
-          'glass relative overflow-hidden rounded-2xl p-4 sm:p-5',
+          'card relative overflow-hidden rounded-lg p-4 sm:p-5',
           'transition-colors duration-300',
-          isNew && 'ring-2 ring-stone-400/50'
+          isNew && 'ring-2 ring-zinc-400/50'
         )}
         {...(isNew && { initial: 'initial', animate: 'animate', variants: highlightVariants })}
       >
         {/* 跟随鼠标的柔和光晕 */}
         <motion.div
-          className="pointer-events-none absolute inset-0 z-0 rounded-2xl transition-opacity duration-300"
+          className="pointer-events-none absolute inset-0 z-0 rounded-lg transition-opacity duration-300"
           style={{
             background: `radial-gradient(300px circle at ${mousePosition.x * 100}% ${mousePosition.y * 100}%, rgba(120, 113, 108, 0.10), transparent 40%)`,
             opacity: isHovered ? 1 : 0,
@@ -142,16 +143,16 @@ export default function CommentItem({
               {getAvatarLetter(comment.author_name)}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="break-words font-medium text-stone-900 dark:text-white">{comment.author_name}</p>
-              <p className="text-xs text-stone-500 dark:text-stone-400">
+              <p className="break-words font-medium text-zinc-900 dark:text-white">{comment.author_name}</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 <time dateTime={comment.created}>{formatTime(comment.created)}</time>
               </p>
             </div>
           </div>
 
           {/* 评论内容 */}
-          <div className="mb-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-stone-700 [overflow-wrap:anywhere] dark:text-stone-300">
-            {comment.content}
+          <div className="mb-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-zinc-700 [overflow-wrap:anywhere] dark:text-zinc-300">
+            {sanitizeText(comment.content)}
           </div>
 
           {/* 操作栏 */}
@@ -160,7 +161,7 @@ export default function CommentItem({
               onClick={() => setIsReplyOpen(!isReplyOpen)}
               aria-expanded={isReplyOpen}
               aria-controls={`reply-form-${comment.id}`}
-              className="focus-ring flex items-center gap-1.5 rounded-md text-sm text-stone-500 transition-colors hover:text-stone-600 dark:text-stone-400 dark:hover:text-stone-500"
+              className="focus-ring min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center gap-1.5 rounded-md text-sm text-zinc-500 transition-colors hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-500"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -180,9 +181,9 @@ export default function CommentItem({
         />
       </motion.div>
 
-      {/* 子评论（递归渲染） - indigo 竖线引导嵌套关系 */}
+      {/* 子评论（递归渲染） - teal 竖线引导嵌套关系 */}
       {comment.children.length > 0 && (
-        <div className="mt-3 space-y-3 border-l-2 border-stone-200 pl-3 dark:border-stone-800/60 sm:pl-6">
+        <div className="mt-3 space-y-3 border-l-2 border-zinc-200 pl-3 dark:border-zinc-800/60 sm:pl-6">
           {comment.children.map((child) => (
             <CommentItem
               key={child.id}

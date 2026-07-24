@@ -1,4 +1,4 @@
-# Local test Caddy config.
+﻿# Local test Caddy config.
 # The docker compose image is the standard caddy:2.8.4-alpine image, so do not
 # use third-party directives such as rate_limit here.
 
@@ -18,15 +18,26 @@
         -X-Powered-By
     }
 
+    @blocked_admin_access {
+        path /admin* /_/* /api/admins/* /api/blog-admin/webauthn/*
+        not path /_astro/* /pagefind/*
+        not remote_ip {$ADMIN_IP}
+    }
+    respond @blocked_admin_access "Forbidden" 403
+
     @bad_paths {
         path /.env* /.git* /.svn* /wp-* /xmlrpc* /vendor* /node_modules* /.htaccess* /backup* /sql* /config* /phpmyadmin* /mysql* /shell* /cmd* /eval* /input* /index.php* /info.php*
-        not path /_/*
+        not path /_astro/*
     }
     handle @bad_paths {
         respond 403
     }
 
-    handle /_/admin* {
+    @pb_admin {
+        path /_/*
+        not path /_astro/*
+    }
+    handle @pb_admin {
         reverse_proxy pocketbase:8090 {
             header_up X-Real-IP {remote_host}
             header_up X-Forwarded-For {remote_host}
@@ -35,11 +46,11 @@
     }
 
     @static {
-        path *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot
+        path /_astro/* /pagefind/* *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot
     }
     handle @static {
         header Cache-Control "public, max-age=3600"
-        reverse_proxy pocketbase:8090
+        file_server
     }
 
     handle /api/* {
@@ -51,7 +62,8 @@
     }
 
     handle {
-        reverse_proxy pocketbase:8090
+        try_files {path} {path}/ =404
+        file_server
     }
 
     log {

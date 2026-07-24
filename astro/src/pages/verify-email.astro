@@ -1,0 +1,10 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import EmailVerificationResult from '../components/auth/EmailVerificationResult';
+---
+
+<BaseLayout title="邮箱验证" description="验证你的邮箱地址" noindex>
+  <div class="max-w-3xl mx-auto px-4">
+    <EmailVerificationResult client:idle />
+  </div>
+</BaseLayout>

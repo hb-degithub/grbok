@@ -1,0 +1,25 @@
+.scrollfloat-root {
+  display: inline-flex;
+  flex-wrap: wrap;
+  overflow: hidden;
+}
+
+.scrollfloat-char {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+
+.dark .scrollfloat-char {
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrollfloat-root {
+    overflow: visible;
+  }
+
+  .scrollfloat-char {
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}

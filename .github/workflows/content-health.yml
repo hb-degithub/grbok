@@ -1,0 +1,61 @@
+name: Content Health Check
+
+on:
+  schedule:
+    # 每周一凌晨 2:00 (UTC+8 周一 10:00)
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check-links:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: astro/package-lock.json
+
+      - name: Install & build
+        run: |
+          cd astro
+          npm ci
+          npm run build
+        env:
+          PUBLIC_SITE_URL: https://blog.example.com
+          PUBLIC_POCKETBASE_URL: http://localhost:8090
+
+      - name: Check external links
+        id: check
+        run: cd astro && node scripts/content-health-check.mjs
+        continue-on-error: true
+
+      - name: Create issue on failure
+        if: steps.check.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const date = new Date().toISOString().slice(0, 10);
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `⚠️ 内容健康度检查发现失效链接 (${date})`,
+              body: [
+                '## 检查结果',
+                '',
+                '本周的内容健康度检查发现失效外链，请查看 Action 日志获取详情：',
+                '',
+                `[查看运行日志](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+                '',
+                '## 修复建议',
+                '',
+                '1. 打开日志查看失效 URL 列表',
+                '2. 更新文章中的外链或移除失效链接',
+                '3. 重新构建并验证',
+              ].join('\n'),
+              labels: ['content-health', 'bug', 'automated'],
+            });

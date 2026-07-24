@@ -1,0 +1,69 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ParticleField from '../components/effects/ParticleField';
+import ScrollReveal from '../components/ui/ScrollReveal';
+import FeedCopyButton from '../components/subscribe/FeedCopyButton';
+
+const feedUrl = new URL('/feed.xml', Astro.site).href;
+
+const readers = [
+  { name: 'Feedly', url: 'https://feedly.com/', desc: '最主流的在线 RSS 阅读器，网页/手机都能用' },
+  { name: 'Inoreader', url: 'https://www.inoreader.com/', desc: '功能全面的阅读器，支持过滤与规则' },
+  { name: 'NetNewsWire', url: 'https://netnewswire.com/', desc: '苹果生态免费开源阅读器' },
+];
+---
+
+<BaseLayout title="订阅" description="通过 RSS 订阅博客更新">
+  <div class="pointer-events-none fixed inset-0 z-0 hidden lg:block" aria-hidden="true">
+    <ParticleField client:visible count={36} speed={0.25} />
+  </div>
+  <section class="relative z-10 mx-auto w-full max-w-3xl px-5 py-16 sm:px-8">
+    <div class="mb-10">
+      <ScrollReveal client:visible>
+        <div class="mb-4 flex items-center gap-3">
+          <span class="h-px w-8 bg-zinc-400 dark:bg-zinc-500"></span>
+          <span class="font-mono text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Subscribe</span>
+        </div>
+        <h1 class="text-4xl font-black tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-5xl">订阅</h1>
+        <p class="mt-3 max-w-xl text-zinc-500 dark:text-zinc-400">通过 RSS 订阅，新文章会第一时间出现在你的阅读器里。</p>
+      </ScrollReveal>
+    </div>
+
+    <div class="grid gap-5">
+      <ScrollReveal client:visible>
+        <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">RSS 订阅地址</h2>
+          <p class="mt-2 text-sm leading-7 text-zinc-500 dark:text-zinc-400">
+            RSS 是一种内容订阅协议。把下面的地址粘贴到任意 RSS 阅读器，即可订阅本博客的全部文章。
+          </p>
+          <div class="mt-4 flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 dark:border-zinc-700 dark:bg-zinc-950/50">
+            <svg class="h-4 w-4 shrink-0 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z" />
+            </svg>
+            <code class="min-w-0 flex-1 truncate font-mono text-xs text-zinc-600 dark:text-zinc-300">{feedUrl}</code>
+          </div>
+          <div class="mt-4 flex flex-wrap items-center gap-3">
+            <FeedCopyButton client:load url={feedUrl} />
+            <a href="/feed.xml" target="_blank" rel="noopener noreferrer" class="inline-flex min-h-10 items-center rounded-lg border border-zinc-200 px-4 py-2 text-sm font-semibold text-zinc-600 no-underline transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-300 dark:hover:text-zinc-100">
+              打开 feed.xml
+            </a>
+          </div>
+        </div>
+      </ScrollReveal>
+
+      <ScrollReveal delay={0.1} client:visible>
+        <div class="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">推荐阅读器</h2>
+          <div class="mt-4 grid gap-3 sm:grid-cols-3">
+            {readers.map((reader) => (
+              <a href={reader.url} target="_blank" rel="noopener noreferrer" class="group rounded-lg border border-zinc-200 p-4 no-underline transition-all hover:-translate-y-0.5 hover:border-teal-500/40 dark:border-zinc-700 dark:hover:border-teal-400/40">
+                <div class="text-sm font-bold text-zinc-900 transition-colors group-hover:text-teal-600 dark:text-zinc-100 dark:group-hover:text-teal-400">{reader.name}</div>
+                <div class="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">{reader.desc}</div>
+              </a>
+            ))}
+          </div>
+        </div>
+      </ScrollReveal>
+    </div>
+  </section>
+</BaseLayout>

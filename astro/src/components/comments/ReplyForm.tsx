@@ -7,6 +7,10 @@ import type { CommentFormData } from '../../types/pocketbase';
 
 const replyLimiter = new RateLimiter(3, 1/12);
 
+const NAME_MAX = 30;
+const CONTENT_MAX = 500;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 interface ReplyFormProps {
   /** 是否显示回复框 */
   isOpen: boolean;
@@ -20,9 +24,9 @@ interface ReplyFormProps {
   moderationEnabled?: boolean;
 }
 
-/** 共享 textarea 样式 - 玻璃底 + indigo focus-visible */
+/** 共享 textarea 样式 - 玻璃底 + teal focus-visible */
 const textareaClass =
-  'w-full rounded-xl border border-stone-200 bg-white/70 px-4 py-2.5 text-sm text-stone-900 placeholder-stone-400 transition-all duration-200 ease-out outline-none focus-visible:border-stone-500 focus-visible:ring-2 focus-visible:ring-stone-500/30 dark:border-stone-700 dark:bg-stone-900/50 dark:text-stone-100 dark:placeholder-stone-500 dark:focus-visible:border-stone-400';
+  'w-full rounded-xl border border-zinc-200 bg-white/70 px-4 py-2.5 text-sm text-zinc-900 placeholder-zinc-400 transition-all duration-200 ease-out outline-none focus-visible:border-zinc-500 focus-visible:ring-2 focus-visible:ring-zinc-500/30 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus-visible:border-zinc-400';
 
 /**
  * 回复表单组件
@@ -30,7 +34,7 @@ const textareaClass =
  * 设计决策：用 glass（比主表单的 glass-strong 更通透）表示「嵌套/次要」层级；
  * height:auto 过渡实现平滑展开收起；textarea 用 parentId 派生 id 关联 label。
  */
-export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderationEnabled = true }: ReplyFormProps) {
+export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderationEnabled = true }: ReplyFormProps) {
   const [formData, setFormData] = useState<CommentFormData>({
     author_name: '',
     author_email: '',
@@ -46,6 +50,18 @@ export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderati
     if (!formData.author_name || !formData.author_email || !formData.content) {
       setStatus('error');
       setErrorMessage('请填写所有必填字段');
+      return;
+    }
+
+    if (!EMAIL_RE.test(formData.author_email)) {
+      setStatus('error');
+      setErrorMessage('邮箱格式不正确');
+      return;
+    }
+
+    if (formData.author_name.length > NAME_MAX || formData.content.length > CONTENT_MAX) {
+      setStatus('error');
+      setErrorMessage(`昵称不超过 ${NAME_MAX} 字，回复不超过 ${CONTENT_MAX} 字`);
       return;
     }
 
@@ -104,7 +120,7 @@ export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderati
           exit="exit"
           className="overflow-hidden"
         >
-          <form onSubmit={handleSubmit} className="glass rounded-xl p-4 sm:p-5" noValidate>
+          <form onSubmit={handleSubmit} className="card rounded-xl p-4 sm:p-5" noValidate>
             {status === 'success' ? (
               /* ==================== 成功状态 ==================== */
               <motion.div
@@ -139,6 +155,7 @@ export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderati
                     value={formData.author_name}
                     onChange={(e) => setFormData((prev) => ({ ...prev, author_name: e.target.value }))}
                     required
+                    maxLength={NAME_MAX}
                     autoComplete="name"
                   />
                   <Input
@@ -148,12 +165,13 @@ export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderati
                     value={formData.author_email}
                     onChange={(e) => setFormData((prev) => ({ ...prev, author_email: e.target.value }))}
                     required
+                    maxLength={100}
                     autoComplete="email"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor={contentId} className="mb-1.5 block text-sm font-medium text-stone-700 dark:text-stone-300">
+                  <label htmlFor={contentId} className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     回复内容
                   </label>
                   <textarea
@@ -165,6 +183,7 @@ export function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderati
                     }}
                     placeholder="写下你的回复..."
                     rows={3}
+                    maxLength={CONTENT_MAX}
                     className={textareaClass}
                     required
                   />

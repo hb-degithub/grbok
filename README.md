@@ -1,4 +1,4 @@
-# 胡巴的博客
+﻿# 胡巴的博客
 
 基于 Astro + PocketBase 的个人博客系统。
 
@@ -91,7 +91,9 @@ docker compose -f docker-compose.local.yml --env-file .env.local up -d
 - [PocketBase 数据结构](/docs/pocketbase-schema.md) — 数据库表结构
 - [安全配置](/docs/pocketbase-security-rules.json) — PocketBase 安全规则
 - [迁移验证](/docs/migration-validation.md) — 数据库迁移验证
+- [管理员认证加固运维手册](/docs/admin-auth-hardening-runbook.md) — 部署、注册、恢复与回滚
 
 ## 许可
 
 私有项目
+

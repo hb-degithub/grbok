@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SITE_CONFIG } from '../../config/site';
 import { useAuthStatus } from '../../hooks/useAuthStatus';
+import useBreakpoint from '../../hooks/useBreakpoint';
 
 interface SideNavProps {
   id?: string;
@@ -17,10 +18,47 @@ const mainNavItems = [
   { href: '/about', label: '关于', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
 ];
 
+// 「更多功能」分组条目：后续子项目（友链/留言板等）逐个追加到这里
+const moreNavItems = [
+  { href: '/stats', label: '访问统计', icon: 'M3 3v18h18M7 14l4-4 3 3 5-6' },
+  { href: '/links', label: '友情链接', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
+  { href: '/guestbook', label: '留言板', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' },
+  { href: '/gallery', label: '相册', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
+  { href: '/projects', label: '项目', icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4' },
+  { href: '/subscribe', label: '订阅', icon: 'M6 5c7.18 0 13 5.82 13 13M6 11a7 7 0 017 7m-6 0a1 1 0 11-2 0 1 1 0 012 0z' },
+];
+
 const adminNavItem = { href: '/admin', label: '管理后台', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' };
 const loginNavItem = { href: '/login', label: '登录', icon: 'M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1' };
 
 const DRAWER_TRANSITION = { type: 'spring', damping: 28, stiffness: 260 } as const;
+
+const STAGGER_EASE = [0.16, 1, 0.3, 1] as const;
+
+function getStaggerVariants(reduced: boolean) {
+  if (reduced) {
+    return {
+      container: {
+        hidden: { opacity: 1 },
+        visible: { opacity: 1, transition: { staggerChildren: 0, delayChildren: 0 } },
+      },
+      item: {
+        hidden: { opacity: 1, x: 0 },
+        visible: { opacity: 1, x: 0, transition: { duration: 0 } },
+      },
+    };
+  }
+  return {
+    container: {
+      hidden: { opacity: 0 },
+      visible: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.1 } },
+    },
+    item: {
+      hidden: { opacity: 0, x: -20 },
+      visible: { opacity: 1, x: 0, transition: { duration: 0.3, ease: STAGGER_EASE } },
+    },
+  };
+}
 
 function getScrollbarWidth() {
   return typeof window !== 'undefined' ? window.innerWidth - document.documentElement.clientWidth : 0;
@@ -30,10 +68,12 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
   const drawerRef = useRef<HTMLElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
   const { isAuthenticated, isLoading, canAccessAdmin } = useAuthStatus();
-  const secondaryNavItems = [
+  const { prefersReducedMotion } = useBreakpoint();
+  const staggerVariants = useMemo(() => getStaggerVariants(prefersReducedMotion), [prefersReducedMotion]);
+  const secondaryNavItems = useMemo(() => [
     canAccessAdmin ? adminNavItem : null,
     !isLoading && !isAuthenticated ? loginNavItem : null,
-  ].filter((item): item is typeof adminNavItem => Boolean(item));
+  ].filter((item): item is typeof adminNavItem => Boolean(item)), [canAccessAdmin, isLoading, isAuthenticated]);
 
   const isActive = (href: string) => {
     if (href === '/') return currentPath === '/';
@@ -125,7 +165,7 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             onClick={onClose}
-            className="fixed inset-0 z-50 bg-stone-900/20 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-zinc-900/20 backdrop-blur-sm"
             aria-hidden="true"
           />
           <motion.aside
@@ -141,19 +181,19 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
             transition={DRAWER_TRANSITION}
             onClick={handleDrawerClick}
             onKeyDown={handleDrawerKeyDown}
-            className="fixed inset-y-0 left-0 z-50 flex h-auto max-h-none w-[min(288px,88dvw)] max-w-[calc(100dvw-env(safe-area-inset-right))] flex-col overflow-hidden bg-white shadow-2xl outline-none dark:bg-stone-900"
+            className="fixed inset-y-0 left-0 z-50 flex h-auto max-h-none w-[min(288px,88dvw)] max-w-[calc(100dvw-env(safe-area-inset-right))] flex-col overflow-hidden bg-white shadow-2xl outline-none dark:bg-zinc-900"
           >
-            <div className="flex min-h-[56px] shrink-0 items-center justify-between gap-3 border-b border-stone-200 px-3 py-2 pt-[max(env(safe-area-inset-top),0.5rem)] dark:border-stone-800 sm:px-5">
+            <div className="flex min-h-[56px] shrink-0 items-center justify-between gap-3 border-b border-zinc-200 px-3 py-2 pt-[max(env(safe-area-inset-top),0.5rem)] dark:border-zinc-800 sm:px-5">
               <a href="/" className="flex min-h-[40px] min-w-0 items-center gap-2.5">
-                <div className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-xl bg-stone-500 text-lg font-bold text-white">
+                <div className="flex h-[36px] w-[36px] shrink-0 items-center justify-center rounded-xl bg-zinc-500 text-lg font-bold text-white">
                   {SITE_CONFIG.logoText}
                 </div>
-                <span className="min-w-0 break-words text-base font-bold leading-tight text-stone-900 dark:text-stone-100">{SITE_CONFIG.name}</span>
+                <span className="min-w-0 break-words text-base font-bold leading-tight text-zinc-900 dark:text-zinc-100">{SITE_CONFIG.name}</span>
               </a>
               <button
                 type="button"
                 onClick={onClose}
-                className="focus-ring flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] shrink-0 items-center justify-center rounded-lg text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100"
+                className="focus-ring flex h-[40px] min-h-[40px] w-[40px] min-w-[40px] shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
                 aria-label="关闭侧边导航"
               >
                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -163,17 +203,23 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
             </div>
 
             <nav className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-4">
-              <div className="space-y-1">
-                <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">主导航</p>
+              <motion.div
+                className="space-y-1"
+                variants={staggerVariants.container}
+                initial="hidden"
+                animate="visible"
+              >
+                <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">主导航</p>
                 {mainNavItems.map((item) => (
-                  <a
+                  <motion.a
                     key={item.href}
                     href={item.href}
                     onClick={handleLinkClick}
+                    variants={staggerVariants.item}
                     className={`flex min-h-[44px] min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium leading-snug transition-colors ${
                       isActive(item.href)
-                        ? 'bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-100'
-                        : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100'
+                        ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
+                        : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100'
                     }`}
                     aria-current={isActive(item.href) ? 'page' : undefined}
                   >
@@ -181,21 +227,27 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
                     </svg>
                     <span className="min-w-0 break-words">{item.label}</span>
-                  </a>
+                  </motion.a>
                 ))}
-              </div>
+              </motion.div>
 
-              <div className="mt-6 space-y-1">
-                <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-stone-400 dark:text-stone-500">其他</p>
-                {secondaryNavItems.map((item) => (
-                  <a
+              <motion.div
+                className="mt-6 space-y-1"
+                variants={staggerVariants.container}
+                initial="hidden"
+                animate="visible"
+              >
+                <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">更多功能</p>
+                {moreNavItems.map((item) => (
+                  <motion.a
                     key={item.href}
                     href={item.href}
                     onClick={handleLinkClick}
+                    variants={staggerVariants.item}
                     className={`flex min-h-[44px] min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium leading-snug transition-colors ${
                       isActive(item.href)
-                        ? 'bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-100'
-                        : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900 dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-stone-100'
+                        ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
+                        : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100'
                     }`}
                     aria-current={isActive(item.href) ? 'page' : undefined}
                   >
@@ -203,9 +255,37 @@ export default function SideNav({ id, isOpen, onClose, currentPath }: SideNavPro
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
                     </svg>
                     <span className="min-w-0 break-words">{item.label}</span>
-                  </a>
+                  </motion.a>
                 ))}
-              </div>
+              </motion.div>
+
+              <motion.div
+                className="mt-6 space-y-1"
+                variants={staggerVariants.container}
+                initial="hidden"
+                animate="visible"
+              >
+                <p className="mb-2 break-words px-3 text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">其他</p>
+                {secondaryNavItems.map((item) => (
+                  <motion.a
+                    key={item.href}
+                    href={item.href}
+                    onClick={handleLinkClick}
+                    variants={staggerVariants.item}
+                    className={`flex min-h-[44px] min-w-0 items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium leading-snug transition-colors ${
+                      isActive(item.href)
+                        ? 'bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100'
+                        : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100'
+                    }`}
+                    aria-current={isActive(item.href) ? 'page' : undefined}
+                  >
+                    <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
+                    </svg>
+                    <span className="min-w-0 break-words">{item.label}</span>
+                  </motion.a>
+                ))}
+              </motion.div>
             </nav>
           </motion.aside>
         </>

@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AnnouncementsManager from '../../../components/admin/AnnouncementsManager';
+---
+
+<AdminLayout title="公告管理" requiredRole="super_admin">
+  <AnnouncementsManager client:only="react" />
+</AdminLayout>

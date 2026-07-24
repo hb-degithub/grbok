@@ -28,9 +28,9 @@ migrate((db) => {
     links = new Collection({ name: "friend_links", type: "base", system: false, schema: [] });
   }
   ensureField(links, { name: "name", type: "text", required: true, options: { min: 1, max: 100, pattern: "" } });
-  ensureField(links, { name: "url", type: "text", required: true, options: { min: 1, max: 500, pattern: "" } });
+  ensureField(links, { name: "url", type: "text", required: true, options: { min: 1, max: 500, pattern: "^https?://.+" } });
   ensureField(links, { name: "description", type: "text", required: false, options: { min: null, max: 500, pattern: "" } });
-  ensureField(links, { name: "avatar", type: "text", required: false, options: { min: null, max: 500, pattern: "" } });
+  ensureField(links, { name: "avatar", type: "text", required: false, options: { min: null, max: 500, pattern: "^https?://.+|^$" } });
   ensureField(links, { name: "status", type: "select", required: true, options: { maxSelect: 1, values: ["show", "hide"] } });
   ensureField(links, { name: "sort_order", type: "number", required: false, options: { min: 0, max: null, noDecimal: true } });
   links.listRule = "status = \"show\" || " + AUTHOR_RULE;

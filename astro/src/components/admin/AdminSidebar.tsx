@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAdminAuth, useAdminLogout, type AdminRole } from '../../hooks/useAdminAuth';
+import useBreakpoint from '../../hooks/useBreakpoint';
 import { cn } from '../../lib/utils';
 
 interface NavItem {
@@ -14,12 +15,17 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/admin', label: '仪表盘', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', section: '主控台', requiredRole: 'author', hint: '概览' },
+  { href: '/admin/stats', label: '统计', icon: 'M3 3v18h18M7 14l4-4 3 3 5-6', section: '主控台', requiredRole: 'author', hint: '访问' },
   { href: '/admin/posts', label: '文章', icon: 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z', section: '内容', requiredRole: 'author', hint: '撰写' },
   { href: '/admin/comments', label: '评论', icon: 'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z', section: '内容', requiredRole: 'admin', hint: '审核' },
   { href: '/admin/tags', label: '标签', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', section: '内容', requiredRole: 'author', hint: '分类' },
+  { href: '/admin/media', label: '媒体', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z', section: '内容', requiredRole: 'author', hint: '图片' },
+  { href: '/admin/friend-links', label: '友链', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1', section: '内容', requiredRole: 'super_admin', hint: '外链' },
   { href: '/admin/users', label: '用户', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', section: '系统', requiredRole: 'super_admin', hint: '权限' },
+  { href: '/admin/announcements', label: '公告', icon: 'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z', section: '系统', requiredRole: 'super_admin', hint: '广播' },
   { href: '/admin/settings', label: '设置', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', section: '系统', requiredRole: 'super_admin', hint: '站点' },
   { href: '/admin/security', label: '安全', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', section: '系统', requiredRole: 'super_admin', hint: '审计' },
+  { href: '/admin/audit', label: '审计日志', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4', section: '系统', requiredRole: 'super_admin', hint: '操作记录' },
 ];
 
 const roleLabels: Record<AdminRole, string> = {
@@ -45,11 +51,12 @@ function getScrollbarWidth() {
 }
 
 export default function AdminSidebar() {
+  const { isDesktop } = useBreakpoint();
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false;
     const stored = window.localStorage.getItem('admin-sidebar-collapsed');
     if (stored !== null) return stored === 'true';
-    return window.innerWidth < 1180;
+    return !isDesktop;
   });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const drawerRef = useRef<HTMLElement>(null);
@@ -64,9 +71,8 @@ export default function AdminSidebar() {
   const role = user?.role as AdminRole | undefined;
 
   useEffect(() => {
-    const media = window.matchMedia('(min-width: 1024px)');
     const syncSidebarWidth = () => {
-      if (!media.matches) {
+      if (!isDesktop) {
         document.documentElement.style.setProperty('--admin-sidebar-width', '0px');
         return;
       }
@@ -74,9 +80,7 @@ export default function AdminSidebar() {
       window.localStorage.setItem('admin-sidebar-collapsed', String(collapsed));
     };
     syncSidebarWidth();
-    media.addEventListener?.('change', syncSidebarWidth);
-    return () => media.removeEventListener?.('change', syncSidebarWidth);
-  }, [collapsed]);
+  }, [collapsed, isDesktop]);
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -194,8 +198,8 @@ export default function AdminSidebar() {
         ref={triggerRef}
         type="button"
         onClick={() => setDrawerOpen(true)}
-        className="fixed left-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-50 flex h-11 w-11 items-center justify-center rounded-md border border-border bg-white/95 text-text shadow-md backdrop-blur lg:hidden"
-        aria-label="鎵撳紑鍚庡彴鑿滃崟"
+        className="fixed left-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-50 flex h-11 w-11 items-center justify-center rounded-md border border-border bg-white text-text shadow-md backdrop-blur lg:hidden"
+        aria-label="打开后台菜单"
         aria-expanded={drawerOpen}
         aria-controls="admin-mobile-sidebar"
       >
@@ -209,7 +213,7 @@ export default function AdminSidebar() {
       >
         <div className="flex h-16 items-center justify-between border-b border-border px-3">
           {!collapsed && (
-            <a href="/admin" className="min-w-0 text-text hover:text-text" aria-label="鍚庡彴棣栭〉">
+            <a href="/admin" className="min-w-0 text-text hover:text-text" aria-label="后台首页">
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-md bg-text text-sm font-black text-white">B</span>
                 <div className="min-w-0">
@@ -238,7 +242,7 @@ export default function AdminSidebar() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-stone-950/35 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-50 bg-zinc-950/35 backdrop-blur-sm lg:hidden"
               onClick={() => setDrawerOpen(false)}
               aria-hidden="true"
             />
@@ -248,7 +252,7 @@ export default function AdminSidebar() {
               tabIndex={-1}
               role="dialog"
               aria-modal="true"
-              aria-label="鍚庡彴鑿滃崟"
+              aria-label="后台菜单"
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
@@ -257,7 +261,7 @@ export default function AdminSidebar() {
               onClick={(event) => event.stopPropagation()}
             >
               <div className="flex min-h-16 items-center justify-between border-b border-border px-4 pt-[max(env(safe-area-inset-top),0.5rem)]">
-                <a href="/admin" onClick={() => setDrawerOpen(false)} className="min-w-0 text-text hover:text-text" aria-label="鍚庡彴棣栭〉">
+                <a href="/admin" onClick={() => setDrawerOpen(false)} className="min-w-0 text-text hover:text-text" aria-label="后台首页">
                   <div className="flex items-center gap-2">
                     <span className="flex h-9 w-9 items-center justify-center rounded-md bg-text text-sm font-black text-white">B</span>
                     <div className="min-w-0">
@@ -270,7 +274,7 @@ export default function AdminSidebar() {
                   type="button"
                   onClick={() => setDrawerOpen(false)}
                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-bg-soft hover:text-text"
-                  aria-label="鍏抽棴鍚庡彴鑿滃崟"
+                  aria-label="关闭后台菜单"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>

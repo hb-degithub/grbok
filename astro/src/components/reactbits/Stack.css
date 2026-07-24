@@ -1,0 +1,102 @@
+.stack-root {
+  position: relative;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+/* Individual card */
+.stack-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #e4e4e7;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  overflow: hidden;
+}
+
+.stack-card:active {
+  cursor: grabbing;
+}
+
+/* Top card — full visibility */
+.stack-card--top {
+  opacity: 1;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* Cards behind — depth effect */
+.stack-card--behind {
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Empty state */
+.stack-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #a1a1aa;
+  font-size: 0.875rem;
+  border-radius: 0.75rem;
+  border: 1px dashed #d4d4d8;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Reduced motion fallback */
+.stack-reduced-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stack-reduced-item {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e4e4e7;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* Dark mode */
+.dark .stack-card {
+  background: rgba(39, 39, 42, 0.7);
+  border-color: #3f3f46;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.dark .stack-card--top {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.dark .stack-card--behind {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.dark .stack-empty {
+  color: #71717a;
+  border-color: #3f3f46;
+  background: rgba(39, 39, 42, 0.5);
+}
+
+.dark .stack-reduced-item {
+  border-color: #3f3f46;
+  background: rgba(39, 39, 42, 0.7);
+}
+
+/* Reduced motion media query */
+@media (prefers-reduced-motion: reduce) {
+  .stack-card {
+    transition: none !important;
+  }
+}

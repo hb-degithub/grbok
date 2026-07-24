@@ -1,4 +1,4 @@
-﻿version: "3.8"
+version: "3.8"
 
 services:
   caddy:
@@ -6,7 +6,7 @@ services:
     container_name: blog-caddy
     restart: unless-stopped
     ports:
-      - "${CADDY_HTTP_PORT:-18080}:80"
+      - "127.0.0.1:${CADDY_HTTP_PORT:-18080}:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./astro/dist:/srv:ro
@@ -16,8 +16,77 @@ services:
       - ADMIN_IP=${ADMIN_IP}
     networks:
       - blog_network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      pocketbase:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  admin-auth:
+    build:
+      context: ./admin-auth
+    container_name: blog-admin-auth
+    restart: unless-stopped
+    expose:
+      - "8787"
+    environment:
+      - NODE_ENV=production
+      - ADMIN_AUTH_INTERNAL_SECRET=${ADMIN_AUTH_INTERNAL_SECRET}
+      - ADMIN_AUTH_HASH_SECRET=${ADMIN_AUTH_HASH_SECRET}
+      - ADMIN_AUTH_RP_ID=${ADMIN_AUTH_RP_ID:-hlydwz.com}
+      - ADMIN_AUTH_ORIGIN=${ADMIN_AUTH_ORIGIN:-https://hlydwz.com}
+      - ADMIN_AUTH_SESSION_TTL_SECONDS=${ADMIN_AUTH_SESSION_TTL_SECONDS:-900}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-}
+      - SMTP_USERNAME=${SMTP_USERNAME:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM_ADDRESS=${SMTP_FROM_ADDRESS:-}
+      - SMTP_FROM_NAME=${SMTP_FROM_NAME:-}
+      - SMTP_TLS_MODE=${SMTP_TLS_MODE:-auto}
+      - SMTP_CONNECTION_TIMEOUT_MS=${SMTP_CONNECTION_TIMEOUT_MS:-10000}
+      - SMTP_SOCKET_TIMEOUT_MS=${SMTP_SOCKET_TIMEOUT_MS:-30000}
+      - MAIL_PROVIDER_LABEL=${MAIL_PROVIDER_LABEL:-Standard SMTP}
+      - MAIL_ALERT_RECIPIENTS=${MAIL_ALERT_RECIPIENTS:-}
+      - MAIL_INTERNAL_SECRET=${MAIL_INTERNAL_SECRET}
+      - PUBLIC_SITE_URL=${PUBLIC_SITE_URL:-https://hlydwz.com}
+      - ALIYUN_SMTP_HOST=${ALIYUN_SMTP_HOST:-}
+      - ALIYUN_SMTP_PORT=${ALIYUN_SMTP_PORT:-}
+      - ALIYUN_SMTP_USER=${ALIYUN_SMTP_USER:-}
+      - ALIYUN_SMTP_PASSWORD=${ALIYUN_SMTP_PASSWORD:-}
+      - ALIYUN_FROM_EMAIL=${ALIYUN_FROM_EMAIL:-}
+      - ALIYUN_FROM_NAME=${ALIYUN_FROM_NAME:-}
+    networks:
+      - blog_network
+    user: "node"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -42,13 +111,32 @@ services:
     restart: unless-stopped
     volumes:
       - pb_data:/pb_data
-      - ./pb_migrations:/pb_migrations
+      - ./pb_migrations:/pb_migrations:ro
       - ./pb_hooks:/pb_hooks:ro
     environment:
       - PB_ENCRYPTION_KEY=${PB_ENCRYPTION_KEY}
       - TZ=${TZ:-Asia/Shanghai}
+      - ADMIN_AUTH_INTERNAL_URL=http://admin-auth:8787
+      - ADMIN_AUTH_INTERNAL_SECRET=${ADMIN_AUTH_INTERNAL_SECRET}
+      - ADMIN_AUTH_HASH_SECRET=${ADMIN_AUTH_HASH_SECRET}
+      - MAIL_INTERNAL_SECRET=${MAIL_INTERNAL_SECRET}
+      - MAIL_HASH_SECRET=${MAIL_HASH_SECRET}
+      - MAIL_GATEWAY_INTERNAL_URL=http://admin-auth:8787
+      - MAIL_GATEWAY_ENABLED=${MAIL_GATEWAY_ENABLED:-false}
+      - MAIL_ACCOUNT_ENABLED=${MAIL_ACCOUNT_ENABLED:-false}
+      - MAIL_OTP_ENABLED=${MAIL_OTP_ENABLED:-false}
+      - PUBLIC_SITE_URL=${PUBLIC_SITE_URL:-https://hlydwz.com}
     networks:
       - blog_network
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    depends_on:
+      admin-auth:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/api/health"]
       interval: 30s

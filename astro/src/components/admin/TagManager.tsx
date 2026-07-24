@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
+import { showToast } from '../ui/Toast';
+import ConfirmDialog from '../ui/ConfirmDialog';
 import type { Tag } from '../../types/pocketbase';
 
 export default function TagManager() {
@@ -8,6 +10,7 @@ export default function TagManager() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Tag | null>(null);
   const [saving, setSaving] = useState(false);
+  const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
 
   const fetchTags = useCallback(async () => {
     setLoading(true);
@@ -27,15 +30,17 @@ export default function TagManager() {
       if (editing.id) { await pb.collection('tags').update(editing.id, data); }
       else { await pb.collection('tags').create(data); }
       setEditing(null); fetchTags();
-    } catch (err) { console.error('保存标签失败：', err); alert('保存失败，请检查 slug 是否唯一。'); }
+      showToast('标签保存成功', 'success');
+    } catch (err) { console.error('保存标签失败：', err); showToast('保存失败，请检查 slug 是否唯一。', 'error'); }
     finally { setSaving(false); }
   };
 
   const deleteTag = async (id: string) => {
-    if (!confirm('确定删除这个标签吗？')) return;
-    const pb = getPocketBase();
-    try { await pb.collection('tags').delete(id); fetchTags(); }
-    catch (err) { console.error('删除标签失败：', err); }
+    setConfirmState({ open: true, title: '确认删除', message: '确定删除这个标签吗？', onConfirm: async () => {
+      const pb = getPocketBase();
+      try { await pb.collection('tags').delete(id); fetchTags(); showToast('标签已删除', 'success'); }
+      catch (err) { console.error('删除标签失败：', err); showToast('删除标签失败', 'error'); }
+    }});
   };
 
   return (
@@ -61,7 +66,7 @@ export default function TagManager() {
       <AnimatePresence>
         {editing && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-stretch justify-center overflow-y-auto glass-overlay p-0 sm:items-center sm:p-4" onClick={() => setEditing(null)}>
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} onClick={(e) => e.stopPropagation()} className="card flex min-h-[var(--vvh,100dvh)] w-full max-w-md flex-col overflow-hidden rounded-none p-5 sm:min-h-0 sm:rounded-2xl sm:p-6">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} onClick={(e) => e.stopPropagation()} className="card flex min-h-[var(--vvh,100dvh)] w-full max-w-md flex-col overflow-hidden rounded-none p-5 sm:min-h-0 sm:rounded-lg sm:p-6">
               <h2 className="mb-6 break-words font-display text-lg font-bold uppercase tracking-wide text-text [overflow-wrap:anywhere]">{editing.id ? '编辑标签' : '新建标签'}</h2>
               <div className="space-y-4">
                 <div><label className="mb-1.5 block font-mono text-xs uppercase tracking-widest text-text-secondary">名称</label>
@@ -79,6 +84,14 @@ export default function TagManager() {
           </motion.div>
         )}
       </AnimatePresence>
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        danger
+        onConfirm={() => { confirmState.onConfirm(); setConfirmState(s => ({ ...s, open: false })); }}
+        onCancel={() => setConfirmState(s => ({ ...s, open: false }))}
+      />
     </div>
   );
 }

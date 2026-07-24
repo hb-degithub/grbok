@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import MediaLibrary from '../../../components/admin/MediaLibrary';
+---
+
+<AdminLayout title="媒体库" requiredRole="author">
+  <MediaLibrary client:only="react" />
+</AdminLayout>

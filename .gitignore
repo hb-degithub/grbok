@@ -18,6 +18,8 @@ pb_data/
 .vscode/
 .idea/
 .claude/settings.local.json
+.codex/
+.qoder/
 *.swp
 *.swo
 
@@ -65,3 +67,17 @@ id_ed25519
 # 部署临时文件
 deploy-*.tar.gz
 deploy-*.zip
+
+# Local PocketBase data
+pb_local/
+
+# Superpowers local config
+.superpowers/
+.worktrees/
+
+# Playwright screenshots
+astro/screenshot-*.png
+astro/pw-screenshot.cjs
+
+# ZCode session workspace
+.zcode/

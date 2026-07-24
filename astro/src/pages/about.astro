@@ -1,39 +1,55 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ScrollReveal from '../components/ui/ScrollReveal';
-import GlowCard from '../components/ui/GlowCard';
 import Typewriter from '../components/ui/Typewriter';
+import GlareHover from '../components/reactbits/GlareHover';
+import BlurText from '../components/reactbits/BlurText';
+import ParticleField from '../components/effects/ParticleField';
 
-const skills = [
-  { name: 'Astro', level: 90 },
-  { name: 'React', level: 85 },
-  { name: 'TypeScript', level: 88 },
-  { name: 'Tailwind CSS', level: 92 },
-  { name: 'Node.js', level: 80 },
-  { name: 'PocketBase', level: 75 },
+const techStack = [
+  { name: 'Astro 6', desc: 'SSG 静态站点生成，群岛架构' },
+  { name: 'React 19', desc: '交互组件 + Framer Motion 动效' },
+  { name: 'TailwindCSS 4', desc: '原子化样式，深色主题设计系统' },
+  { name: 'PocketBase', desc: 'BaaS 后端 — Auth / DB / API / 文件存储' },
+  { name: 'Caddy 2', desc: '反向代理，自动 HTTPS，安全响应头' },
+  { name: 'WebAuthn', desc: '管理员 Passkey 双因素认证' },
+  { name: 'Pagefind', desc: '离线全文搜索索引' },
+  { name: 'Docker Compose', desc: '容器化编排与部署' },
+];
+
+const features = [
+  { title: '安全加固', desc: 'CSP / HSTS / CORS 严格策略，多层速率限制，DOMPurify 防注入，Docker 容器权限最小化' },
+  { title: '管理员体系', desc: 'RBAC 四级角色，WebAuthn Passkey 二次验证，服务端认证守卫，IP 白名单' },
+  { title: '交互体验', desc: '粒子背景、网格扫描、Dock 导航、Bento 卡片、阅读进度、滚动揭示动效' },
+  { title: 'SEO & PWA', desc: 'RSS 订阅、站点地图、Open Graph、Service Worker 离线缓存、Manifest' },
+  { title: '评论系统', desc: '嵌套回复、服务端校验、邮件通知、速率限制、实时订阅更新' },
+  { title: '全文搜索', desc: 'Pagefind 离线索引，即时搜索结果高亮，零服务器依赖' },
 ];
 
 const links = [
   { name: 'GitHub', url: 'https://github.com', icon: 'M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z' },
-  { name: 'Twitter', url: 'https://twitter.com', icon: 'M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z' },
-  { name: 'Email', url: 'mailto:hi@example.com', icon: 'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm16 2l-8 5-8-5v2l8 5 8-5V6zm0 12H4V8l8 5 8-5v10z' },
+  { name: 'B站', url: 'https://space.bilibili.com/691237475', icon: 'M17.813 4.653h.854c1.51.054 2.769.578 3.773 1.574 1.004.995 1.524 2.249 1.56 3.76v7.36c-.036 1.51-.556 2.769-1.56 3.773s-2.262 1.524-3.773 1.56H5.333c-1.51-.036-2.769-.556-3.773-1.56S.036 18.858 0 17.347v-7.36c.036-1.511.556-2.765 1.56-3.76 1.004-.996 2.262-1.52 3.773-1.574h.774l-1.174-1.12a1.234 1.234 0 0 1-.373-.906c0-.356.124-.659.373-.907l.027-.027c.267-.249.573-.373.92-.373.347 0 .653.124.92.373L9.653 4.44c.071.071.134.142.187.213h4.267a.836.836 0 0 1 .16-.213l2.853-2.747c.267-.249.573-.373.92-.373.347 0 .662.151.929.4.267.249.391.551.391.907 0 .355-.124.657-.373.906zM5.333 7.24c-.746.018-1.373.276-1.88.773-.506.498-.769 1.13-.786 1.894v7.52c.017.764.28 1.395.786 1.893.507.498 1.134.756 1.88.773h13.334c.746-.017 1.373-.275 1.88-.773.506-.498.769-1.129.786-1.893v-7.52c-.017-.765-.28-1.396-.786-1.894-.507-.497-1.134-.755-1.88-.773zM8 11.107c.373 0 .684.124.933.373.25.249.383.569.4.96v1.173c-.017.391-.15.711-.4.96-.249.25-.56.374-.933.374s-.684-.125-.933-.374c-.25-.249-.383-.569-.4-.96V12.44c0-.373.129-.689.386-.947.258-.257.574-.386.947-.386zm8 0c.373 0 .684.124.933.373.25.249.383.569.4.96v1.173c-.017.391-.15.711-.4.96-.249.25-.56.374-.933.374s-.684-.125-.933-.374c-.25-.249-.383-.569-.4-.96V12.44c.017-.391.15-.711.4-.96.249-.249.56-.373.933-.373z' },
+  { name: 'Email', url: 'mailto:670486183@qq.com', icon: 'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm16 2l-8 5-8-5v2l8 5 8-5V6zm0 12H4V8l8 5 8-5v10z' },
 ];
 ---
 
 <BaseLayout title="关于" description="关于这个博客和作者">
-  <div class="max-w-3xl mx-auto">
+  <div class="pointer-events-none fixed inset-0 z-0 hidden lg:block" aria-hidden="true">
+    <ParticleField client:visible count={36} speed={0.25} />
+  </div>
+  <div class="relative z-10 max-w-3xl mx-auto">
     <!-- 头部 -->
     <ScrollReveal client:visible>
       <div class="mb-16 text-center">
-        <div class="mb-6 inline-flex h-24 w-24 items-center justify-center rounded-full border-2 border-stone-200 bg-stone-100 dark:border-stone-700 dark:bg-stone-800">
-          <span class="font-display text-3xl font-black text-stone-500 dark:text-stone-400">B</span>
+        <div class="mb-6 inline-flex h-24 w-24 items-center justify-center rounded-full border-2 border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
+          <span class="font-display text-3xl font-black text-zinc-500 dark:text-zinc-400">B</span>
         </div>
-        <h1 class="font-display text-4xl font-black uppercase tracking-wide text-stone-900 dark:text-stone-100 mb-4">
-          关于博客
+        <h1 class="font-display text-4xl font-black uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-4">
+          <BlurText client:visible text="关于博客" className="text-4xl font-black tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-5xl" />
         </h1>
-        <div class="text-stone-500 dark:text-stone-400">
+        <div class="text-zinc-500 dark:text-zinc-400">
           <Typewriter
-            text="一个分享技术、思考与生活的个人博客"
+            text="分享技术、思考与生活"
             client:visible
           />
         </div>
@@ -42,19 +58,16 @@ const links = [
 
     <!-- 介绍 -->
     <ScrollReveal delay={0.1} client:visible>
-      <div class="card rounded-2xl p-8 mb-8">
-        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-stone-900 dark:text-stone-100 mb-4">
+      <div class="card rounded-lg p-8 mb-8">
+        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-4">
           关于这个博客
         </h2>
-        <div class="space-y-4 text-stone-500 dark:text-stone-400">
+        <div class="space-y-4 text-zinc-500 dark:text-zinc-400">
           <p>
-            这是一个使用现代技术栈构建的个人博客系统，旨在分享技术文章、学习笔记和个人思考。
+            胡巴的博客是一个自建的全栈个人博客系统，使用 Astro + React + PocketBase 构建，自 2025 年运行至今。
           </p>
           <p>
-            博客采用 Astro 框架构建，结合 React 组件实现交互功能，使用 PocketBase 作为后端服务。
-          </p>
-          <p>
-            设计风格采用科幻/终端风格，追求极致的视觉体验和流畅的交互动效。
+            前端采用 Astro 群岛架构实现静态生成与交互组件的混合渲染，后端依托 PocketBase 提供 Auth、数据库与 API 服务，Caddy 负责反向代理与安全防护，Docker Compose 统一编排部署。
           </p>
         </div>
       </div>
@@ -62,23 +75,34 @@ const links = [
 
     <!-- 技术栈 -->
     <ScrollReveal delay={0.2} client:visible>
-      <div class="card rounded-2xl p-8 mb-8">
-        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-stone-900 dark:text-stone-100 mb-6">
+      <div class="card rounded-lg p-8 mb-8">
+        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-6">
           技术栈
         </h2>
-        <div class="space-y-4">
-          {skills.map((skill) => (
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {techStack.map((tech) => (
+            <GlareHover client:visible glareColor="rgba(20, 184, 166, 0.08)">
+              <div class="flex items-center gap-3 rounded-md border border-zinc-200 dark:border-zinc-700/50 px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-teal-500/30">
+                <span class="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{tech.name}</span>
+                <span class="text-xs text-zinc-400 dark:text-zinc-500 truncate">{tech.desc}</span>
+              </div>
+            </GlareHover>
+          ))}
+        </div>
+      </div>
+    </ScrollReveal>
+
+    <!-- 功能特性 -->
+    <ScrollReveal delay={0.25} client:visible>
+      <div class="card rounded-lg p-8 mb-8">
+        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-6">
+          功能特性
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {features.map((f) => (
             <div>
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-mono text-sm text-stone-900 dark:text-stone-100">{skill.name}</span>
-                <span class="font-mono text-xs text-stone-500 dark:text-stone-400">{skill.level}%</span>
-              </div>
-              <div class="h-2 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
-                <div
-                  class="h-full rounded-full bg-gradient-to-r from-stone-500 to-stone-400 transition-all duration-1000 ease-out"
-                  style={`width: ${skill.level}%`}
-                />
-              </div>
+              <h3 class="font-mono text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{f.title}</h3>
+              <p class="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">{f.desc}</p>
             </div>
           ))}
         </div>
@@ -87,8 +111,8 @@ const links = [
 
     <!-- 联系方式 -->
     <ScrollReveal delay={0.3} client:visible>
-      <div class="card rounded-2xl p-8">
-        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-stone-900 dark:text-stone-100 mb-6">
+      <div class="card rounded-lg p-8">
+        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-6">
           联系方式
         </h2>
         <div class="flex flex-wrap gap-4">

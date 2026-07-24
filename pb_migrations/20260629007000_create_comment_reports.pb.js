@@ -30,7 +30,7 @@ migrate((db) => {
   const comments = find("comments");
   if (comments) ensureField(cr, { name: "comment_id", type: "relation", required: true, options: { collectionId: comments.id, cascadeDelete: true, minSelect: null, maxSelect: 1, displayFields: ["author_name"] } });
   ensureField(cr, { name: "reason", type: "text", required: false, options: { min: null, max: 500, pattern: "" } });
-  ensureField(cr, { name: "reporter_email", type: "text", required: false, options: { min: null, max: 255, pattern: "" } });
+  ensureField(cr, { name: "reporter_email", type: "email", required: false, options: { exceptDomains: null, onlyDomains: null } });
   ensureField(cr, { name: "status", type: "select", required: true, options: { maxSelect: 1, values: ["pending", "dismissed", "actioned"] } });
   cr.listRule = ADMIN_RULE;
   cr.viewRule = ADMIN_RULE;

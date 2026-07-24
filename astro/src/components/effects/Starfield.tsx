@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import useBreakpoint from '../../hooks/useBreakpoint';
 
 interface Star {
   x: number;
@@ -11,12 +12,14 @@ interface Star {
 
 export default function Starfield() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { prefersReducedMotion } = useBreakpoint();
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    if (prefersReducedMotion) return;
 
     let width = window.innerWidth;
     let height = window.innerHeight;
@@ -49,6 +52,10 @@ export default function Starfield() {
 
     let raf = 0;
     const animate = () => {
+      if (document.hidden) {
+        raf = requestAnimationFrame(animate);
+        return;
+      }
       ctx.clearRect(0, 0, width, height);
       const now = Date.now();
       for (const s of stars) {
@@ -72,7 +79,7 @@ export default function Starfield() {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
     };
-  }, []);
+  }, [prefersReducedMotion]);
 
   return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-0" aria-hidden="true" />;
 }

@@ -1,0 +1,139 @@
+/* ── Carousel Root ── */
+.carousel-root {
+  position: relative;
+  width: 100%;
+  perspective: 1200px;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Viewport (clips overflow) ── */
+.carousel-viewport {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  border-radius: 0.75rem;
+  touch-action: pan-y;
+}
+
+/* ── Slide ── */
+.carousel-slide {
+  width: 100%;
+  transform-style: preserve-3d;
+  cursor: grab;
+  will-change: transform, opacity;
+}
+
+.carousel-slide:active {
+  cursor: grabbing;
+}
+
+/* ── Arrow Buttons ── */
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.2s;
+}
+
+.carousel-arrow:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.carousel-arrow:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.carousel-arrow--prev {
+  left: 8px;
+}
+
+.carousel-arrow--next {
+  right: 8px;
+}
+
+/* ── Dots ── */
+.carousel-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 0 4px;
+}
+
+.carousel-dot {
+  width: 8px;
+  height: 8px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: background 0.25s, transform 0.25s, width 0.25s;
+  padding: 0;
+}
+
+.carousel-dot:hover {
+  background: rgba(0, 0, 0, 0.35);
+  transform: scale(1.2);
+}
+
+.carousel-dot--active {
+  background: #6366f1;
+  width: 20px;
+  border-radius: 4px;
+}
+
+/* ── Dark Mode ── */
+.dark .carousel-arrow {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: #d4d4d8;
+}
+
+.dark .carousel-arrow:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.dark .carousel-dot {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark .carousel-dot:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.dark .carousel-dot--active {
+  background: #818cf8;
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .carousel-slide {
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .carousel-arrow {
+    transition: none !important;
+  }
+
+  .carousel-dot {
+    transition: none !important;
+  }
+}

@@ -39,6 +39,8 @@ function statusTone(tone: ActionItem['tone']) {
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recentPosts, setRecentPosts] = useState<{id:string;title:string;status:string;updated:string}[]>([]);
+  const [recentComments, setRecentComments] = useState<{id:string;author_name:string;content:string;status:string;created:string}[]>([]);
   const { hasPermission, user } = useAdminAuth();
   const role = user?.role as AdminRole | undefined;
   const canReadUsers = role === 'super_admin';
@@ -74,9 +76,6 @@ export default function AdminDashboard() {
     }
     fetchStats();
   }, [role, canReadUsers]);
-
-  const [recentPosts, setRecentPosts] = useState<{id:string;title:string;status:string;updated:string}[]>([]);
-  const [recentComments, setRecentComments] = useState<{id:string;author_name:string;content:string;status:string;created:string}[]>([]);
 
   useEffect(() => {
     const pb = getPocketBase();

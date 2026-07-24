@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AuditLogViewer from '../../../components/admin/AuditLogViewer';
+---
+
+<AdminLayout title="审计日志" requiredRole="super_admin">
+  <AuditLogViewer client:only="react" />
+</AdminLayout>

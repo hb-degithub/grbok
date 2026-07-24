@@ -1,10 +1,20 @@
 ---
 import { ClientRouter } from 'astro:transitions';
+import '@fontsource/geist-sans/400.css';
+import '@fontsource/geist-sans/500.css';
+import '@fontsource/geist-sans/700.css';
+import '@fontsource/geist-mono/400.css';
+import '@fontsource/noto-sans-sc/400.css';
+import '@fontsource/noto-sans-sc/500.css';
+import '@fontsource/noto-sans-sc/700.css';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer.astro';
 import SearchModal from '../components/search/SearchModal';
 import AnnouncementBar from '../components/layout/AnnouncementBar';
 import DebugProtection from '../components/effects/DebugProtection';
+import SplashOverlay from '../components/effects/SplashOverlay';
+import WelcomeOverlay from '../components/effects/WelcomeOverlay';
+import CursorGlow from '../components/effects/CursorGlow';
 import ToastContainer from '../components/ui/Toast';
 import { SITE_CONFIG } from '../config/site';
 
@@ -13,10 +23,18 @@ interface Props {
   description?: string;
   image?: string;
   showChrome?: boolean;
+  mainClass?: string;
   noindex?: boolean;
 }
 
-const { title, description = SITE_CONFIG.description, image, showChrome = true, noindex = false } = Astro.props;
+const {
+  title,
+  description = SITE_CONFIG.description,
+  image,
+  showChrome = true,
+  mainClass = showChrome ? 'pt-4 sm:pt-20 sm:pb-8' : '',
+  noindex = false,
+} = Astro.props;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 ---
 
@@ -35,16 +53,13 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     <link rel="canonical" href={canonicalURL} />
 
     <meta property="og:type" content="website" />
-    <meta property="og:url" content={Astro.url} />
+    <meta property="og:url" content={canonicalURL} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     {image && <meta property="og:image" content={new URL(image, Astro.url)} />}
 
     <link rel="sitemap" href="/sitemap-index.xml" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <script is:inline>
       (() => {
         const storageKey = 'blog-theme-mode';
@@ -68,7 +83,13 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
         const applyTheme = () => {
           const mode = readMode();
           const theme = resolveTheme(mode);
-          document.documentElement.classList.toggle('dark', theme === 'dark');
+          if (document.startViewTransition) {
+            document.startViewTransition(() => {
+              document.documentElement.classList.toggle('dark', theme === 'dark');
+            });
+          } else {
+            document.documentElement.classList.toggle('dark', theme === 'dark');
+          }
           document.documentElement.dataset.theme = theme;
           document.documentElement.dataset.themeMode = mode;
         };
@@ -99,11 +120,13 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
           // safe-area aware spacing, and touch target sizes.
           root.style.fontSize = '';
           if (vvw < 768) {
-            root.style.setProperty('--header-h', vvh < 560 ? '3rem' : '3.5rem');
+            root.style.setProperty('--header-h', vvh < 560 ? '3.5rem' : '4rem');
+            root.style.setProperty('--header-offset', vvh < 560 ? '3.5rem' : '4rem');
             root.style.setProperty('--tap', vvw < 360 ? '2.5rem' : '2.75rem');
             root.style.setProperty('--page-pad', vvw < 360 ? '0.75rem' : '1rem');
           } else {
-            root.style.setProperty('--header-h', '4rem');
+            root.style.setProperty('--header-h', '5rem');
+            root.style.setProperty('--header-offset', '5rem');
             root.style.setProperty('--tap', '2.75rem');
             root.style.setProperty('--page-pad', '1.5rem');
           }
@@ -143,21 +166,46 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
   }
 </script>
 </head>
-  <body class="min-h-[100svh] bg-white font-sans text-stone-900 antialiased dark:bg-stone-950 dark:text-stone-100">
-    {showChrome && <Header client:load />}
-    {showChrome && <SearchModal client:load />}
-    {showChrome && <AnnouncementBar client:load />}
+  <body class="min-h-[100svh] bg-white font-sans text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-50">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[70] focus:px-4 focus:py-2 focus:bg-teal-600 focus:text-white focus:rounded-md">跳转到主要内容</a>
+    {showChrome && <Header transition:persist="header" client:load />}
+    {showChrome && <SearchModal client:idle />}
+    {showChrome && <AnnouncementBar client:idle />}
 
-    <main class:list={["w-full overflow-x-clip", showChrome && "pt-[var(--header-offset,4rem)]"]}>
+    <main id="main-content" class:list={["w-full overflow-x-clip", mainClass]}>
       <slot />
     </main>
 
-    {showChrome && <Footer />}
-    <DebugProtection client:load />
-  <ToastContainer client:load />
+    {showChrome && <Footer transition:persist="footer" />}
+    <DebugProtection client:idle />
+    <SplashOverlay client:idle />
+    <WelcomeOverlay client:idle />
+    <CursorGlow client:only="react" />
+  <ToastContainer client:idle />
+    <script define:vars={{ pbBase: import.meta.env.PUBLIC_POCKETBASE_URL || '' }}>
+  // 访问统计探针：页面浏览（含客户端导航）通过 sendBeacon 上报。
+  // 尊重 DNT；静默失败绝不影响页面；guard 防止 ClientRouter 重复挂监听。
+  (() => {
+    if (!pbBase) return;
+    const send = () => {
+      try {
+        if (navigator.doNotTrack === '1') return;
+        const body = JSON.stringify({ path: location.pathname, referrer: document.referrer || '' });
+        navigator.sendBeacon(`${pbBase}/api/track-view`, new Blob([body], { type: 'application/json' }));
+      } catch (_) {}
+    };
+    // astro:page-load 在首次加载与每次客户端导航都会触发，
+    // 挂一次监听器即可覆盖所有 pageview，不再单独立即 send（否则双倍计数）。
+    if (!window.__pvBeaconBound) {
+      window.__pvBeaconBound = true;
+      document.addEventListener('astro:page-load', send);
+    }
+  })();
+</script>
 </body>
 </html>
 
-<style>
+<style is:global>
   @import '../styles/global.css';
 </style>
+

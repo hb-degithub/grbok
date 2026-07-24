@@ -1,0 +1,254 @@
+.stepper-outer-container {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.stepper-circle-container {
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  max-width: 32rem;
+  border-radius: 1rem;
+  border: 1px solid rgb(228 228 231 / 0.8);
+  background: rgb(255 255 255 / 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.dark .stepper-circle-container {
+  border-color: rgb(255 255 255 / 0.1);
+  background: rgb(9 9 11 / 0.85);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.4),
+    0 10px 10px -5px rgba(0, 0, 0, 0.2);
+}
+
+.stepper-indicator-row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: 1.5rem 2rem 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .stepper-indicator-row {
+    padding: 1rem 1.25rem 0.25rem;
+  }
+}
+
+.stepper-content-default {
+  position: relative;
+  overflow: hidden;
+}
+
+.stepper-step-default {
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
+@media (max-width: 640px) {
+  .stepper-step-default {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+}
+
+.stepper-footer-container {
+  padding-left: 2rem;
+  padding-right: 2rem;
+  padding-bottom: 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .stepper-footer-container {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+    padding-bottom: 1.25rem;
+  }
+}
+
+.stepper-footer-nav {
+  margin-top: 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+}
+
+.stepper-footer-nav.spread {
+  justify-content: space-between;
+}
+
+.stepper-footer-nav.end {
+  justify-content: flex-end;
+}
+
+.stepper-back-button {
+  transition: all 250ms;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  color: #71717a;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+}
+
+.stepper-back-button:hover {
+  color: #18181b;
+  background: rgb(244 244 245 / 0.8);
+}
+
+.dark .stepper-back-button:hover {
+  color: #fafafa;
+  background: rgb(39 39 42 / 0.8);
+}
+
+.stepper-back-button.inactive {
+  pointer-events: none;
+  opacity: 0.5;
+  color: #a1a1aa;
+}
+
+.stepper-next-button {
+  transition: all 250ms;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background-color: #14b8a6;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: -0.01em;
+  padding: 0.5rem 1.25rem;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 4px 14px 0 rgb(20 184 166 / 0.25);
+}
+
+.stepper-next-button:hover {
+  background-color: #0d9488;
+  box-shadow: 0 6px 20px 0 rgb(20 184 166 / 0.4);
+}
+
+.stepper-next-button:active {
+  background-color: #0f766e;
+}
+
+.stepper-indicator {
+  position: relative;
+  cursor: pointer;
+  outline: none;
+}
+
+.stepper-indicator[data-status="active"] .stepper-indicator-inner {
+  box-shadow: 0 0 0 3px rgb(20 184 166 / 0.2);
+  animation: stepper-pulse 2s ease-in-out infinite;
+}
+
+@keyframes stepper-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgb(20 184 166 / 0.2); }
+  50% { box-shadow: 0 0 0 6px rgb(20 184 166 / 0.1); }
+}
+
+.stepper-indicator-inner {
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+@media (max-width: 640px) {
+  .stepper-indicator-inner {
+    height: 1.75rem;
+    width: 1.75rem;
+    font-size: 0.75rem;
+  }
+}
+
+.stepper-active-dot {
+  height: 0.625rem;
+  width: 0.625rem;
+  border-radius: 9999px;
+  background-color: #fff;
+}
+
+.stepper-step-number {
+  font-size: 0.8125rem;
+}
+
+.stepper-connector {
+  position: relative;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+  height: 0.125rem;
+  flex: 1;
+  overflow: hidden;
+  border-radius: 0.25rem;
+  background-color: #d4d4d8;
+}
+
+.dark .stepper-connector {
+  background-color: #3f3f46;
+}
+
+.stepper-connector-inner {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+}
+
+.stepper-check-icon {
+  height: 1rem;
+  width: 1rem;
+  color: #fff;
+}
+
+/* Landscape phone compact mode */
+.stepper-circle-container.landscape-compact {
+  border-radius: 0.75rem;
+}
+
+.stepper-circle-container.landscape-compact .stepper-indicator-row {
+  padding: 0.5rem 1rem 0.125rem;
+}
+
+.stepper-circle-container.landscape-compact .stepper-step-default {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.stepper-circle-container.landscape-compact .stepper-indicator-inner {
+  height: 1.5rem;
+  width: 1.5rem;
+  font-size: 0.6875rem;
+}
+
+.stepper-footer-container.landscape-compact {
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-bottom: 0.75rem;
+}
+
+.stepper-footer-container.landscape-compact .stepper-footer-nav {
+  margin-top: 0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stepper-outer-container,
+  .stepper-outer-container * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
