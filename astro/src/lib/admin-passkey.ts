@@ -1,6 +1,7 @@
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
 import { getPocketBase } from './pocketbase';
-import { withAuthRequestHeaders } from './security';
+import { clearAdminRecoveryCode, clearAdminStepUp, saveAdminStepUp } from './admin-step-up';
+import { shouldClearRecoveryCodeAfterRequestError, shouldClearRecoveryCodeAfterStatus } from './admin-recovery-header';
 
 const ADMIN_CAPABLE_ROLES = ['author', 'admin', 'super_admin'];
 
@@ -8,43 +9,57 @@ export function isAdminCapableRole(role: unknown): boolean {
   return typeof role === 'string' && ADMIN_CAPABLE_ROLES.includes(role);
 }
 
-export async function fetchAdminVerificationStatus(): Promise<{ verified: boolean; expires_at?: string }> {
-  const pb = getPocketBase();
-  return withAuthRequestHeaders(pb, () =>
-    pb.send('/api/blog-admin/webauthn/session', { method: 'GET' })
-  );
+export type AdminStepUpStatus = 'bootstrap_required' | 'recovery_reenroll' | 'verified' | 'expired' | 'binding_changed';
+export type AdminVerificationStatus = { status: AdminStepUpStatus; verified: boolean; expiresAt?: string };
+export type AdminPasskeyDto = { id: string; label: string; created: string; revokedAt: string | null; current: boolean };
+
+export async function listAdminPasskeys(): Promise<{ items: AdminPasskeyDto[] }> {
+  return getPocketBase().send('/api/blog-admin/passkeys', { method: 'GET' }) as Promise<{ items: AdminPasskeyDto[] }>;
 }
 
-export async function requestAdminPasskeyVerification(): Promise<{ verified: boolean; expires_at?: string }> {
+export async function revokeAdminPasskey(id: string): Promise<{ item: AdminPasskeyDto }> {
+  return getPocketBase().send(`/api/blog-admin/passkeys/${encodeURIComponent(id)}/revoke`, { method: 'POST' }) as Promise<{ item: AdminPasskeyDto }>;
+}
+
+export async function fetchAdminVerificationStatus(): Promise<AdminVerificationStatus> {
+  const pb = getPocketBase();
+  const result = await pb.send('/api/blog-admin/step-up/status', { method: 'GET' }) as AdminVerificationStatus;
+  if (result.status === 'binding_changed' || result.status === 'expired') clearAdminStepUp();
+  if (shouldClearRecoveryCodeAfterStatus(result.status)) clearAdminRecoveryCode();
+  return result;
+}
+
+export async function requestAdminPasskeyVerification(): Promise<AdminVerificationStatus> {
   const pb = getPocketBase();
 
-  const options = await withAuthRequestHeaders(pb, () =>
-    pb.send('/api/blog-admin/webauthn/authenticate/options', { method: 'POST' })
-  );
+  const options = await pb.send('/api/blog-admin/step-up/options', { method: 'POST' });
 
   const assertion = await startAuthentication({ optionsJSON: options });
 
-  return withAuthRequestHeaders(pb, () =>
-    pb.send('/api/blog-admin/webauthn/authenticate/verify', {
-      method: 'POST',
-      body: { response: assertion },
-    })
-  );
+  const result = await pb.send('/api/blog-admin/step-up/verify', {
+    method: 'POST',
+    body: { response: assertion },
+  }) as { verified: boolean; credential: string; expiresAt: string };
+  if (result.verified && result.credential && result.expiresAt) {
+    saveAdminStepUp(result.credential, result.expiresAt);
+    return { status: 'verified', verified: true, expiresAt: result.expiresAt };
+  }
+  return { status: 'expired', verified: false };
 }
 
 export async function registerAdminPasskey(label: string): Promise<{ verified: boolean; credentialId?: string }> {
   const pb = getPocketBase();
-
-  const options = await withAuthRequestHeaders(pb, () =>
-    pb.send('/api/blog-admin/webauthn/register/options', { method: 'POST' })
-  );
-
-  const attestation = await startRegistration({ optionsJSON: options });
-
-  return withAuthRequestHeaders(pb, () =>
-    pb.send('/api/blog-admin/webauthn/register/verify', {
+  try {
+    const options = await pb.send('/api/blog-admin/passkeys/registration/options', { method: 'POST' });
+    const attestation = await startRegistration({ optionsJSON: options });
+    const result = await pb.send('/api/blog-admin/passkeys/registration/verify', {
       method: 'POST',
       body: { response: attestation, label },
-    })
-  );
+    }) as { verified: boolean; item?: { id: string } };
+    if (result.verified) clearAdminRecoveryCode();
+    return { verified: result.verified, credentialId: result.item?.id };
+  } catch (error) {
+    if (shouldClearRecoveryCodeAfterRequestError(error)) clearAdminRecoveryCode();
+    throw error;
+  }
 }

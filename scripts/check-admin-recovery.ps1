@@ -22,9 +22,9 @@ if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
         'Action',
         'Read-Host',
         '-AsSecureString',
-        'admin_recovery_codes',
-        'used_at',
-        'expires_at'
+        '/api/blog-admin/local-recovery',
+        'recoveryCode',
+        'referenceId'
     )
     foreach ($pattern in $requiredPatterns) {
         if ($content -notmatch [regex]::Escape($pattern)) {
@@ -35,6 +35,12 @@ if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
     # Recovery code must not be accepted as a plaintext command-line parameter
     if ($content -match '\\s-RecoveryCode\\b') {
         $failures += "$scriptPath : must not accept -RecoveryCode as a plaintext parameter"
+    }
+    if ($content -match '\\s-StepUp\\b|X-Admin-Step-Up') {
+        $failures += "$scriptPath : local recovery must never accept or send a step-up secret"
+    }
+    if ($content -match '/api/collections/|Invoke-PBApi\s+PATCH|Method\s*=\s*''PATCH''') {
+        $failures += "$scriptPath : recovery must use only the single transactional endpoint"
     }
 }
 

@@ -1,0 +1,8 @@
+---
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import EmailChangeForm from '../../components/auth/EmailChangeForm';
+---
+
+<AuthLayout title="变更邮箱" description="变更账户绑定邮箱" noindex>
+  <EmailChangeForm client:load />
+</AuthLayout>

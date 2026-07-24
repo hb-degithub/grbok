@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:4321';
-const ROUTES = ['/', '/posts', '/login', '/tags'];
+const ROUTES = ['/', '/posts', '/login', '/tags', '/forgot-password', '/reset-password', '/confirm-email-change', '/account/email-change'];
 const VIEWPORTS = [
   { name: '320x568', width: 320, height: 568 },
   { name: '360x740', width: 360, height: 740 },

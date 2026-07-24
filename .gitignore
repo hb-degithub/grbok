@@ -9,6 +9,13 @@
 .env.astro
 !.env.example
 
+# Host-only mail archive credentials and remote configuration
+mail-archive.env
+rclone.conf
+*.agekey
+age-identity*
+archive-remote.conf
+
 # Docker 数据卷（运行时生成）
 pb_data/
 
@@ -48,6 +55,10 @@ temp/
 # 临时调试文件 (仅根目录, 不影响 pb_hooks/*.pb.js 和 src 下的 js)
 /*.js
 /*.bat
+# Python test artifacts
+__pycache__/
+*.py[cod]
+
 /*.vbs
 /*.png
 /*.jpg

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getPocketBase } from '../lib/pocketbase';
-import { normalizeAuthEmail, withAuthRequestHeaders } from '../lib/security';
-import type { Post, PublicComment, ReaderRegisterData, User } from '../types/pocketbase';
+import { revokeCurrentAdminCredential, runAfterAdminCredentialRevoked } from '../lib/admin-auth-lifecycle';
+import { clearAdminStepUp } from '../lib/admin-step-up';
+import { registerReader as registerReaderRequest, requestReaderOtp, requestVerification as requestVerificationRequest, verifyReaderOtp } from '../lib/blog-auth-client';
+import type { Post, PublicComment, ReaderRegisterData } from '../types/pocketbase';
 
 export function usePocketBase() {
   const pb = getPocketBase();
@@ -52,21 +54,25 @@ export function usePocketBase() {
 
     requestOTP: useCallback(async (email: string) => {
       try {
-        const result = await withAuthRequestHeaders(pb, () => pb.collection('users').requestOTP(normalizeAuthEmail(email)));
-        return { data: result, error: null };
+        const result = await requestReaderOtp(email);
+        return { data: { otpId: result.challengeId }, error: null };
       } catch (err) {
         console.error('发送 OTP 验证码失败:', err);
         return { data: null, error: err };
       }
     }, [pb]),
 
-        authWithOTP: useCallback(async (otpId: string, code: string) => {
+    authWithOTP: useCallback(async (otpId: string, code: string) => {
       try {
-        const result = await withAuthRequestHeaders(pb, () => pb.collection('users').authWithOTP<User>(otpId, code));
+        const result = await runAfterAdminCredentialRevoked(
+          pb,
+          () => clearAdminStepUp({ includeClientSession: true }),
+          () => verifyReaderOtp(otpId, code),
+        );
         const role = result.record?.role;
 
         if (role === 'author' || role === 'admin' || role === 'super_admin') {
-          pb.authStore.clear();
+          await revokeCurrentAdminCredential(pb, () => clearAdminStepUp({ includeClientSession: true }));
           return { success: false, data: null, error: new Error('高权限账户请使用密码登录，并在密码校验后完成二次验证。') };
         }
 
@@ -79,10 +85,8 @@ export function usePocketBase() {
 
     registerReader: useCallback(async (data: Omit<ReaderRegisterData, 'role'>) => {
       try {
-        const payload: ReaderRegisterData = { ...data, email: normalizeAuthEmail(data.email), role: 'reader' };
-        const record = await withAuthRequestHeaders(pb, () => pb.collection('users').create<User>(payload));
-        const auth = await withAuthRequestHeaders(pb, () => pb.collection('users').authWithPassword<User>(payload.email, data.password));
-        return { success: true, data: { record, auth }, error: null };
+        const accepted = await registerReaderRequest(data);
+        return { success: true, data: accepted, error: null };
       } catch (err) {
         console.error('注册 reader 用户失败:', err);
         return { success: false, data: null, error: err };
@@ -91,7 +95,7 @@ export function usePocketBase() {
 
     requestVerification: useCallback(async (email: string) => {
       try {
-        await pb.collection('users').requestVerification(normalizeAuthEmail(email));
+        await requestVerificationRequest(email);
         return { success: true, error: null };
       } catch (err) {
         console.error('发送验证邮件失败:', err);

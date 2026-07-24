@@ -30,18 +30,94 @@ if (-not $migration) {
     }
 }
 
+$stepUpMigration = Get-Item -LiteralPath 'pb_migrations/20260716100000_create_admin_step_up_security.pb.js' -ErrorAction SilentlyContinue
+if (-not $stepUpMigration) {
+    $failures += 'Missing migration pb_migrations/20260716100000_create_admin_step_up_security.pb.js'
+} else {
+    $stepUpContent = Get-Content -LiteralPath $stepUpMigration.FullName -Raw
 
-$hookFile = 'pb_hooks/admin_webauthn.pb.js'
+    $requiredCollections = @('admin_step_up_sessions', 'admin_passkey_state', 'admin_security_audits')
+    foreach ($name in $requiredCollections) {
+        if ($stepUpContent -notmatch [regex]::Escape($name)) {
+            $failures += "Step-up migration missing collection $name"
+        }
+    }
+
+    $requiredStepUpFields = @('user','selector','secret_hmac','client_session_hmac','fingerprint_hash','ip_hash','user_agent_hash','verified_at','expires_at','revoked_at')
+    foreach ($field in $requiredStepUpFields) {
+        if ($stepUpContent -notmatch [regex]::Escape($field)) {
+            $failures += "Step-up migration missing field $field"
+        }
+    }
+
+    $requiredChallengeContract = @('binding_selector', 'client_session_hmac', 'bootstrap_registration', 'add_registration', 'authentication')
+    foreach ($value in $requiredChallengeContract) {
+        if ($stepUpContent -notmatch [regex]::Escape($value)) {
+            $failures += "Step-up migration missing challenge contract $value"
+        }
+    }
+
+    $requiredIndexes = @(
+        'idx_admin_step_up_sessions_selector',
+        'idx_admin_step_up_sessions_expires',
+        'idx_admin_passkey_state_user',
+        'idx_webauthn_challenges_expires'
+    )
+    foreach ($index in $requiredIndexes) {
+        if ($stepUpContent -notmatch [regex]::Escape($index)) {
+            $failures += "Step-up migration missing index $index"
+        }
+    }
+
+    foreach ($collectionVariable in @('stepUpSessions', 'passkeyState', 'securityAudits')) {
+        foreach ($rule in @('listRule', 'viewRule', 'createRule', 'updateRule', 'deleteRule')) {
+            if ($stepUpContent -notmatch "(?m)^\s*$collectionVariable\.$rule\s*=\s*null;") {
+                $failures += "Step-up migration must set $collectionVariable.$rule to null"
+            }
+        }
+    }
+
+    foreach ($rule in @('listRule', 'viewRule', 'updateRule', 'deleteRule')) {
+        if ($stepUpContent -notmatch "(?m)^\s*passkeys\.$rule\s*=\s*null;") {
+            $failures += "Step-up migration must set admin_passkeys $rule to null"
+        }
+    }
+}
+
+$cutoverMigration = Get-Item -LiteralPath 'pb_migrations/20260716100500_harden_admin_recovery_cutover.pb.js' -ErrorAction SilentlyContinue
+if (-not $cutoverMigration) {
+    $failures += 'Missing migration pb_migrations/20260716100500_harden_admin_recovery_cutover.pb.js'
+} else {
+    $cutoverContent = Get-Content -LiteralPath $cutoverMigration.FullName -Raw
+    foreach ($field in @('recovery_nonce_hmac', 'recovery_expires_at')) {
+        if ($cutoverContent -notmatch [regex]::Escape($field)) {
+            $failures += "Recovery cutover migration missing field $field"
+        }
+    }
+    if ($cutoverContent -notmatch 'UNIQUE INDEX[\s\S]*webauthn_challenges[\s\S]*user[\s\S]*purpose') {
+        $failures += 'Recovery cutover migration missing unique (user,purpose) challenge index'
+    }
+    if ($cutoverContent -notmatch "deleteAllPages\('admin_verified_sessions'\)" -or $cutoverContent -notmatch 'deleteRecord') {
+        $failures += 'Recovery cutover migration must delete all legacy admin_verified_sessions'
+    }
+}
+
+
+$hookFile = 'pb_hooks/admin_security.pb.js'
 if (-not (Test-Path -LiteralPath $hookFile -PathType Leaf)) {
     $failures += "Missing hook file: $hookFile"
 } else {
     $hookContent = Get-Content -LiteralPath $hookFile -Raw
     $requiredRoutes = @(
-        '/api/blog-admin/webauthn/register/options',
-        '/api/blog-admin/webauthn/register/verify',
-        '/api/blog-admin/webauthn/authenticate/options',
-        '/api/blog-admin/webauthn/authenticate/verify',
-        '/api/blog-admin/webauthn/session'
+        '/api/blog-admin/step-up/status',
+        '/api/blog-admin/step-up/options',
+        '/api/blog-admin/step-up/verify',
+        '/api/blog-admin/step-up/revoke',
+        '/api/blog-admin/passkeys',
+        '/api/blog-admin/passkeys/registration/options',
+        '/api/blog-admin/passkeys/registration/verify',
+        '/api/blog-admin/passkeys/:id/revoke',
+        '/api/blog-admin/local-recovery'
     )
     foreach ($route in $requiredRoutes) {
         if ($hookContent -notmatch [regex]::Escape($route)) {

@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import GuestbookModerator from '../../components/admin/GuestbookModerator';
+---
+
+<AdminLayout title="留言治理" description="管理公开留言板" requiredRole="super_admin">
+  <GuestbookModerator client:load />
+</AdminLayout>

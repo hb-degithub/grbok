@@ -4,6 +4,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { RateLimiter } from '../../lib/security';
 import { getPocketBase } from '../../lib/pocketbase';
+import { requestVerification } from '../../lib/blog-auth-client';
 import type { CommentFormData } from '../../types/pocketbase';
 
 const commentLimiter = new RateLimiter(3, 1/12); // 每分钟最多3条
@@ -115,7 +116,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
     if (!email) return;
     setVerifyResendStatus('sending');
     try {
-      await pb.collection('users').requestVerification(email);
+      await requestVerification(email);
       setVerifyResendStatus('sent');
     } catch {
       setVerifyResendStatus('error');

@@ -23,12 +23,6 @@ interface AuthAttemptOptions {
   lockMs?: number;
 }
 
-type BeforeSendResult = RequestInit | { url?: string; options?: RequestInit } | void;
-type BeforeSend = (url: string, options: RequestInit) => BeforeSendResult | Promise<BeforeSendResult>;
-
-interface AuthHeaderClient {
-  beforeSend?: BeforeSend;
-}
 
 function escapeAttribute(value: string): string {
   return value
@@ -126,13 +120,6 @@ function writeAuthAttemptState(key: string, state: AuthAttemptState): void {
   window.localStorage.setItem(authStorageKey(key), JSON.stringify(state));
 }
 
-function normalizeBeforeSendResult(result: BeforeSendResult, url: string, options: RequestInit) {
-  if (!result) return { url, options };
-  if ('options' in result || 'url' in result) {
-    return { url: result.url || url, options: result.options || options };
-  }
-  return { url, options: result };
-}
 
 /** Sanitize HTML for safe rendering.
  *
@@ -263,30 +250,8 @@ export async function getBrowserFingerprint(): Promise<string> {
   }
 }
 
-export async function withAuthRequestHeaders<T>(client: AuthHeaderClient, run: () => Promise<T>, extraHeaders: Record<string, string> = {}): Promise<T> {
-  const originalBeforeSend = client.beforeSend;
-  const fingerprint = await getBrowserFingerprint();
-
-  client.beforeSend = async (url, options) => {
-    const request = normalizeBeforeSendResult(
-      originalBeforeSend ? await originalBeforeSend(url, options) : undefined,
-      url,
-      options
-    );
-    const headers = new Headers(request.options.headers as HeadersInit | undefined);
-    headers.set('X-Browser-Fingerprint', fingerprint);
-    headers.set('X-Auth-Client-Time', new Date().toISOString());
-    headers.set('X-Requested-With', 'XMLHttpRequest');
-    Object.entries(extraHeaders).forEach(([name, value]) => headers.set(name, value));
-    request.options.headers = Object.fromEntries(headers.entries());
-    return request;
-  };
-
-  try {
-    return await run();
-  } finally {
-    client.beforeSend = originalBeforeSend;
-  }
+export async function withAuthRequestHeaders<T>(_client: unknown, run: () => Promise<T>): Promise<T> {
+  return run();
 }
 
 export function getAuthAttemptKey(email: string): string {

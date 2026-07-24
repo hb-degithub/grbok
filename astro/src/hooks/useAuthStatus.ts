@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getPocketBase } from '../lib/pocketbase';
+import { isServerConfirmedCredentialInvalid, revokeCurrentAdminCredential } from '../lib/admin-auth-lifecycle';
+import { clearAdminStepUp } from '../lib/admin-step-up';
 import type { User, UserRole } from '../types/pocketbase';
 
 export const ROLE_LABELS: Record<UserRole, string> = {
@@ -57,8 +59,13 @@ export function useAuthStatus() {
       if (pb.authStore.isValid && pb.authStore.record) {
         try {
           await pb.collection('users').authRefresh();
-        } catch {
-          pb.authStore.clear();
+        } catch (error) {
+          if (isServerConfirmedCredentialInvalid(error)) {
+            clearAdminStepUp({ includeClientSession: true });
+            pb.authStore.clear();
+          } else {
+            console.warn('Session refresh failed; local credentials were retained.', error);
+          }
         }
       }
 
@@ -74,8 +81,9 @@ export function useAuthStatus() {
     };
   }, []);
 
-  const logout = useCallback((redirectTo?: string) => {
-    getPocketBase().authStore.clear();
+  const logout = useCallback(async (redirectTo?: string) => {
+    const pb = getPocketBase();
+    await revokeCurrentAdminCredential(pb, () => clearAdminStepUp({ includeClientSession: true }));
     if (redirectTo) window.location.href = redirectTo;
   }, []);
 

@@ -1,106 +1,48 @@
-﻿'use strict';
+'use strict';
 
-var ALLOWED_FIELDS = [
-  'request_id', 'category', 'source_collection', 'source_record_id',
-  'recipient_masked', 'recipient_hash', 'request_ip_hash', 'result',
-  'duration_ms', 'attempt', 'error_class',
-];
-var ALLOWED_FIELDS_SET = {};
-for (var i = 0; i < ALLOWED_FIELDS.length; i++) {
-  ALLOWED_FIELDS_SET[ALLOWED_FIELDS[i]] = true;
-}
-var FORBIDDEN_FIELDS = ['html', 'text', 'body', 'token', 'code', 'recipient', 'ip'];
-var RESULT_VALUES = ['accepted', 'sent', 'failed', 'suppressed', 'rate_limited', 'decoy'];
-var RESULT_VALUES_SET = {};
-for (var j = 0; j < RESULT_VALUES.length; j++) {
-  RESULT_VALUES_SET[RESULT_VALUES[j]] = true;
-}
-var DURATION_MAX = 120000;
-var ATTEMPT_MAX = 100;
-var RATE_COUNT_FIELDS = ['recipient_hash', 'request_ip_hash'];
-var RATE_COUNT_FIELDS_SET = {};
-for (var k = 0; k < RATE_COUNT_FIELDS.length; k++) {
-  RATE_COUNT_FIELDS_SET[RATE_COUNT_FIELDS[k]] = true;
-}
+var FIELDS = ['event_id', 'category', 'source_kind', 'result', 'duration_ms', 'attempt', 'error_class'];
+var FIELD_SET = {};
+for (var f = 0; f < FIELDS.length; f++) FIELD_SET[FIELDS[f]] = true;
+var CATEGORIES = {
+  account_verification: true, account_password_reset: true, account_email_change: true,
+  reader_otp: true, comment_new: true, comment_approved: true, comment_reply: true,
+  admin_test: true, ops_alert: true, account_retention_notice: true,
+};
+var SOURCE_KINDS = { account: true, reader: true, comment: true, admin: true, operations: true, retention: true, registration: true };
+var RESULTS = { sent: true, failed: true };
+var ERROR_CLASSES = { NONE: true, MAIL_NOT_CONFIGURED: true, SMTP_AUTH: true, SMTP_CONNECTION: true, SMTP_TIMEOUT: true, RECIPIENT_TEMPORARY: true, RECIPIENT_PERMANENT: true, PAYLOAD_INVALID: true, RATE_LIMITED: true, INTERNAL_ERROR: true, GATEWAY_UNAVAILABLE: true, OUTBOX_UNAVAILABLE: true };
 
-function clampInt(value, min, max) {
-  var n = Number(value);
-  if (!isFinite(n) || n < min) return min;
-  if (n > max) return max;
-  return Math.floor(n);
+function integer(value, min, max, name) {
+  var number = Number(value);
+  if (!Number.isSafeInteger(number) || number < min || number > max) throw new Error('invalid ' + name);
+  return number;
 }
 
 function delivery(input) {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
-    throw new Error('delivery input must be a plain object');
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('delivery input must be an object');
+  var keys = Object.keys(input);
+  if (keys.length !== FIELDS.length) throw new Error('delivery input fields mismatch');
+  for (var i = 0; i < keys.length; i++) if (!FIELD_SET[keys[i]]) throw new Error('unknown log field: ' + keys[i]);
+  var eventId = String(input.event_id || '');
+  var category = String(input.category || '');
+  var sourceKind = String(input.source_kind || '');
+  var result = String(input.result || '');
+  var errorClass = String(input.error_class || '').toUpperCase();
+  if (!/^[A-Za-z0-9_-]{22,64}$/.test(eventId)) throw new Error('invalid event_id');
+  if (!CATEGORIES[category] || !SOURCE_KINDS[sourceKind] || !RESULTS[result] || !ERROR_CLASSES[errorClass]) {
+    throw new Error('invalid delivery enum');
   }
-
-  for (var key in input) {
-    if (Object.prototype.hasOwnProperty.call(input, key)) {
-      if (!ALLOWED_FIELDS_SET[key]) {
-        throw new Error('unknown log field: ' + key);
-      }
-    }
-  }
-
-  for (var f = 0; f < FORBIDDEN_FIELDS.length; f++) {
-    if (Object.prototype.hasOwnProperty.call(input, FORBIDDEN_FIELDS[f])) {
-      throw new Error('forbidden log field: ' + FORBIDDEN_FIELDS[f]);
-    }
-  }
-
-  var required = ['request_id', 'category', 'source_collection', 'source_record_id',
-    'recipient_masked', 'recipient_hash', 'request_ip_hash', 'result', 'duration_ms', 'attempt', 'error_class'];
-  for (var r = 0; r < required.length; r++) {
-    if (!Object.prototype.hasOwnProperty.call(input, required[r])) {
-      throw new Error('missing required log field: ' + required[r]);
-    }
-  }
-
-  var result = String(input.result);
-  if (!RESULT_VALUES_SET[result]) {
-    throw new Error('invalid result value: ' + result);
-  }
-
   var collection = $app.dao().findCollectionByNameOrId('mail_delivery_logs');
   var record = new Record(collection);
-  record.set('request_id', String(input.request_id));
-  record.set('category', String(input.category));
-  record.set('source_collection', String(input.source_collection));
-  record.set('source_record_id', String(input.source_record_id));
-  record.set('recipient_masked', String(input.recipient_masked));
-  record.set('recipient_hash', String(input.recipient_hash));
-  record.set('request_ip_hash', String(input.request_ip_hash));
+  record.set('event_id', eventId);
+  record.set('category', category);
+  record.set('source_kind', sourceKind);
   record.set('result', result);
-  record.set('duration_ms', clampInt(input.duration_ms, 0, DURATION_MAX));
-  record.set('attempt', clampInt(input.attempt, 0, ATTEMPT_MAX));
-  record.set('error_class', String(input.error_class));
+  record.set('duration_ms', integer(input.duration_ms, 0, 120000, 'duration_ms'));
+  record.set('attempt', integer(input.attempt, 1, 20, 'attempt'));
+  record.set('error_class', errorClass);
+  record.set('archive_batch_id', '');
   $app.dao().saveRecord(record);
 }
 
-function rateCount(field, hash, sinceIso) {
-  if (!RATE_COUNT_FIELDS_SET[field]) {
-    throw new Error('rateCount field must be recipient_hash or request_ip_hash');
-  }
-  if (typeof hash !== 'string' || !hash) {
-    throw new Error('rateCount hash must be a non-empty string');
-  }
-  if (typeof sinceIso !== 'string' || !sinceIso) {
-    throw new Error('rateCount sinceIso must be a non-empty string');
-  }
-
-  var records = $app.dao().findRecordsByFilter(
-    'mail_delivery_logs',
-    field + ' = {:hash} && created >= {:since}',
-    '-created',
-    1000,
-    0,
-    { hash: hash, since: sinceIso }
-  );
-  return records ? records.length : 0;
-}
-
-module.exports = {
-  delivery: delivery,
-  rateCount: rateCount,
-};
+module.exports = { delivery: delivery };

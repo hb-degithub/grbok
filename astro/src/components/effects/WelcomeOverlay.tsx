@@ -169,7 +169,7 @@ export default function WelcomeOverlay() {
       }, 600);
     } else {
       setRegStatus('error');
-      setRegError('注册失败，邮箱可能已被注册');
+      setRegError('提交失败，请检查信息后重试');
     }
   }, [regName, regEmail, regPassword, registerReader]);
 
@@ -320,7 +320,7 @@ export default function WelcomeOverlay() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
                         </div>
-                        <p className="text-sm font-medium text-teal-700 dark:text-teal-300">注册成功！</p>
+                        <p className="text-sm font-medium text-teal-700 dark:text-teal-300">提交后请验证邮箱，验证完成后可评论</p>
                       </motion.div>
                     ) : (
                       <div className="space-y-3">
@@ -370,7 +370,7 @@ export default function WelcomeOverlay() {
                           disabled={regStatus === 'loading'}
                           className="w-full rounded-full bg-teal-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-teal-600 disabled:opacity-50 dark:bg-teal-600 dark:hover:bg-teal-500"
                         >
-                          {regStatus === 'loading' ? '注册中...' : '注册并继续'}
+                          {regStatus === 'loading' ? '提交中...' : '提交注册'}
                         </button>
 
                         <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
