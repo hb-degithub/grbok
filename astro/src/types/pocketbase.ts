@@ -7,7 +7,7 @@ export interface User {
   avatar: string;
   role: UserRole;
   bio: string;
-  emailVerified: boolean;
+  verified: boolean;
   created: string;
   updated: string;
 }

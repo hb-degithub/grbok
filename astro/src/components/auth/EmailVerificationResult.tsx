@@ -22,7 +22,7 @@ export default function EmailVerificationResult() {
     pb.collection('users').confirmVerification(token)
       .then(() => {
         setStatus('success');
-        // Refresh auth store to update emailVerified
+        // Refresh auth store to update verified
         return pb.collection('users').authRefresh();
       })
       .catch((err) => {

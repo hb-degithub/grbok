@@ -13,31 +13,9 @@ interface Props {
 
 const { title, description = '博客后台管理面板', requiredRole = 'author' } = Astro.props;
 
-// Server-side auth check: prevent any admin HTML from leaking to unauthenticated users.
-const pbUrl = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
-const cookieHeader = Astro.request.headers.get('cookie') || '';
-const pbAuthMatch = cookieHeader.match(/pb_auth=([^;]+)/);
-
-if (!pbAuthMatch) {
-  return Astro.redirect('/login');
-}
-
-// Validate the token with PocketBase server-side
-try {
-  const token = decodeURIComponent(pbAuthMatch[1]);
-  const res = await fetch(`${pbUrl}/api/collections/users/auth-refresh`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-    signal: AbortSignal.timeout(3000),
-  });
-  if (!res.ok) {
-    return Astro.redirect('/login');
-  }
-} catch {
-  return Astro.redirect('/login');
-}
+// 鉴权完全交给客户端 AdminGuard（未登录会跳转 /login）。
+// 不要在这里做服务端 Astro.redirect：SSG 构建期没有 cookie，
+// 会让 dist/admin/index.html 只生成 15 字节空壳，导致 /admin 空白页。
 
 const requiredRoleLabel: Record<AdminRole, string> = {
   reader: '普通用户',

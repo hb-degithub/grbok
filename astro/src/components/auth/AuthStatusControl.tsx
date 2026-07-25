@@ -104,7 +104,7 @@ export default function AuthStatusControl() {
             <div className="truncate text-sm font-bold text-zinc-950 dark:text-zinc-50">{displayName}</div>
             <div className="mt-0.5 flex items-center gap-1.5 truncate">
               <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">{user?.email || '已登录'}</span>
-              {user?.emailVerified === false && (
+              {user?.verified === false && (
                 <span className="shrink-0 rounded border border-amber-300 bg-amber-50 px-1 py-px text-[10px] font-semibold leading-none text-amber-600 dark:border-amber-700 dark:bg-amber-900/40 dark:text-amber-400">未验证</span>
               )}
             </div>

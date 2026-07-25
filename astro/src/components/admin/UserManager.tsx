@@ -201,7 +201,7 @@ export default function UserManager() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <p className="break-words text-sm font-semibold text-text [overflow-wrap:anywhere]">{user.name || '未命名用户'}</p>
-                    {user.emailVerified ? (
+                    {user.verified ? (
                       <span className="rounded border border-success/30 bg-success/10 px-1.5 py-0.5 font-mono text-[9px] uppercase text-success" title="邮箱已验证">已验证</span>
                     ) : (
                       <span className="rounded border border-warning/30 bg-warning/10 px-1.5 py-0.5 font-mono text-[9px] uppercase text-warning" title="邮箱未验证">未验证</span>

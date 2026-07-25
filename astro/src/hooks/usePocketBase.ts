@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getPocketBase } from '../lib/pocketbase';
-import { revokeCurrentAdminCredential, runAfterAdminCredentialRevoked } from '../lib/admin-auth-lifecycle';
+import { runAfterAdminCredentialRevoked } from '../lib/admin-auth-lifecycle';
 import { clearAdminStepUp } from '../lib/admin-step-up';
 import { registerReader as registerReaderRequest, requestReaderOtp, requestVerification as requestVerificationRequest, verifyReaderOtp } from '../lib/blog-auth-client';
 import type { Post, PublicComment, ReaderRegisterData } from '../types/pocketbase';
@@ -69,13 +69,7 @@ export function usePocketBase() {
           () => clearAdminStepUp({ includeClientSession: true }),
           () => verifyReaderOtp(otpId, code),
         );
-        const role = result.record?.role;
-
-        if (role === 'author' || role === 'admin' || role === 'super_admin') {
-          await revokeCurrentAdminCredential(pb, () => clearAdminStepUp({ includeClientSession: true }));
-          return { success: false, data: null, error: new Error('高权限账户请使用密码登录，并在密码校验后完成二次验证。') };
-        }
-
+        // 所有角色均可通过 OTP 登录；admin/super_admin 进入后台时由 AdminGuard 强制 TOTP 二次验证
         return { success: true, data: result, error: null };
       } catch (err) {
         console.error('OTP login failed:', err);
