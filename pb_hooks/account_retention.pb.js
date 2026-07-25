@@ -1,30 +1,22 @@
-(function () {
-'use strict';
+/// <reference path="../pb_data/types.d.ts" />
 
-var retention = require(__hooks + '/lib/account_retention.js');
-var BATCH_LIMIT = 100;
-
-function enabled(name) {
-  return String($os.getenv(name) || 'false').toLowerCase() === 'true';
-}
-
-function logSummary(job, summary) {
-  console.log(JSON.stringify({ job: job, summary: summary }));
-}
+// 账号保留定时任务与钩子。
+// 注意：handler 内 require + 内联开关检查（JSVM 下顶层/IIFE 变量对 handler 与 cron 不可见）。
 
 cronAdd('account-retention-reminders', '17 * * * *', function () {
-  if (!enabled('ACCOUNT_RETENTION_REMINDER_ENABLED')) return;
-  logSummary('account_retention_reminders', retention.runDueReminders(Date.now(), BATCH_LIMIT));
+  if (String($os.getenv('ACCOUNT_RETENTION_REMINDER_ENABLED') || 'false').toLowerCase() !== 'true') return;
+  var summary = require(__hooks + '/lib/account_retention.js').runDueReminders(Date.now(), 100);
+  console.log(JSON.stringify({ job: 'account_retention_reminders', summary: summary }));
 });
 
 cronAdd('account-retention-cleanup', '43 * * * *', function () {
-  if (!enabled('ACCOUNT_RETENTION_DELETE_ENABLED')) return;
-  logSummary('account_retention_cleanup', retention.runDueCleanup(Date.now(), BATCH_LIMIT));
+  if (String($os.getenv('ACCOUNT_RETENTION_DELETE_ENABLED') || 'false').toLowerCase() !== 'true') return;
+  var summary = require(__hooks + '/lib/account_retention.js').runDueCleanup(Date.now(), 100);
+  console.log(JSON.stringify({ job: 'account_retention_cleanup', summary: summary }));
 });
 
 onRecordAfterUpdateRequest(function (e) {
   if (!e.record || !e.record.verified()) return;
-  retention.cancelForVerifiedUser($app.dao(), e.record);
+  require(__hooks + '/lib/account_retention.js').cancelForVerifiedUser($app.dao(), e.record);
   if (typeof e.next === 'function') e.next();
 }, 'users');
-})();

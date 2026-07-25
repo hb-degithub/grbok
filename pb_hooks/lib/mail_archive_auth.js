@@ -65,12 +65,37 @@ function cleanupExpiredNonces(dao, nowMs, limit) {
   return rows.length;
 }
 
+// 归档路由公共处理：开关检查 + 签名验证 + 统一错误映射。
+// operation 为 handler 内闭包（参数为已验证的 JSON body），返回要写给客户端的对象。
+function handleSignedRoute(e, routePath, operation) {
+  function header(name) { try { return String(e.request().header.get(name) || ''); } catch (_) { return ''; } }
+  if (String($os.getenv('MAIL_ARCHIVE_API_ENABLED') || 'false').toLowerCase() !== 'true') {
+    return e.json(409, { code: 'ARCHIVE_API_DISABLED' });
+  }
+  try {
+    var raw = readerToString(e.request().body, 65537);
+    var body = authenticateSignedJson($app.dao(), {
+      timestamp: header('X-Archive-Timestamp'), nonce: header('X-Archive-Nonce'),
+      signature: header('X-Archive-Signature'), bodySha256: header('X-Archive-Body-SHA256'),
+      method: 'POST', path: routePath, rawBody: raw,
+    }, Date.now());
+    return e.json(200, operation(body));
+  } catch (error) {
+    var code = String(error && error.code || 'ARCHIVE_REQUEST_REJECTED');
+    var authFailure = code.indexOf('SIGNATURE') !== -1 || code.indexOf('NONCE') !== -1 || code.indexOf('TIMESTAMP') !== -1 || code.indexOf('BODY_HASH') !== -1;
+    var status = authFailure ? 401 : 409;
+    if (authFailure) code = 'ARCHIVE_AUTH_REJECTED';
+    return e.json(status, { code: code });
+  }
+}
+
 function setDependenciesForTests(value) { testDependencies = value; }
 function resetDependenciesForTests() { testDependencies = null; }
 
 module.exports = {
   authenticateSignedJson: authenticateSignedJson,
   cleanupExpiredNonces: cleanupExpiredNonces,
+  handleSignedRoute: handleSignedRoute,
   _setDependenciesForTests: setDependenciesForTests,
   _resetDependenciesForTests: resetDependenciesForTests,
 };
