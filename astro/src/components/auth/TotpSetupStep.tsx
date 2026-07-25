@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import QRCode from 'qrcode';
-import { confirmAdminTotpSetup, startAdminTotpSetup } from '../../lib/admin-totp';
+import { drawQrToCanvas } from '../../lib/qr-canvas';
+import { describeTotpError, confirmAdminTotpSetup, startAdminTotpSetup } from '../../lib/admin-totp';
 import { saveAdminRecoveryCode } from '../../lib/admin-step-up';
 import Button from '../ui/Button';
 
@@ -27,7 +27,7 @@ export default function TotpSetupStep({ onReturnToLogin, mode = 'setup' }: TotpS
         setUri(result.uri);
         setBase32(result.base32);
         if (canvasRef.current) {
-          QRCode.toCanvas(canvasRef.current, result.uri, { width: 200, margin: 1 });
+          drawQrToCanvas(canvasRef.current, result.uri, 200);
         }
       })
       .catch((err) => {
@@ -60,7 +60,7 @@ export default function TotpSetupStep({ onReturnToLogin, mode = 'setup' }: TotpS
       throw new Error('动态码校验失败');
     } catch (err) {
       setStatus('error');
-      setErrorMessage(err instanceof Error ? err.message : '动态码校验失败');
+      setErrorMessage(describeTotpError(err, '动态码校验失败'));
     }
   };
 

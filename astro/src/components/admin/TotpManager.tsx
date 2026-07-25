@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import QRCode from 'qrcode';
+import { drawQrToCanvas } from '../../lib/qr-canvas';
 import { useAdminAuth } from '../../hooks/useAdminAuth';
 import { fetchAdminVerificationStatus, revokeAdminTotp, startAdminTotpSetup, confirmAdminTotpSetup } from '../../lib/admin-totp';
 import Button from '../ui/Button';
@@ -46,7 +46,7 @@ export default function TotpManager() {
       setRebindUri(result.uri);
       setRebindBase32(result.base32);
       if (canvasRef.current) {
-        QRCode.toCanvas(canvasRef.current, result.uri, { width: 180, margin: 1 });
+        drawQrToCanvas(canvasRef.current, result.uri, 180);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '初始化重新绑定失败');

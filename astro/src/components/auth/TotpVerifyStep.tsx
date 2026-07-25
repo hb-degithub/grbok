@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { verifyAdminTotp } from '../../lib/admin-totp';
+import { describeTotpError, verifyAdminTotp } from '../../lib/admin-totp';
 import { saveAdminRecoveryCode } from '../../lib/admin-step-up';
 import Button from '../ui/Button';
 
@@ -29,7 +29,7 @@ export default function TotpVerifyStep({ onReturnToLogin }: TotpVerifyStepProps)
       throw new Error('动态码校验失败');
     } catch (err) {
       setStatus('error');
-      setErrorMessage(err instanceof Error ? err.message : '动态码校验失败');
+      setErrorMessage(describeTotpError(err, '动态码校验失败'));
     }
   };
 
