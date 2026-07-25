@@ -15,6 +15,8 @@ var INTERNAL_SECRET = String($os.getenv('ADMIN_AUTH_INTERNAL_SECRET') || '').tri
 var HASH_SECRET = String($os.getenv('ADMIN_AUTH_HASH_SECRET') || '').trim();
 var SITE_NAME = String($os.getenv('PUBLIC_SITE_NAME') || '').trim() || '个人博客';
 var ADMIN_ROLES = ['author', 'admin', 'super_admin'];
+// 强制 TOTP 的角色：仅 admin / super_admin；author 等其他角色免二次验证
+var TOTP_ENFORCED_ROLES = ['admin', 'super_admin'];
 var REFERENCE_ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-';
 var COLLECTION = 'admin_totp_secrets';
 
@@ -30,7 +32,8 @@ function requireAdmin(c, superOnly) {
   var user = actor(c);
   var role = user ? String(user.get('role') || '').trim() : '';
   if (!user || ADMIN_ROLES.indexOf(role) === -1) apiError(401, 'AUTH_REQUIRED');
-  if (superOnly && role !== 'super_admin') apiError(403, 'AUTH_REQUIRED');
+  // superOnly 语义 = 仅强制 TOTP 的角色（admin / super_admin）可操作绑定、吊销、恢复
+  if (superOnly && TOTP_ENFORCED_ROLES.indexOf(role) === -1) apiError(403, 'AUTH_REQUIRED');
   if (!user.verified()) apiError(403, 'AUTH_REQUIRED');
   return user;
 }
@@ -119,7 +122,7 @@ function requestMeta(c) {
   var clientSession = header(c, 'X-Admin-Session');
   var fingerprint = header(c, 'X-Browser-Fingerprint');
   var userAgent = header(c, 'User-Agent');
-  var ip = String(c.realIP() || '').trim();
+  var ip = require('./client_ip.js').clientIp(c);
   if (!clientSession || !fingerprint || !userAgent || !ip) apiError(400, 'INVALID_REQUEST');
   return { clientSession: clientSession, fingerprint: fingerprint, userAgent: userAgent, ip: ip };
 }
@@ -172,13 +175,17 @@ function audit(c, txDao, user, actionCode, targetId, before, after) {
 // GET /api/blog-admin/step-up/status（路由沿用，语义改 TOTP）
 function stepUpStatus(c) {
   var user = requireAdmin(c, false);
+  var role = String(user.get('role') || '').trim();
+  // author 等非强制角色：不做二次验证，直接放行
+  if (TOTP_ENFORCED_ROLES.indexOf(role) === -1) {
+    return c.json(200, { status: 'verified', verified: true });
+  }
   var state = totpState($app.dao(), user.id);
   if (!isBound(state)) {
     if (state && validRecoveryState(state, c)) {
       return c.json(200, { status: 'recovery_reenroll', verified: false });
     }
-    var status = String(user.get('role')) === 'super_admin' ? 'totp_setup_required' : 'expired';
-    return c.json(200, { status: status, verified: false });
+    return c.json(200, { status: 'totp_setup_required', verified: false });
   }
   try {
     var secure = stepUp.requireAdminStepUp(c, { requireVerifiedEmail: true });
@@ -243,7 +250,7 @@ function totpConfirm(c) {
       apiError(500, 'TOTP_SECRET_UNAVAILABLE');
     }
     var result = totp.verifyCode(totp.secretFromHex(plainHex), input.code, -1);
-    if (!result.ok) apiError(400, 'TOTP_CODE_INVALID');
+    if (!result.ok) apiError(400, result.replay ? 'TOTP_CODE_REPLAYED' : 'TOTP_CODE_INVALID');
     // 转正
     state.set('secret_enc', state.getString('secret_pending_enc'));
     state.set('secret_pending_enc', '');
@@ -283,7 +290,7 @@ function totpVerify(c) {
     }
     var lastUsed = Number(state.get('last_used_timestep') || -1);
     var result = totp.verifyCode(totp.secretFromHex(plainHex), input.code, lastUsed);
-    if (!result.ok) apiError(400, 'TOTP_CODE_INVALID');
+    if (!result.ok) apiError(400, result.replay ? 'TOTP_CODE_REPLAYED' : 'TOTP_CODE_INVALID');
     // 事务内更新防重放水线
     state.set('last_used_timestep', result.timestep);
     txDao.saveRecord(state);

@@ -53,11 +53,7 @@ function header(ctx, name) {
 
 function clientIp(ctx) {
   var c = requestContext(ctx);
-  try {
-    return String(c.realIP() || '').trim();
-  } catch (_) {
-    return '';
-  }
+  return require('./client_ip.js').clientIp(c);
 }
 function trustedAdminIp(ip) {
   var configured = String($os.getenv('ADMIN_IP') || '').split(/[\s,]+/).filter(Boolean);
@@ -147,6 +143,8 @@ function requireProtectedWrite(e, operation) {
   if (!actor) return;
   var role = String(actor.get('role') || '').trim();
   if (ADMIN_ROLES.indexOf(role) === -1) return;
+  // 仅 admin / super_admin 强制 step-up（2FA）；author 的写操作豁免
+  if (role === 'author') return;
 
   if (operation === 'update' && collection === 'users' && e.record.id === actor.id) {
     var stored = $app.dao().findRecordById('users', actor.id);

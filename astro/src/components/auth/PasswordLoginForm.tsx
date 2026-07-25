@@ -20,6 +20,8 @@ import {
 
 const loginLimiter = new RateLimiter(5, 1 / 12);
 const adminRoles = new Set(['author', 'admin', 'super_admin']);
+// 强制 TOTP 二次验证的角色：仅 admin / super_admin；author 登录后直接进入后台
+const totpEnforcedRoles = new Set(['admin', 'super_admin']);
 
 const containerVariants = {
   hidden: { opacity: 0, y: 16 },
@@ -87,7 +89,7 @@ export default function PasswordLoginForm() {
   };
 
   const handlePostLogin = (role: unknown) => {
-    if (adminRoles.has(String(role))) {
+    if (totpEnforcedRoles.has(String(role))) {
       setTotpStep(true);
       setStatus('idle');
       return;
