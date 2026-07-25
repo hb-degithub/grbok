@@ -123,7 +123,7 @@ function parseEmailBody(e, field) {
 }
 
 function getClientIP(e) {
-  try { return rateLimit.normalizeIp(String(e.realIP() || '').trim()); } catch (_) { return ''; }
+  try { return rateLimit.normalizeIp(require('./client_ip.js').clientIp(e)); } catch (_) { return ''; }
 }
 function getAuthorization(e) {
   try { return String(e.request().header.get('Authorization') || '').trim(); } catch (_) { return ''; }

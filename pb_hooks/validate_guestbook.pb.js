@@ -38,7 +38,7 @@ onRecordBeforeCreateRequest(function (e) {
 
   var ip;
   try {
-    ip = rateLimit.normalizeIp(String(e.httpContext.realIP() || '').trim());
+    ip = rateLimit.normalizeIp(require(__hooks + '/lib/client_ip.js').clientIp(e.httpContext));
   } catch (_) {
     throw detailedError(503, 'GUESTBOOK_UNAVAILABLE');
   }

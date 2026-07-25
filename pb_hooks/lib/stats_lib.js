@@ -41,7 +41,7 @@ function getHeader(e, name) {
 
 function getClientIP(e) {
   try {
-    return String(e.realIP() || '').trim();
+    return require('./client_ip.js').clientIp(e);
   } catch (_) {
     return '';
   }

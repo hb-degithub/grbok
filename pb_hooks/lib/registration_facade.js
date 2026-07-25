@@ -106,7 +106,7 @@ function handle(c, deps) {
   var input;
   try { input = parse(c); } catch (_) { return response(c, 400, 'INVALID_REGISTRATION', referenceId); }
   var nowMs = Date.now();
-  var ipValue = deps && deps.ip ? deps.ip : String(c.realIP() || '');
+  var ipValue = deps && deps.ip ? deps.ip : require('./client_ip.js').clientIp(c);
   var outcome = null;
   try {
     $app.dao().runInTransaction(function (txDao) {
