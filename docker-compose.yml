@@ -13,7 +13,8 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     environment:
-      - ADMIN_IP=${ADMIN_IP}
+      # Caddy 层 IP 白名单已停用：ADMIN_IP 为空时回退为全网段（不拦截 /_ 与 /api/admins）
+      - ADMIN_IP=${ADMIN_IP:-0.0.0.0/0}
       - OPENRESTY_TRUSTED_PROXY=${OPENRESTY_TRUSTED_PROXY}
     networks:
       - blog_network

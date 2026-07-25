@@ -92,8 +92,16 @@ export function installAdminStepUpHeaders(pb: PocketBase): void {
     const prior = originalBeforeSend ? await originalBeforeSend(url, options) : options;
     const next = prior || options;
     let requestUrl: URL;
-    try { requestUrl = new URL(url, pb.baseUrl); } catch { return next; }
-    if (requestUrl.origin !== apiOrigin || typeof window === 'undefined') return next;
+    try { requestUrl = new URL(url, pb.baseUrl); } catch { return { url, options: next }; }
+    if (requestUrl.origin !== apiOrigin || typeof window === 'undefined') return { url, options: next };
+
+    // ESA 边缘无视源站 no-store，长期缓存 API GET 响应并串给其他访客
+    // （/api/blog-admin/step-up/status 曾被缓存后把已绑定用户误判成未绑定）。
+    // 所有 GET/HEAD 追加一次性参数强制边缘 MISS，在 ESA 规则修正前兜底。
+    const method = String((next as { method?: string }).method || 'GET').toUpperCase();
+    if (method === 'GET' || method === 'HEAD') {
+      requestUrl.searchParams.set('_ts', Date.now().toString(36) + Math.random().toString(36).slice(2, 8));
+    }
 
     const headers = new Headers(next.headers as HeadersInit | undefined);
     headers.set('X-Admin-Session', getAdminClientSession());
@@ -107,6 +115,6 @@ export function installAdminStepUpHeaders(pb: PocketBase): void {
       headers.set('X-Admin-Recovery-Code', recoveryCode);
     }
     next.headers = Object.fromEntries(headers.entries());
-    return next;
+    return { url: requestUrl.toString(), options: next };
   };
 }

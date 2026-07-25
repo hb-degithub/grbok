@@ -160,9 +160,12 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
   }
 </style>
 
-<script is:inline>
+<script is:inline define:vars={{ swVersion: Date.now().toString(36) }}>
+  // 注册 URL 带构建版本参数：ESA 边缘会无视 no-cache 长期缓存 /sw.js，
+  // 固定路径会导致旧 Service Worker 永远无法更新（已引发过生产事故）。
+  // 每次构建生成新 v=，保证浏览器和 CDN 都拿到最新 SW 脚本。
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.register(`/sw.js?v=${swVersion}`).catch(() => {});
   }
 </script>
 </head>

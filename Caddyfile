@@ -8,8 +8,11 @@
     encode zstd gzip
     root * /srv
 
+    # /admin 是前端静态页面，需对所有用户开放（鉴权由前端 + PB API 层负责）；
+    # /api/blog-admin/* 由 PocketBase hooks 鉴权（requireAdmin 检查角色+token），不卡 IP；
+    # 仅 /_/ PB 后台、/api/admins 需 IP 白名单保护。
     @blocked_admin_access {
-        path /admin* /_/* /api/admins/* /api/blog-admin/*
+        path /_/* /api/admins/*
         not path /_astro/* /pagefind/*
         not client_ip {$ADMIN_IP}
     }
@@ -100,6 +103,9 @@
 
     handle /api/* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
+        # API 响应永不缓存：CDN（ESA）曾缓存过 /api/blog-admin/* 的 403，
+        # 导致后续请求命中陈旧响应、绕过源站鉴权状态。
+        header Cache-Control "no-store"
 
         @preflight method OPTIONS
         handle @preflight {

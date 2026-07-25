@@ -28,6 +28,18 @@ function isStaticAsset(url) {
          STATIC_EXT.test(url.pathname);
 }
 
+function offlineResponse() {
+  // caches.match may resolve to undefined (cache cleared / install incomplete);
+  // respondWith MUST resolve to a real Response, otherwise the browser throws
+  // "Failed to convert value to 'Response'" and the page dies with a network error.
+  return caches.match('/offline/').then(r => r ||
+    new Response('<!DOCTYPE html><html><body><h1>网络不可用，请稍后重试</h1></body></html>', {
+      status: 503,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    })
+  );
+}
+
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
@@ -38,14 +50,14 @@ self.addEventListener('fetch', e => {
 
   // Never cache API requests - always network
   if (url.pathname.startsWith('/api/')) {
-    e.respondWith(fetch(e.request).catch(() => caches.match('/offline/')));
+    e.respondWith(fetch(e.request).catch(offlineResponse));
     return;
   }
 
   // Navigation requests: network-first with offline fallback
   if (e.request.mode === 'navigate') {
     e.respondWith(
-      fetch(e.request).catch(() => caches.match('/offline/'))
+      fetch(e.request).catch(offlineResponse)
     );
     return;
   }
