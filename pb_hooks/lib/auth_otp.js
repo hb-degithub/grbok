@@ -53,15 +53,18 @@ function hashSecret() {
 function hashCode(challengeId, code) { return $security.hs256('otp-code:' + challengeId + ':' + code, hashSecret()); }
 function pbDate(ms) { return new Date(ms).toISOString().replace('T', ' '); }
 function featureEnabled() {
-  return String($os.getenv('MAIL_GATEWAY_ENABLED') || '').trim().toLowerCase() === 'true'
-    && String($os.getenv('MAIL_OTP_ENABLED') || '').trim().toLowerCase() === 'true';
+  if (String($os.getenv('MAIL_OTP_ENABLED') || '').trim().toLowerCase() !== 'true') return false;
+  if (String($os.getenv('MAIL_GATEWAY_ENABLED') || '').trim().toLowerCase() === 'true') return true;
+  // 网关 env 未开但后台已配置 SMTP 时同样视为启用（与 mail_gateway.requireEnabled 一致）
+  try { return !!require('./mail_smtp_config.js').resolve($app.dao()); } catch (_) { return false; }
 }
 function findUserByEmail(dao, email) {
   var rows = dao.findRecordsByFilter('users', 'email = {:email}', '', 1, 0, { email: email });
   return rows && rows.length ? rows[0] : null;
 }
-function eligibleReader(user) { return Boolean(user && user.verified() === true && user.getString('role') === 'reader'); }
-function getIp(e) { try { return rateLimit.normalizeIp(String(e.realIP() || '').trim()); } catch (_) { return ''; } }
+// 所有已验证邮箱的账号均可接收 OTP；admin/super_admin 登录后仍须通过 TOTP 二次验证（AdminGuard 强制）
+function eligibleReader(user) { return Boolean(user && user.verified() === true); }
+function getIp(e) { try { return rateLimit.normalizeIp(require('./client_ip.js').clientIp(e)); } catch (_) { return ''; } }
 
 function reserveChallenge(e, email) {
   var reservation = {

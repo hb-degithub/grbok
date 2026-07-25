@@ -3,6 +3,9 @@ import { MailError } from './errors.mjs';
 
 const PAYLOAD_KEYS = Object.freeze(['requestId', 'messageId', 'category', 'to', 'subject', 'html', 'text']);
 const OPS_KEYS = Object.freeze(['eventId', 'check', 'state', 'observedAt', 'summary']);
+const SMTP_OVERRIDE_KEYS = Object.freeze(['host', 'port', 'username', 'password', 'fromAddress', 'fromName', 'tlsMode']);
+const TLS_MODES = new Set(['auto', 'implicit', 'starttls']);
+const hostPattern = /^[a-z0-9](?:[a-z0-9.-]{0,251})[a-z0-9]$/i;
 const idPattern = /^[A-Za-z][A-Za-z0-9_-]{19,127}$/;
 const emailPattern = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
 const opsChecks = new Set(['container_caddy', 'container_pocketbase', 'container_admin_auth', 'public_health', 'backup_age', 'disk_usage']);
@@ -43,6 +46,39 @@ export function validateOpsEvent(value) {
     eventId: value.eventId, check: value.check, state: value.state,
     observedAt: value.observedAt, summary: value.summary,
   };
+}
+
+// 请求级 SMTP 配置（PocketBase 后台管理界面下发，优先于环境变量）。
+// 仅在已验签的内网请求中有效；校验失败一律 PAYLOAD_INVALID。
+export function validateSmtpOverride(value) {
+  assertExactObject(value, SMTP_OVERRIDE_KEYS);
+  if (typeof value.host !== 'string' || !hostPattern.test(value.host) || value.host.includes('..')) invalid();
+  if (!Number.isSafeInteger(value.port) || value.port < 1 || value.port > 65535) invalid();
+  if (typeof value.username !== 'string' || value.username.length === 0 || value.username.length > 320) invalid();
+  if (typeof value.password !== 'string' || value.password.length === 0 || value.password.length > 512) invalid();
+  if (typeof value.fromAddress !== 'string' || !emailPattern.test(value.fromAddress)) invalid();
+  if (typeof value.fromName !== 'string' || value.fromName.length === 0 || [...value.fromName].length > 120) invalid();
+  if (typeof value.tlsMode !== 'string' || !TLS_MODES.has(value.tlsMode)) invalid();
+  if (/[\r\n]/.test(value.host) || /[\r\n]/.test(value.username) || /[\r\n]/.test(value.fromAddress)) invalid();
+  return {
+    host: value.host.toLowerCase(),
+    port: value.port,
+    username: value.username,
+    password: value.password,
+    fromAddress: value.fromAddress.toLowerCase(),
+    fromName: value.fromName,
+    tlsMode: value.tlsMode,
+  };
+}
+
+// 从 send/verify 请求体中分离可选的 smtp override，返回 { rest, smtp }
+export function extractSmtpOverride(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { rest: body, smtp: null };
+  if (body.smtp === undefined) return { rest: body, smtp: null };
+  const smtp = validateSmtpOverride(body.smtp);
+  const rest = { ...body };
+  delete rest.smtp;
+  return { rest, smtp };
 }
 
 function assertExactObject(value, keys) {

@@ -206,18 +206,53 @@ describe('createMailHttpHandler', () => {
     assert.deepEqual(Object.keys(result).sort(), ['checkedAt', 'configured', 'fromDomain', 'lastVerify', 'port', 'providerLabel', 'tlsMode'].sort());
   });
 
-  it('requires POST verify with an exactly empty body', async () => {
+  it('verify accepts an empty body or a signed smtp override only', async () => {
     let calls = 0;
-    const isolated = await listen(service({ verify: async () => { calls++; return { ok: true, verifiedAt: '2026-07-13T00:00:00.000Z' }; } }));
+    let seenOverride = null;
+    const isolated = await listen(service({ verify: async (override) => { calls++; seenOverride = override; return { ok: true, verifiedAt: '2026-07-13T00:00:00.000Z' }; } }));
     try {
       const empty = await fetch(`${isolated.baseUrl}/internal/mail/verify`, signed('/internal/mail/verify'));
       assert.equal(empty.status, 200);
       await body(empty);
-      const rawBody = Buffer.from('{}');
-      const fields = await fetch(`${isolated.baseUrl}/internal/mail/verify`, signed('/internal/mail/verify', { rawBody }));
+      assert.equal(seenOverride, null);
+
+      // 非空 body 但缺少 smtp 键 → 400
+      const fields = await fetch(`${isolated.baseUrl}/internal/mail/verify`, signed('/internal/mail/verify', { rawBody: Buffer.from('{}') }));
       assert.equal(fields.status, 400);
       assert.deepEqual(await body(fields), payloadFailure);
-      assert.equal(calls, 1);
+
+      // 非法 smtp override → 400
+      const badSmtp = JSON.stringify({ smtp: { host: 'bad host!', port: 465, username: 'u', password: 'p', fromAddress: 'noreply@mail.example.net', fromName: 'Blog', tlsMode: 'auto' } });
+      const invalidSmtp = await fetch(`${isolated.baseUrl}/internal/mail/verify`, signed('/internal/mail/verify', { rawBody: Buffer.from(badSmtp) }));
+      assert.equal(invalidSmtp.status, 400);
+      assert.deepEqual(await body(invalidSmtp), payloadFailure);
+
+      // 合法 smtp override → 200，override 透传给 service
+      const goodSmtp = JSON.stringify({ smtp: { host: 'smtpdm.aliyun.com', port: 465, username: 'noreply@mail.example.net', password: 'secret-pass', fromAddress: 'noreply@mail.example.net', fromName: 'Blog', tlsMode: 'auto' } });
+      const validSmtp = await fetch(`${isolated.baseUrl}/internal/mail/verify`, signed('/internal/mail/verify', { rawBody: Buffer.from(goodSmtp) }));
+      assert.equal(validSmtp.status, 200);
+      await body(validSmtp);
+      assert.deepEqual(seenOverride, { host: 'smtpdm.aliyun.com', port: 465, username: 'noreply@mail.example.net', password: 'secret-pass', fromAddress: 'noreply@mail.example.net', fromName: 'Blog', tlsMode: 'auto' });
+      assert.equal(calls, 2);
+    } finally { await isolated.close(); }
+  });
+
+  it('send separates a signed smtp override from the mail payload', async () => {
+    let seenPayload = null;
+    let seenOverride = null;
+    const isolated = await listen(service({
+      send: async (mail, override) => { seenPayload = mail; seenOverride = override; return success; },
+    }));
+    try {
+      const envelope = JSON.stringify({
+        ...payload,
+        smtp: { host: 'smtpdm.aliyun.com', port: 465, username: 'noreply@mail.example.net', password: 'secret-pass', fromAddress: 'noreply@mail.example.net', fromName: 'Blog', tlsMode: 'implicit' },
+      });
+      const response = await fetch(`${isolated.baseUrl}/internal/mail/send`, signed('/internal/mail/send', { rawBody: Buffer.from(envelope) }));
+      assert.equal(response.status, 200);
+      await body(response);
+      assert.deepEqual(Object.keys(seenPayload).sort(), ['category', 'html', 'messageId', 'requestId', 'subject', 'text', 'to'].sort());
+      assert.deepEqual(seenOverride, { host: 'smtpdm.aliyun.com', port: 465, username: 'noreply@mail.example.net', password: 'secret-pass', fromAddress: 'noreply@mail.example.net', fromName: 'Blog', tlsMode: 'implicit' });
     } finally { await isolated.close(); }
   });
 

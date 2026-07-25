@@ -1,9 +1,11 @@
 'use strict';
 
 const crypto = require('./mail_crypto.js');
+const smtpConfig = require('./mail_smtp_config.js');
 
 const SEND_PATH = '/internal/mail/send';
 const STATUS_PATH = '/internal/mail/status';
+const VERIFY_PATH = '/internal/mail/verify';
 const STABLE_CODES = {
   MAIL_NOT_CONFIGURED: true,
   SMTP_AUTH: true,
@@ -36,10 +38,21 @@ function gatewayError(code, retryable) {
   return error;
 }
 
-function requireEnabled() {
-  if (String($os.getenv('MAIL_GATEWAY_ENABLED') || '').trim().toLowerCase() !== 'true') {
-    throw gatewayError('MAIL_NOT_CONFIGURED', false);
+function pbSmtpOverride() {
+  // 后台（PB 集合）配置的 SMTP 优先于 admin-auth 环境变量
+  try {
+    return smtpConfig.resolve($app.dao());
+  } catch (_) {
+    return null;
   }
+}
+
+function requireEnabled() {
+  if (String($os.getenv('MAIL_GATEWAY_ENABLED') || '').trim().toLowerCase() === 'true') {
+    return;
+  }
+  if (pbSmtpOverride()) return;
+  throw gatewayError('MAIL_NOT_CONFIGURED', false);
 }
 
 function internalBaseUrl() {
@@ -132,9 +145,11 @@ function successfulHttp(response) {
 
 function send(message) {
   requireEnabled();
+  const override = pbSmtpOverride();
+  const envelope = override ? Object.assign({}, message, { smtp: override }) : message;
   let rawBody;
   try {
-    rawBody = JSON.stringify(message);
+    rawBody = JSON.stringify(envelope);
   } catch (_) {
     throw gatewayError('PAYLOAD_INVALID', false);
   }
@@ -155,8 +170,34 @@ function send(message) {
   throw responseFailure(response);
 }
 
+// 真实 SMTP 连通性测试（后台配置存在时按请求级配置测试）
+function verify() {
+  requireEnabled();
+  const override = pbSmtpOverride();
+  const rawBody = override ? JSON.stringify({ smtp: override }) : '';
+  const response = signedRequest('POST', VERIFY_PATH, rawBody);
+  const body = response && response.json;
+  if (successfulHttp(response) && body && body.ok === true && typeof body.verifiedAt === 'string') {
+    return { ok: true, verifiedAt: body.verifiedAt };
+  }
+  throw responseFailure(response);
+}
+
 function status() {
   requireEnabled();
+  const override = pbSmtpOverride();
+  if (override) {
+    // 后台配置优先：状态直接反映 PB 集合中的配置（连通性测试走 verify）
+    return {
+      configured: true,
+      port: override.port,
+      fromDomain: override.fromAddress.slice(override.fromAddress.lastIndexOf('@') + 1).toLowerCase(),
+      tlsMode: override.tlsMode,
+      providerLabel: '阿里云邮件推送（后台配置）',
+      lastVerify: null,
+      checkedAt: new Date().toISOString(),
+    };
+  }
   const response = signedRequest('GET', STATUS_PATH, '');
   const body = response && response.json;
   if (!successfulHttp(response) || !validStatus(body)) {
@@ -187,4 +228,5 @@ function validStatus(body) {
 module.exports = {
   send,
   status,
+  verify,
 };

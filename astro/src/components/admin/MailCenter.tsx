@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
 
-type TabKey = 'overview' | 'queue' | 'logs' | 'verify';
+type TabKey = 'overview' | 'queue' | 'logs' | 'templates' | 'rules' | 'suppress' | 'smtp' | 'verify';
 
 interface OverviewData {
   gateway: {
@@ -70,6 +70,13 @@ interface TemplateItem {
   subject_template: string;
   variables: string[];
   required_variables: string[];
+  content?: {
+    preheader?: string;
+    title?: string;
+    paragraphs?: string[];
+    action?: { label?: string; urlVariable?: string } | null;
+    footer?: string;
+  };
 }
 
 interface RulePolicy {
@@ -117,9 +124,9 @@ export default function MailCenter() {
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
 
-  const send = useCallback(async <T,>(path: string, method: 'GET' | 'POST' = 'GET'): Promise<T> => {
+  const send = useCallback(async <T,>(path: string, method: 'GET' | 'POST' | 'PUT' = 'GET', body?: unknown): Promise<T> => {
     const pb = getPocketBase();
-    return pb.send<T>(path, { method });
+    return pb.send<T>(path, { method, ...(body !== undefined ? { body } : {}) });
   }, []);
 
   const loadOverview = useCallback(async () => {
@@ -237,6 +244,7 @@ export default function MailCenter() {
     { key: 'templates', label: '模板' },
     { key: 'rules', label: '规则' },
     { key: 'suppress', label: '抑制' },
+    { key: 'smtp', label: 'SMTP 配置' },
     { key: 'verify', label: '连接验证' },
   ];
 
@@ -449,30 +457,11 @@ export default function MailCenter() {
           ) : (
             <div className="space-y-3">
               {templateItems.map((item) => (
-                <div key={item.id} className="card rounded-xl p-4">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{item.name}</span>
-                      {item.builtin && <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">内置</span>}
-                    </div>
-                    <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">v{item.version}</span>
-                  </div>
-                  <p className="font-mono text-xs text-zinc-600 dark:text-zinc-400">键：{item.key}</p>
-                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">分类：{item.category}</p>
-                  <p className="mt-2 break-words text-sm text-zinc-700 dark:text-zinc-300">主题模板：{item.subject_template}</p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {item.variables.map((v) => (
-                      <span key={v} className="rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">{v}</span>
-                    ))}
-                  </div>
-                  {item.required_variables.length > 0 && (
-                    <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">必需变量：{item.required_variables.join(', ')}</p>
-                  )}
-                </div>
+                <TemplateCard key={item.id} item={item} send={send} onSaved={loadTemplates} />
               ))}
             </div>
           )}
-          <p className="text-xs text-zinc-400 dark:text-zinc-500">模板为只读视图；恢复默认需通过受保护的迁移或 CLI 操作。</p>
+          <p className="text-xs text-zinc-400 dark:text-zinc-500">文案中用 {'{{变量名}}'} 引用变量；必需变量的占位符必须保留。测试邮件发送到当前登录管理员的邮箱。</p>
         </div>
       )}
 
@@ -480,6 +469,7 @@ export default function MailCenter() {
         <div className="space-y-4">
           {ruleData && (
             <>
+              <MailRatePolicyEditor />
               <div className="card rounded-xl p-5">
                 <h2 className="mb-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">限流策略</h2>
                 <div className="overflow-x-auto">
@@ -554,6 +544,10 @@ export default function MailCenter() {
         </div>
       )}
 
+      {tab === 'smtp' && (
+        <SmtpSettingsPanel send={send} />
+      )}
+
       {tab === 'verify' && !loading && (
         <div className="space-y-4">
           <div className="card rounded-xl p-5">
@@ -592,5 +586,416 @@ export default function MailCenter() {
         </div>
       )}
     </motion.div>
+  );
+}
+
+// ---------- SMTP 配置面板（后台自管理，保存即生效，密码加密存储、不回显）----------
+
+interface SmtpConfigView {
+  configured: boolean;
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  from_address: string;
+  from_name: string;
+  tls_mode: string;
+  has_password: boolean;
+  updated_at: string;
+}
+
+interface SmtpSettingsPanelProps {
+  send: <T,>(path: string, method?: 'GET' | 'POST' | 'PUT', body?: unknown) => Promise<T>;
+}
+
+function SmtpSettingsPanel({ send }: SmtpSettingsPanelProps) {
+  const [form, setForm] = useState({ enabled: false, host: 'smtpdm.aliyun.com', port: 465, username: '', password: '', from_address: '', from_name: '个人博客', tls_mode: 'auto' });
+  const [hasPassword, setHasPassword] = useState(false);
+  const [updatedAt, setUpdatedAt] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const data = await send<SmtpConfigView>('/api/blog-admin/mail/smtp');
+      if (data.configured) {
+        setForm({
+          enabled: data.enabled,
+          host: data.host || 'smtpdm.aliyun.com',
+          port: data.port || 465,
+          username: data.username || '',
+          password: '',
+          from_address: data.from_address || '',
+          from_name: data.from_name || '个人博客',
+          tls_mode: data.tls_mode || 'auto',
+        });
+        setHasPassword(data.has_password);
+        setUpdatedAt(data.updated_at || '');
+      }
+    } catch (err: unknown) {
+      setMessage({ ok: false, text: `读取配置失败：${(err as Error)?.message || '未知错误'}` });
+    } finally {
+      setLoading(false);
+    }
+  }, [send]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const patch = (key: string, value: string | number | boolean) => setForm((prev) => ({ ...prev, [key]: value }));
+
+  const save = async (thenVerify: boolean) => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const data = await send<SmtpConfigView>('/api/blog-admin/mail/smtp', 'PUT', { ...form });
+      setHasPassword(data.has_password);
+      setUpdatedAt(data.updated_at || '');
+      setForm((prev) => ({ ...prev, password: '' }));
+      if (thenVerify) {
+        setSaving(false);
+        setVerifying(true);
+        try {
+          const result = await send<{ verified: boolean; error: string | null }>('/api/blog-admin/mail/verify', 'POST');
+          setMessage(result.verified
+            ? { ok: true, text: '已保存，SMTP 连接验证成功。' }
+            : { ok: false, text: `已保存，但连接验证失败：${result.error || '未知错误'}` });
+        } finally {
+          setVerifying(false);
+        }
+        return;
+      }
+      setMessage({ ok: true, text: '已保存。' });
+    } catch (err: unknown) {
+      const code = (err as { response?: { data?: { message?: string; code?: string } } })?.response?.data;
+      setMessage({ ok: false, text: `保存失败：${code?.message || code?.code || (err as Error)?.message || '未知错误'}` });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputCls = 'w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:text-zinc-100';
+  const labelCls = 'mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400';
+
+  if (loading) return <p className="text-sm text-zinc-500 dark:text-zinc-400">加载中…</p>;
+
+  return (
+    <div className="space-y-4">
+      <div className="card rounded-xl p-5">
+        <h2 className="mb-1 text-base font-semibold text-zinc-900 dark:text-zinc-100">SMTP 发送配置</h2>
+        <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+          配置阿里云邮件推送（DirectMail）的 SMTP 参数。保存后立即生效，无需重启服务；密码加密存储且永不回显。
+          {updatedAt && <span className="ml-1 text-xs">（上次更新：{new Date(updatedAt.replace(' ', 'T')).toLocaleString('zh-CN')}）</span>}
+        </p>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className={labelCls}>SMTP 主机</label>
+            <input className={inputCls} value={form.host} onChange={(e) => patch('host', e.target.value)} placeholder="smtpdm.aliyun.com" />
+          </div>
+          <div>
+            <label className={labelCls}>端口（465=SSL，25/80=STARTTLS）</label>
+            <input className={inputCls} type="number" min={1} max={65535} value={form.port} onChange={(e) => patch('port', Number(e.target.value) || 465)} />
+          </div>
+          <div>
+            <label className={labelCls}>SMTP 用户名（发信地址）</label>
+            <input className={inputCls} value={form.username} onChange={(e) => patch('username', e.target.value)} placeholder="noreply@mail.hlydwz.com" autoComplete="off" />
+          </div>
+          <div>
+            <label className={labelCls}>SMTP 密码{hasPassword ? '（已保存，留空表示不修改）' : '（必填）'}</label>
+            <input className={inputCls} type="password" value={form.password} onChange={(e) => patch('password', e.target.value)} placeholder={hasPassword ? '••••••••' : 'DirectMail 的 SMTP 密码'} autoComplete="new-password" />
+          </div>
+          <div>
+            <label className={labelCls}>发件人地址</label>
+            <input className={inputCls} value={form.from_address} onChange={(e) => patch('from_address', e.target.value)} placeholder="noreply@mail.hlydwz.com" />
+          </div>
+          <div>
+            <label className={labelCls}>发件人名称</label>
+            <input className={inputCls} value={form.from_name} onChange={(e) => patch('from_name', e.target.value)} placeholder="个人博客" />
+          </div>
+          <div>
+            <label className={labelCls}>TLS 模式</label>
+            <select className={inputCls} value={form.tls_mode} onChange={(e) => patch('tls_mode', e.target.value)}>
+              <option value="auto">自动（按端口判断）</option>
+              <option value="implicit">Implicit SSL（465）</option>
+              <option value="starttls">STARTTLS（25/80/587）</option>
+            </select>
+          </div>
+          <div className="flex items-end pb-1">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <input type="checkbox" checked={form.enabled} onChange={(e) => patch('enabled', e.target.checked)} className="h-4 w-4 rounded border-zinc-300" />
+              启用此配置（启用后全站邮件由此发出）
+            </label>
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-3">
+          <button onClick={() => void save(false)} disabled={saving || verifying} className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800">
+            {saving ? '保存中…' : '保存'}
+          </button>
+          <button onClick={() => void save(true)} disabled={saving || verifying} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
+            {verifying ? '验证中…' : saving ? '保存中…' : '保存并验证连接'}
+          </button>
+        </div>
+
+        {message && (
+          <p className={`mt-3 text-sm ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+            {message.text}
+          </p>
+        )}
+      </div>
+
+      <div className="card rounded-xl p-5">
+        <h3 className="mb-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">阿里云邮件推送参数在哪里</h3>
+        <ol className="list-decimal space-y-1 pl-5 text-sm text-zinc-500 dark:text-zinc-400">
+          <li>阿里云控制台 → 邮件推送（DirectMail）→ 发信域名：添加域名（如 mail.hlydwz.com）并按提示完成 DNS 验证（MX/SPF/DKIM 记录）。</li>
+          <li>发信地址：新建发信地址（如 noreply@mail.hlydwz.com），类型选"触发邮件"，设置 SMTP 密码。</li>
+          <li>SMTP 服务地址：<code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">smtpdm.aliyun.com</code>，SSL 端口 465。</li>
+          <li>把发信地址填到上方"SMTP 用户名"和"发件人地址"，SMTP 密码填到"SMTP 密码"。</li>
+        </ol>
+      </div>
+    </div>
+  );
+}
+// ---------- 邮件模板卡片（查看 / 编辑 / 发送测试）----------
+
+interface TemplateCardProps {
+  item: TemplateItem;
+  send: <T,>(path: string, method?: 'GET' | 'POST' | 'PUT', body?: unknown) => Promise<T>;
+  onSaved: () => void;
+}
+
+interface TestResult {
+  sent: boolean;
+  to?: string;
+  subject?: string;
+  stage?: string;
+  error?: string;
+}
+
+function TemplateCard({ item, send, onSaved }: TemplateCardProps) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({ subject_template: '', preheader: '', title: '', paragraphs: '', footer: '', action_label: '' });
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const hasAction = !!(item.content && item.content.action && typeof item.content.action === 'object');
+
+  const startEdit = () => {
+    setForm({
+      subject_template: item.subject_template || '',
+      preheader: item.content?.preheader || '',
+      title: item.content?.title || '',
+      paragraphs: (item.content?.paragraphs || []).join('\n'),
+      footer: item.content?.footer || '',
+      action_label: item.content?.action?.label || '',
+    });
+    setMessage(null);
+    setEditing(true);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const paragraphs = form.paragraphs.split('\n').map((line) => line.trim()).filter(Boolean);
+      await send('/api/blog-admin/mail/templates', 'PUT', {
+        key: item.key,
+        subject_template: form.subject_template,
+        preheader: form.preheader,
+        title: form.title,
+        paragraphs,
+        footer: form.footer,
+        action_label: form.action_label,
+      });
+      setMessage({ ok: true, text: '已保存。' });
+      setEditing(false);
+      onSaved();
+    } catch (err: unknown) {
+      const code = (err as { response?: { data?: { message?: string; code?: string } } })?.response?.data;
+      setMessage({ ok: false, text: `保存失败：${code?.message || code?.code || (err as Error)?.message || '未知错误'}` });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const runTest = async () => {
+    setTesting(true);
+    setMessage(null);
+    try {
+      const result = await send<TestResult>('/api/blog-admin/mail/test', 'POST', { key: item.key });
+      setMessage(result.sent
+        ? { ok: true, text: `测试邮件已发送至 ${result.to}（主题：${result.subject}），请查收。` }
+        : { ok: false, text: `发送失败（${result.stage === 'render' ? '模板渲染' : 'SMTP 发送'}）：${result.error || '未知错误'}` });
+    } catch (err: unknown) {
+      setMessage({ ok: false, text: `发送失败：${(err as Error)?.message || '未知错误'}` });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const inputCls = 'w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-sm text-zinc-900 dark:border-zinc-600 dark:text-zinc-100';
+  const labelCls = 'mb-1 block text-xs font-medium text-zinc-500 dark:text-zinc-400';
+
+  return (
+    <div className="card rounded-xl p-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-zinc-900 dark:text-zinc-100">{item.name}</span>
+          {item.builtin && <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">内置</span>}
+        </div>
+        <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">v{item.version}</span>
+      </div>
+      <p className="font-mono text-xs text-zinc-600 dark:text-zinc-400">键：{item.key} · 分类：{item.category}</p>
+
+      {!editing && (
+        <>
+          <p className="mt-2 break-words text-sm text-zinc-700 dark:text-zinc-300">主题模板：{item.subject_template}</p>
+          <div className="mt-2 flex flex-wrap gap-1">
+            {item.variables.map((v) => (
+              <span key={v} className="rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">{v}</span>
+            ))}
+          </div>
+          {item.required_variables.length > 0 && (
+            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">必需变量：{item.required_variables.join(', ')}</p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button onClick={startEdit} className="rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800">编辑</button>
+            <button onClick={() => void runTest()} disabled={testing} className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
+              {testing ? '发送中…' : '发送测试邮件'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {editing && (
+        <div className="mt-3 space-y-3">
+          <div>
+            <label className={labelCls}>主题模板（可用变量：{item.variables.map((v) => `{{${v}}}`).join(' ') }）</label>
+            <input className={inputCls} value={form.subject_template} onChange={(e) => setForm((p) => ({ ...p, subject_template: e.target.value }))} />
+          </div>
+          <div>
+            <label className={labelCls}>预览文本（preheader，收件箱列表里显示的摘要）</label>
+            <input className={inputCls} value={form.preheader} onChange={(e) => setForm((p) => ({ ...p, preheader: e.target.value }))} />
+          </div>
+          <div>
+            <label className={labelCls}>正文标题</label>
+            <input className={inputCls} value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} />
+          </div>
+          <div>
+            <label className={labelCls}>正文段落（每行一段）</label>
+            <textarea className={inputCls} rows={Math.max(3, form.paragraphs.split('\n').length + 1)} value={form.paragraphs} onChange={(e) => setForm((p) => ({ ...p, paragraphs: e.target.value }))} />
+          </div>
+          {hasAction && (
+            <div>
+              <label className={labelCls}>按钮文字（链接地址由系统生成，不可改）</label>
+              <input className={inputCls} value={form.action_label} onChange={(e) => setForm((p) => ({ ...p, action_label: e.target.value }))} />
+            </div>
+          )}
+          <div>
+            <label className={labelCls}>页脚</label>
+            <input className={inputCls} value={form.footer} onChange={(e) => setForm((p) => ({ ...p, footer: e.target.value }))} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => void save()} disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
+              {saving ? '保存中…' : '保存'}
+            </button>
+            <button onClick={() => setEditing(false)} className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800">取消</button>
+          </div>
+        </div>
+      )}
+
+      {message && (
+        <p className={`mt-3 text-sm ${message.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+          {message.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ---------- 发信频率编辑（复用安全策略接口，仅展示邮件相关策略）----------
+
+import { getSecurityPolicies, putSecurityPolicies, type PolicyDto } from '../../lib/admin-security-policy';
+
+const MAIL_POLICY_LABELS: Record<string, string> = {
+  account_mail_email: '验证码/验证邮件 · 同一邮箱',
+  account_mail_ip: '验证码/验证邮件 · 同一 IP',
+  account_mail_global: '验证码/验证邮件 · 全站',
+  comment_notification: '评论通知邮件',
+  outbound_global: '外发邮件 · 全站总阀',
+  account_retention_notice: '账号保留提醒邮件',
+};
+
+function MailRatePolicyEditor() {
+  const [dto, setDto] = useState<PolicyDto | null>(null);
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    getSecurityPolicies()
+      .then(setDto)
+      .catch(() => setStatus({ ok: false, text: '无法读取发信策略（需要有效的二次验证会话）' }));
+  }, []);
+
+  const mailKeys = dto ? Object.keys(dto.policies).filter((k) => k in MAIL_POLICY_LABELS) : [];
+
+  const patch = (key: string, field: 'limit' | 'windowSeconds', value: number) => {
+    if (!dto) return;
+    setDto({ ...dto, policies: { ...dto.policies, [key]: { ...dto.policies[key], [field]: value } } });
+  };
+
+  const save = async () => {
+    if (!dto) return;
+    setSaving(true);
+    setStatus(null);
+    try {
+      setDto(await putSecurityPolicies(dto));
+      setStatus({ ok: true, text: '发信频率已保存，即时生效。' });
+    } catch {
+      setStatus({ ok: false, text: '保存失败：请检查数值边界与二次验证会话是否过期。' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputCls = 'w-24 rounded-lg border border-zinc-300 bg-transparent px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:text-zinc-100';
+
+  return (
+    <div className="card rounded-xl p-5">
+      <h2 className="mb-1 text-base font-semibold text-zinc-900 dark:text-zinc-100">发信频率</h2>
+      <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">单位时间内允许发送的邮件数量，超出后请求将被限流（返回 429 或静默丢弃）。调整即时生效。</p>
+      {!dto && !status && <p className="text-sm text-zinc-500 dark:text-zinc-400">加载中…</p>}
+      {dto && (
+        <div className="space-y-3">
+          {mailKeys.map((key) => {
+            const value = dto.policies[key];
+            const bound = dto.bounds[key];
+            return (
+              <div key={key} className="flex flex-wrap items-center gap-3">
+                <span className="w-56 text-sm text-zinc-700 dark:text-zinc-300">{MAIL_POLICY_LABELS[key]}</span>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">每</span>
+                <input aria-label={`${key} 窗口秒`} type="number" className={inputCls} min={bound?.minWindow} max={bound?.maxWindow} value={value.windowSeconds} onChange={(e) => patch(key, 'windowSeconds', Number(e.target.value))} />
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">秒最多</span>
+                <input aria-label={`${key} 限额`} type="number" className={inputCls} min={bound?.minLimit} max={bound?.maxLimit} value={value.limit} onChange={(e) => patch(key, 'limit', Number(e.target.value))} />
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">封（{bound ? `${bound.minLimit}-${bound.maxLimit}` : ''}）</span>
+              </div>
+            );
+          })}
+          <div className="pt-2">
+            <button onClick={() => void save()} disabled={saving} className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
+              {saving ? '保存中…' : '保存频率设置'}
+            </button>
+          </div>
+        </div>
+      )}
+      {status && (
+        <p className={`mt-3 text-sm ${status.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>{status.text}</p>
+      )}
+    </div>
   );
 }

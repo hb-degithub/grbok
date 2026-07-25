@@ -1,6 +1,6 @@
 import { MAIL_ERROR_CODES, MAIL_LIMITS } from './constants.mjs';
 import { MailError } from './errors.mjs';
-import { validateMailPayload } from './validation.mjs';
+import { extractSmtpOverride, validateMailPayload } from './validation.mjs';
 
 const authenticationFailure = Object.freeze({
   ok: false,
@@ -44,15 +44,26 @@ export function createMailHttpHandler({ verifier, service, config }) {
 
       try {
         switch (url.pathname) {
-          case '/internal/mail/send':
+          case '/internal/mail/send': {
             if (!requireMethod(req, res, 'POST')) return true;
-            sendJson(res, 200, await service.send(validateMailPayload(parseJsonObject(rawBody), config)));
+            const extracted = extractSmtpOverride(parseJsonObject(rawBody));
+            sendJson(res, 200, await service.send(validateMailPayload(extracted.rest, config), extracted.smtp));
             return true;
-          case '/internal/mail/verify':
+          }
+          case '/internal/mail/verify': {
             if (!requireMethod(req, res, 'POST')) return true;
-            requireEmptyBody(rawBody);
-            sendJson(res, 200, await service.verify());
+            // 空 body = 测试环境变量配置；非空 body 必须是 {smtp: {...}}（后台下发的请求级配置）
+            let override = null;
+            if (rawBody.length !== 0) {
+              const parsed = parseJsonObject(rawBody);
+              if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || parsed.smtp === undefined) {
+                throw new MailError('PAYLOAD_INVALID', false);
+              }
+              override = extractSmtpOverride(parsed).smtp;
+            }
+            sendJson(res, 200, await service.verify(override));
             return true;
+          }
           case '/internal/mail/status':
             if (!requireMethod(req, res, 'GET')) return true;
             requireEmptyBody(rawBody);

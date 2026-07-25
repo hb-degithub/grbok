@@ -2,15 +2,27 @@ import { redactMailStatus } from './config.mjs';
 import { classifySmtpError, MailError } from './errors.mjs';
 import { validateMailPayload, validateOpsEvent } from './validation.mjs';
 
-export function createMailService({ config, transport, clock = () => new Date(), logger = () => {} }) {
+export function createMailService({ config, transport, createRuntime = null, clock = () => new Date(), logger = () => {} }) {
   let lastVerify = 'never';
 
-  async function send(payload) {
-    requireConfigured(config);
-    const normalized = validateMailPayload(payload, config);
+  // override 存在时按请求级配置临时构建 config + transport（后台管理界面下发的 SMTP 设置）
+  function runtimeFor(override) {
+    if (!override) return { config, transport };
+    if (typeof createRuntime !== 'function') {
+      throw new MailError('MAIL_NOT_CONFIGURED', false);
+    }
+    return createRuntime(override);
+  }
+
+  async function send(payload, override = null) {
+    const runtime = runtimeFor(override);
+    if (!runtime.config.configured) {
+      throw new MailError('MAIL_NOT_CONFIGURED', false);
+    }
+    const normalized = validateMailPayload(payload, runtime.config);
     try {
       const acceptedAt = currentDate(clock).toISOString();
-      await transport.send(normalized);
+      await runtime.transport.send(normalized);
       return {
         ok: true,
         requestId: normalized.requestId,
@@ -22,10 +34,13 @@ export function createMailService({ config, transport, clock = () => new Date(),
     }
   }
 
-  async function verify() {
-    requireConfigured(config);
+  async function verify(override = null) {
+    const runtime = runtimeFor(override);
+    if (!runtime.config.configured) {
+      throw new MailError('MAIL_NOT_CONFIGURED', false);
+    }
     try {
-      await transport.verify();
+      await runtime.transport.verify();
       const verifiedAt = currentDate(clock).toISOString();
       lastVerify = 'ok';
       return { ok: true, verifiedAt };

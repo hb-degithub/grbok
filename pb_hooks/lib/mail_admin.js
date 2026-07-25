@@ -2,6 +2,8 @@
 
 var gateway = require('./mail_gateway.js');
 var stepUp = require('./admin_step_up.js');
+var smtpConfig = require('./mail_smtp_config.js');
+var mailTemplates = require('./mail_templates.js');
 
 var QUEUE_STATUSES = ['pending', 'processing', 'retry', 'sent', 'failed', 'cancelled'];
 var LOG_RESULTS = ['sent', 'failed'];
@@ -13,9 +15,9 @@ function apiError(status, code) {
 }
 
 function requireTrustedAdminIp(c) {
-  var actual = '';
-  try { actual = String(c.realIP() || '').trim(); } catch (_) {}
   var configured = String($os.getenv('ADMIN_IP') || '').split(/[\s,]+/).filter(Boolean);
+  if (configured.length === 0) return; // 未配置白名单 = 不启用 IP 检查（后台访问由 super_admin + step-up 保护）
+  var actual = require('./client_ip.js').clientIp(c);
   if (!actual || configured.indexOf(actual) === -1) apiError(403, 'ADMIN_NETWORK_DENIED');
 }
 
@@ -208,20 +210,46 @@ function verify(c) {
   requireTrustedAdminIp(c);
   stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
 
-  var status = null;
+  var result = null;
   var error = null;
   try {
-    status = gateway.status();
+    result = gateway.verify();
   } catch (e) {
-    error = String(e && e.message || 'verification failed');
+    error = String(e && e.code || e && e.message || 'verification failed');
   }
 
+  var statusView = null;
+  try { statusView = gateway.status(); } catch (_) {}
+
   return c.json(200, {
-    verified: status !== null,
-    gateway: status,
+    verified: result !== null,
+    gateway: statusView,
+    verified_at: result ? result.verifiedAt : '',
     error: error,
     checked_at: new Date().toISOString(),
   });
+}
+
+// GET /api/blog-admin/mail/smtp — 脱敏回显当前后台 SMTP 配置
+function smtpRead(c) {
+  requireTrustedAdminIp(c);
+  var secure = stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
+  void secure;
+  return c.json(200, smtpConfig.readPublic($app.dao()));
+}
+
+// PUT /api/blog-admin/mail/smtp — 保存后台 SMTP 配置（密码加密存储，留空则保留原密码）
+function smtpSave(c) {
+  requireTrustedAdminIp(c);
+  var secure = stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
+  var input;
+  try {
+    input = JSON.parse(readerToString(c.request().body, 8193) || '{}');
+  } catch (_) {
+    apiError(400, 'INVALID_REQUEST');
+  }
+  var saved = smtpConfig.save($app.dao(), input, secure.actorId);
+  return c.json(200, saved);
 }
 
 function templates(c) {
@@ -253,6 +281,7 @@ function templates(c) {
       subject_template: r.getString('subject_template') || '',
       variables: Array.isArray(variables) ? variables : [],
       required_variables: Array.isArray(required) ? required : [],
+      content: (function () { try { return JSON.parse(r.getString('content_json') || '{}'); } catch (_) { return {}; } })(),
     };
   });
 
@@ -321,9 +350,146 @@ function suppress(c) {
 
   return c.json(200, { items: items, note: '仅展示因永久地址错误而最终失败的记录；解除抑制需重新触发合法业务事件。' });
 }
+
+
+// PUT /api/blog-admin/mail/templates — 编辑模板（主题/标题/段落/页脚/按钮文字）
+function templateUpdate(c) {
+  requireTrustedAdminIp(c);
+  stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
+
+  var input;
+  try { input = JSON.parse(readerToString(c.request().body, 65537) || '{}'); } catch (_) { apiError(400, 'INVALID_REQUEST'); }
+
+  var key = String(input.key || '').trim();
+  if (!/^[a-z][a-z0-9_]{0,63}$/.test(key)) apiError(400, 'INVALID_TEMPLATE_KEY');
+
+  var dao = $app.dao();
+  var rows = dao.findRecordsByFilter('mail_templates', 'key = {:key} && is_current = true', '-created', 1, 0, { key: key });
+  if (!rows || !rows.length) apiError(404, 'TEMPLATE_NOT_FOUND');
+  var record = rows[0];
+
+  var subject = String(input.subject_template || '').trim();
+  if (!subject || subject.length > 200) apiError(400, 'INVALID_SUBJECT');
+  var title = String(input.title || '').trim();
+  if (!title || title.length > 200) apiError(400, 'INVALID_TITLE');
+  var preheader = String(input.preheader || '');
+  var footer = String(input.footer || '');
+  var paragraphs = input.paragraphs;
+  if (!Array.isArray(paragraphs) || paragraphs.length === 0 || paragraphs.length > 10) apiError(400, 'INVALID_PARAGRAPHS');
+  for (var i = 0; i < paragraphs.length; i++) {
+    paragraphs[i] = String(paragraphs[i] || '').trim();
+    if (!paragraphs[i] || paragraphs[i].length > 1000) apiError(400, 'INVALID_PARAGRAPHS');
+  }
+
+  var content;
+  try { content = JSON.parse(record.getString('content_json') || '{}'); } catch (_) { content = {}; }
+  content.preheader = preheader;
+  content.title = title;
+  content.paragraphs = paragraphs;
+  content.footer = footer;
+  if (content.action && typeof content.action === 'object') {
+    var label = String(input.action_label || '').trim();
+    if (label && label.length <= 40) content.action.label = label; // 仅允许改按钮文字，urlVariable 不动
+  }
+
+  // 校验 required 变量的占位符仍出现在文案里（action 的 URL 变量除外）
+  var required = [];
+  try { required = JSON.parse(record.getString('required_variables_json') || '[]'); } catch (_) {}
+  var urlVar = content.action && typeof content.action === 'object' ? String(content.action.urlVariable || '') : '';
+  var haystack = [subject, preheader, title, paragraphs.join('\n'), footer].join('\n');
+  for (var j = 0; j < required.length; j++) {
+    var reqName = String(required[j]);
+    if (reqName && reqName === urlVar) continue;
+    if (haystack.indexOf('{{' + reqName + '}}') === -1) apiError(400, 'MISSING_REQUIRED_VARIABLE: ' + reqName);
+  }
+
+  record.set('subject_template', subject);
+  record.set('content_json', JSON.stringify(content));
+  dao.saveRecord(record);
+  return c.json(200, { saved: true, key: key });
+}
+
+// 模板变量的测试示例值
+function sampleVariableValue(name) {
+  var map = {
+    code: '123456', displayName: '测试用户', expiresMinutes: '10',
+    email: 'reader@example.com', name: '测试用户', siteName: '个人博客',
+  };
+  if (map[name]) return map[name];
+  if (/url/i.test(name)) {
+    var site = String($os.getenv('PUBLIC_SITE_URL') || '').trim() || 'https://hlydwz.com';
+    return site.replace(/\/$/, '') + '/';
+  }
+  return 'sample-' + name;
+}
+
+// POST /api/blog-admin/mail/test — 用指定模板向当前管理员邮箱发送一封测试邮件
+function sendTest(c) {
+  requireTrustedAdminIp(c);
+  var secure = stepUp.requireAdminStepUp(c, { requireSuperAdmin: true, requireVerifiedEmail: true });
+
+  var input;
+  try { input = JSON.parse(readerToString(c.request().body, 8193) || '{}'); } catch (_) { apiError(400, 'INVALID_REQUEST'); }
+  var key = String(input.key || '').trim();
+  if (!/^[a-z][a-z0-9_]{0,63}$/.test(key)) apiError(400, 'INVALID_TEMPLATE_KEY');
+
+  var to = secure.actor ? String(secure.actor.getString('email') || '').trim() : '';
+  if (!to) apiError(400, 'ADMIN_EMAIL_UNAVAILABLE');
+
+  var rows = $app.dao().findRecordsByFilter('mail_templates', 'key = {:key} && is_current = true', '-created', 1, 0, { key: key });
+  if (!rows || !rows.length) apiError(404, 'TEMPLATE_NOT_FOUND');
+  var record = rows[0];
+
+  var declared = [];
+  try { declared = JSON.parse(record.getString('variables_json') || '[]'); } catch (_) {}
+  var vars = {};
+  var declaredSet = {};
+  for (var i = 0; i < declared.length; i++) {
+    var name = String(declared[i]);
+    declaredSet[name] = true;
+    vars[name] = sampleVariableValue(name);
+  }
+  if (input.vars && typeof input.vars === 'object' && !Array.isArray(input.vars)) {
+    for (var k in input.vars) {
+      if (Object.prototype.hasOwnProperty.call(input.vars, k) && declaredSet[k]) {
+        vars[k] = String(input.vars[k]).slice(0, 500);
+      }
+    }
+  }
+
+  var rendered;
+  try {
+    rendered = mailTemplates.render(key, vars);
+  } catch (e) {
+    return c.json(200, { sent: false, stage: 'render', error: String(e && e.message || e) });
+  }
+
+  try {
+    var result = gateway.send({
+      requestId: 'test-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
+      messageId: 'testmsg-' + Date.now() + '-' + Math.floor(Math.random() * 100000),
+      category: rendered.category,
+      to: to,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    });
+    return c.json(200, { sent: true, to: maskRecipient(to), request_id: result.requestId, subject: rendered.subject });
+  } catch (e) {
+    return c.json(200, { sent: false, stage: 'send', error: String(e && e.code || e && e.message || e), to: maskRecipient(to) });
+  }
+}
+
 module.exports = {
   overview: overview,
   queue: queue,
   logs: logs,
   verify: verify,
+  templates: templates,
+  rules: rules,
+  suppress: suppress,
+  smtpRead: smtpRead,
+  smtpSave: smtpSave,
+  templateUpdate: templateUpdate,
+  sendTest: sendTest,
 };

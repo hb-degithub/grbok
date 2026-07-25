@@ -221,7 +221,26 @@ export function startServer({
 } = {}) {
   const mailConfig = createMailConfig(env);
   const mailTransport = createMailTransport({ config: mailConfig, nodemailer });
-  const mailService = createMailService({ config: mailConfig, transport: mailTransport });
+  // 请求级 SMTP 配置（PocketBase 后台下发）：按参数即时构建 config + transport，
+  // 站点地址等基础设施项仍从环境变量继承。
+  const createMailRuntime = (override) => {
+    const cfg = createMailConfig({
+      SMTP_HOST: override.host,
+      SMTP_PORT: String(override.port),
+      SMTP_USERNAME: override.username,
+      SMTP_PASSWORD: override.password,
+      SMTP_FROM_ADDRESS: override.fromAddress,
+      SMTP_FROM_NAME: override.fromName,
+      SMTP_TLS_MODE: override.tlsMode,
+      SMTP_CONNECTION_TIMEOUT_MS: env.SMTP_CONNECTION_TIMEOUT_MS,
+      SMTP_SOCKET_TIMEOUT_MS: env.SMTP_SOCKET_TIMEOUT_MS,
+      PUBLIC_SITE_URL: env.PUBLIC_SITE_URL,
+      NODE_ENV: env.NODE_ENV,
+      MAIL_PROVIDER_LABEL: '阿里云邮件推送（后台配置）',
+    });
+    return { config: cfg, transport: createMailTransport({ config: cfg, nodemailer }) };
+  };
+  const mailService = createMailService({ config: mailConfig, transport: mailTransport, createRuntime: createMailRuntime });
   const mailVerifier = createMailRequestVerifier({ secret: config.mailInternalSecret });
   const mailHttpHandler = createMailHttpHandler({ verifier: mailVerifier, service: mailService, config: mailConfig });
   const server = createServer({ config, mailHttpHandler });
