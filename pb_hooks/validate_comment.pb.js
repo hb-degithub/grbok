@@ -3,19 +3,21 @@ const MAX_NESTING_DEPTH = 5;
 
 onRecordBeforeCreateRequest((e) => {
   const stripTags = (value) => String(value || '').replace(/<[^>]*>/g, '').trim();
-  const commentRateBuckets = globalThis.commentRateBuckets || (globalThis.commentRateBuckets = {});
 
-  // Cleanup old entries periodically
-  const _now = Date.now();
-  if (!globalThis._commentLastCleanup || _now - globalThis._commentLastCleanup > 5 * 60 * 1000) {
-    globalThis._commentLastCleanup = _now;
-    for (const key of Object.keys(commentRateBuckets)) {
-      const bucket = commentRateBuckets[key];
-      if (!bucket || bucket.length === 0 || _now - bucket[bucket.length - 1] > 600000) {
-        delete commentRateBuckets[key];
-      }
+  const rateLimit = require(__hooks + '/lib/security_rate_limit.js');
+
+  // Detailed error shape mirroring validate_guestbook.pb.js so the frontend
+  // can surface server-provided Chinese copy instead of a hardcoded fallback.
+  // retryAfter is attached when the request is rate-limited (HTTP 429).
+  const detailedError = (status, code, retryAfter) => {
+    const data = {
+      code: new ValidationError(code, code),
+    };
+    if (retryAfter) {
+      data.retryAfter = new ValidationError('COMMENT_RETRY_AFTER', String(retryAfter));
     }
-  }
+    return new ApiError(status, code, data);
+  };
 
   const boolSetting = (key, fallback) => {
     try {
@@ -38,26 +40,20 @@ onRecordBeforeCreateRequest((e) => {
     return $app.dao().findRecordById(collection, id);
   };
 
-  const getClientIP = () => {
-    try {
-      const real = e.httpContext?.realIP?.();
-      if (real && real.trim()) return real.trim();
-    } catch (_) {}
-    return '';
-  };
-
-  const rateLimit = (key, limit, windowMs) => {
-    if (!key) return;
-    const now = Date.now();
-    const bucketKey = String(key);
-    const bucket = commentRateBuckets[bucketKey] || [];
-    const active = bucket.filter((time) => now - time < windowMs);
-    if (active.length >= limit) {
-      throw new BadRequestError('Too many comment submissions. Please retry later.');
-    }
-    active.push(now);
-    commentRateBuckets[bucketKey] = active;
-  };
+  // Real client IP via the shared client_ip helper: prefers the ESA-injected
+  // ali-real-client-ip header and falls back to realIP(). Returns '' when no
+  // IP can be resolved.
+  var ip;
+  try {
+    ip = rateLimit.normalizeIp(
+      require(__hooks + '/lib/client_ip.js').clientIp(e.httpContext),
+    );
+  } catch (_) {
+    // normalizeIp throws on empty/invalid input — keep the original "无法识别
+    // 客户端" semantics so anonymous clients behind a misconfigured proxy
+    // still get a clear, distinguishable rejection.
+    throw new BadRequestError('无法识别客户端');
+  }
 
   const hasSpamPattern = (content) => {
     const linkCount = (content.match(/https?:\/\//gi) || []).length;
@@ -73,8 +69,6 @@ onRecordBeforeCreateRequest((e) => {
   const authorName = stripTags(record.get('author_name'));
   const authorEmail = String(record.get('author_email') || '').trim();
   const content = stripTags(record.get('content'));
-  const ip = getClientIP();
-  if (!ip) throw new BadRequestError('无法识别客户端');
 
   if (!boolSetting('enable_comments', true)) throw new BadRequestError('Comments are disabled.');
   if (!authorName) throw new BadRequestError('Author name is required.');
@@ -161,10 +155,44 @@ onRecordBeforeCreateRequest((e) => {
     }
   }
 
-  rateLimit('ip:min:' + ip, 5, 60 * 1000);
-  rateLimit('ip:hour:' + ip, 30, 60 * 60 * 1000);
-  rateLimit('email:min:' + authorEmail.toLowerCase(), 3, 60 * 1000);
-  rateLimit('post:min:' + postId, 12, 60 * 1000);
+  // Three-axis rate limiting (IP / email / post) using the persistent,
+  // multi-instance-safe limiter. Thresholds align with the prior in-memory
+  // buckets' per-minute axes (the per-hour IP axis was strictly weaker than
+  // the per-minute axis and is subsumed by it). All three entries are
+  // consumed atomically inside a single transaction so a partial write can
+  // never leak a quota decrement.
+  let normalizedEmail;
+  try {
+    normalizedEmail = rateLimit.normalizeEmail(authorEmail);
+  } catch (_) {
+    // Email shape was already validated above; treat normalization failure
+    // as a transient store error rather than a leak.
+    throw detailedError(503, 'COMMENT_UNAVAILABLE');
+  }
+
+  let decision;
+  try {
+    $app.dao().runInTransaction(function (txDao) {
+      decision = rateLimit.consume(txDao, {
+        nowMs: Date.now(),
+        entries: [
+          { policyKey: 'comment_ip', subject: ip },
+          { policyKey: 'comment_email', subject: normalizedEmail },
+          { policyKey: 'comment_post', subject: postId },
+        ],
+      });
+    });
+    if (!decision || typeof decision.allowed !== 'boolean') throw new Error('invalid rate decision');
+  } catch (_) {
+    // RateLimitUnavailableError (degraded store / corrupt bucket / write
+    // failure) — fail closed with 503 so the operator is alerted without
+    // silently dropping the request.
+    throw detailedError(503, 'COMMENT_UNAVAILABLE');
+  }
+
+  if (!decision.allowed) {
+    throw detailedError(429, 'COMMENT_RATE_LIMITED', decision.retryAfterSeconds);
+  }
 
   record.set('author_name', authorName);
   record.set('author_email', authorEmail);

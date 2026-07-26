@@ -18,6 +18,8 @@ interface CommentItemProps {
   isNew?: boolean;
   /** 是否启用人工审核 */
   moderationEnabled?: boolean;
+  /** 服务端返回的提交错误文案（来自 useComments.submitError），无文案时为 null */
+  serverError?: string | null;
 }
 
 const itemVariants = {
@@ -54,6 +56,7 @@ export default function CommentItem({
   onSubmitReply,
   isNew = false,
   moderationEnabled = true,
+  serverError,
 }: CommentItemProps) {
   const [isReplyOpen, setIsReplyOpen] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -178,6 +181,7 @@ export default function CommentItem({
           onSubmit={onSubmitReply}
           parentId={comment.id}
           moderationEnabled={moderationEnabled}
+          serverError={serverError}
         />
       </motion.div>
 
@@ -192,6 +196,7 @@ export default function CommentItem({
               maxDepth={maxDepth}
               onSubmitReply={onSubmitReply}
               moderationEnabled={moderationEnabled}
+              serverError={serverError}
             />
           ))}
         </div>

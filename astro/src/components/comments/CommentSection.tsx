@@ -51,7 +51,7 @@ function SkeletonComment({ delay = 0 }: { delay?: number }) {
 export default function CommentSection({ postId }: CommentSectionProps) {
   const { settings, loading: settingsLoading } = useSiteSettings();
   const commentsEnabled = !settingsLoading && settings.enable_comments;
-  const { comments, loading, error, submitComment, refresh } = useComments(postId, { enabled: commentsEnabled });
+  const { comments, loading, error, submitError, submitComment, refresh } = useComments(postId, { enabled: commentsEnabled });
   const [newCommentIds, setNewCommentIds] = useState<Set<string>>(new Set());
 
   // Track logged-in user's email verification status
@@ -189,7 +189,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
       </div>
 
       {/* 主评论表单 */}
-      <CommentForm postId={postId} onSubmit={handleSubmit} moderationEnabled={settings.comment_moderation} userEmailVerified={userEmailVerified} />
+      <CommentForm postId={postId} onSubmit={handleSubmit} moderationEnabled={settings.comment_moderation} userEmailVerified={userEmailVerified} serverError={submitError} />
 
       {/* 评论列表 */}
       <AnimatePresence>
@@ -216,6 +216,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
                 onSubmitReply={handleSubmit}
                 isNew={newCommentIds.has(comment.id)}
                 moderationEnabled={settings.comment_moderation}
+                serverError={submitError}
               />
             ))}
           </motion.div>

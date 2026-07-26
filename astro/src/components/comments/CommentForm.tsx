@@ -41,6 +41,8 @@ interface CommentFormProps {
   moderationEnabled?: boolean;
   /** 当前登录用户是否已验证邮箱（undefined = 未登录 / 不强制） */
   userEmailVerified?: boolean;
+  /** 服务端返回的提交错误文案（来自 useComments.submitError），无文案时为 null */
+  serverError?: string | null;
 }
 
 /** 共享 textarea 样式 - 玻璃底 + teal focus-visible */
@@ -53,7 +55,7 @@ const textareaClass =
  * 设计决策：glass-strong 容器保证表单文字对比度；textarea 用 id 关联 label，
  * 支持 `aria-describedby` 错误播报；成功态用 emerald 打勾动画。
  */
-export default function CommentForm({ postId, onSubmit, moderationEnabled = true, userEmailVerified }: CommentFormProps) {
+export default function CommentForm({ postId, onSubmit, moderationEnabled = true, userEmailVerified, serverError }: CommentFormProps) {
   const [formData, setFormData] = useState<CommentFormData>({
     author_name: '',
     author_email: '',
@@ -104,7 +106,9 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
       statusTimerRef.current = window.setTimeout(() => setStatus('idle'), 2000);
     } else {
       setStatus('error');
-      setErrorMessage('提交失败，请重试');
+      // Prefer the server-provided copy (e.g. "请先验证你的邮箱后再发表评论")
+      // when present; otherwise fall back to the neutral generic.
+      setErrorMessage(serverError || '提交失败，请重试');
     }
   };
 

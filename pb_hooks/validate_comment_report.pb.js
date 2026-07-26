@@ -1,46 +1,57 @@
 (function () {
 /// <reference path="../pb_data/types.d.ts" />
 
-// Comment report rate limiting — per-IP, in-memory with periodic cleanup
-const WINDOW_MS = 10 * 60 * 1000; // 10 minutes
-const MAX_REPORTS = 5;
-const buckets = globalThis.__reportBuckets || (globalThis.__reportBuckets = {});
-let lastCleanup = Date.now();
-
-function maybeCleanup() {
-  const now = Date.now();
-  if (now - lastCleanup < 5 * 60 * 1000) return;
-  lastCleanup = now;
-  for (const key of Object.keys(buckets)) {
-    const entry = buckets[key];
-    if (entry && now - entry.windowStart > WINDOW_MS) {
-      delete buckets[key];
-    }
-  }
-}
-
+// Comment report rate limiting — per-IP, persisted via security_rate_limit so
+// limits survive restarts and stay consistent across instances.
 onRecordBeforeCreateRequest((e) => {
   const record = e.record;
   if (!record) return;
 
-  // Rate limit by IP
-  const info = $apis.requestInfo(e.httpContext);
-  const ip = (info.clientIp || 'unknown').trim();
-  const key = 'report:' + ip;
-  const now = Date.now();
+  const rateLimit = require(__hooks + '/lib/security_rate_limit.js');
 
-  maybeCleanup();
+  // Detailed error shape mirroring validate_guestbook.pb.js so the frontend
+  // can surface a server-provided message.
+  const detailedError = (status, code, retryAfter) => {
+    const data = {
+      code: new ValidationError(code, code),
+    };
+    if (retryAfter) {
+      data.retryAfter = new ValidationError('COMMENT_REPORT_RETRY_AFTER', String(retryAfter));
+    }
+    return new ApiError(status, code, data);
+  };
 
-  let entry = buckets[key];
-  if (!entry || now - entry.windowStart > WINDOW_MS) {
-    entry = { windowStart: now, count: 0 };
-    buckets[key] = entry;
+  // Resolve real client IP through the shared client_ip helper (ESA
+  // ali-real-client-ip header with realIP() fallback). Preserve the original
+  // 'unknown' fallback subject when no IP can be resolved so reporters
+  // behind a misconfigured proxy still share a single bucket instead of being
+  // blocked outright.
+  let ip;
+  try {
+    const raw = require(__hooks + '/lib/client_ip.js').clientIp(e.httpContext);
+    ip = rateLimit.normalizeIp(raw);
+  } catch (_) {
+    ip = 'unknown';
   }
 
-  if (entry.count >= MAX_REPORTS) {
-    throw new BadRequestError('Too many reports, please try again later');
+  let decision;
+  try {
+    $app.dao().runInTransaction(function (txDao) {
+      decision = rateLimit.consume(txDao, {
+        nowMs: Date.now(),
+        entries: [{ policyKey: 'comment_report_ip', subject: ip }],
+      });
+    });
+    if (!decision || typeof decision.allowed !== 'boolean') throw new Error('invalid rate decision');
+  } catch (_) {
+    // RateLimitUnavailableError — fail closed with 503.
+    throw detailedError(503, 'COMMENT_REPORT_UNAVAILABLE');
   }
 
-  entry.count++;
+  if (!decision.allowed) {
+    throw detailedError(429, 'COMMENT_REPORT_RATE_LIMITED', decision.retryAfterSeconds);
+  }
+
+  if (typeof e.next === 'function') e.next();
 }, 'comment_reports');
 })();

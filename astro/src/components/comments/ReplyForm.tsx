@@ -22,6 +22,8 @@ interface ReplyFormProps {
   parentId?: string | null;
   /** 是否启用人工审核 */
   moderationEnabled?: boolean;
+  /** 服务端返回的提交错误文案（来自 useComments.submitError），无文案时为 null */
+  serverError?: string | null;
 }
 
 /** 共享 textarea 样式 - 玻璃底 + teal focus-visible */
@@ -34,7 +36,7 @@ const textareaClass =
  * 设计决策：用 glass（比主表单的 glass-strong 更通透）表示「嵌套/次要」层级；
  * height:auto 过渡实现平滑展开收起；textarea 用 parentId 派生 id 关联 label。
  */
-export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderationEnabled = true }: ReplyFormProps) {
+export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderationEnabled = true, serverError }: ReplyFormProps) {
   const [formData, setFormData] = useState<CommentFormData>({
     author_name: '',
     author_email: '',
@@ -83,7 +85,9 @@ export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, 
       }, 1500);
     } else {
       setStatus('error');
-      setErrorMessage('提交失败，请重试');
+      // Prefer the server-provided copy when present; otherwise fall back to
+      // the neutral generic.
+      setErrorMessage(serverError || '提交失败，请重试');
     }
   };
 
