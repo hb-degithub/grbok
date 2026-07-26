@@ -11,10 +11,16 @@ const POCKETBASE_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhos
 
 /**
  * 创建新的 PocketBase 实例
- * SSR 环境下每次请求创建新实例，避免状态污染
+ * SSR 环境下每次请求创建新实例，避免状态污染。
+ * 浏览器侧同样幂等安装 step-up 头注入器（WeakSet 去重），
+ * 防止未来新增组件绕过 getPocketBase 单例导致写请求缺 X-Admin-Step-Up 头。
  */
 export function createPocketBase(): PocketBase {
-  return new PocketBase(POCKETBASE_URL);
+  const instance = new PocketBase(POCKETBASE_URL);
+  if (typeof window !== 'undefined') {
+    installAdminStepUpHeaders(instance);
+  }
+  return instance;
 }
 
 /**

@@ -274,8 +274,10 @@ function totpConfirm(c) {
 }
 
 // POST /api/blog-admin/totp/verify — step-up 验证（6 位码）
+// 与 setup/confirm/revoke 对齐：仅强制 TOTP 的角色（admin/super_admin）可调用；
+// author 由 stepUpStatus 直通 verified，无需也不应走 verify。
 function totpVerify(c) {
-  var user = requireAdmin(c, false);
+  var user = requireAdmin(c, true);
   var input = body(c);
   var issued = null;
   var saved = null;

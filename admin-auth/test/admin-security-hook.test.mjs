@@ -4,7 +4,9 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 async function loadAdminSecurityModule() {
-  const source = await readFile(new URL('../../pb_hooks/lib/admin_security.js', import.meta.url), 'utf8');
+  // TOTP 重构（commit fb787f0）删除了 admin_security.js，loopback/恢复审计逻辑
+  // 迁移到 admin_totp_security.js；这里改读新位置以继续覆盖原语义。
+  const source = await readFile(new URL('../../pb_hooks/lib/admin_totp_security.js', import.meta.url), 'utf8');
   const module = { exports: {} };
   const context = vm.createContext({
     module,
@@ -12,7 +14,7 @@ async function loadAdminSecurityModule() {
     require() { return {}; },
     $os: { getenv() { return ''; } },
   });
-  vm.runInContext(source, context, { filename: 'admin_security.js' });
+  vm.runInContext(source, context, { filename: 'admin_totp_security.js' });
   return module.exports;
 }
 
@@ -27,7 +29,8 @@ test('local recovery accepts only real loopback addresses', async () => {
 });
 
 test('local recovery audit records the actual PocketBase admin as a pseudonymous actor', async () => {
-  const securitySource = await readFile(new URL('../../pb_hooks/lib/admin_security.js', import.meta.url), 'utf8');
+  // 恢复审计源码同样迁至 admin_totp_security.js（admin_security.js 已删除）。
+  const securitySource = await readFile(new URL('../../pb_hooks/lib/admin_totp_security.js', import.meta.url), 'utf8');
   const auditSource = await readFile(new URL('../../pb_hooks/lib/admin_security_audit.js', import.meta.url), 'utf8');
   const migrationSource = await readFile(new URL('../../pb_migrations/20260716100600_add_admin_audit_actor.pb.js', import.meta.url), 'utf8');
   assert.match(securitySource, /actorType:\s*'pb_admin'/);
@@ -69,6 +72,15 @@ async function loadAdminStepUpModule() {
       randomStringWithAlphabet() { return 'x'.repeat(22); },
       hs256(input, secret) { return `hash:${input}:${secret.length}`; },
       equal(left, right) { return left === right; },
+    },
+    // requireAdminStepUp 通过 require('./client_ip.js').clientIp(c) 取真实 IP。
+    // 沙箱里没有真实 HTTP 层，桩成回退 realIP() —— stepUpContext 即通过 realIP() 注入测试预设 IP，
+    // 让执行流能穿过四要素校验进入 requireTrustedAdminIp 分支，从而断言 ADMIN_NETWORK_DENIED。
+    require(name) {
+      if (name === './client_ip.js') {
+        return { clientIp(c) { return String((c && typeof c.realIP === 'function') ? c.realIP() : '').trim(); } };
+      }
+      return {};
     },
   });
   vm.runInContext(source, context, { filename: 'admin_step_up.js' });
