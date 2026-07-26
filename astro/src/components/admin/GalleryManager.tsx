@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
 import { useAdminAuth } from '../../hooks/useAdminAuth';
+import { describePbError } from '../../lib/pb-error';
+import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 
 interface GalleryItem {
   id: string;
@@ -63,7 +65,8 @@ export default function GalleryManager() {
       setItems((prev) => prev.map((it) => it.id === item.id ? { ...it, status: next } : it));
       setStatus(`相片已${next === 'show' ? '显示' : '隐藏'}`);
     } catch (err: unknown) {
-      setError((err as Error)?.message || '操作失败');
+      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
+      setError(describePbError(err, '操作失败'));
     }
   }, []);
 
@@ -77,7 +80,8 @@ export default function GalleryManager() {
       setItems((prev) => prev.filter((it) => it.id !== item.id));
       setStatus('相片已删除');
     } catch (err: unknown) {
-      setError((err as Error)?.message || '删除失败');
+      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
+      setError(describePbError(err, '删除失败'));
     }
   }, []);
 
@@ -105,7 +109,8 @@ export default function GalleryManager() {
       setStatus('上传成功');
       load();
     } catch (err: unknown) {
-      setError((err as Error)?.message || '上传失败：请确认文件类型为 JPEG/PNG/WebP/GIF 且不超过 10MB');
+      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
+      setError(describePbError(err, '上传失败：请确认文件类型为 JPEG/PNG/WebP/GIF 且不超过 10MB'));
     } finally {
       setUploading(false);
     }

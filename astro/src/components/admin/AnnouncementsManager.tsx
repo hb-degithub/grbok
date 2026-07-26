@@ -4,6 +4,8 @@ import { getPocketBase } from '../../lib/pocketbase';
 import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { cn } from '../../lib/utils';
+import { describePbError } from '../../lib/pb-error';
+import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 import type { Announcement } from '../../types/pocketbase';
 
 type AnnDraft = Omit<Announcement, 'id' | 'created' | 'updated'> & { id?: string };
@@ -74,7 +76,8 @@ export default function AnnouncementsManager() {
       showToast(item.enabled ? '已停用' : '已启用', 'success');
     } catch (err) {
       console.error('切换公告状态失败:', err);
-      showToast('操作失败', 'error');
+      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+      showToast(describePbError(err, '操作失败'), 'error');
     }
   };
 
@@ -105,7 +108,8 @@ export default function AnnouncementsManager() {
       showToast('公告保存成功', 'success');
     } catch (err) {
       console.error('保存公告失败:', err);
-      showToast('保存失败', 'error');
+      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+      showToast(describePbError(err, '保存失败'), 'error');
     } finally {
       setSaving(false);
     }
@@ -119,7 +123,8 @@ export default function AnnouncementsManager() {
       fetchItems();
     } catch (err) {
       console.error('删除公告失败:', err);
-      showToast('删除失败', 'error');
+      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+      showToast(describePbError(err, '删除失败'), 'error');
     }
   };
 

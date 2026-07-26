@@ -4,6 +4,8 @@ import { getPocketBase } from '../../lib/pocketbase';
 import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { cn } from '../../lib/utils';
+import { describePbError } from '../../lib/pb-error';
+import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 import type { FriendLink } from '../../types/pocketbase';
 
 type LinkDraft = Omit<FriendLink, 'id' | 'created' | 'updated'> & { id?: string };
@@ -77,7 +79,8 @@ export default function FriendLinksManager() {
       showToast('友链保存成功', 'success');
     } catch (err) {
       console.error('保存友链失败:', err);
-      showToast('保存失败', 'error');
+      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+      showToast(describePbError(err, '保存失败'), 'error');
     } finally {
       setSaving(false);
     }
@@ -91,7 +94,8 @@ export default function FriendLinksManager() {
       fetchLinks();
     } catch (err) {
       console.error('删除友链失败:', err);
-      showToast('删除失败', 'error');
+      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+      showToast(describePbError(err, '删除失败'), 'error');
     }
   };
 

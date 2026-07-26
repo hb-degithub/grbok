@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
+import { describePbError } from '../../lib/pb-error';
+import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 
 interface GuestbookItem {
   id: string;
@@ -51,8 +53,9 @@ export default function GuestbookModerator() {
       setItems((prev) => prev.map((it) => it.id === item.id ? { ...it, status: next } : it));
       setStatus(`留言已${next === 'show' ? '显示' : '隐藏'}`);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { code?: string } } })?.response?.data?.code || (err as Error)?.message || '操作失败';
-      setError(msg);
+      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
+      setError(describePbError(err, code || '操作失败'));
     }
   }, []);
 
@@ -66,8 +69,9 @@ export default function GuestbookModerator() {
       setItems((prev) => prev.filter((it) => it.id !== item.id));
       setStatus('留言已删除');
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { code?: string } } })?.response?.data?.code || (err as Error)?.message || '删除失败';
-      setError(msg);
+      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
+      setError(describePbError(err, code || '删除失败'));
     }
   }, []);
 

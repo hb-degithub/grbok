@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
 import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import { describePbError } from '../../lib/pb-error';
+import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 import type { Tag } from '../../types/pocketbase';
 
 export default function TagManager() {
@@ -31,7 +33,11 @@ export default function TagManager() {
       else { await pb.collection('tags').create(data); }
       setEditing(null); fetchTags();
       showToast('标签保存成功', 'success');
-    } catch (err) { console.error('保存标签失败：', err); showToast('保存失败，请检查 slug 是否唯一。', 'error'); }
+    } catch (err) {
+      console.error('保存标签失败：', err);
+      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+      showToast(describePbError(err, '保存失败'), 'error');
+    }
     finally { setSaving(false); }
   };
 
@@ -39,7 +45,11 @@ export default function TagManager() {
     setConfirmState({ open: true, title: '确认删除', message: '确定删除这个标签吗？', onConfirm: async () => {
       const pb = getPocketBase();
       try { await pb.collection('tags').delete(id); fetchTags(); showToast('标签已删除', 'success'); }
-      catch (err) { console.error('删除标签失败：', err); showToast('删除标签失败', 'error'); }
+      catch (err) {
+        console.error('删除标签失败：', err);
+        if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+        showToast(describePbError(err, '删除标签失败'), 'error');
+      }
     }});
   };
 

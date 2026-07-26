@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { getPocketBase } from '../../lib/pocketbase';
+import { describePbError } from '../../lib/pb-error';
+import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 
 type TabKey = 'overview' | 'queue' | 'logs' | 'templates' | 'rules' | 'suppress' | 'smtp' | 'verify';
 
@@ -136,8 +138,9 @@ export default function MailCenter() {
       const data = await send<OverviewData>('/api/blog-admin/mail/overview');
       setOverview(data);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { code?: string } } })?.response?.data?.code || (err as Error)?.message || '无法读取邮件概览';
-      setError(msg);
+      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
+      setError(describePbError(err, code || '无法读取邮件概览'));
     } finally {
       setLoading(false);
     }
@@ -151,8 +154,9 @@ export default function MailCenter() {
       const data = await send<{ items: QueueItem[] }>(`/api/blog-admin/mail/queue${params}`);
       setQueueItems(data.items || []);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { code?: string } } })?.response?.data?.code || (err as Error)?.message || '无法读取邮件队列';
-      setError(msg);
+      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
+      setError(describePbError(err, code || '无法读取邮件队列'));
     } finally {
       setLoading(false);
     }
@@ -166,8 +170,9 @@ export default function MailCenter() {
       const data = await send<{ items: LogItem[] }>(`/api/blog-admin/mail/logs${params}`);
       setLogItems(data.items || []);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { code?: string } } })?.response?.data?.code || (err as Error)?.message || '无法读取邮件日志';
-      setError(msg);
+      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
+      setError(describePbError(err, code || '无法读取邮件日志'));
     } finally {
       setLoading(false);
     }
@@ -182,8 +187,9 @@ export default function MailCenter() {
       setVerifyData(data);
       setStatus(data.verified ? '连接验证成功' : '连接验证失败');
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { code?: string } } })?.response?.data?.code || (err as Error)?.message || '验证请求失败';
-      setError(msg);
+      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
+      setError(describePbError(err, code || '验证请求失败'));
     } finally {
       setLoading(false);
     }
@@ -196,7 +202,8 @@ export default function MailCenter() {
       const data = await send<{ items: TemplateItem[] }>('/api/blog-admin/mail/templates');
       setTemplateItems(data.items || []);
     } catch (err: unknown) {
-      setError((err as Error)?.message || '无法读取邮件模板');
+      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
+      setError(describePbError(err, '无法读取邮件模板'));
     } finally {
       setLoading(false);
     }
@@ -209,7 +216,8 @@ export default function MailCenter() {
       const data = await send<RuleData>('/api/blog-admin/mail/rules');
       setRuleData(data);
     } catch (err: unknown) {
-      setError((err as Error)?.message || '无法读取邮件规则');
+      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
+      setError(describePbError(err, '无法读取邮件规则'));
     } finally {
       setLoading(false);
     }
@@ -222,7 +230,8 @@ export default function MailCenter() {
       const data = await send<{ items: SuppressItem[] }>('/api/blog-admin/mail/suppress');
       setSuppressItems(data.items || []);
     } catch (err: unknown) {
-      setError((err as Error)?.message || '无法读取抑制列表');
+      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
+      setError(describePbError(err, '无法读取抑制列表'));
     } finally {
       setLoading(false);
     }
@@ -670,8 +679,8 @@ function SmtpSettingsPanel({ send }: SmtpSettingsPanelProps) {
       }
       setMessage({ ok: true, text: '已保存。' });
     } catch (err: unknown) {
-      const code = (err as { response?: { data?: { message?: string; code?: string } } })?.response?.data;
-      setMessage({ ok: false, text: `保存失败：${code?.message || code?.code || (err as Error)?.message || '未知错误'}` });
+      if (notifyStepUpExpired(err)) { setMessage({ ok: false, text: '管理会话已过期，请重新验证动态口令' }); return; }
+      setMessage({ ok: false, text: `保存失败：${describePbError(err, '未知错误')}` });
     } finally {
       setSaving(false);
     }
@@ -816,8 +825,8 @@ function TemplateCard({ item, send, onSaved }: TemplateCardProps) {
       setEditing(false);
       onSaved();
     } catch (err: unknown) {
-      const code = (err as { response?: { data?: { message?: string; code?: string } } })?.response?.data;
-      setMessage({ ok: false, text: `保存失败：${code?.message || code?.code || (err as Error)?.message || '未知错误'}` });
+      if (notifyStepUpExpired(err)) { setMessage({ ok: false, text: '管理会话已过期，请重新验证动态口令' }); return; }
+      setMessage({ ok: false, text: `保存失败：${describePbError(err, '未知错误')}` });
     } finally {
       setSaving(false);
     }
@@ -956,8 +965,9 @@ function MailRatePolicyEditor() {
     try {
       setDto(await putSecurityPolicies(dto));
       setStatus({ ok: true, text: '发信频率已保存，即时生效。' });
-    } catch {
-      setStatus({ ok: false, text: '保存失败：请检查数值边界与二次验证会话是否过期。' });
+    } catch (err: unknown) {
+      if (notifyStepUpExpired(err)) { setStatus({ ok: false, text: '管理会话已过期，请重新验证动态口令' }); return; }
+      setStatus({ ok: false, text: describePbError(err, '保存失败：请检查数值边界与二次验证会话是否过期。') });
     } finally {
       setSaving(false);
     }

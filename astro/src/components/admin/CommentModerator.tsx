@@ -4,6 +4,8 @@ import { getPocketBase } from '../../lib/pocketbase';
 import { cn } from '../../lib/utils';
 import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import { describePbError } from '../../lib/pb-error';
+import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 import type { Comment } from '../../types/pocketbase';
 
 type CommentFilter = 'all' | 'pending' | 'approved' | 'spam';
@@ -50,7 +52,11 @@ export default function CommentModerator() {
         await Promise.all(selectedIds.map(id => pb.collection('comments').update(id, { status: action })));
         setSelectedIds([]); fetchComments();
         showToast('操作成功', 'success');
-      } catch (err) { console.error(err); showToast('操作失败', 'error'); }
+      } catch (err) {
+        console.error('批量审核评论失败:', err);
+        if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+        showToast(describePbError(err, '操作失败'), 'error');
+      }
     }});
   };
   const batchDelete = async () => {
@@ -61,7 +67,11 @@ export default function CommentModerator() {
         await Promise.all(selectedIds.map(id => pb.collection('comments').delete(id)));
         setSelectedIds([]); fetchComments();
         showToast('评论已删除', 'success');
-      } catch (err) { console.error(err); showToast('删除失败', 'error'); }
+      } catch (err) {
+        console.error('批量删除评论失败:', err);
+        if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+        showToast(describePbError(err, '删除失败'), 'error');
+      }
     }});
   };
   const riskHints = (comment: Comment) => {
@@ -108,7 +118,8 @@ export default function CommentModerator() {
       fetchComments();
     } catch (err) {
       console.error('更新评论状态失败：', err);
-      showToast('状态更新失败', 'error');
+      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+      showToast(describePbError(err, '状态更新失败'), 'error');
     }
   };
 
@@ -121,7 +132,8 @@ export default function CommentModerator() {
         fetchComments();
       } catch (err) {
         console.error('删除评论失败：', err);
-        showToast('删除失败', 'error');
+        if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+        showToast(describePbError(err, '删除失败'), 'error');
       }
     }});
   };

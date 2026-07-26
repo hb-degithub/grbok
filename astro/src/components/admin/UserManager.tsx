@@ -4,6 +4,8 @@ import { getPocketBase } from '../../lib/pocketbase';
 import { useAdminAuth, type AdminRole } from '../../hooks/useAdminAuth';
 import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import { describePbError } from '../../lib/pb-error';
+import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 import type { User } from '../../types/pocketbase';
 
 const listVariants = {
@@ -77,7 +79,8 @@ export default function UserManager() {
         showToast('角色更新成功', 'success');
       } catch (err) {
         console.error('更新用户角色失败：', err);
-        setError('角色更新失败，请确认当前账号仍拥有超级管理员权限。');
+        if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+        setError(describePbError(err, '角色更新失败'));
         showToast('角色更新失败', 'error');
       } finally {
         setUpdatingId('');
@@ -108,7 +111,8 @@ export default function UserManager() {
         showToast('用户已删除', 'success');
       } catch (err) {
         console.error('删除用户失败：', err);
-        setError('删除失败，请确认当前账号仍拥有超级管理员权限。');
+        if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+        setError(describePbError(err, '删除失败'));
         showToast('删除用户失败', 'error');
       } finally {
         setDeletingId('');

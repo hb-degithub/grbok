@@ -4,6 +4,8 @@ import { getPocketBase } from '../../lib/pocketbase';
 import { cn } from '../../lib/utils';
 import { sanitizeHtml } from '../../lib/security';
 import { showToast } from '../ui/Toast';
+import { notifyStepUpExpired } from '../../lib/step-up-recovery';
+import { describePbError } from '../../lib/pb-error';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import MediaLibrary from './MediaLibrary';
 import type { Post } from '../../types/pocketbase';
@@ -61,7 +63,7 @@ export default function PostManager() {
   const [draftRestored, setDraftRestored] = useState(false);
   const [allTags, setAllTags] = useState([]);
   const [selectedTagIds, setSelectedTagIds] = useState([]);
-  const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
+  const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void; onCancel?: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -91,14 +93,20 @@ export default function PostManager() {
   // 筛选/搜索变化时回到第 1 页
   useEffect(() => { setPage(1); }, [filter, query]);
 
-  // Auto-save to localStorage when editing
+  // Auto-save to localStorage when editing.
+  // 使用 ref 持有最新 editing，避免每次 keystroke 触发 effect 重置 2s 定时导致草稿迟迟不落盘；
+  // 仅在 editing 切换（打开/关闭/换文章）时挂一次 2s 防抖定时。
+  const editingRef = useRef<Post | PostDraft | null>(null);
+  editingRef.current = editing;
   useEffect(() => {
     if (!editing) return;
     const timer = setTimeout(() => {
-      try { localStorage.setItem(draftKey, JSON.stringify(editing)); } catch (e) { console.warn('draft auto-save failed:', e); }
+      const cur = editingRef.current;
+      if (!cur) return;
+      try { localStorage.setItem(draftKey, JSON.stringify(cur)); } catch (e) { console.warn('draft auto-save failed:', e); }
     }, 2000);
     return () => clearTimeout(timer);
-  }, [editing, draftKey]);
+  }, [draftKey, editing?.id]);
 
   // Beforeunload warning when there are unsaved changes
   useEffect(() => {
@@ -154,7 +162,8 @@ export default function PostManager() {
       fetchPosts();
     } catch (err) {
       console.error('更新文章状态失败:', err);
-      showToast('状态更新失败', 'error');
+      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+      showToast(describePbError(err, '状态更新失败'), 'error');
     }
   };
 
@@ -167,7 +176,8 @@ export default function PostManager() {
         fetchPosts();
       } catch (err) {
         console.error('删除文章失败:', err);
-        showToast('删除文章失败', 'error');
+        if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+        showToast(describePbError(err, '删除文章失败'), 'error');
       }
     }});
   };
@@ -207,12 +217,7 @@ export default function PostManager() {
         const created = await pb.collection('posts').create({ ...data, author: pb.authStore.record?.id });
         savedPostId = created.id;
       }
-      setEditing(null);
-      clearSavedDraft();
-      setDirty(false);
-      fetchPosts();
-      setSelectedTagIds([]);
-      // Sync tags via post_tags
+      // 标签同步须在关闭编辑器之前完成，失败时保留编辑器与草稿以便重试
       try {
         if (savedPostId) {
           const existing = await pb.collection("post_tags").getList(1, 100, { filter: pb.filter('post_id = {:postId}', { postId: savedPostId }) }).catch(() => ({ items: [] }));
@@ -222,11 +227,24 @@ export default function PostManager() {
           await Promise.all(toRemove.map(i => pb.collection("post_tags").delete(i.id)));
           await Promise.all(toAdd.map(id => pb.collection("post_tags").create({ post_id: savedPostId, tag_id: id })));
         }
-      } catch (e) { console.error("Tag sync failed:", e); }
+      } catch (err) {
+        if (notifyStepUpExpired(err)) {
+          showToast('管理会话已过期，请重新验证动态口令后重试保存', 'error');
+          return;
+        }
+        showToast(`文章已保存，但标签同步失败：${describePbError(err, '请重试保存')}（重新点击保存可重试）`, 'error');
+        return;
+      }
+      setEditing(null);
+      clearSavedDraft();
+      setDirty(false);
+      fetchPosts();
+      setSelectedTagIds([]);
       showToast('文章保存成功', 'success');
     } catch (err) {
       console.error('保存文章失败:', err);
-      showToast('保存失败，请检查 slug 是否唯一。', 'error');
+      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+      showToast(describePbError(err, '保存失败'), 'error');
     } finally {
       setSaving(false);
     }
@@ -335,7 +353,27 @@ export default function PostManager() {
                 <span className={'w-fit rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase ' + (statusColors[post.status] || '')}>{statusLabels[post.status] || post.status}</span>
                 <span className="font-mono text-xs text-text-secondary">{post.views || 0}</span>
                 <div className="flex flex-wrap items-center gap-1 border-t border-border/50 pt-2 lg:justify-end lg:border-0 lg:pt-0">
-                  <button onClick={() => setEditing(post)} className="inline-flex h-10 w-10 items-center justify-center rounded-md text-text-secondary hover:bg-accent/10 hover:text-accent" title="编辑" aria-label="编辑文章">
+                  <button onClick={() => {
+                    const key = 'blog-draft-' + post.id;
+                    let saved: string | null = null;
+                    try { saved = localStorage.getItem(key); } catch (e) { console.warn('draft read failed:', e); }
+                    if (saved) {
+                      try {
+                        const parsed = JSON.parse(saved);
+                        if (parsed && parsed.title) {
+                          setConfirmState({
+                            open: true,
+                            title: '恢复未保存草稿？',
+                            message: `检测到该文章有未保存的草稿（标题：${parsed.title}），是否恢复？取消将清除草稿并使用服务器版本。`,
+                            onConfirm: () => { setEditing({ ...parsed, id: post.id }); setDirty(true); },
+                            onCancel: () => { try { localStorage.removeItem(key); } catch (e) { console.warn('draft clear failed:', e); } setEditing(post); },
+                          });
+                          return;
+                        }
+                      } catch (e) { console.warn('draft parse failed:', e); }
+                    }
+                    setEditing(post);
+                  }} className="inline-flex h-10 w-10 items-center justify-center rounded-md text-text-secondary hover:bg-accent/10 hover:text-accent" title="编辑" aria-label="编辑文章">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                   </button>
                   {post.status !== 'published' && <button onClick={() => updateStatus(post.id, 'published')} className="inline-flex h-10 w-10 items-center justify-center rounded-md text-text-secondary hover:bg-success/10 hover:text-success" title="发布" aria-label="发布文章">
@@ -523,8 +561,8 @@ export default function PostManager() {
         title={confirmState.title}
         message={confirmState.message}
         danger
-        onConfirm={() => { confirmState.onConfirm(); setConfirmState(s => ({ ...s, open: false })); }}
-        onCancel={() => setConfirmState(s => ({ ...s, open: false }))}
+        onConfirm={() => { confirmState.onConfirm(); setConfirmState(s => ({ ...s, open: false, onCancel: undefined })); }}
+        onCancel={() => { confirmState.onCancel?.(); setConfirmState(s => ({ ...s, open: false, onCancel: undefined })); }}
       />
     </div>
   );

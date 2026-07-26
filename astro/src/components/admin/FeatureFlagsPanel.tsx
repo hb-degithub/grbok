@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { getPocketBase } from '../../lib/pocketbase';
 import { DEFAULT_FEATURE_FLAGS, FEATURE_FLAGS_KEY, type FeatureFlags } from '../../config/feature-flags';
 import { showToast } from '../ui/Toast';
+import { describePbError } from '../../lib/pb-error';
+import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 
 /**
  * 智能功能开关面板 —— 超管后台新增模块。
@@ -77,13 +79,21 @@ export default function FeatureFlagsPanel() {
         );
         await pb.collection('settings').update(existing.id, payload);
       } catch (notFoundErr) {
-        // 记录不存在，创建
+        // step-up 过期：不要 fallback create，直接报会话过期
+        if (notifyStepUpExpired(notFoundErr)) {
+          showToast('管理会话已过期，请重新验证动态口令', 'error');
+          return;
+        }
+        // 仅当真不存在（404）时才 create；其他错误冒泡到外层统一翻译
+        const status = (notFoundErr as { status?: number })?.status;
+        if (status !== 404) throw notFoundErr;
         await pb.collection('settings').create({ key: FEATURE_FLAGS_KEY, ...payload });
       }
       showToast('功能开关已保存', 'success');
     } catch (err) {
-      showToast('保存失败，请检查权限', 'error');
       console.error('Feature flags save error:', err);
+      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+      showToast(describePbError(err, '保存失败'), 'error');
     } finally {
       setSaving(false);
     }

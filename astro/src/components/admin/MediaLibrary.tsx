@@ -5,6 +5,8 @@ import { useAdminAuth } from '../../hooks/useAdminAuth';
 import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { cn } from '../../lib/utils';
+import { describePbError } from '../../lib/pb-error';
+import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 import type { MediaAsset } from '../../types/pocketbase';
 
 interface MediaLibraryProps {
@@ -77,6 +79,7 @@ export default function MediaLibrary({ onSelect, onClose }: MediaLibraryProps) {
         success++;
       } catch (err) {
         console.error('上传失败:', err);
+        if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; fetchAssets(); return; }
         failed++;
       }
     }
@@ -117,7 +120,8 @@ export default function MediaLibrary({ onSelect, onClose }: MediaLibraryProps) {
       fetchAssets();
     } catch (err) {
       console.error('删除失败:', err);
-      showToast('删除失败，可能无权限', 'error');
+      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
+      showToast(describePbError(err, '删除失败'), 'error');
     }
   };
 
