@@ -90,7 +90,14 @@ function requestInitialVerification(record, email, ip, nowMs) {
     });
   } catch (_) { return; }
   if (allowed) {
-    try { $mails.sendRecordVerification($app, record); } catch (_) {}
+    // 走新 SMTP 体系：生成 verification token 入队 mail_outbox（异步发送、带去重/重试），
+    // 替代 $mails.sendRecordVerification（PB 原生 MTA 只读环境变量，不走后台 SMTP 配置）。
+    try {
+      require('./auth_facade.js').enqueueVerificationMail(record);
+    } catch (error) {
+      var code = String(error && error.code || error && error.message || 'INTERNAL_ERROR').slice(0, 64);
+      console.error('[account-mail] operation=registration-verification recordId=' + (record && record.id ? record.id : '') + ' result=' + code);
+    }
   }
 }
 

@@ -11,6 +11,34 @@ var COLLECTION = 'mail_smtp_settings';
 var TLS_MODES = ['auto', 'implicit', 'starttls'];
 var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 var HOST_RE = /^[a-z0-9](?:[a-z0-9.-]{0,251})[a-z0-9]$/i;
+var IPV4_RE = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+var INTERNAL_HOST_NAMES = { localhost: true };
+var INTERNAL_HOST_SUFFIXES = ['.internal', '.local', '.lan'];
+
+// SMTP override 的目标必须是公网 MTA 域名，拒绝 IP 字面量与内网/元数据地址，
+// 防止 SSRF（云环境可窃 IAM 元数据）。判定逻辑与 admin-auth/src/mail/validation.mjs
+// 的 isRejectedSmtpHost 保持一致（PB 侧与 admin-auth 侧共用同一规则）。
+// 与 mail_gateway.js 的 isInternalHost（PB→admin-auth 内部调用"只允许内网"）相反：
+// 这里是 admin-auth→外部 MTA，"只允许公网域名"。
+function rejectSmtpHost(rawHost) {
+  if (typeof rawHost !== 'string') return true;
+  var host = String(rawHost).trim().toLowerCase();
+  if (!host) return true;
+  // IPv6 字面量（含 :），形如 [::1] 或 ::1 / fe80::1
+  if (host.indexOf(':') !== -1) return true;
+  // IPv4 字面量：拒绝所有（含 169.254.169.254 元数据、127.0.0.1、10/172.16/192.168）
+  if (IPV4_RE.test(host)) return true;
+  // 显式内部主机名
+  if (INTERNAL_HOST_NAMES[host]) return true;
+  // 单标签主机名（不含点，如 admin-auth、pb、mailhog）——公网 SMTP 域名必含点
+  if (host.indexOf('.') === -1) return true;
+  // 内部后缀
+  for (var i = 0; i < INTERNAL_HOST_SUFFIXES.length; i++) {
+    var suffix = INTERNAL_HOST_SUFFIXES[i];
+    if (host.length >= suffix.length && host.substr(host.length - suffix.length) === suffix) return true;
+  }
+  return false;
+}
 
 // ---------- text <-> hex（Unicode 安全，每字符 4 位 hex，配合 XOR 流加密）----------
 function textToHex(text) {
@@ -107,6 +135,7 @@ function save(dao, input, userId) {
   var enabled = input.enabled === true;
 
   if (!HOST_RE.test(host) || host.indexOf('..') !== -1) invalid('host');
+  if (rejectSmtpHost(host)) invalid('host');
   if (!Number.isSafeInteger(port) || port < 1 || port > 65535) invalid('port');
   if (!EMAIL_RE.test(fromAddress)) invalid('from_address');
   if (TLS_MODES.indexOf(tlsMode) === -1) invalid('tls_mode');
@@ -144,4 +173,5 @@ module.exports = {
   resolve: resolve,
   readPublic: readPublic,
   save: save,
+  rejectSmtpHost: rejectSmtpHost,
 };

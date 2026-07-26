@@ -17,13 +17,21 @@ function string(value, max, name) {
 }
 function variables(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid('invalid variables');
-  var allowed = { postTitle: true, commenter: true, content: true, postUrl: true, displayName: true, cleanupDate: true, siteUrl: true };
+  // 变量白名单按模板分组：评论通知、保留通知、邮箱验证。
+  var allowed = {
+    postTitle: true, commenter: true, content: true, postUrl: true,
+    displayName: true, cleanupDate: true, siteUrl: true,
+    actionUrl: true, expiresMinutes: true,
+  };
+  // 长字段单独放宽上限：content（评论正文）、actionUrl（含 token 的验证链接）。
+  var longFields = { content: 2000, actionUrl: 1000 };
   var result = {};
   var keys = Object.keys(value);
   if (!keys.length || keys.length > 6) invalid('invalid variables');
   for (var i = 0; i < keys.length; i++) {
     if (!allowed[keys[i]]) invalid('invalid variable');
-    result[keys[i]] = string(value[keys[i]], keys[i] === 'content' ? 2000 : 500, keys[i]);
+    var max = longFields[keys[i]] || 500;
+    result[keys[i]] = string(value[keys[i]], max, keys[i]);
   }
   if (JSON.stringify(result).length > 16384) invalid('variables too large');
   return result;
@@ -39,7 +47,7 @@ function enqueue(txDao, input) {
   var existing = findDedupe(txDao, dedupeKey);
   if (existing) return { queued: false, outboxId: existing.id };
   var category = string(input.category, 64, 'category');
-  if (category !== 'comment_notification' && category !== 'account_retention_notice') invalid('invalid category');
+  if (category !== 'comment_notification' && category !== 'account_retention_notice' && category !== 'account_verification') invalid('invalid category');
   var policyKey = category;
   var limit = rateLimit.consume(txDao, { nowMs: Date.now(), entries: [
     { policyKey: policyKey, subject: 'v1' }, { policyKey: 'outbound_global', subject: 'v1' },
@@ -47,7 +55,8 @@ function enqueue(txDao, input) {
   if (!limit.allowed) return { queued: false, outboxId: null, limited: true };
   var templateKey = string(input.templateKey, 64, 'templateKey');
   if ((category === 'comment_notification' && templateKey !== 'comment_new') ||
-      (category === 'account_retention_notice' && templateKey !== 'account_retention_notice')) invalid('invalid template');
+      (category === 'account_retention_notice' && templateKey !== 'account_retention_notice') ||
+      (category === 'account_verification' && templateKey !== 'account_verification')) invalid('invalid template');
   var record = new Record(txDao.findCollectionByNameOrId('mail_outbox'));
   record.set('dedupe_key', dedupeKey);
   record.set('event_id', $security.randomStringWithAlphabet(22, ALPHABET));
@@ -116,6 +125,20 @@ function trustedLoginUrl(value) {
 }
 function render(record) {
   var vars = recordVariables(record);
+  if (record.getString('template_key') === 'account_verification') {
+    // 走共享模板引擎（mail_templates 集合的 account_verification 模板），
+    // 与 auth_facade.forwardAccountMail 渲染路径一致；actionUrl 来源由
+    // templates.render 校验 PUBLIC_SITE_URL 一致，避免被注入任意跳转。
+    var displayName = string(vars.displayName, 80, 'displayName');
+    var actionUrl = string(vars.actionUrl, 1000, 'actionUrl');
+    var expiresMinutes = string(vars.expiresMinutes, 500, 'expiresMinutes');
+    var rendered = templates.render('account_verification', {
+      displayName: displayName,
+      actionUrl: actionUrl,
+      expiresMinutes: expiresMinutes,
+    });
+    return { subject: rendered.subject, html: rendered.html, text: rendered.text };
+  }
   if (record.getString('template_key') === 'account_retention_notice') {
     var displayName = string(vars.displayName, 80, 'displayName');
     var cleanupDate = string(vars.cleanupDate, 80, 'cleanupDate');
@@ -173,7 +196,16 @@ function processBatch(nowMs, limit) {
       if (retryable && record.getInt('attempt') < 5) summary.retry++; else summary.failed++;
     }
     if (finish(record.id, leases[i].leaseToken, nowMs, result, errorClass, retryable)) {
-      try { logs.delivery({ event_id: $security.randomStringWithAlphabet(22, ALPHABET), category: record.getString('category') === 'comment_notification' ? 'comment_new' : 'account_retention_notice', source_kind: record.getString('category') === 'comment_notification' ? 'comment' : 'retention', result: result, duration_ms: 0, attempt: record.getInt('attempt'), error_class: errorClass }); } catch (_) {}
+      try {
+        var cat = record.getString('category');
+        var logCategory = cat === 'comment_notification' ? 'comment_new'
+          : cat === 'account_verification' ? 'account_verification'
+          : 'account_retention_notice';
+        var logSource = cat === 'comment_notification' ? 'comment'
+          : cat === 'account_verification' ? 'registration'
+          : 'retention';
+        logs.delivery({ event_id: $security.randomStringWithAlphabet(22, ALPHABET), category: logCategory, source_kind: logSource, result: result, duration_ms: 0, attempt: record.getInt('attempt'), error_class: errorClass });
+      } catch (_) {}
     }
   }
   return summary;

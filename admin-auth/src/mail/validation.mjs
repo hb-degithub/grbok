@@ -6,6 +6,30 @@ const OPS_KEYS = Object.freeze(['eventId', 'check', 'state', 'observedAt', 'summ
 const SMTP_OVERRIDE_KEYS = Object.freeze(['host', 'port', 'username', 'password', 'fromAddress', 'fromName', 'tlsMode']);
 const TLS_MODES = new Set(['auto', 'implicit', 'starttls']);
 const hostPattern = /^[a-z0-9](?:[a-z0-9.-]{0,251})[a-z0-9]$/i;
+const ipv4Pattern = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+const internalHostSuffixes = new Set(['.internal', '.local', '.lan']);
+const internalHostNames = new Set(['localhost']);
+// SMTP override 的目标必须是公网 MTA 域名，拒绝 IP 字面量与内网/元数据地址，
+// 防止 SSRF（云环境可窃 IAM 元数据）。判定逻辑与 pb_hooks/lib/mail_smtp_config.js
+// 的 rejectSmtpHost 保持一致（admin-auth 侧与 PB 侧共用同一规则）。
+export function isRejectedSmtpHost(rawHost) {
+  if (typeof rawHost !== 'string') return true;
+  const host = rawHost.trim().toLowerCase();
+  if (!host) return true;
+  // IPv6 字面量（含 :），形如 [::1] 或 ::1 / fe80::1
+  if (host.includes(':')) return true;
+  // IPv4 字面量：拒绝所有（含 169.254.169.254 元数据、127.0.0.1、10/172.16/192.168）
+  if (ipv4Pattern.test(host)) return true;
+  // 显式内部主机名
+  if (internalHostNames.has(host)) return true;
+  // 单标签主机名（不含点，如 admin-auth、pb、mailhog）——公网 SMTP 域名必含点
+  if (!host.includes('.')) return true;
+  // 内部后缀
+  for (const suffix of internalHostSuffixes) {
+    if (host.endsWith(suffix)) return true;
+  }
+  return false;
+}
 const idPattern = /^[A-Za-z][A-Za-z0-9_-]{19,127}$/;
 const emailPattern = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
 const opsChecks = new Set(['container_caddy', 'container_pocketbase', 'container_admin_auth', 'public_health', 'backup_age', 'disk_usage']);
@@ -49,10 +73,12 @@ export function validateOpsEvent(value) {
 }
 
 // 请求级 SMTP 配置（PocketBase 后台管理界面下发，优先于环境变量）。
-// 仅在已验签的内网请求中有效；校验失败一律 PAYLOAD_INVALID。
+// 仅在已验签的内网请求中有效；校验失败一律 PAYLOAD_INVALID（PB 侧 mail_smtp_config.js
+// 对应字段级错误为 INVALID_SMTP_CONFIG: <field>，两侧 host 白名单逻辑保持一致）。
 export function validateSmtpOverride(value) {
   assertExactObject(value, SMTP_OVERRIDE_KEYS);
   if (typeof value.host !== 'string' || !hostPattern.test(value.host) || value.host.includes('..')) invalid();
+  if (isRejectedSmtpHost(value.host)) invalid();
   if (!Number.isSafeInteger(value.port) || value.port < 1 || value.port > 65535) invalid();
   if (typeof value.username !== 'string' || value.username.length === 0 || value.username.length > 320) invalid();
   if (typeof value.password !== 'string' || value.password.length === 0 || value.password.length > 512) invalid();

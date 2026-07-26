@@ -81,9 +81,55 @@ function forwardAccountMail(category, e) {
   } catch (_) {}
 }
 
-function requestVerificationFor(record) {
+// 生成邮箱验证 token 并入队 mail_outbox，走新 SMTP 体系（mail_gateway/SMTP override），
+// 替代直接调用 $mails.sendRecordVerification（PB 原生 MTA 仅读环境变量）。
+// 失败不阻塞注册流程，仅记录结构化日志。
+function enqueueVerificationMail(record) {
   if (!record || record.verified() || !record.getString('email')) return;
-  $mails.sendRecordVerification($app, record);
+  // 与 forwardAccountMail 一致：账户邮件特性未启用时不入队，避免注定失败的邮件堆积。
+  if (!isFeatureEnabled()) return;
+  var outbox = require('./mail_outbox.js');
+  var startedAt = Date.now();
+  try {
+    var token = $tokens.recordVerifyToken($app, record);
+    var actionUrl = buildActionUrl(token, 'account_verification');
+    var email = String(record.getString('email') || '').trim().toLowerCase();
+    var displayName = String(record.getString('name') || email.split('@')[0] || '');
+    var result = null;
+    $app.dao().runInTransaction(function (txDao) {
+      result = outbox.enqueue(txDao, {
+        dedupeKey: 'verify:account:' + record.id,
+        category: 'account_verification',
+        recipient: email,
+        templateKey: 'account_verification',
+        variables: {
+          displayName: displayName,
+          actionUrl: actionUrl,
+          expiresMinutes: '24\u5c0f\u65f6',
+        },
+      });
+    });
+    try {
+      var logResult = 'failed';
+      var errorClass = 'OUTBOX_UNAVAILABLE';
+      if (result && result.queued) { logResult = 'accepted'; errorClass = 'NONE'; }
+      else if (result && result.limited) { logResult = 'rate_limited'; errorClass = 'RATE_LIMITED'; }
+      else if (result && result.outboxId) { logResult = 'suppressed'; errorClass = 'NONE'; }
+      logs.delivery({
+        event_id: crypto.requestId('evt'), category: 'account_verification', source_kind: 'registration',
+        result: logResult,
+        duration_ms: Math.min(120000, Math.max(0, Date.now() - startedAt)), attempt: 1,
+        error_class: errorClass,
+      });
+    } catch (_) {}
+  } catch (error) {
+    var code = String(error && error.code || error && error.message || 'INTERNAL_ERROR').slice(0, 64);
+    console.error('[account-mail] operation=verification-enqueue recordId=' + (record && record.id ? record.id : '') + ' result=' + code);
+  }
+}
+
+function requestVerificationFor(record) {
+  enqueueVerificationMail(record);
 }
 
 function invalidRequestError() {
@@ -194,6 +240,7 @@ function requestEmailChange(e) { processAccountRequest(e, 'emailChange'); }
 
 module.exports = {
   forwardAccountMail: forwardAccountMail,
+  enqueueVerificationMail: enqueueVerificationMail,
   requestVerificationFor: requestVerificationFor,
   isFeatureEnabled: isFeatureEnabled,
   buildActionUrl: buildActionUrl,
