@@ -4,6 +4,7 @@ import { useAdminVerification } from '../../hooks/useAdminVerification';
 import TotpSetupStep from '../auth/TotpSetupStep';
 import TotpVerifyStep from '../auth/TotpVerifyStep';
 import AdminEmailVerificationRequired from './AdminEmailVerificationRequired';
+import StepUpRecoveryModal from './StepUpRecoveryModal';
 import { useAdminLogout } from '../../hooks/useAdminAuth';
 
 interface Props { children: React.ReactNode; requiredRole?: AdminRole; }
@@ -38,7 +39,7 @@ export default function AdminGuard({ children, requiredRole = 'author' }: Props)
 
   // 仅 admin / super_admin 强制 TOTP；author 等角色在邮箱验证通过后直接放行
   if (role === 'author') {
-    return <>{children}</>;
+    return <>{children}<StepUpRecoveryModal /></>;
   }
 
   if (isVerifying) return null;
@@ -70,5 +71,5 @@ export default function AdminGuard({ children, requiredRole = 'author' }: Props)
     );
   }
 
-  return <>{children}</>;
+  return <>{children}<StepUpRecoveryModal /></>;
 }
