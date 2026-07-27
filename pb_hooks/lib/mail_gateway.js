@@ -229,4 +229,6 @@ module.exports = {
   send,
   status,
   verify,
+  // 供 stats_geo.js 复用同一内网签名通道（访客地理 IP 解析）
+  _internalBaseUrl: internalBaseUrl,
 };

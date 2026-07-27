@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
+import { useAuth } from '../../hooks/domains/useAuth';
 
 type VerifyStatus = 'loading' | 'success' | 'error' | 'already_verified';
 
 export default function EmailVerificationResult() {
   const [status, setStatus] = useState<VerifyStatus>('loading');
   const [errorMessage, setErrorMessage] = useState('');
+  const { confirmVerification } = useAuth();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -18,12 +19,14 @@ export default function EmailVerificationResult() {
       return;
     }
 
-    const pb = getPocketBase();
-    pb.collection('users').confirmVerification(token)
-      .then(() => {
-        setStatus('success');
-        // Refresh auth store to update verified
-        return pb.collection('users').authRefresh();
+    confirmVerification(token)
+      .then((success) => {
+        if (success) {
+          setStatus('success');
+        } else {
+          setStatus('error');
+          setErrorMessage('验证失败，请重新发送验证邮件');
+        }
       })
       .catch((err) => {
         const msg = err?.response?.data?.message || err?.message || '';
@@ -34,7 +37,7 @@ export default function EmailVerificationResult() {
           setErrorMessage(msg || '验证失败，请重新发送验证邮件');
         }
       });
-  }, []);
+  }, [confirmVerification]);
 
   // Auto-redirect after success
   useEffect(() => {

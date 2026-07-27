@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+﻿import React from 'react';
 import { motion } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
-import { DEFAULT_SITE_SETTINGS, mergeSettingRecords, type SiteSettings } from '../../lib/site-settings';
-import { showToast } from '../ui/Toast';
+import { useSettings } from '../../hooks/domains/useSettings';
+import type { SiteSettings } from '../../lib/services/settingsService';
 
 const settingDescriptions: Record<keyof SiteSettings, string> = {
   site_title: '站点标题',
@@ -34,47 +33,14 @@ function Toggle({ checked, onChange, label, description }: { checked: boolean; o
 }
 
 export default function SettingsForm() {
-  const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SITE_SETTINGS);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    async function load() {
-      const pb = getPocketBase();
-      try {
-        const result = await pb.collection('settings').getFullList();
-        setSettings(mergeSettingRecords(result as Array<{ key: string; value: unknown }>));
-      } catch (err) {
-        console.error('加载设置失败：', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, []);
-
-  const saveSettings = async () => {
-    setSaving(true);
-    const pb = getPocketBase();
-    try {
-      for (const [key, value] of Object.entries(settings)) {
-        try {
-          const existing = await pb.collection('settings').getFirstListItem(pb.filter('key = {:key}', { key }));
-          await pb.collection('settings').update(existing.id, { value: String(value), description: settingDescriptions[key as keyof SiteSettings] || '' });
-        } catch {
-          await pb.collection('settings').create({ key, value: String(value), description: settingDescriptions[key as keyof SiteSettings] || '' });
-        }
-      }
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (err) {
-      console.error('保存设置失败：', err);
-      showToast('保存设置失败', 'error');
-    } finally {
-      setSaving(false);
-    }
-  };
+  const {
+    settings,
+    loading,
+    saving,
+    saved,
+    saveSettings,
+    updateSetting,
+  } = useSettings();
 
   if (loading) return <div className="min-w-0 space-y-4">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-md bg-bg-soft" />)}</div>;
 
@@ -88,27 +54,27 @@ export default function SettingsForm() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">站点标题</label>
-            <input type="text" value={settings.site_title} onChange={(e) => setSettings({ ...settings, site_title: e.target.value })} className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" />
+            <input type="text" value={settings.site_title} onChange={(e) => updateSetting('site_title', e.target.value)} className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" />
           </div>
           <div>
             <label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">每页文章数</label>
-            <input type="number" min={1} max={50} value={settings.posts_per_page} onChange={(e) => setSettings({ ...settings, posts_per_page: parseInt(e.target.value) || 10 })} className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" />
+            <input type="number" min={1} max={50} value={settings.posts_per_page} onChange={(e) => updateSetting('posts_per_page', parseInt(e.target.value) || 10)} className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" />
           </div>
         </div>
         <div className="mt-4">
           <label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">站点描述</label>
-          <textarea value={settings.site_description} onChange={(e) => setSettings({ ...settings, site_description: e.target.value })} rows={3} className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" />
+          <textarea value={settings.site_description} onChange={(e) => updateSetting('site_description', e.target.value)} rows={3} className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" />
         </div>
         <div className="mt-4">
           <label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">站点 Logo URL</label>
-          <input type="text" value={settings.site_logo} onChange={(e) => setSettings({ ...settings, site_logo: e.target.value })} placeholder="https://..." className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-accent focus:bg-white" />
+          <input type="text" value={settings.site_logo} onChange={(e) => updateSetting('site_logo', e.target.value)} placeholder="https://..." className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white" />
           {settings.site_logo && <img src={settings.site_logo} alt="Logo 预览" className="mt-3 h-16 w-16 rounded-md border border-border object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />}
         </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <Toggle checked={settings.enable_comments} onChange={(checked) => setSettings({ ...settings, enable_comments: checked })} label="启用评论" description="关闭后访客无法继续提交新评论。" />
-        <Toggle checked={settings.comment_moderation} onChange={(checked) => setSettings({ ...settings, comment_moderation: checked })} label="评论审核" description="开启后新评论进入待审核队列，通过后才公开展示。" />
+        <Toggle checked={settings.enable_comments} onChange={(checked) => updateSetting('enable_comments', checked)} label="启用评论" description="关闭后访客无法继续提交新评论。" />
+        <Toggle checked={settings.comment_moderation} onChange={(checked) => updateSetting('comment_moderation', checked)} label="评论审核" description="开启后新评论进入待审核队列，通过后才公开展示。" />
       </section>
 
       <section className="card max-w-full overflow-hidden rounded-md p-4 shadow-xs sm:p-5">
@@ -121,7 +87,7 @@ export default function SettingsForm() {
         </div>
         <Toggle
           checked={settings.debug_protection_enabled}
-          onChange={(checked) => setSettings({ ...settings, debug_protection_enabled: checked })}
+          onChange={(checked) => updateSetting('debug_protection_enabled', checked)}
           label="启用调试干扰"
           description="拦截 F12、Ctrl+Shift+I/J/C、Ctrl+U、右键菜单，并在页面显示轻量提示。懂技术的人仍可绕过。"
         />

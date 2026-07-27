@@ -141,7 +141,7 @@ export interface Announcement {
 }
 
 
-export interface AdminPasskeyDto {
+export interface AdminTotpBindingDto {
   id: string;
   label: string;
   revokedAt: string | null;

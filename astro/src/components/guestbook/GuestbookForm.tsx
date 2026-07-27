@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { showToast } from '../ui/Toast';
-import { getPocketBase } from '../../lib/pocketbase';
+import { useGuestbook } from '../../hooks/domains/useGuestbook';
 import { fadeUp } from '../../lib/motion';
 
 const NICKNAME_MAX = 30;
@@ -12,16 +12,9 @@ const CONTENT_MAX = 500;
 const textareaClass =
   'w-full rounded-xl border border-zinc-200 bg-white/70 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 transition-all duration-200 ease-out outline-none focus-visible:border-teal-500 focus-visible:ring-2 focus-visible:ring-teal-500/35 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus-visible:border-teal-400';
 
-interface GuestbookMessage {
-  id: string;
-  nickname: string;
-  content: string;
-  created: string;
-}
-
 interface GuestbookFormProps {
   /** 提交成功回调：把新留言插入墙顶 */
-  onPosted: (message: GuestbookMessage) => void;
+  onPosted: (message: { id: string; nickname: string; content: string; created: string }) => void;
 }
 
 /** 留言表单：昵称 + 内容（带字数统计），前端预校验，成功后回调插入墙顶 */
@@ -29,6 +22,7 @@ export default function GuestbookForm({ onPosted }: GuestbookFormProps) {
   const [nickname, setNickname] = useState('');
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const { postMessage } = useGuestbook();
 
   const trimmedNickname = nickname.trim();
   const trimmedContent = content.trim();
@@ -44,14 +38,15 @@ export default function GuestbookForm({ onPosted }: GuestbookFormProps) {
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      const pb = getPocketBase();
-      const record = await pb
-        .collection('guestbook_messages')
-        .create<GuestbookMessage>({ nickname: trimmedNickname, content: trimmedContent, status: 'show' });
-      showToast('留言成功，感谢你的到访！', 'success');
-      setNickname('');
-      setContent('');
-      onPosted(record);
+      const success = await postMessage({ nickname: trimmedNickname, content: trimmedContent });
+      if (success) {
+        showToast('留言成功，感谢你的到访！', 'success');
+        setNickname('');
+        setContent('');
+        onPosted({ id: '', nickname: trimmedNickname, content: trimmedContent, created: new Date().toISOString() });
+      } else {
+        showToast('提交失败，可能是太频繁了，请稍后再试', 'error');
+      }
     } catch {
       showToast('提交失败，可能是太频繁了，请稍后再试', 'error');
     } finally {

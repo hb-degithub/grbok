@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getPocketBase } from '../lib/pocketbase';
+import { authService } from '../lib/services/authService';
 import { isServerConfirmedCredentialInvalid, revokeCurrentAdminCredential } from '../lib/admin-auth-lifecycle';
 import { clearAdminStepUp } from '../lib/admin-step-up';
 import type { User, UserRole } from '../types/pocketbase';
@@ -19,9 +19,8 @@ const ROLE_RANK: Record<UserRole, number> = {
 };
 
 function readUser(): User | null {
-  const pb = getPocketBase();
-  return pb.authStore.isValid && pb.authStore.record
-    ? (pb.authStore.record as unknown as User)
+  return authService.isAuthenticated() && authService.getPocketBase().authStore.record
+    ? (authService.getPocketBase().authStore.record as unknown as User)
     : null;
 }
 
@@ -46,7 +45,7 @@ export function useAuthStatus() {
 
   useEffect(() => {
     let mounted = true;
-    const pb = getPocketBase();
+    const pb = authService.getPocketBase();
 
     const sync = () => {
       if (!mounted) return;
@@ -82,7 +81,7 @@ export function useAuthStatus() {
   }, []);
 
   const logout = useCallback(async (redirectTo?: string) => {
-    const pb = getPocketBase();
+    const pb = authService.getPocketBase();
     await revokeCurrentAdminCredential(pb, () => clearAdminStepUp({ includeClientSession: true }));
     if (redirectTo) window.location.href = redirectTo;
   }, []);

@@ -9,6 +9,7 @@ import { createMailHttpHandler } from './mail/http.mjs';
 import { createMailRequestVerifier } from './mail/request-auth.mjs';
 import { createMailService } from './mail/service.mjs';
 import { createMailTransport } from './mail/transport.mjs';
+import { createGeoService } from './mail/geo.mjs';
 import { isVerifiedSessionValid } from './session-policy.mjs';
 import { createStepUpCredential, verifyStepUpCredential } from './step-up-policy.mjs';
 
@@ -242,7 +243,8 @@ export function startServer({
   };
   const mailService = createMailService({ config: mailConfig, transport: mailTransport, createRuntime: createMailRuntime });
   const mailVerifier = createMailRequestVerifier({ secret: config.mailInternalSecret });
-  const mailHttpHandler = createMailHttpHandler({ verifier: mailVerifier, service: mailService, config: mailConfig });
+  const geoService = createGeoService({ mmdbPath: env.GEO_MMDB_PATH });
+  const mailHttpHandler = createMailHttpHandler({ verifier: mailVerifier, service: mailService, config: mailConfig, geo: geoService });
   const server = createServer({ config, mailHttpHandler });
 
   server.listen(port, host, () => {

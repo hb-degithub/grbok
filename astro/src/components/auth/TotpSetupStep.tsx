@@ -13,7 +13,6 @@ interface TotpSetupStepProps {
 export default function TotpSetupStep({ onReturnToLogin, mode = 'setup' }: TotpSetupStepProps) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const [uri, setUri] = useState('');
   const [base32, setBase32] = useState('');
   const [code, setCode] = useState('');
   const [copied, setCopied] = useState(false);
@@ -24,7 +23,6 @@ export default function TotpSetupStep({ onReturnToLogin, mode = 'setup' }: TotpS
     startAdminTotpSetup()
       .then((result) => {
         if (cancelled) return;
-        setUri(result.uri);
         setBase32(result.base32);
         if (canvasRef.current) {
           drawQrToCanvas(canvasRef.current, result.uri, 200);

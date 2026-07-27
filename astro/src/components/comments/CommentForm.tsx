@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { RateLimiter } from '../../lib/security';
-import { getPocketBase } from '../../lib/pocketbase';
+import { authService } from '../../lib/services/authService';
 import { requestVerification } from '../../lib/blog-auth-client';
 import type { CommentFormData } from '../../types/pocketbase';
 
@@ -115,8 +115,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
   const [verifyResendStatus, setVerifyResendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
 
   const handleResendVerification = useCallback(async () => {
-    const pb = getPocketBase();
-    const email = pb.authStore.record?.email;
+    const email = authService.getUserEmail();
     if (!email) return;
     setVerifyResendStatus('sending');
     try {

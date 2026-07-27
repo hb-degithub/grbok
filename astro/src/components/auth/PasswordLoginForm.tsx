@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
 import { runAfterAdminCredentialRevoked } from '../../lib/admin-auth-lifecycle';
 import { clearAdminStepUp } from '../../lib/admin-step-up';
 import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
 import TotpStepGate from './TotpStepGate';
+import { useAuth } from '../../hooks/domains/useAuth';
 import {
   RateLimiter,
   clearAuthFailures,
@@ -17,6 +17,7 @@ import {
   setAuthLock,
   withAuthRequestHeaders,
 } from '../../lib/security';
+import { authService } from '../../lib/services/authService';
 
 const loginLimiter = new RateLimiter(5, 1 / 12);
 const adminRoles = new Set(['author', 'admin', 'super_admin']);
@@ -75,6 +76,7 @@ export default function PasswordLoginForm() {
   const [totpStep, setTotpStep] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [success, setSuccess] = useState(false);
+  const { login } = useAuth();
 
   useEffect(() => {
     if (!success) return;
@@ -125,11 +127,10 @@ export default function PasswordLoginForm() {
     setStatus('loading');
     setErrorMessage('');
     try {
-      const pb = getPocketBase();
       const auth = await runAfterAdminCredentialRevoked(
-        pb,
+        authService.getPocketBase(),
         () => clearAdminStepUp({ includeClientSession: true }),
-        () => withAuthRequestHeaders(pb, () => pb.collection('users').authWithPassword(normalizedEmail, password)),
+        () => withAuthRequestHeaders(authService.getPocketBase(), () => authService.getPocketBase().collection('users').authWithPassword(normalizedEmail, password)),
       );
       clearAuthFailures(attemptKey);
       handlePostLogin(auth.record?.role);

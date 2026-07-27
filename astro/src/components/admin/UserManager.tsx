@@ -1,11 +1,8 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
+import { useAdminUsers } from '../../hooks/domains/useAdminUsers';
 import { useAdminAuth, type AdminRole } from '../../hooks/useAdminAuth';
-import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
-import { describePbError } from '../../lib/pb-error';
-import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 import type { User } from '../../types/pocketbase';
 
 const listVariants = {
@@ -32,67 +29,25 @@ const roleLabels: Record<string, string> = {
 };
 
 export default function UserManager() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
-  const [updatingId, setUpdatingId] = useState('');
-  const [deletingId, setDeletingId] = useState('');
-  const [error, setError] = useState('');
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
   const { user: currentUser } = useAdminAuth();
+  const { users, loading, error, updatingId, deletingId, updateRole, deleteUser, getAvatarUrl, setError } = useAdminUsers();
   const superAdminCount = users.filter((user) => user.role === 'super_admin').length;
 
-  useEffect(() => {
-    async function fetchUsers() {
-      const pb = getPocketBase();
-      try {
-        const result = await pb.collection('users').getList<User>(1, 100, { sort: '-created' });
-        setUsers(result.items);
-      } catch (err) {
-        console.error('获取用户失败：', err);
-        setError('用户列表加载失败，请确认当前账号拥有超级管理员权限。');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchUsers();
-  }, []);
-
-  const updateRole = async (targetUser: User, role: AdminRole) => {
+  const handleUpdateRole = (targetUser: User, role: AdminRole) => {
     if (targetUser.role === role) return;
-
     if (targetUser.role === 'super_admin' && role !== 'super_admin' && superAdminCount <= 1) {
       setError('至少需要保留一个超级管理员。');
       return;
     }
-
     const label = roleLabels[role] || role;
     setConfirmState({ open: true, title: '确认操作', message: `确定把 ${targetUser.name || targetUser.email} 的角色改为 ${label} 吗？`, onConfirm: async () => {
-      setUpdatingId(targetUser.id);
-      setError('');
-
-      try {
-        const pb = getPocketBase();
-        const updated = await pb.collection('users').update<User>(targetUser.id, { role });
-        setUsers((items) => items.map((item) => item.id === targetUser.id ? { ...item, ...updated } : item));
-        showToast('角色更新成功', 'success');
-      } catch (err) {
-        console.error('更新用户角色失败：', err);
-        if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
-        setError(describePbError(err, '角色更新失败'));
-        showToast('角色更新失败', 'error');
-      } finally {
-        setUpdatingId('');
-      }
+      await updateRole(targetUser, role, superAdminCount);
     }});
   };
 
-  if (loading) {
-    return <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-md border border-border bg-white" />)}</div>;
-  }
-
-  const deleteUser = (targetUser: User) => {
+  const handleDeleteUser = (targetUser: User) => {
     if (targetUser.role === 'super_admin' && superAdminCount <= 1) {
       setError('至少需要保留一个超级管理员，无法删除。');
       return;
@@ -102,23 +57,13 @@ export default function UserManager() {
       return;
     }
     setConfirmState({ open: true, title: '确认删除用户', message: `确定删除用户 ${targetUser.name || targetUser.email} 吗？此操作无法撤销，该用户的评论记录会保留。`, onConfirm: async () => {
-      setDeletingId(targetUser.id);
-      setError('');
-      try {
-        const pb = getPocketBase();
-        await pb.collection('users').delete(targetUser.id);
-        setUsers((items) => items.filter((item) => item.id !== targetUser.id));
-        showToast('用户已删除', 'success');
-      } catch (err) {
-        console.error('删除用户失败：', err);
-        if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
-        setError(describePbError(err, '删除失败'));
-        showToast('删除用户失败', 'error');
-      } finally {
-        setDeletingId('');
-      }
+      await deleteUser(targetUser, superAdminCount, currentUser?.id);
     }});
   };
+
+  if (loading) {
+    return <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-md border border-border bg-white" />)}</div>;
+  }
 
   const filteredUsers = (() => {
     const keyword = query.trim().toLowerCase();
@@ -191,7 +136,7 @@ export default function UserManager() {
               <div className="flex min-w-0 items-center gap-3">
                 {user.avatar ? (
                   <img
-                    src={user.avatar.startsWith('http') ? user.avatar : getPocketBase().files.getUrl(user as any, user.avatar)}
+                    src={getAvatarUrl(user)}
                     alt=""
                     className="h-9 w-9 shrink-0 rounded-md object-cover"
                     onError={(event) => { (event.target as HTMLImageElement).style.display = 'none'; }}
@@ -221,7 +166,7 @@ export default function UserManager() {
                 </span>
                 <select
                   value={user.role}
-                  onChange={(event) => updateRole(user, event.target.value as AdminRole)}
+                  onChange={(event) => handleUpdateRole(user, event.target.value as AdminRole)}
                   disabled={isUpdating || isLastSuperAdmin || currentUser?.role !== 'super_admin'}
                   title={isLastSuperAdmin ? '不能降级最后一个超级管理员' : '修改用户角色'}
                   className="min-h-10 min-w-0 flex-1 rounded-md border border-border bg-white px-2 py-1 text-xs text-text outline-none transition-colors hover:border-border-hover disabled:cursor-not-allowed disabled:opacity-60 min-[390px]:flex-none"
@@ -232,7 +177,7 @@ export default function UserManager() {
                   <option value="super_admin">超级管理员</option>
                 </select>
                 <button
-                  onClick={() => deleteUser(user)}
+                  onClick={() => handleDeleteUser(user)}
                   disabled={!canModify || isDeleting || isLastSuperAdmin}
                   title={isLastSuperAdmin ? '不能删除最后一个超级管理员' : !canModify ? '无权限' : '删除用户'}
                   aria-label="删除用户"

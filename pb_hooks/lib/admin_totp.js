@@ -31,6 +31,10 @@ function base32Encode(bytes) {
   if (bits > 0) {
     out += B32_ALPHABET.charAt((value << (5 - bits)) & 31);
   }
+  // 填充到 8 的倍数
+  while (out.length % 8 !== 0) {
+    out += '=';
+  }
   return out;
 }
 
@@ -55,7 +59,7 @@ function base32Decode(str) {
 // ---------- 字节工具 ----------
 function hexToBytes(hex) {
   var bytes = [];
-  var text = String(hex || '');
+  var text = String(hex || '').replace(/\s/g, '');
   for (var i = 0; i + 1 < text.length; i += 2) {
     bytes.push(parseInt(text.substr(i, 2), 16));
   }

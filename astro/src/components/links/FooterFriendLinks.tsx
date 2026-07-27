@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { getPocketBase } from '../../lib/pocketbase';
-import type { FriendLink } from '../../types/pocketbase';
+﻿import React from 'react';
+import { useFriendLinks } from '../../hooks/domains/useFriendLinks';
 
 const MAX_LINKS = 10;
 
@@ -18,20 +17,16 @@ function isSafeLinkUrl(url: string): boolean {
  * 无数据时不渲染（避免空标题）。
  */
 export default function FooterFriendLinks() {
-  const [links, setLinks] = useState<FriendLink[] | null>(null);
+  const { links, loading } = useFriendLinks();
 
-  useEffect(() => {
-    const pb = getPocketBase();
-    pb.collection('friend_links')
-      .getList<FriendLink>(1, 50, { sort: 'sort_order,-created' })
-      .then((r) => setLinks(r.items.filter((i) => i.status === 'show' && isSafeLinkUrl(i.url))))
-      .catch(() => setLinks([]));
-  }, []);
+  if (loading) return null;
 
-  if (!links || links.length === 0) return null;
+  const visibleLinks = links.filter((i) => i.status === 'show' && isSafeLinkUrl(i.url));
 
-  const shown = links.slice(0, MAX_LINKS);
-  const hasMore = links.length > MAX_LINKS;
+  if (visibleLinks.length === 0) return null;
+
+  const shown = visibleLinks.slice(0, MAX_LINKS);
+  const hasMore = visibleLinks.length > MAX_LINKS;
 
   return (
     <div className="mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-zinc-400 dark:text-zinc-500">
@@ -55,3 +50,4 @@ export default function FooterFriendLinks() {
     </div>
   );
 }
+

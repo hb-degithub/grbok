@@ -2,57 +2,38 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { motion, MotionConfig } from 'framer-motion';
 import Masonry from '../reactbits/Masonry';
 import GalleryLightbox from './GalleryLightbox';
-import { getPocketBase } from '../../lib/pocketbase';
+import { useGallery } from '../../hooks/domains/useGallery';
 import { EASE_OUT_EXPO } from '../../lib/motion';
 
-interface GalleryItem {
-  id: string;
-  photo: string;
-  title?: string;
-  description?: string;
-  album?: string;
-}
-
-const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || '';
 const ALL = '__all__';
-
-function fileUrl(item: GalleryItem, thumb = false): string {
-  const base = `${PB_URL}/api/files/gallery_items/${item.id}/${item.photo}`;
-  return thumb ? `${base}?thumb=300x300` : base;
-}
 
 /** 相册面板：分组筛选（layoutId pill）+ 瀑布流 + 灯箱 */
 export default function GalleryBoard() {
-  const [items, setItems] = useState<GalleryItem[] | null>(null);
-  const [error, setError] = useState(false);
+  const { items, loading, error, setFilter, getPhotoUrl } = useGallery();
   const [album, setAlbum] = useState<string>(ALL);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
+  // 仅展示已显示的照片，与原直接查询 status = "show" 保持一致
   useEffect(() => {
-    const pb = getPocketBase();
-    pb.collection('gallery_items')
-      .getList<GalleryItem>(1, 100, { sort: 'sort_order,-created', filter: 'status = "show"' })
-      .then((r) => setItems(r.items))
-      .catch(() => setError(true));
-  }, []);
+    setFilter('show');
+  }, [setFilter]);
 
   const albums = useMemo(() => {
     const set = new Set<string>();
-    (items || []).forEach((i) => {
+    items.forEach((i) => {
       if (i.album && i.album.trim()) set.add(i.album.trim());
     });
     return Array.from(set);
   }, [items]);
 
   const filtered = useMemo(() => {
-    if (!items) return [];
     if (album === ALL) return items;
     return items.filter((i) => (i.album || '').trim() === album);
   }, [items, album]);
 
   const counts = useMemo(() => {
     const map = new Map<string, number>();
-    (items || []).forEach((i) => {
+    items.forEach((i) => {
       const key = (i.album || '').trim();
       if (key) map.set(key, (map.get(key) || 0) + 1);
     });
@@ -72,7 +53,7 @@ export default function GalleryBoard() {
     );
   }
 
-  if (items === null) {
+  if (loading && items.length === 0) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -90,7 +71,7 @@ export default function GalleryBoard() {
     );
   }
 
-  const fullUrls = filtered.map((i) => fileUrl(i));
+  const fullUrls = filtered.map((i) => getPhotoUrl(i));
 
   return (
     <MotionConfig reducedMotion="user">
@@ -146,7 +127,7 @@ export default function GalleryBoard() {
               className="group relative block w-full overflow-hidden rounded-xl border border-zinc-200 bg-white text-left shadow-xl shadow-zinc-900/[0.04] dark:border-zinc-800 dark:bg-zinc-900"
               aria-label={item.title ? `查看大图：${item.title}` : '查看大图'}
             >
-              <img src={fileUrl(item, true)} alt={item.title || '相册图片'} loading="lazy" className="w-full object-cover" />
+              <img src={getPhotoUrl(item, '300x300')} alt={item.title || '相册图片'} loading="lazy" className="w-full object-cover" />
               {item.title && (
                 <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-zinc-950/70 to-transparent px-3 pb-2 pt-8 text-sm font-semibold text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                   {item.title}

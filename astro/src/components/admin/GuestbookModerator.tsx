@@ -1,16 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
-import { describePbError } from '../../lib/pb-error';
-import { notifyStepUpExpired } from '../../lib/step-up-recovery';
-
-interface GuestbookItem {
-  id: string;
-  nickname: string;
-  content: string;
-  status: string;
-  created: string;
-}
+import { useGuestbookAdmin } from '../../hooks/domains/useGuestbookAdmin';
+import type { GuestbookItem } from '../../lib/services/guestbookService';
 
 const STATUS_TONE: Record<string, string> = {
   show: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
@@ -18,62 +9,25 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export default function GuestbookModerator() {
-  const [items, setItems] = useState<GuestbookItem[]>([]);
-  const [filter, setFilter] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [status, setStatus] = useState('');
+  const {
+    items,
+    loading,
+    error,
+    status,
+    filter,
+    setFilter,
+    toggleStatus: toggleStatusService,
+    remove: removeService,
+  } = useGuestbookAdmin();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const pb = getPocketBase();
-      const result = await pb.collection('guestbook_messages').getList<GuestbookItem>(1, 50, {
-        sort: '-created',
-        filter: filter ? `status = "${filter}"` : undefined,
-      });
-      setItems(result.items || []);
-    } catch (err: unknown) {
-      setError((err as Error)?.message || '无法读取留言');
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
+  const toggleStatus = async (item: GuestbookItem) => {
+    await toggleStatusService(item);
+  };
 
-  useEffect(() => { load(); }, [load]);
-
-  const toggleStatus = useCallback(async (item: GuestbookItem) => {
-    const next = item.status === 'show' ? 'hidden' : 'show';
-    setError('');
-    setStatus('');
-    try {
-      const pb = getPocketBase();
-      await pb.collection('guestbook_messages').update(item.id, { status: next });
-      setItems((prev) => prev.map((it) => it.id === item.id ? { ...it, status: next } : it));
-      setStatus(`留言已${next === 'show' ? '显示' : '隐藏'}`);
-    } catch (err: unknown) {
-      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
-      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
-      setError(describePbError(err, code || '操作失败'));
-    }
-  }, []);
-
-  const remove = useCallback(async (item: GuestbookItem) => {
+  const remove = async (item: GuestbookItem) => {
     if (!window.confirm(`确定删除「${item.nickname}」的留言？此操作不可逆。`)) return;
-    setError('');
-    setStatus('');
-    try {
-      const pb = getPocketBase();
-      await pb.collection('guestbook_messages').delete(item.id);
-      setItems((prev) => prev.filter((it) => it.id !== item.id));
-      setStatus('留言已删除');
-    } catch (err: unknown) {
-      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
-      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
-      setError(describePbError(err, code || '删除失败'));
-    }
-  }, []);
+    await removeService(item);
+  };
 
   const fmtDate = (s: string) => {
     if (!s) return '-';

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useComments } from '../../hooks/useComments';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
-import { getPocketBase } from '../../lib/pocketbase';
+import { authService } from '../../lib/services/authService';
 import CommentItem from './CommentItem';
 import CommentForm from './CommentForm';
 import type { CommentFormData } from '../../types/pocketbase';
@@ -57,16 +57,11 @@ export default function CommentSection({ postId }: CommentSectionProps) {
   // Track logged-in user's email verification status
   const [userEmailVerified, setUserEmailVerified] = useState<boolean | undefined>(undefined);
   useEffect(() => {
-    const pb = getPocketBase();
     const sync = () => {
-      if (pb.authStore.isValid && pb.authStore.record) {
-        setUserEmailVerified(!!(pb.authStore.record as any).verified);
-      } else {
-        setUserEmailVerified(undefined);
-      }
+      setUserEmailVerified(authService.getUserEmailVerified());
     };
     sync();
-    const unsub = pb.authStore.onChange(sync);
+    const unsub = authService.onAuthChange(sync);
     return () => { unsub?.(); };
   }, []);
 

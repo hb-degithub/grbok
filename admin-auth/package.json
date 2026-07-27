@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "admin-auth",
   "version": "1.0.0",
   "description": "Internal admin authentication and mail gateway service",
@@ -9,6 +9,7 @@
     "mail:cli": "node src/mail/cli.mjs"
   },
   "dependencies": {
+    "maxmind": "^5.0.6",
     "nodemailer": "9.0.3"
   },
   "engines": {

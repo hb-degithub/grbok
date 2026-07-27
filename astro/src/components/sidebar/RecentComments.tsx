@@ -1,22 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
+import { useRecentComments } from '../../hooks/domains/useRecentComments';
 import { sanitizeText } from '../../lib/security';
 import AnimatedList from '../reactbits/AnimatedList';
-import type { Comment } from '../../types/pocketbase';
 
 export default function RecentComments() {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const pb = getPocketBase();
-    pb.collection('comments')
-      .getList<Comment>(1, 5, { filter: pb.filter('status = {:status}', { status: 'approved' }), sort: '-created', fields: 'id,author_name,content,post_id,created' })
-      .then((res) => setComments(res.items))
-      .catch((err) => console.error('加载评论失败:', err))
-      .finally(() => setLoading(false));
-  }, []);
+  const { comments, loading } = useRecentComments(5);
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }} className="space-y-3">

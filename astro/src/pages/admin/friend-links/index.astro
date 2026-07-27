@@ -3,6 +3,6 @@ import AdminLayout from '../../../layouts/AdminLayout.astro';
 import FriendLinksManager from '../../../components/admin/FriendLinksManager';
 ---
 
-<AdminLayout title="友情链接" requiredRole="super_admin">
-  <FriendLinksManager client:only="react" />
+<AdminLayout title="友链管理" requiredRole="super_admin">
+  <FriendLinksManager client:load />
 </AdminLayout>

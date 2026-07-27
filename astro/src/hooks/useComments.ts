@@ -1,13 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getPocketBase } from '../lib/pocketbase';
+import { commentService } from '../lib/services/commentService';
 import type {
   PublicComment,
   NestedComment,
   CommentFormData,
   CommentRealtimeEvent,
 } from '../types/pocketbase';
-
-const PUBLIC_COMMENT_FIELDS = 'id,post_id,author_name,content,parent_id,status,created,updated';
 
 export function useComments(postId: string, options: { enabled?: boolean } = {}) {
   const enabled = options.enabled ?? true;
@@ -19,27 +17,6 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
   // on every successful submit so stale copy can't linger across attempts.
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const buildCommentTree = useCallback((flatComments: PublicComment[]): NestedComment[] => {
-    const commentMap = new Map<string, NestedComment>();
-    const rootComments: NestedComment[] = [];
-
-    flatComments.forEach((comment) => {
-      commentMap.set(comment.id, { ...comment, children: [] });
-    });
-
-    flatComments.forEach((comment) => {
-      const node = commentMap.get(comment.id)!;
-
-      if (comment.parent_id && commentMap.has(comment.parent_id)) {
-        commentMap.get(comment.parent_id)!.children.push(node);
-      } else {
-        rootComments.push(node);
-      }
-    });
-
-    return rootComments;
-  }, []);
-
   const fetchComments = useCallback(async () => {
     if (!enabled) {
       setComments([]);
@@ -49,14 +26,8 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
 
     try {
       setLoading(true);
-      const pb = getPocketBase();
-      const result = await pb.collection('public_comments').getFullList<PublicComment>({
-        filter: pb.filter('post_id = {:postId}', { postId }),
-        sort: 'created',
-        fields: PUBLIC_COMMENT_FIELDS,
-      });
-
-      setComments(buildCommentTree(result));
+      const result = await commentService.getPublicComments(postId);
+      setComments(commentService.buildCommentTree(result));
       setError(null);
     } catch (err) {
       console.error('Failed to fetch comments:', err);
@@ -64,7 +35,7 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
     } finally {
       setLoading(false);
     }
-  }, [postId, buildCommentTree, enabled]);
+  }, [postId, enabled]);
 
   useEffect(() => {
     // Guard against fetch races when postId changes rapidly: an in-flight
@@ -83,14 +54,9 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
       }
       try {
         if (active) setLoading(true);
-        const pb = getPocketBase();
-        const result = await pb.collection('public_comments').getFullList<PublicComment>({
-          filter: pb.filter('post_id = {:postId}', { postId }),
-          sort: 'created',
-          fields: PUBLIC_COMMENT_FIELDS,
-        });
+        const result = await commentService.getPublicComments(postId);
         if (!active) return;
-        setComments(buildCommentTree(result));
+        setComments(commentService.buildCommentTree(result));
         setError(null);
       } catch (err) {
         console.error('Failed to fetch comments:', err);
@@ -129,13 +95,7 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
 
     const subscribe = async () => {
       try {
-        const pb = getPocketBase();
-        const unsub = await pb.collection('public_comments').subscribe('*', (e) => {
-          handleRealtimeEvent({
-            action: e.action as 'create' | 'update' | 'delete',
-            record: e.record as PublicComment,
-          });
-        });
+        const unsub = await commentService.subscribeToPublicComments(handleRealtimeEvent);
         if (cancelled) {
           unsub();
         } else {
@@ -153,7 +113,7 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
       cancelled = true;
       if (unsubscribe) unsubscribe();
     };
-  }, [postId, buildCommentTree, enabled]);
+  }, [postId, enabled]);
 
   const submitComment = useCallback(
     async (data: CommentFormData): Promise<boolean> => {
@@ -161,14 +121,7 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
       try {
         if (!enabled) return false;
         setIsSubmitting(true);
-        const pb = getPocketBase();
-        await pb.collection('comments').create({
-          post_id: postId,
-          author_name: data.author_name,
-          author_email: data.author_email,
-          content: data.content,
-          parent_id: data.parent_id || null,
-        });
+        await commentService.submitComment(postId, data);
 
         setSubmitError(null);
         return true;
@@ -180,7 +133,7 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
         // Backend copy is our own curated Chinese phrasing (e.g. "请先验证你的
         // 邮箱后再发表评论"), so we display it verbatim with a generic
         // fallback when no usable string is present.
-        const message = extractSubmitMessage(err);
+        const message = commentService.extractSubmitMessage(err);
         setSubmitError(message);
         return false;
       } finally {
@@ -199,33 +152,6 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
     submitComment,
     refresh: fetchComments,
   };
-}
-
-/**
- * Extract a visitor-facing message from a PocketBase submission error.
- *
- * Prefers the server-provided string (hook BadRequestError / ApiError copy),
- * then falls back to a neutral generic. Only non-empty strings are trusted —
- * objects/arrays from the response are ignored to avoid leaking raw payloads.
- */
-function extractSubmitMessage(err: unknown): string {
-  const anyErr = err as {
-    message?: unknown;
-    response?: { message?: unknown; data?: { message?: unknown } };
-    data?: { message?: unknown };
-  } | null | undefined;
-  const candidates = [
-    anyErr?.response?.data?.message,
-    anyErr?.response?.message,
-    anyErr?.data?.message,
-    anyErr?.message,
-  ];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim()) {
-      return candidate.trim();
-    }
-  }
-  return '提交失败，请重试';
 }
 
 function addToParent(

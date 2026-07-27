@@ -1,28 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
-import type { FriendLink } from '../../types/pocketbase';
-
-function isSafeLinkUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
+import { useSidebarFriendLinks } from '../../hooks/domains/useSidebarFriendLinks';
 
 export default function FriendLinks() {
-  const [links, setLinks] = useState<FriendLink[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const pb = getPocketBase();
-    pb.collection('friend_links').getList<FriendLink>(1, 20, { sort: 'sort_order,-created' })
-      .then(r => setLinks(r.items.filter(i => i.status === 'show' && isSafeLinkUrl(i.url))))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const { links, loading } = useSidebarFriendLinks(20);
 
   if (loading) return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="space-y-3">

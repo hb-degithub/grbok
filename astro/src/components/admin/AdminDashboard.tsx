@@ -1,18 +1,8 @@
-import React, { useEffect, useState } from 'react';
+﻿import React from 'react';
 import { motion } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
-import { useAdminAuth, type AdminRole } from '../../hooks/useAdminAuth';
+import { useAdminDashboard } from '../../hooks/domains/useAdminDashboard';
 import StatsCard from './StatsCard';
-
-interface DashboardStats {
-  totalPosts: number;
-  publishedPosts: number;
-  draftPosts: number;
-  totalComments: number;
-  pendingComments: number;
-  totalTags: number;
-  totalUsers: number | null;
-}
+import type { AdminRole } from '../../hooks/useAdminAuth';
 
 interface ActionItem {
   label: string;
@@ -37,54 +27,18 @@ function statusTone(tone: ActionItem['tone']) {
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [recentPosts, setRecentPosts] = useState<{id:string;title:string;status:string;updated:string}[]>([]);
-  const [recentComments, setRecentComments] = useState<{id:string;author_name:string;content:string;status:string;created:string}[]>([]);
-  const { hasPermission, user } = useAdminAuth();
-  const role = user?.role as AdminRole | undefined;
-  const canReadUsers = role === 'super_admin';
+  const {
+    stats,
+    loading,
+    recentPosts,
+    recentComments,
+    role,
+    hasPermission,
+    user,
+    publishRate,
+    reviewRate,
+  } = useAdminDashboard();
 
-  useEffect(() => {
-    async function fetchStats() {
-      if (!role) return;
-      const pb = getPocketBase();
-      try {
-        const [posts, published, drafts, comments, pending, tags, users] = await Promise.all([
-          pb.collection('posts').getList(1, 1),
-          pb.collection('posts').getList(1, 1, { filter: 'status = "published"' }),
-          pb.collection('posts').getList(1, 1, { filter: 'status = "draft"' }),
-          pb.collection('comments').getList(1, 1),
-          pb.collection('comments').getList(1, 1, { filter: 'status = "pending"' }),
-          pb.collection('tags').getList(1, 1),
-          canReadUsers ? pb.collection('users').getList(1, 1) : Promise.resolve(null),
-        ]);
-        setStats({
-          totalPosts: posts.totalItems,
-          publishedPosts: published.totalItems,
-          draftPosts: drafts.totalItems,
-          totalComments: comments.totalItems,
-          pendingComments: pending.totalItems,
-          totalTags: tags.totalItems,
-          totalUsers: users?.totalItems ?? null,
-        });
-      } catch (err) {
-        console.error('获取统计数据失败：', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchStats();
-  }, [role, canReadUsers]);
-
-  useEffect(() => {
-    const pb = getPocketBase();
-    pb.collection("posts").getList(1, 5, { sort: "-updated", fields: "id,title,status,updated" }).then(r => setRecentPosts(r.items)).catch(() => {});
-    pb.collection("comments").getList(1, 5, { sort: "-created", fields: "id,author_name,content,status,created" }).then(r => setRecentComments(r.items)).catch(() => {});
-  }, []);
-
-  const publishRate = stats && stats.totalPosts > 0 ? Math.round((stats.publishedPosts / stats.totalPosts) * 100) : 0;
-  const reviewRate = stats && stats.totalComments > 0 ? Math.round(((stats.totalComments - stats.pendingComments) / stats.totalComments) * 100) : 100;
   const currentTime = new Date().toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', month: '2-digit', day: '2-digit' });
 
   const actionItems: ActionItem[] = [
@@ -195,7 +149,6 @@ export default function AdminDashboard() {
         </section>
       </div>
 
-      {/* Recent Activity */}
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="card rounded-md p-4 shadow-xs">
           <h3 className="mb-3 text-sm font-black text-text">最近文章</h3>

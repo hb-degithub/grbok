@@ -1,44 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
+import { useSiteCounts } from '../../hooks/domains/useSiteCounts';
 import { SITE_CONFIG } from '../../config/site';
 import CountUp from '../reactbits/CountUp';
 
-interface Stat {
-  label: string;
-  value: string;
-}
-
 export default function ProfileCard() {
-  const [mounted, setMounted] = useState(false);
-  const [stats, setStats] = useState<Stat[]>([
-    { label: '文章', value: '-' },
-    { label: '标签', value: '-' },
-    { label: '评论', value: '-' },
-  ]);
-
-  useEffect(() => {
-    const pb = getPocketBase();
-    const fetchStats = async () => {
-      try {
-        const [postsRes, tagsRes, commentsRes] = await Promise.all([
-          pb.collection('posts').getList(1, 1, { filter: 'status = "published"' }),
-          pb.collection('tags').getList(1, 1),
-          pb.collection('comments').getList(1, 1, { filter: 'status = "approved"' }),
-        ]);
-        setStats([
-          { label: '文章', value: String(postsRes.totalItems) },
-          { label: '标签', value: String(tagsRes.totalItems) },
-          { label: '评论', value: String(commentsRes.totalItems) },
-        ]);
-        setMounted(true);
-      } catch (err) {
-        console.error('加载统计数据失败:', err);
-        setMounted(true);
-      }
-    };
-    fetchStats();
-  }, []);
+  const { stats, mounted } = useSiteCounts();
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="space-y-3 text-center">
@@ -64,4 +31,3 @@ export default function ProfileCard() {
     </motion.div>
   );
 }
-

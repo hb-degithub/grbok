@@ -1,56 +1,30 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
+import { useAdminTags } from '../../hooks/domains/useAdminTags';
 import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
-import { describePbError } from '../../lib/pb-error';
-import { notifyStepUpExpired } from '../../lib/step-up-recovery';
-import type { Tag } from '../../types/pocketbase';
+import type { Tag } from '../../lib/services/adminTagService';
 
 export default function TagManager() {
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<Tag | null>(null);
-  const [saving, setSaving] = useState(false);
+  const {
+    tags,
+    loading,
+    editing,
+    saving,
+    setEditing,
+    saveTag,
+    deleteTag,
+  } = useAdminTags();
+
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
 
-  const fetchTags = useCallback(async () => {
-    setLoading(true);
-    const pb = getPocketBase();
-    try { const result = await pb.collection('tags').getList<Tag>(1, 100, { sort: 'name' }); setTags(result.items); }
-    catch (err) { console.error('获取标签失败：', err); }
-    finally { setLoading(false); }
-  }, []);
-  useEffect(() => { fetchTags(); }, [fetchTags]);
-
-  const saveTag = async () => {
-    if (!editing || !editing.name) return;
-    setSaving(true);
-    const pb = getPocketBase();
-    try {
-      const data = { name: editing.name, slug: editing.slug || editing.name.toLowerCase().replace(/[^\w\u4e00-\u9fa5]/g, '-').replace(/-+/g, '-'), description: editing.description || '' };
-      if (editing.id) { await pb.collection('tags').update(editing.id, data); }
-      else { await pb.collection('tags').create(data); }
-      setEditing(null); fetchTags();
-      showToast('标签保存成功', 'success');
-    } catch (err) {
-      console.error('保存标签失败：', err);
-      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
-      showToast(describePbError(err, '保存失败'), 'error');
-    }
-    finally { setSaving(false); }
-  };
-
-  const deleteTag = async (id: string) => {
-    setConfirmState({ open: true, title: '确认删除', message: '确定删除这个标签吗？', onConfirm: async () => {
-      const pb = getPocketBase();
-      try { await pb.collection('tags').delete(id); fetchTags(); showToast('标签已删除', 'success'); }
-      catch (err) {
-        console.error('删除标签失败：', err);
-        if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
-        showToast(describePbError(err, '删除标签失败'), 'error');
-      }
-    }});
+  const handleDelete = (id: string) => {
+    setConfirmState({
+      open: true,
+      title: '确认删除',
+      message: '确定删除这个标签吗？',
+      onConfirm: () => deleteTag(id),
+    });
   };
 
   return (
@@ -67,7 +41,7 @@ export default function TagManager() {
               <div className="min-w-0 flex-1"><p className="break-words font-medium text-text [overflow-wrap:anywhere]">{tag.name}</p><p className="break-all font-mono text-[10px] text-muted [overflow-wrap:anywhere]">/{tag.slug}</p></div>
               <div className="flex shrink-0 items-center gap-1">
                 <button onClick={() => setEditing(tag)} className="inline-flex h-10 w-10 items-center justify-center rounded-md text-text-secondary hover:bg-accent/10 hover:text-accent" title="编辑标签"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                <button onClick={() => deleteTag(tag.id)} className="inline-flex h-10 w-10 items-center justify-center rounded-md text-text-secondary hover:bg-danger/10 hover:text-danger" title="删除标签"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                <button onClick={() => handleDelete(tag.id)} className="inline-flex h-10 w-10 items-center justify-center rounded-md text-text-secondary hover:bg-danger/10 hover:text-danger" title="删除标签"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
               </div>
             </motion.div>
           ))}

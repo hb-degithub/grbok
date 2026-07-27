@@ -32,8 +32,8 @@ function requireAdmin(c, superOnly) {
   var user = actor(c);
   var role = user ? String(user.get('role') || '').trim() : '';
   if (!user || ADMIN_ROLES.indexOf(role) === -1) apiError(401, 'AUTH_REQUIRED');
-  // superOnly 语义 = 仅强制 TOTP 的角色（admin / super_admin）可操作绑定、吊销、恢复
-  if (superOnly && TOTP_ENFORCED_ROLES.indexOf(role) === -1) apiError(403, 'AUTH_REQUIRED');
+  // superOnly 语义 = 仅 super_admin 可操作绑定、吊销、恢复
+  if (superOnly && role !== 'super_admin') apiError(403, 'AUTH_REQUIRED');
   if (!user.verified()) apiError(403, 'AUTH_REQUIRED');
   return user;
 }
@@ -274,10 +274,9 @@ function totpConfirm(c) {
 }
 
 // POST /api/blog-admin/totp/verify — step-up 验证（6 位码）
-// 与 setup/confirm/revoke 对齐：仅强制 TOTP 的角色（admin/super_admin）可调用；
-// author 由 stepUpStatus 直通 verified，无需也不应走 verify。
+// admin / super_admin 已绑定 TOTP 后均可调用验证并签发 step-up session。
 function totpVerify(c) {
-  var user = requireAdmin(c, true);
+  var user = requireAdmin(c, false);
   var input = body(c);
   var issued = null;
   var saved = null;
@@ -305,7 +304,7 @@ function totpVerify(c) {
 
 // POST /api/blog-admin/totp/revoke — 吊销绑定（需有效 step-up）
 function totpRevoke(c) {
-  var user = requireAdmin(c, true);
+  var user = requireAdmin(c, false);
   stepUp.requireAdminStepUp(c, { requireVerifiedEmail: true });
   $app.dao().runInTransaction(function (txDao) {
     var state = totpState(txDao, user.id);

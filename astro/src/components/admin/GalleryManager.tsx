@@ -1,20 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
 import { useAdminAuth } from '../../hooks/useAdminAuth';
-import { describePbError } from '../../lib/pb-error';
-import { notifyStepUpExpired } from '../../lib/step-up-recovery';
-
-interface GalleryItem {
-  id: string;
-  title: string;
-  description: string;
-  album: string;
-  sort_order: number;
-  status: string;
-  photo: string;
-  created: string;
-}
+import { useGallery } from '../../hooks/domains/useGallery';
+import type { GalleryItem } from '../../lib/services/galleryService';
 
 const STATUS_TONE: Record<string, string> = {
   show: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
@@ -23,12 +11,22 @@ const STATUS_TONE: Record<string, string> = {
 
 export default function GalleryManager() {
   const { user } = useAdminAuth();
-  const [items, setItems] = useState<GalleryItem[]>([]);
-  const [filter, setFilter] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [status, setStatus] = useState('');
-  const [uploading, setUploading] = useState(false);
+  const {
+    items,
+    loading,
+    error,
+    status,
+    filter,
+    uploading,
+    setFilter,
+    setError,
+    load,
+    toggleStatus: toggleStatusService,
+    remove: removeService,
+    upload: uploadService,
+    getPhotoUrl,
+  } = useGallery();
+
   const [file, setFile] = useState<File | null>(null);
   const [newTitle, setNewTitle] = useState('');
   const [newAlbum, setNewAlbum] = useState('');
@@ -36,85 +34,28 @@ export default function GalleryManager() {
   const isSuperAdmin = user?.role === 'super_admin';
   const isAuthor = user?.role === 'author' || user?.role === 'admin' || isSuperAdmin;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const pb = getPocketBase();
-      const result = await pb.collection('gallery_items').getList<GalleryItem>(1, 50, {
-        sort: '-created',
-        filter: filter ? `status = "${filter}"` : undefined,
-      });
-      setItems(result.items || []);
-    } catch (err: unknown) {
-      setError((err as Error)?.message || '无法读取相册');
-    } finally {
-      setLoading(false);
-    }
-  }, [filter]);
+  const toggleStatus = async (item: GalleryItem) => {
+    await toggleStatusService(item);
+  };
 
-  useEffect(() => { load(); }, [load]);
-
-  const toggleStatus = useCallback(async (item: GalleryItem) => {
-    const next = item.status === 'show' ? 'hidden' : 'show';
-    setError('');
-    setStatus('');
-    try {
-      const pb = getPocketBase();
-      await pb.collection('gallery_items').update(item.id, { status: next });
-      setItems((prev) => prev.map((it) => it.id === item.id ? { ...it, status: next } : it));
-      setStatus(`相片已${next === 'show' ? '显示' : '隐藏'}`);
-    } catch (err: unknown) {
-      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
-      setError(describePbError(err, '操作失败'));
-    }
-  }, []);
-
-  const remove = useCallback(async (item: GalleryItem) => {
+  const remove = async (item: GalleryItem) => {
     if (!window.confirm(`确定删除${item.title ? `「${item.title}」` : '该相片'}？此操作不可逆。`)) return;
-    setError('');
-    setStatus('');
-    try {
-      const pb = getPocketBase();
-      await pb.collection('gallery_items').delete(item.id);
-      setItems((prev) => prev.filter((it) => it.id !== item.id));
-      setStatus('相片已删除');
-    } catch (err: unknown) {
-      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
-      setError(describePbError(err, '删除失败'));
-    }
-  }, []);
+    await removeService(item);
+  };
 
-  const handleUpload = useCallback(async (e: React.FormEvent) => {
+  const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) {
       setError('请选择图片文件');
       return;
     }
-    setError('');
-    setStatus('');
-    setUploading(true);
-    try {
-      const pb = getPocketBase();
-      const formData = new FormData();
-      formData.append('photo', file);
-      formData.append('status', 'show');
-      if (newTitle.trim()) formData.append('title', newTitle.trim());
-      if (newAlbum.trim()) formData.append('album', newAlbum.trim());
-      formData.append('sort_order', '0');
-      await pb.collection('gallery_items').create(formData);
+    const success = await uploadService(file, newTitle, newAlbum);
+    if (success) {
       setFile(null);
       setNewTitle('');
       setNewAlbum('');
-      setStatus('上传成功');
-      load();
-    } catch (err: unknown) {
-      if (notifyStepUpExpired(err)) { setError('管理会话已过期，请重新验证动态口令'); return; }
-      setError(describePbError(err, '上传失败：请确认文件类型为 JPEG/PNG/WebP/GIF 且不超过 10MB'));
-    } finally {
-      setUploading(false);
     }
-  }, [file, newTitle, newAlbum, load]);
+  };
 
   const fmtDate = (s: string) => {
     if (!s) return '-';
@@ -122,12 +63,7 @@ export default function GalleryManager() {
   };
 
   const photoUrl = (item: GalleryItem, thumb: string) => {
-    const pb = getPocketBase();
-    const fileName = Array.isArray(item.photo) ? item.photo[0] : item.photo;
-    if (!fileName) return '';
-    const base = pb.baseUrl.replace(/\/$/, '');
-    const path = `api/files/gallery_items/${item.id}/${fileName}`;
-    return thumb ? `${base}/${path}?thumb=${thumb}` : `${base}/${path}`;
+    return getPhotoUrl(item, thumb);
   };
 
   return (

@@ -1,34 +1,36 @@
 import { useCallback, useEffect, useState } from 'react';
-import { getPocketBase } from '../lib/pocketbase';
+import { postService } from '../lib/services/postService';
+import { commentService } from '../lib/services/commentService';
 import { runAfterAdminCredentialRevoked } from '../lib/admin-auth-lifecycle';
 import { clearAdminStepUp } from '../lib/admin-step-up';
 import { registerReader as registerReaderRequest, requestReaderOtp, requestVerification as requestVerificationRequest, verifyReaderOtp } from '../lib/blog-auth-client';
-import type { Post, PublicComment, ReaderRegisterData } from '../types/pocketbase';
+import { authService } from '../lib/services/authService';
+import type { Post, ReaderRegisterData } from '../types/pocketbase';
 
+/**
+ * @deprecated 请使用领域特定的 Hooks，如 usePosts、useComments 等
+ * 此 Hook 保留用于向后兼容，新代码应使用 Service 层和领域 Hooks
+ */
 export function usePocketBase() {
-  const pb = getPocketBase();
+  const pb = authService.getPocketBase();
 
   return {
     pb,
 
     getPosts: useCallback(async (page = 1, perPage = 10) => {
       try {
-        const result = await pb.collection('posts').getList<Post>(page, perPage, {
-          filter: 'status = "published"',
-          sort: '-published_at',
-          expand: 'author',
-        });
+        const result = await postService.getPublishedPosts(page, perPage);
         return { data: result, error: null };
       } catch (err) {
         console.error('获取文章列表失败:', err);
         return { data: null, error: err };
       }
-    }, [pb]),
+    }, []),
 
     getPost: useCallback(async (slug: string) => {
       try {
-        const result = await pb.collection('posts').getFirstListItem<Post>(
-          pb.filter('slug = {:slug} && status = {:status}', { slug, status: 'published' }),
+        const result = await postService.getFirstListItem(
+          `slug = "${slug}" && status = "published"`,
           { expand: 'author' }
         );
         return { data: result, error: null };
@@ -36,21 +38,17 @@ export function usePocketBase() {
         console.error('获取文章失败:', err);
         return { data: null, error: err };
       }
-    }, [pb]),
+    }, []),
 
     getComments: useCallback(async (postId: string) => {
       try {
-        const result = await pb.collection('public_comments').getFullList<PublicComment>({
-          filter: pb.filter('post_id = {:postId}', { postId }),
-          sort: '-created',
-          fields: 'id,post_id,author_name,content,parent_id,status,created,updated',
-        });
+        const result = await commentService.getPublicComments(postId);
         return { data: result, error: null };
       } catch (err) {
         console.error('获取评论失败:', err);
         return { data: null, error: err };
       }
-    }, [pb]),
+    }, []),
 
     requestOTP: useCallback(async (email: string) => {
       try {
@@ -60,7 +58,7 @@ export function usePocketBase() {
         console.error('发送 OTP 验证码失败:', err);
         return { data: null, error: err };
       }
-    }, [pb]),
+    }, []),
 
     authWithOTP: useCallback(async (otpId: string, code: string) => {
       try {
@@ -85,7 +83,7 @@ export function usePocketBase() {
         console.error('注册 reader 用户失败:', err);
         return { success: false, data: null, error: err };
       }
-    }, [pb]),
+    }, []),
 
     requestVerification: useCallback(async (email: string) => {
       try {
@@ -95,7 +93,7 @@ export function usePocketBase() {
         console.error('发送验证邮件失败:', err);
         return { success: false, error: err };
       }
-    }, [pb]),
+    }, []),
   };
 }
 
@@ -106,7 +104,7 @@ export function usePosts(page = 1, perPage = 10, tagSlug?: string) {
   const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
-    const pb = getPocketBase();
+    const pb = authService.getPocketBase();
 
     const fetchPosts = async () => {
       setLoading(true);
@@ -127,7 +125,7 @@ export function usePosts(page = 1, perPage = 10, tagSlug?: string) {
             filter: pb.filter('tag_id = {:tagId}', { tagId: tag.id }),
             fields: 'post_id',
           });
-          const postIds = ptRes.map((pt: { post_id: string }) => pt.post_id);
+          const postIds = ptRes.map((pt) => (pt as unknown as { post_id: string }).post_id);
           if (postIds.length === 0) {
             setPosts([]);
             setTotalPages(1);

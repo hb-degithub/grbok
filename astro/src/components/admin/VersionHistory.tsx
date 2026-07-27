@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { getPocketBase } from '../../lib/pocketbase';
+﻿import React, { useState } from 'react';
+import { useVersionHistory } from '../../hooks/domains/useVersionHistory';
 import { showToast } from '../ui/Toast';
+import type { PostVersion } from '../../lib/services/versionHistoryService';
 
 /**
  * 版本历史对比组件 —— 超管后台新增模块。
@@ -12,215 +13,203 @@ import { showToast } from '../ui/Toast';
  * 资产保护：纯后台展示，不修改任何前端 DOM/动画。
  */
 
-interface PostVersion {
-  id: string;
-  post_id: string;
-  content: string;
-  title: string;
-  excerpt: string;
-  editor: string;
-  note?: string;
-  created: string;
-    expand?: {
-    post_id?: { id: string; title: string; slug: string };
-    editor?: { id: string; name: string };
-  };
+function formatDate(value: string) {
+  return new Date(value).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function truncate(text: string, length: number = 100) {
+  if (text.length <= length) return text;
+  return text.slice(0, length) + '...';
 }
 
 export default function VersionHistory() {
-  const [versions, setVersions] = useState<PostVersion[]>([]);
-  const [posts, setPosts] = useState<{ id: string; title: string; slug: string }[]>([]);
-  const [selectedPost, setSelectedPost] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [compareLeft, setCompareLeft] = useState<string | null>(null);
-  const [compareRight, setCompareRight] = useState<string | null>(null);
-  const pb = getPocketBase();
+  const {
+    versions,
+    posts,
+    selectedPost,
+    setSelectedPost,
+    loading,
+    compareLeft,
+    compareRight,
+    toggleCompare,
+    clearCompare,
+    getCompareVersions,
+  } = useVersionHistory();
 
-  const loadPosts = useCallback(async () => {
-    try {
-      const res = await pb.collection('posts').getList(1, 200, {
-        sort: '-updated',
-        fields: 'id,title,slug',
-      });
-      setPosts(res.items);
-    } catch (err) {
-      console.error('Failed to load posts:', err);
-    }
-  }, [pb]);
+  const [compareData, setCompareData] = useState<{ left: PostVersion; right: PostVersion } | null>(null);
+  const [showCompare, setShowCompare] = useState(false);
 
-  const loadVersions = useCallback(async () => {
-    if (!selectedPost) {
-      setVersions([]);
-      setLoading(false);
+  const handleCompare = async () => {
+    if (!compareLeft || !compareRight) {
+      showToast('请选择两个版本进行对比', 'warning');
       return;
     }
-    setLoading(true);
-    try {
-      const res = await pb.collection('post_versions').getList(1, 50, {
-        filter: `post_id = "${selectedPost}"`,
-        sort: '-created',
-        expand: 'post_id,editor',
-      });
-      setVersions(res.items);
-    } catch {
-      setVersions([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [pb, selectedPost]);
-
-  useEffect(() => {
-    loadPosts();
-  }, [loadPosts]);
-
-  useEffect(() => {
-    loadVersions();
-  }, [loadVersions]);
-
-  const restoreVersion = async (version: PostVersion) => {
-    if (!confirm(`确定恢复到版本 "${version.note || version.title}" 吗？当前内容将被覆盖。`)) return;
-    try {
-      await pb.collection('posts').update(version.post_id, {
-        content: version.content,
-        title: version.title,
-        excerpt: version.excerpt,
-      });
-      showToast('版本已恢复', 'success');
-    } catch {
-      showToast('恢复失败', 'error');
+    const data = await getCompareVersions();
+    if (data) {
+      setCompareData(data);
+      setShowCompare(true);
     }
   };
 
-  const getDiffPreview = (left: PostVersion | undefined, right: PostVersion | undefined) => {
-    if (!left || !right) return null;
-    const leftLines = left.content.split('\n');
-    const rightLines = right.content.split('\n');
-    const maxLines = Math.min(Math.max(leftLines.length, rightLines.length), 30);
-    const rows: { left: string; right: string; diff: boolean }[] = [];
-    for (let i = 0; i < maxLines; i++) {
-      const l = leftLines[i] || '';
-      const r = rightLines[i] || '';
-      rows.push({ left: l, right: r, diff: l !== r });
-    }
-    return rows;
+  const closeCompare = () => {
+    setShowCompare(false);
+    setCompareData(null);
   };
-
-  const leftVersion = versions.find((v) => v.id === compareLeft);
-  const rightVersion = versions.find((v) => v.id === compareRight);
-  const diffRows = getDiffPreview(leftVersion, rightVersion);
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-lg font-bold text-zinc-950 dark:text-zinc-50">版本历史</h2>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">查看文章历史版本，对比差异，恢复旧版本。</p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <select
-          value={selectedPost}
-          onChange={(e) => {
-            setSelectedPost(e.target.value);
-            setCompareLeft(null);
-            setCompareRight(null);
-          }}
-          className="min-h-9 rounded-md border border-border bg-white px-3 py-1.5 text-sm text-text outline-none dark:bg-zinc-800"
-          aria-label="选择文章"
-        >
-          <option value="">选择文章...</option>
-          {posts.map((p) => (
-            <option key={p.id} value={p.id}>{p.title}</option>
-          ))}
-        </select>
-        {selectedPost && (
-          <span className="text-xs text-zinc-500">{versions.length} 个版本</span>
+    <div className="space-y-4">
+      {/* 筛选器 */}
+      <div className="card rounded-md p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={selectedPost}
+            onChange={(e) => setSelectedPost(e.target.value)}
+            className="min-w-[200px] rounded-md border border-border bg-bg-soft px-3 py-2 text-sm text-text outline-none focus:border-accent"
+          >
+            <option value="">全部文章</option>
+            {posts.map((post) => (
+              <option key={post.id} value={post.id}>
+                {post.title}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleCompare}
+            disabled={!compareLeft || !compareRight}
+            className="btn-primary min-h-10 px-4 text-xs disabled:opacity-50"
+          >
+            对比选中版本
+          </button>
+          {(compareLeft || compareRight) && (
+            <button
+              onClick={clearCompare}
+              className="btn-ghost min-h-10 px-4 text-xs"
+            >
+              清除选择
+            </button>
+          )}
+        </div>
+        {(compareLeft || compareRight) && (
+          <div className="mt-3 text-xs text-text-secondary">
+            已选择 {compareLeft ? 1 : 0 + compareRight ? 1 : 0} 个版本
+            {compareLeft && compareRight && '，点击"对比选中版本"查看差异'}
+          </div>
         )}
       </div>
 
+      {/* 版本列表 */}
       {loading ? (
-        <div className="animate-pulse space-y-2">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 rounded-lg bg-zinc-100 dark:bg-zinc-800" />
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-20 animate-pulse rounded-md bg-bg-soft" />
           ))}
         </div>
-      ) : !selectedPost ? (
-        <div className="rounded-lg border border-dashed border-border p-12 text-center text-sm text-zinc-400">
-          请选择一篇文章查看版本历史
-        </div>
       ) : versions.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border p-12 text-center text-sm text-zinc-400">
-          该文章暂无历史版本
+        <div className="card rounded-md p-8 text-center text-text-secondary">
+          暂无版本历史
         </div>
       ) : (
-        <>
-          <div className="overflow-hidden rounded-xl border border-border">
-            <table className="w-full text-sm">
-              <thead className="bg-zinc-50 text-xs text-zinc-500 dark:bg-zinc-900">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium">对比</th>
-                  <th className="px-4 py-3 text-left font-medium">版本备注</th>
-                  <th className="px-4 py-3 text-left font-medium">保存者</th>
-                  <th className="px-4 py-3 text-left font-medium">时间</th>
-                  <th className="px-4 py-3 text-right font-medium">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {versions.map((v) => (
-                  <tr key={v.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => setCompareLeft(v.id === compareLeft ? null : v.id)}
-                          className={`h-6 w-6 rounded text-xs font-bold ${
-                            compareLeft === v.id ? 'bg-teal-600 text-white' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'
-                          }`}
-                          title="设为左侧对比"
-                        >L</button>
-                        <button
-                          onClick={() => setCompareRight(v.id === compareRight ? null : v.id)}
-                          className={`h-6 w-6 rounded text-xs font-bold ${
-                            compareRight === v.id ? 'bg-emerald-600 text-white' : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800'
-                          }`}
-                          title="设为右侧对比"
-                        >R</button>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-text">{v.note || v.title}</td>
-                    <td className="px-4 py-3 text-zinc-500">{v.expand?.editor?.name || '—'}</td>
-                    <td className="px-4 py-3 text-zinc-500">{new Date(v.created).toLocaleString('zh-CN')}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => restoreVersion(v)}
-                        className="rounded-md px-3 py-1 text-xs font-medium text-teal-600 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-950/30"
-                      >恢复</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {diffRows && (
-            <div className="rounded-xl border border-border overflow-hidden">
-              <div className="border-b border-border bg-zinc-50 px-4 py-2 text-xs font-medium text-zinc-500 dark:bg-zinc-900">
-                版本对比：{leftVersion?.note || leftVersion?.title} → {rightVersion?.note || rightVersion?.title}
-              </div>
-              <div className="max-h-[400px] overflow-auto">
-                <table className="w-full font-mono text-xs">
-                  <tbody className="divide-y divide-border">
-                    {diffRows.map((row, i) => (
-                      <tr key={i} className={row.diff ? 'bg-amber-50 dark:bg-amber-950/20' : ''}>
-                        <td className="w-10 px-2 py-1 text-right text-zinc-400">{i + 1}</td>
-                        <td className="px-2 py-1 text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap break-all">{row.left || '—'}</td>
-                        <td className="px-2 py-1 text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap break-all">{row.right || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        <div className="space-y-2">
+          {versions.map((version) => (
+            <div
+              key={version.id}
+              className={`card rounded-md p-4 transition-colors ${
+                compareLeft === version.id || compareRight === version.id
+                  ? 'border-accent bg-accent/5'
+                  : ''
+              }`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-text">
+                      {version.expand?.post_id?.title || version.title}
+                    </span>
+                    <span className="rounded-md border border-border bg-bg-soft px-2 py-0.5 font-mono text-[10px] uppercase text-text-secondary">
+                      v{version.id.slice(0, 6)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-text-secondary">
+                    {truncate(version.excerpt || version.content, 80)}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-text-secondary">
+                    <span>{version.expand?.editor?.name || '未知编辑'}</span>
+                    <span>{formatDate(version.created)}</span>
+                    {version.note && (
+                      <span className="text-accent">备注：{version.note}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    onClick={() => toggleCompare(version.id)}
+                    className={`min-h-10 rounded-md px-3 text-xs font-medium transition-colors ${
+                      compareLeft === version.id || compareRight === version.id
+                        ? 'bg-accent text-white'
+                        : 'bg-bg-soft text-text-secondary hover:bg-accent/10'
+                    }`}
+                  >
+                    {compareLeft === version.id || compareRight === version.id
+                      ? '已选择'
+                      : '选择对比'}
+                  </button>
+                </div>
               </div>
             </div>
-          )}
-        </>
+          ))}
+        </div>
+      )}
+
+      {/* 对比弹窗 */}
+      {showCompare && compareData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-lg bg-bg shadow-xl">
+            <div className="flex items-center justify-between border-b border-border p-4">
+              <h3 className="text-lg font-semibold text-text">版本对比</h3>
+              <button
+                onClick={closeCompare}
+                className="rounded-md p-1 text-text-secondary hover:bg-bg-soft"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="grid max-h-[calc(90vh-60px)] grid-cols-2 divide-x divide-border overflow-auto">
+              <div className="p-4">
+                <div className="mb-3 rounded-md bg-bg-soft p-2 text-xs text-text-secondary">
+                  <p>版本：{compareData.left.id.slice(0, 8)}</p>
+                  <p>时间：{formatDate(compareData.left.created)}</p>
+                  <p>编辑：{compareData.left.expand?.editor?.name || '未知'}</p>
+                </div>
+                <h4 className="mb-2 font-medium text-text">{compareData.left.title}</h4>
+                <div className="prose prose-sm max-w-none text-text-secondary">
+                  <pre className="whitespace-pre-wrap rounded-md bg-bg-soft p-3 font-mono text-xs">
+                    {compareData.left.content}
+                  </pre>
+                </div>
+              </div>
+              <div className="p-4">
+                <div className="mb-3 rounded-md bg-bg-soft p-2 text-xs text-text-secondary">
+                  <p>版本：{compareData.right.id.slice(0, 8)}</p>
+                  <p>时间：{formatDate(compareData.right.created)}</p>
+                  <p>编辑：{compareData.right.expand?.editor?.name || '未知'}</p>
+                </div>
+                <h4 className="mb-2 font-medium text-text">{compareData.right.title}</h4>
+                <div className="prose prose-sm max-w-none text-text-secondary">
+                  <pre className="whitespace-pre-wrap rounded-md bg-bg-soft p-3 font-mono text-xs">
+                    {compareData.right.content}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

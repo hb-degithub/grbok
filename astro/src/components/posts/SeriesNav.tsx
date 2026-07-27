@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 文章系列导航组件 —— 基于 PocketBase settings 表存储系列映射。
  *
  * settings 表中 key 格式：series:{seriesId}，value 为 JSON 数组：
@@ -8,37 +8,10 @@
  * <SeriesNav client:visible seriesId={post.expand?.series?.id} />
  */
 
-import { useState, useEffect } from 'react';
-import { getPocketBase } from '../../lib/pocketbase';
-
-interface SeriesEntry {
-  slug: string;
-  title: string;
-  order: number;
-}
+import { useSeries } from '../../hooks/domains/useSeries';
 
 export default function SeriesNav({ seriesId, currentSlug }: { seriesId: string; currentSlug?: string }) {
-  const [entries, setEntries] = useState<SeriesEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!seriesId) {
-      setLoading(false);
-      return;
-    }
-
-    const pb = getPocketBase();
-    pb.collection('settings')
-      .getFirstListItem(pb.filter('key = {:key}', { key: `series:${seriesId}` }))
-      .then((record) => {
-        // settings.value 是 json 字段，SDK 返回时已解析为对象
-        const stored = record.value as SeriesEntry[] | string;
-        const list: SeriesEntry[] = typeof stored === 'string' ? JSON.parse(stored || '[]') : (stored || []);
-        setEntries(list.sort((a, b) => (a.order || 0) - (b.order || 0)));
-      })
-      .catch(() => setEntries([]))
-      .finally(() => setLoading(false));
-  }, [seriesId]);
+  const { entries, loading } = useSeries(seriesId);
 
   if (loading || !entries.length) return null;
 

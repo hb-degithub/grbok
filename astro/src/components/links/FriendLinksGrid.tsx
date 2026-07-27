@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
+﻿import React from 'react';
 import { motion } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
+import { useFriendLinks } from '../../hooks/domains/useFriendLinks';
 import { trackLinkClick } from '../../lib/track';
 import { fadeUp, staggerContainer } from '../../lib/motion';
-import type { FriendLink } from '../../types/pocketbase';
 
 function isSafeLinkUrl(url: string): boolean {
   try {
@@ -24,17 +23,11 @@ function hostname(url: string): string {
 
 /** 友链卡片网格：头像/首字母 + 名称 + 简介 + 域名；点击上报后新标签打开 */
 export default function FriendLinksGrid() {
-  const [links, setLinks] = useState<FriendLink[] | null>(null);
+  const { links, loading } = useFriendLinks();
 
-  useEffect(() => {
-    const pb = getPocketBase();
-    pb.collection('friend_links')
-      .getList<FriendLink>(1, 50, { sort: 'sort_order,-created' })
-      .then((r) => setLinks(r.items.filter((i) => i.status === 'show' && isSafeLinkUrl(i.url))))
-      .catch(() => setLinks([]));
-  }, []);
+  const visibleLinks = links.filter((i) => i.status === 'show' && isSafeLinkUrl(i.url));
 
-  if (links === null) {
+  if (loading) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -44,7 +37,7 @@ export default function FriendLinksGrid() {
     );
   }
 
-  if (links.length === 0) {
+  if (visibleLinks.length === 0) {
     return (
       <div className="rounded-xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
         暂无友链，欢迎通过下方邮箱申请互换。
@@ -54,7 +47,7 @@ export default function FriendLinksGrid() {
 
   return (
     <motion.div variants={staggerContainer(0.06)} initial="hidden" animate="visible" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {links.map((link) => (
+      {visibleLinks.map((link) => (
         <motion.a
           key={link.id}
           variants={fadeUp}
@@ -87,3 +80,4 @@ export default function FriendLinksGrid() {
     </motion.div>
   );
 }
+

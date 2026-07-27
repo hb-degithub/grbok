@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getPocketBase } from '../lib/pocketbase';
+import { authService } from '../lib/services/authService';
 import { isServerConfirmedCredentialInvalid, revokeCurrentAdminCredential } from '../lib/admin-auth-lifecycle';
 import { clearAdminStepUp } from '../lib/admin-step-up';
 import type { User } from '../types/pocketbase';
@@ -31,7 +31,7 @@ export function useAdminAuth(): AdminAuthState {
 
   useEffect(() => {
     let mounted = true;
-    const pb = getPocketBase();
+    const pb = authService.getPocketBase();
     let unsubscribe: (() => void) | undefined;
 
     const checkAuth = async () => {
@@ -94,7 +94,7 @@ export function useAdminAuth(): AdminAuthState {
 export function useAdminLogout() {
   return {
     logout: async () => {
-      const pb = getPocketBase();
+      const pb = authService.getPocketBase();
       await revokeCurrentAdminCredential(pb, () => clearAdminStepUp({ includeClientSession: true }));
       window.location.href = '/login';
     },

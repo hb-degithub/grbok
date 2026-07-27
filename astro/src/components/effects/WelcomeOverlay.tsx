@@ -3,8 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Stepper, { Step } from '../reactbits/Stepper';
 import SplitText from '../reactbits/SplitText';
 import SpotlightCard from '../reactbits/SpotlightCard';
-import { usePocketBase } from '../../hooks/usePocketBase';
-import { getPocketBase } from '../../lib/pocketbase';
+import { useUser } from '../../hooks/domains/useUser';
 import { RateLimiter } from '../../lib/security';
 import useBreakpoint from '../../hooks/useBreakpoint';
 
@@ -40,7 +39,7 @@ export default function WelcomeOverlay() {
   const [resendStatus, setResendStatus] = useState<'idle' | 'loading' | 'sent'>('idle');
   const [showSkipConfirm, setShowSkipConfirm] = useState(false);
 
-  const { registerReader, requestVerification } = usePocketBase();
+  const { registerReader, requestVerification, isLoggedIn: checkLoggedIn } = useUser();
   const { isMobile } = useBreakpoint();
   const spotlightSize = isMobile ? 120 : 180;
   const [isLandscapePhone, setIsLandscapePhone] = useState(false);
@@ -83,11 +82,10 @@ export default function WelcomeOverlay() {
     const path = window.location.pathname;
     const skipOverlay = path.startsWith('/login') || path.startsWith('/admin');
     if (!hasBeenWelcomed() && !skipOverlay) {
-      const pb = getPocketBase();
-      setIsLoggedIn(pb.authStore.isValid && !!pb.authStore.record);
+      setIsLoggedIn(checkLoggedIn());
       setVisible(true);
     }
-  }, []);
+  }, [checkLoggedIn]);
 
   // Scroll lock
   useEffect(() => {
@@ -171,7 +169,7 @@ export default function WelcomeOverlay() {
       setRegStatus('error');
       setRegError('提交失败，请检查信息后重试');
     }
-  }, [regName, regEmail, regPassword, registerReader]);
+  }, [regName, regEmail, regPassword, registerReader, scheduleTimeout]);
 
   const handleResendVerification = useCallback(async () => {
     if (!registeredEmail) return;

@@ -1,270 +1,267 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { getPocketBase } from '../../lib/pocketbase';
-import { DEFAULT_FEATURE_FLAGS, FEATURE_FLAGS_KEY, type FeatureFlags } from '../../config/feature-flags';
-import { showToast } from '../ui/Toast';
-import { describePbError } from '../../lib/pb-error';
-import { notifyStepUpExpired } from '../../lib/step-up-recovery';
+﻿import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useFeatureFlags } from '../../hooks/domains/useFeatureFlags';
+import type { FeatureFlag } from '../../lib/services/featureFlagService';
 
-/**
- * 智能功能开关面板 —— 超管后台新增模块。
- *
- * 路由：/admin/features/
- * 权限：admin+
- * 依赖文件：config/feature-flags.ts, lib/pocketbase.ts, hooks/useSiteSettings.ts
- * 资产保护：纯配置驱动，不修改任何前端 DOM/CSS/动画。
- *
- * 所有开关写入 settings 表 key="feature_flags"，
- * 前端组件通过 useSiteSettings 读取并决定是否渲染。
- */
+interface FlagFormData {
+  key: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+}
 
-type FlagSection = keyof FeatureFlags;
-
-const SECTION_LABELS: Record<FlagSection, string> = {
-  rag_chatbot: 'RAG 助手',
-  privacy_analytics: '隐私埋点',
-  newsletter: 'Newsletter',
-  ab_testing: 'A/B 测试',
+const defaultFormData: FlagFormData = {
+  key: '',
+  name: '',
+  description: '',
+  enabled: false,
 };
 
-const SECTION_ICONS: Record<FlagSection, string> = {
-  rag_chatbot: '💬',
-  privacy_analytics: '📊',
-  newsletter: '📧',
-  ab_testing: '🧪',
-};
+function FlagModal({
+  flag,
+  onClose,
+  onSave,
+  saving,
+}: {
+  flag: FeatureFlag | null;
+  onClose: () => void;
+  onSave: (data: FlagFormData) => Promise<boolean>;
+  saving: boolean;
+}) {
+  const [formData, setFormData] = useState<FlagFormData>(
+    flag
+      ? { key: flag.key, name: flag.name, description: flag.description || '', enabled: flag.enabled }
+      : defaultFormData
+  );
 
-export default function FeatureFlagsPanel() {
-  const [flags, setFlags] = useState<FeatureFlags>(DEFAULT_FEATURE_FLAGS);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  // showToast is imported as a module-level function
-
-  const pb = getPocketBase();
-
-  const loadFlags = useCallback(async () => {
-    try {
-      const record = await pb.collection('settings').getFirstListItem(
-        pb.filter('key = {:key}', { key: FEATURE_FLAGS_KEY })
-      );
-      // settings.value 是 json 字段，SDK 返回时已解析为对象，无需 JSON.parse
-      const stored = record.value as Partial<FeatureFlags> | string;
-      let parsed: Partial<FeatureFlags>;
-      if (typeof stored === 'string') {
-        try { parsed = JSON.parse(stored || '{}'); }
-        catch { parsed = {}; }
-      } else {
-        parsed = stored || {};
-      }
-      setFlags({ ...DEFAULT_FEATURE_FLAGS, ...parsed });
-    } catch {
-      // 首次使用，记录不存在，用默认值
-      setFlags(DEFAULT_FEATURE_FLAGS);
-    } finally {
-      setLoading(false);
-    }
-  }, [pb]);
-
-  useEffect(() => {
-    loadFlags();
-  }, [loadFlags]);
-
-  const saveFlags = async () => {
-    setSaving(true);
-    try {
-      // settings.value 是 json 字段，PocketBase 期望直接传对象而非字符串
-      const payload = { value: flags, description: '智能功能开关配置' };
-      try {
-        const existing = await pb.collection('settings').getFirstListItem(
-          pb.filter('key = {:key}', { key: FEATURE_FLAGS_KEY })
-        );
-        await pb.collection('settings').update(existing.id, payload);
-      } catch (notFoundErr) {
-        // step-up 过期：不要 fallback create，直接报会话过期
-        if (notifyStepUpExpired(notFoundErr)) {
-          showToast('管理会话已过期，请重新验证动态口令', 'error');
-          return;
-        }
-        // 仅当真不存在（404）时才 create；其他错误冒泡到外层统一翻译
-        const status = (notFoundErr as { status?: number })?.status;
-        if (status !== 404) throw notFoundErr;
-        await pb.collection('settings').create({ key: FEATURE_FLAGS_KEY, ...payload });
-      }
-      showToast('功能开关已保存', 'success');
-    } catch (err) {
-      console.error('Feature flags save error:', err);
-      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
-      showToast(describePbError(err, '保存失败'), 'error');
-    } finally {
-      setSaving(false);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const success = await onSave(formData);
+    if (success) {
+      onClose();
     }
   };
-
-  const toggleFlag = (section: FlagSection) => {
-    setFlags((prev) => ({
-      ...prev,
-      [section]: { ...prev[section], enabled: !prev[section].enabled },
-    }));
-  };
-
-  const updateFlag = <K extends FlagSection>(section: K, field: string, value: unknown) => {
-    setFlags((prev) => ({
-      ...prev,
-      [section]: { ...prev[section], [field]: value },
-    }));
-  };
-
-  if (loading) {
-    return (
-      <div className="space-y-4">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="animate-pulse rounded-xl border border-border bg-white p-6 dark:bg-zinc-900">
-            <div className="h-6 w-40 rounded bg-zinc-200 dark:bg-zinc-700" />
-            <div className="mt-4 h-4 w-full rounded bg-zinc-100 dark:bg-zinc-800" />
-          </div>
-        ))}
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-zinc-950 dark:text-zinc-50">智能功能开关</h2>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            控制博客智能化功能的启停与参数。所有开关通过配置驱动前端，无需修改代码。
-          </p>
-        </div>
-        <button
-          onClick={saveFlags}
-          disabled={saving}
-          className="inline-flex min-h-10 items-center rounded-lg bg-teal-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-teal-700 disabled:opacity-50"
-        >
-          {saving ? '保存中...' : '保存配置'}
-        </button>
-      </div>
-
-      {(Object.keys(flags) as FlagSection[]).map((section) => {
-        const config = flags[section];
-        return (
-          <section
-            key={section}
-            className="rounded-xl border border-border bg-white p-6 shadow-sm dark:bg-zinc-900"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-start justify-between">
+          <h3 className="text-lg font-bold text-text">{flag ? '编辑功能开关' : '新建功能开关'}</h3>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1 text-text-secondary hover:bg-bg-soft hover:text-text"
           >
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl" aria-hidden="true">{SECTION_ICONS[section]}</span>
-                <div>
-                  <h3 className="text-base font-semibold text-zinc-950 dark:text-zinc-50">
-                    {SECTION_LABELS[section]}
-                  </h3>
-                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                    {section === 'rag_chatbot' && '悬浮 Chatbot Widget，API 失败时降级为静态 FAQ'}
-                    {section === 'privacy_analytics' && '无 Cookie 隐私埋点，尊重 DNT，sendBeacon 上报'}
-                    {section === 'newsletter' && '订阅表单与邮件频率控制'}
-                    {section === 'ab_testing' && '客户端特征标志，实验变体动态渲染'}
-                  </p>
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">
+              开关标识
+            </label>
+            <input
+              type="text"
+              value={formData.key}
+              onChange={(e) => setFormData({ ...formData, key: e.target.value })}
+              placeholder="feature_key"
+              required
+              disabled={!!flag}
+              className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-accent focus:bg-white disabled:opacity-60"
+            />
+            <p className="mt-1 text-xs text-text-secondary">唯一标识符，创建后不可修改</p>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">
+              显示名称
+            </label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="功能名称"
+              required
+              className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">
+              描述
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="功能描述..."
+              rows={3}
+              className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white"
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, enabled: !formData.enabled })}
+              className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
+                formData.enabled ? 'border-accent bg-accent' : 'border-border bg-bg-soft'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                  formData.enabled ? 'translate-x-5' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+            <span className="text-sm text-text">{formData.enabled ? '已启用' : '已禁用'}</span>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-md border border-border bg-white px-4 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-soft"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="btn-primary rounded-md px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+export default function FeatureFlagsPanel() {
+  const { flags, loading, saving, saveFlag, toggleFlag, deleteFlag } = useFeatureFlags();
+  const [showModal, setShowModal] = useState(false);
+  const [editingFlag, setEditingFlag] = useState<FeatureFlag | null>(null);
+  const [deletingKey, setDeletingKey] = useState<string | null>(null);
+
+  const handleEdit = (flag: FeatureFlag) => {
+    setEditingFlag(flag);
+    setShowModal(true);
+  };
+
+  const handleCreate = () => {
+    setEditingFlag(null);
+    setShowModal(true);
+  };
+
+  const handleDelete = async (key: string) => {
+    if (!confirm('确定要删除这个功能开关吗？')) return;
+    setDeletingKey(key);
+    await deleteFlag(key);
+    setDeletingKey(null);
+  };
+
+  const handleSave = async (data: FlagFormData) => {
+    return saveFlag(data);
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-w-0 space-y-4">
+      <section className="card rounded-md p-4 shadow-xs">
+        <div className="mb-4 flex items-center justify-between border-b border-border pb-3">
+          <div>
+            <h2 className="break-words text-sm font-black text-text">功能开关</h2>
+            <p className="mt-1 break-words text-xs text-text-secondary">控制网站功能的启用和禁用。</p>
+          </div>
+          <button
+            onClick={handleCreate}
+            className="btn-primary min-h-10 rounded-md px-4 text-xs"
+          >
+            新建开关
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-20 animate-pulse rounded-md bg-bg-soft" />
+            ))}
+          </div>
+        ) : flags.length === 0 ? (
+          <div className="py-8 text-center text-sm text-text-secondary">暂无功能开关</div>
+        ) : (
+          <div className="space-y-3">
+            {flags.map((flag) => (
+              <div
+                key={flag.id}
+                className="flex items-center justify-between rounded-md border border-border bg-white p-4"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-sm font-medium text-text">{flag.key}</span>
+                    <button
+                      onClick={() => toggleFlag(flag.key, !flag.enabled)}
+                      className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors ${
+                        flag.enabled ? 'border-success bg-success' : 'border-border bg-bg-soft'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                          flag.enabled ? 'translate-x-4' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <p className="mt-1 text-sm text-text">{flag.name}</p>
+                  {flag.description && (
+                    <p className="mt-1 text-xs text-text-secondary">{flag.description}</p>
+                  )}
+                </div>
+                <div className="ml-4 flex shrink-0 items-center gap-2">
+                  <button
+                    onClick={() => handleEdit(flag)}
+                    className="rounded-md border border-border bg-white px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-bg-soft hover:text-text"
+                  >
+                    编辑
+                  </button>
+                  <button
+                    onClick={() => handleDelete(flag.key)}
+                    disabled={deletingKey === flag.key}
+                    className="rounded-md border border-error/25 bg-error/10 px-3 py-1.5 text-xs text-error transition-colors hover:bg-error/20 disabled:opacity-50"
+                  >
+                    {deletingKey === flag.key ? '删除中...' : '删除'}
+                  </button>
                 </div>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={config.enabled}
-                aria-label={`启用 ${SECTION_LABELS[section]}`}
-                onClick={() => toggleFlag(section)}
-                className={`relative h-7 w-12 rounded-full transition-colors ${
-                  config.enabled ? 'bg-teal-600' : 'bg-zinc-300 dark:bg-zinc-700'
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
-                    config.enabled ? 'translate-x-5' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-            </div>
+            ))}
+          </div>
+        )}
+      </section>
 
-            {config.enabled && (
-              <div className="mt-4 space-y-3 border-t border-border pt-4">
-                {section === 'rag_chatbot' && (
-                  <>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">API 端点</label>
-                      <input
-                        type="text"
-                        value={config.endpoint}
-                        onChange={(e) => updateFlag(section, 'endpoint', e.target.value)}
-                        className="min-h-9 w-full rounded-md border border-border bg-white px-3 py-1.5 text-sm text-text outline-none focus:border-teal-400 dark:bg-zinc-800"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">FAQ（JSON 数组）</label>
-                      <textarea
-                        value={config.faqs_json}
-                        onChange={(e) => updateFlag(section, 'faqs_json', e.target.value)}
-                        rows={3}
-                        className="w-full rounded-md border border-border bg-white px-3 py-1.5 text-sm text-text outline-none focus:border-teal-400 dark:bg-zinc-800"
-                        placeholder='[{"q":"如何订阅？","a":"访问 /subscribe"}]'
-                      />
-                    </div>
-                  </>
-                )}
-                {section === 'privacy_analytics' && (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                      事件采样率：{config.sample_rate * 100}%
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={config.sample_rate}
-                      onChange={(e) => updateFlag(section, 'sample_rate', parseFloat(e.target.value))}
-                      className="w-full"
-                      aria-label="采样率"
-                    />
-                  </div>
-                )}
-                {section === 'newsletter' && (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">发送频率</label>
-                    <select
-                      value={config.frequency}
-                      onChange={(e) => updateFlag(section, 'frequency', e.target.value)}
-                      className="min-h-9 w-full rounded-md border border-border bg-white px-3 py-1.5 text-sm text-text outline-none dark:bg-zinc-800"
-                    >
-                      <option value="weekly">每周</option>
-                      <option value="biweekly">双周</option>
-                      <option value="monthly">每月</option>
-                    </select>
-                  </div>
-                )}
-                {section === 'ab_testing' && (
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">活跃实验 ID（逗号分隔）</label>
-                    <input
-                      type="text"
-                      value={config.active_experiments.join(', ')}
-                      onChange={(e) => updateFlag(section, 'active_experiments', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))}
-                      className="min-h-9 w-full rounded-md border border-border bg-white px-3 py-1.5 text-sm text-text outline-none dark:bg-zinc-800"
-                      placeholder="hero-layout-v2, cta-color-test"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
-        );
-      })}
-
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
-        <p className="text-xs text-blue-700 dark:text-blue-300">
-          ℹ️ 功能开关通过 PocketBase <code className="font-mono">settings</code> 表存储（key=<code className="font-mono">feature_flags</code>）。
-          前端组件通过 <code className="font-mono">useSiteSettings</code> hook 读取配置，决定是否渲染对应功能。
-          所有配置变更会记录到审计日志。
-        </p>
-      </div>
-    </div>
+      <AnimatePresence>
+        {showModal && (
+          <FlagModal
+            flag={editingFlag}
+            onClose={() => setShowModal(false)}
+            onSave={handleSave}
+            saving={saving}
+          />
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

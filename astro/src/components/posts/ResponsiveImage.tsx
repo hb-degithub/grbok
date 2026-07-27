@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 响应式图片组件 -- 利用 PocketBase file 字段的 thumb 参数生成多尺寸 srcset。
  *
  * 现有 PostCard 等组件直接用原始图片 URL，此组件为可选替代，
@@ -7,6 +7,7 @@
  * PocketBase 缩略图语法：/api/files/{collection}/{id}/{filename}?thumb={w}x0
  */
 
+import { useMemo } from 'react';
 import { getPocketBase } from '../../lib/pocketbase';
 
 interface ResponsiveImageProps {
@@ -35,11 +36,14 @@ export default function ResponsiveImage({
   sizes = '(max-width: 640px) 100vw, 50vw',
 }: ResponsiveImageProps) {
   // 复用 PocketBase 单例的 baseUrl，确保与 SDK 一致
-  const pbUrl = getPocketBase().baseUrl.replace(/\/$/, '');
-  // 对路径段做 URL 编码，防止中文/特殊字符文件名损坏
-  const enc = (s: string) => encodeURIComponent(s);
-  const base = `${pbUrl}/api/files/${enc(collection)}/${enc(recordId)}/${enc(filename)}`;
-  const srcset = BREAKPOINTS.map((w) => `${base}?thumb=${w}x0 ${w}w`).join(', ');
+  const { base, srcset } = useMemo(() => {
+    const pbUrl = getPocketBase().baseUrl.replace(/\/$/, '');
+    // 对路径段做 URL 编码，防止中文/特殊字符文件名损坏
+    const enc = (s: string) => encodeURIComponent(s);
+    const base = `${pbUrl}/api/files/${enc(collection)}/${enc(recordId)}/${enc(filename)}`;
+    const srcset = BREAKPOINTS.map((w) => `${base}?thumb=${w}x0 ${w}w`).join(', ');
+    return { base, srcset };
+  }, [collection, recordId, filename]);
 
   return (
     <img

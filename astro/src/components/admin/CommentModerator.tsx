@@ -1,14 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
+import { useAdminComments, type CommentFilter } from '../../hooks/domains/useAdminComments';
 import { cn } from '../../lib/utils';
-import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
-import { describePbError } from '../../lib/pb-error';
-import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 import type { Comment } from '../../types/pocketbase';
-
-type CommentFilter = 'all' | 'pending' | 'approved' | 'spam';
 
 const statusColors: Record<string, string> = {
   pending: 'bg-warning/15 text-warning border-warning/30',
@@ -33,47 +28,36 @@ function getPostTitle(comment: Comment) {
 }
 
 export default function CommentModerator() {
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<CommentFilter>('pending');
-  const [query, setQuery] = useState('');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
+  const { comments, loading, filter, setFilter, query, setQuery, page, setPage, totalPages, updateStatus, deleteComment, batchUpdateStatus, batchDelete } = useAdminComments();
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
-  const batchAction = async (action: 'approved' | 'spam', label: string) => {
+
+  const handleBatchAction = (action: 'approved' | 'spam', label: string) => {
     if (selectedIds.length === 0) return;
     setConfirmState({ open: true, title: '确认操作', message: '确定' + label + selectedIds.length + '条评论吗？', onConfirm: async () => {
-      const pb = getPocketBase();
-      try {
-        await Promise.all(selectedIds.map(id => pb.collection('comments').update(id, { status: action })));
-        setSelectedIds([]); fetchComments();
-        showToast('操作成功', 'success');
-      } catch (err) {
-        console.error('批量审核评论失败:', err);
-        if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
-        showToast(describePbError(err, '操作失败'), 'error');
-      }
+      await batchUpdateStatus(selectedIds, action);
+      setSelectedIds([]);
     }});
   };
-  const batchDelete = async () => {
+
+  const handleBatchDelete = () => {
     if (selectedIds.length === 0) return;
     setConfirmState({ open: true, title: '确认删除', message: '确定删除' + selectedIds.length + '条评论吗？不可撤销。', onConfirm: async () => {
-      const pb = getPocketBase();
-      try {
-        await Promise.all(selectedIds.map(id => pb.collection('comments').delete(id)));
-        setSelectedIds([]); fetchComments();
-        showToast('评论已删除', 'success');
-      } catch (err) {
-        console.error('批量删除评论失败:', err);
-        if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
-        showToast(describePbError(err, '删除失败'), 'error');
-      }
+      await batchDelete(selectedIds);
+      setSelectedIds([]);
     }});
   };
+
+  const handleDeleteComment = (id: string) => {
+    setConfirmState({ open: true, title: '确认删除', message: '确定永久删除这条评论吗？', onConfirm: async () => {
+      await deleteComment(id);
+    }});
+  };
+
   const riskHints = (comment: Comment) => {
     const hints: string[] = [];
     if (comment.content && /https?:\/\/[^\s]{4,}/i.test(comment.content)) hints.push('含链接');
@@ -82,61 +66,7 @@ export default function CommentModerator() {
     return hints;
   };
 
-  const fetchComments = useCallback(async () => {
-    setLoading(true);
-    const pb = getPocketBase();
-    try {
-      const parts: string[] = [];
-      if (filter !== 'all') parts.push(pb.filter('status = {:status}', { status: filter }));
-      const keyword = query.trim();
-      if (keyword) {
-        const safeKeyword = keyword.replace(/["\\]/g, '');
-        parts.push(pb.filter('(author_name ~ {:kw} || author_email ~ {:kw} || content ~ {:kw})', { kw: safeKeyword }));
-      }
-      const f = parts.length ? parts.join(' && ') : '';
-      const result = await pb.collection('comments').getList<Comment>(page, 20, { filter: f, sort: '-created', expand: 'post_id' });
-      setComments(result.items);
-      setTotalPages(result.totalPages);
-    } catch (err) {
-      console.error('获取评论失败：', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter, page, query]);
-
-  useEffect(() => { fetchComments(); }, [fetchComments]);
-
-  useEffect(() => { setPage(1); }, [filter, query]);
-
   const pageLabel = `第 ${page}/${Math.max(totalPages, 1)} 页 · ${comments.length} 条`;
-
-  const updateStatus = async (id: string, status: Comment['status']) => {
-    const pb = getPocketBase();
-    try {
-      await pb.collection('comments').update(id, { status });
-      showToast('状态更新成功', 'success');
-      fetchComments();
-    } catch (err) {
-      console.error('更新评论状态失败：', err);
-      if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
-      showToast(describePbError(err, '状态更新失败'), 'error');
-    }
-  };
-
-  const deleteComment = async (id: string) => {
-    setConfirmState({ open: true, title: '确认删除', message: '确定永久删除这条评论吗？', onConfirm: async () => {
-      const pb = getPocketBase();
-      try {
-        await pb.collection('comments').delete(id);
-        showToast('评论已删除', 'success');
-        fetchComments();
-      } catch (err) {
-        console.error('删除评论失败：', err);
-        if (notifyStepUpExpired(err)) { showToast('管理会话已过期，请重新验证动态口令', 'error'); return; }
-        showToast(describePbError(err, '删除失败'), 'error');
-      }
-    }});
-  };
 
   return (
     <div className="min-w-0 space-y-4">
@@ -187,7 +117,7 @@ export default function CommentModerator() {
                   {comment.status !== 'spam' && <button onClick={() => updateStatus(comment.id, 'spam')} className="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-md border border-warning/25 bg-warning/10 px-3 text-xs text-warning hover:bg-warning/15" title="标记垃圾评论">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg><span className="max-lg:hidden">垃圾</span>
                   </button>}
-                  <button onClick={() => deleteComment(comment.id)} className="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-md border border-danger/25 bg-danger/10 px-3 text-xs text-danger hover:bg-danger/15" title="删除">
+                  <button onClick={() => handleDeleteComment(comment.id)} className="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-md border border-danger/25 bg-danger/10 px-3 text-xs text-danger hover:bg-danger/15" title="删除">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg><span className="max-lg:hidden">删除</span>
                   </button>
                 </div>

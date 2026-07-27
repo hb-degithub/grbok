@@ -13,7 +13,6 @@ export default function TotpManager() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [confirmRevoke, setConfirmRevoke] = useState(false);
-  const [isRevoking, setIsRevoking] = useState(false);
   // 重新绑定流程
   const [rebindUri, setRebindUri] = useState('');
   const [rebindBase32, setRebindBase32] = useState('');
@@ -71,7 +70,6 @@ export default function TotpManager() {
   };
 
   const handleRevoke = async () => {
-    setIsRevoking(true);
     setError('');
     try {
       await revokeAdminTotp();
@@ -79,8 +77,6 @@ export default function TotpManager() {
       await loadStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : '吊销失败');
-    } finally {
-      setIsRevoking(false);
     }
   };
 

@@ -7,7 +7,7 @@ const authenticationFailure = Object.freeze({
   error: Object.freeze({ code: 'INTERNAL_ERROR', retryable: false }),
 });
 
-export function createMailHttpHandler({ verifier, service, config }) {
+export function createMailHttpHandler({ verifier, service, config, geo }) {
   return {
     async handle(req, res, url) {
       if (!url.pathname.startsWith('/internal/mail/')) return false;
@@ -69,6 +69,16 @@ export function createMailHttpHandler({ verifier, service, config }) {
             requireEmptyBody(rawBody);
             sendJson(res, 200, await service.status());
             return true;
+          case '/internal/mail/geo/lookup': {
+            if (!requireMethod(req, res, 'POST')) return true;
+            if (!geo || typeof geo.lookup !== 'function') {
+              sendJson(res, 200, { ok: true, country: '', region_code: '', city: '', degraded: true });
+              return true;
+            }
+            const payload = parseJsonObject(rawBody);
+            sendJson(res, 200, await geo.lookup(payload && payload.ip));
+            return true;
+          }
           default:
             sendJson(res, 404, authenticationFailure);
             return true;

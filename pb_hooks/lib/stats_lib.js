@@ -3,6 +3,7 @@
 const mailCrypto = require('./mail_crypto.js');
 
 const RATE_LIMIT_PER_MIN = 60;
+const STATS_RATE_LIMIT_PER_MIN = 30; // blogStats 查询接口限制更严格
 const WINDOW_MS = 60 * 1000;
 const RETENTION_DAYS = 90;
 
@@ -195,6 +196,17 @@ function trackView(e) {
     record.set('visitor_hash', visitorHashValue);
     record.set('event', event);
     if (event === 'link_click') record.set('target', target);
+    // 访客地理（仅 pageview 解析，link_click 复用意义不大且省一次内网调用）
+    if (event === 'pageview') {
+      try {
+        const geo = require('./stats_geo.js').resolve(e, ip);
+        if (geo && geo.country) {
+          record.set('country', geo.country);
+          record.set('region_code', geo.region_code || '');
+          record.set('city', geo.city || '');
+        }
+      } catch (_) {}
+    }
     $app.dao().saveRecord(record);
   } catch (_) {
     console.error('[stats][STATS_TRACK_SAVE_FAILED]');
@@ -205,21 +217,38 @@ function trackView(e) {
 }
 
 function blogStats(e) {
+  // 速率限制：防止恶意刷查询接口
+  const ip = getClientIP(e);
+  if (ip) {
+    let rateSubject;
+    try {
+      rateSubject = mailCrypto.hashPrivate('stats-query-ip', ip);
+    } catch (_) {
+      rateSubject = ip; // 降级使用原始 IP（仅内存中，不落库）
+    }
+    if (isRateLimited('bs:' + rateSubject, STATS_RATE_LIMIT_PER_MIN)) {
+      return e.json(429, { ok: false, error: 'RATE_LIMITED' });
+    }
+  }
+
   const range = e.queryParam('range') === '7d' ? '7d' : '30d';
   const from = rangeStart(range);
   const todayFrom = new Date(new Date().setHours(0, 0, 0, 0))
     .toISOString().replace('T', ' ').slice(0, 19);
 
   try {
-    const totalRows = queryRows(
-      'SELECT COUNT(*) AS c FROM page_views WHERE event = {:ev} AND created >= {:from}',
-      { ev: 'pageview', from: from }, { c: 0 });
-    const todayRows = queryRows(
-      'SELECT COUNT(*) AS c FROM page_views WHERE event = {:ev} AND created >= {:from}',
-      { ev: 'pageview', from: todayFrom }, { c: 0 });
-    const uvRows = queryRows(
-      'SELECT COUNT(DISTINCT visitor_hash) AS c FROM page_views WHERE event = {:ev} AND created >= {:from}',
-      { ev: 'pageview', from: from }, { c: 0 });
+    // 合并基础统计查询：totalViews, todayViews, uniqueVisitors
+    const baseStatsRows = queryRows(
+      `SELECT 
+        COUNT(*) AS total_views,
+        SUM(CASE WHEN created >= {:todayFrom} THEN 1 ELSE 0 END) AS today_views,
+        COUNT(DISTINCT visitor_hash) AS unique_visitors
+      FROM page_views 
+      WHERE event = {:ev} AND created >= {:from}`,
+      { ev: 'pageview', from: from, todayFrom: todayFrom }, 
+      { total_views: 0, today_views: 0, unique_visitors: 0 });
+
+    const baseStats = baseStatsRows[0] || { total_views: 0, today_views: 0, unique_visitors: 0 };
 
     const dailyRaw = queryRows(
       'SELECT DATE(created, \'localtime\') AS d, COUNT(*) AS c FROM page_views WHERE event = {:ev} AND created >= {:from} GROUP BY DATE(created, \'localtime\') ORDER BY d ASC',
@@ -233,9 +262,9 @@ function blogStats(e) {
 
     const response = {
       range: range,
-      totalViews: Number((totalRows[0] && totalRows[0].c) || 0),
-      todayViews: Number((todayRows[0] && todayRows[0].c) || 0),
-      uniqueVisitors: Number((uvRows[0] && uvRows[0].c) || 0),
+      totalViews: Number(baseStats.total_views || 0),
+      todayViews: Number(baseStats.today_views || 0),
+      uniqueVisitors: Number(baseStats.unique_visitors || 0),
       daily: dailyRaw.map((row) => ({ date: String(row.d), views: Number(row.c) })),
       topPages: topPagesRaw.map((row) => ({ path: String(row.path), views: Number(row.c) })),
       topReferrers: topRefRaw.map((row) => ({
@@ -252,6 +281,30 @@ function blogStats(e) {
         uaCategories: uaRaw.map((row) => ({
           category: String(row.ua_category),
           views: Number(row.c),
+        })),
+      };
+    }
+
+    // 访客地理聚合（仅 admin，用于后台地图；不返回 visitor_hash 与单条记录）
+    if (e.queryParam('geo') === '1' && isAdminRequest(e)) {
+      const countryRaw = queryRows(
+        "SELECT country, COUNT(*) AS c, COUNT(DISTINCT visitor_hash) AS uv FROM page_views WHERE event = {:ev} AND created >= {:from} AND country != '' GROUP BY country ORDER BY c DESC",
+        { ev: 'pageview', from: from }, { country: '', c: 0, uv: 0 });
+      const regionRaw = queryRows(
+        "SELECT country, region_code, city, COUNT(*) AS c, COUNT(DISTINCT visitor_hash) AS uv FROM page_views WHERE event = {:ev} AND created >= {:from} AND country != '' GROUP BY country, region_code ORDER BY c DESC",
+        { ev: 'pageview', from: from }, { country: '', region_code: '', city: '', c: 0, uv: 0 });
+      response.geo = {
+        countries: countryRaw.map((row) => ({
+          country: String(row.country),
+          views: Number(row.c),
+          uniqueVisitors: Number(row.uv),
+        })),
+        regions: regionRaw.map((row) => ({
+          country: String(row.country),
+          region: String(row.region_code),
+          city: String(row.city || ''),
+          views: Number(row.c),
+          uniqueVisitors: Number(row.uv),
         })),
       };
     }

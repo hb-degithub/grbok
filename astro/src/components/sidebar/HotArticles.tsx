@@ -1,21 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
+import { useHotPosts } from '../../hooks/domains/useHotPosts';
 import AnimatedList from '../reactbits/AnimatedList';
-import type { Post } from '../../types/pocketbase';
 
 export default function HotArticles() {
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const pb = getPocketBase();
-    pb.collection('posts')
-      .getList<Post>(1, 5, { filter: 'status = "published"', sort: '-views', fields: 'id,title,slug,cover,views,created' })
-      .then((res) => setPosts(res.items))
-      .catch((err) => console.error('加载热榜失败:', err))
-      .finally(() => setLoading(false));
-  }, []);
+  const { posts, loading } = useHotPosts(5);
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} className="space-y-3">

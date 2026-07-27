@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getPocketBase } from '../../lib/pocketbase';
-import type { Announcement } from '../../types/pocketbase';
+import { useAnnouncements } from '../../hooks/domains/useAnnouncements';
 import { cn } from '../../lib/utils';
 
 const typeStyles: Record<string, string> = {
@@ -12,15 +11,8 @@ const typeStyles: Record<string, string> = {
 };
 
 export default function AnnouncementBar() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const { announcements } = useAnnouncements(3);
   const [closed, setClosed] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    const pb = getPocketBase();
-    pb.collection('announcements').getList<Announcement>(1, 3, { sort: '-created' })
-      .then(r => setAnnouncements(r.items))
-      .catch(() => {});
-  }, []);
 
   if (announcements.length === 0) return null;
 
