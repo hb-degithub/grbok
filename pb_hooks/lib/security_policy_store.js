@@ -16,6 +16,7 @@ var DEFAULTS = {
   admin_test_global: { limit: 10, windowSeconds: 86400 },
   admin_security_write: { limit: 5, windowSeconds: 3600 },
   comment_notification: { limit: 60, windowSeconds: 60 },
+  comment_reply_notification: { limit: 60, windowSeconds: 60 },
   account_retention_notice: { limit: 10, windowSeconds: 60 },
   outbound_global: { limit: 60, windowSeconds: 60 },
 };
@@ -36,6 +37,7 @@ var BOUNDS = {
   admin_test_global: { minLimit: 10, maxLimit: 10, minWindow: 86400, maxWindow: 86400 },
   admin_security_write: { minLimit: 5, maxLimit: 5, minWindow: 3600, maxWindow: 3600 },
   comment_notification: { minLimit: 60, maxLimit: 60, minWindow: 60, maxWindow: 60 },
+  comment_reply_notification: { minLimit: 60, maxLimit: 60, minWindow: 60, maxWindow: 60 },
   account_retention_notice: { minLimit: 10, maxLimit: 10, minWindow: 60, maxWindow: 60 },
   outbound_global: { minLimit: 60, maxLimit: 60, minWindow: 60, maxWindow: 60 },
 };

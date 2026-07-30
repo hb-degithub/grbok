@@ -17,11 +17,12 @@ function string(value, max, name) {
 }
 function variables(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid('invalid variables');
-  // 变量白名单按模板分组：评论通知、保留通知、邮箱验证。
+  // 变量白名单按模板分组：评论通知、保留通知、邮箱验证、评论回复通知。
   var allowed = {
     postTitle: true, commenter: true, content: true, postUrl: true,
     displayName: true, cleanupDate: true, siteUrl: true,
     actionUrl: true, expiresMinutes: true,
+    parentCommenter: true, parentContent: true,
   };
   // 长字段单独放宽上限：content（评论正文）、actionUrl（含 token 的验证链接）。
   var longFields = { content: 2000, actionUrl: 1000 };
@@ -47,7 +48,7 @@ function enqueue(txDao, input) {
   var existing = findDedupe(txDao, dedupeKey);
   if (existing) return { queued: false, outboxId: existing.id };
   var category = string(input.category, 64, 'category');
-  if (category !== 'comment_notification' && category !== 'account_retention_notice' && category !== 'account_verification') invalid('invalid category');
+  if (category !== 'comment_notification' && category !== 'account_retention_notice' && category !== 'account_verification' && category !== 'comment_reply_notification') invalid('invalid category');
   var policyKey = category;
   var limit = rateLimit.consume(txDao, { nowMs: Date.now(), entries: [
     { policyKey: policyKey, subject: 'v1' }, { policyKey: 'outbound_global', subject: 'v1' },
@@ -56,7 +57,8 @@ function enqueue(txDao, input) {
   var templateKey = string(input.templateKey, 64, 'templateKey');
   if ((category === 'comment_notification' && templateKey !== 'comment_new') ||
       (category === 'account_retention_notice' && templateKey !== 'account_retention_notice') ||
-      (category === 'account_verification' && templateKey !== 'account_verification')) invalid('invalid template');
+      (category === 'account_verification' && templateKey !== 'account_verification') ||
+      (category === 'comment_reply_notification' && templateKey !== 'comment_reply')) invalid('invalid template');
   var record = new Record(txDao.findCollectionByNameOrId('mail_outbox'));
   record.set('dedupe_key', dedupeKey);
   record.set('event_id', $security.randomStringWithAlphabet(22, ALPHABET));
@@ -152,6 +154,15 @@ function render(record) {
     message.text += '\n' + loginUrl;
     return message;
   }
+  if (record.getString('template_key') === 'comment_reply') {
+    var subject = '评论回复: ' + string(vars.postTitle, 160, 'postTitle');
+    var html = '<h2>你的评论收到回复</h2><p><strong>文章:</strong> ' + templates.escapeHtml(vars.postTitle) +
+      '</p><p><strong>你的评论:</strong></p><blockquote>' + templates.escapeHtml(vars.parentContent) +
+      '</blockquote><p><strong>回复者:</strong> ' + templates.escapeHtml(vars.commenter) + '</p><blockquote>' +
+      templates.escapeHtml(vars.content) + '</blockquote><p><a href="' + templates.escapeHtml(vars.postUrl) + '">查看文章</a></p>';
+    var text = '你的评论收到回复\n文章: ' + vars.postTitle + '\n你的评论: ' + vars.parentContent + '\n回复者: ' + vars.commenter + '\n\n' + vars.content + '\n\n' + vars.postUrl;
+    return { subject: subject.slice(0, 255), html: html, text: text };
+  }
   if (record.getString('template_key') !== 'comment_new') invalid('unsupported template');
   var subject = '新评论: ' + string(vars.postTitle, 160, 'postTitle');
   var html = '<h2>你的文章收到新评论</h2><p><strong>文章:</strong> ' + templates.escapeHtml(vars.postTitle) +
@@ -199,9 +210,11 @@ function processBatch(nowMs, limit) {
       try {
         var cat = record.getString('category');
         var logCategory = cat === 'comment_notification' ? 'comment_new'
+          : cat === 'comment_reply_notification' ? 'comment_reply'
           : cat === 'account_verification' ? 'account_verification'
           : 'account_retention_notice';
         var logSource = cat === 'comment_notification' ? 'comment'
+          : cat === 'comment_reply_notification' ? 'comment'
           : cat === 'account_verification' ? 'registration'
           : 'retention';
         logs.delivery({ event_id: $security.randomStringWithAlphabet(22, ALPHABET), category: logCategory, source_kind: logSource, result: result, duration_ms: 0, attempt: record.getInt('attempt'), error_class: errorClass });

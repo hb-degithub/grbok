@@ -48,7 +48,12 @@ class InsightsService extends BaseService<ReactionRecord> {
 
   async getBlogStats(range: string = '7d'): Promise<BlogStatsResponse> {
     const pb = this.getPocketBase();
-    return pb.send<BlogStatsResponse>(`/api/blog-stats?range=${range}`, {
+    
+    // 验证 range 参数，防止注入
+    const ALLOWED_RANGES = ['24h', '7d', '30d', '90d', '1y'];
+    const safeRange = ALLOWED_RANGES.includes(range) ? range : '7d';
+    
+    return pb.send<BlogStatsResponse>(`/api/blog-stats?range=${safeRange}`, {
       method: 'GET',
     });
   }
@@ -56,20 +61,36 @@ class InsightsService extends BaseService<ReactionRecord> {
   async getPostEngagement(postIds: string[]): Promise<PostEngagement[]> {
     const pb = this.getPocketBase();
     
+    // 验证 PocketBase ID 格式（15 位字母数字）
+    const ID_RE = /^[a-z0-9]{15}$/;
+    const safeIds = postIds.filter(id => ID_RE.test(id));
+    
+    if (safeIds.length === 0) {
+      return [];
+    }
+    
+    // 构建参数化 filter
+    const buildIdFilter = (field: string) => {
+      return safeIds.map((id, i) => {
+        const key = `id${i}`;
+        return pb.filter(`${field} = {:${key}}`, { [key]: id });
+      }).join(' || ');
+    };
+    
     // 获取文章信息
     const postsResult = await pb.collection('posts').getList(1, 100, {
-      filter: postIds.map(id => `id = "${id}"`).join(' || '),
+      filter: buildIdFilter('id'),
       fields: 'id,title,views',
     });
     
     // 获取反应统计
     const reactionsResult = await pb.collection('reactions').getList(1, 500, {
-      filter: postIds.map(id => `post_id = "${id}"`).join(' || '),
+      filter: buildIdFilter('post_id'),
     });
     
     // 获取评论统计
     const commentsResult = await pb.collection('comments').getList(1, 500, {
-      filter: postIds.map(id => `post_id = "${id}"`).join(' || ') + ' && status = "approved"',
+      filter: buildIdFilter('post_id') + ' && status = "approved"',
     });
     
     // 计算每个文章的互动分数

@@ -72,7 +72,12 @@ class MailService extends BaseService<MailMessageRecord> {
       const record = await pb.collection('settings').getFirstListItem(
         pb.filter('key = {:key}', { key: 'smtp_config' })
       );
-      return record.value as SmtpConfig;
+      const config = record.value as SmtpConfig;
+      // 遮蔽密码，防止泄露到前端
+      return {
+        ...config,
+        password: config.password ? '••••••••' : '',
+      };
     } catch {
       return null;
     }
@@ -84,7 +89,13 @@ class MailService extends BaseService<MailMessageRecord> {
       const existing = await pb.collection('settings').getFirstListItem(
         pb.filter('key = {:key}', { key: 'smtp_config' })
       );
-      await pb.collection('settings').update(existing.id, { value: config });
+      // 如果密码是遮蔽值，保留原密码不更新
+      const existingConfig = existing.value as SmtpConfig;
+      const newConfig = {
+        ...config,
+        password: config.password === '••••••••' ? existingConfig.password : config.password,
+      };
+      await pb.collection('settings').update(existing.id, { value: newConfig });
     } catch {
       await pb.collection('settings').create({ key: 'smtp_config', value: config });
     }

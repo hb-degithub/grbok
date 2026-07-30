@@ -49,6 +49,10 @@ function GeoMap({ worldData, chinaData, maxViews }: GeoMapProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // 地图尺寸常量
+  const width = mode === 'china' ? 800 : 800;
+  const height = mode === 'china' ? 500 : 420;
+
   // 加载地图数据（仅当缓存为空时）
   useEffect(() => {
     if (cachedWorldGeos && cachedChinaGeos) {
@@ -148,9 +152,6 @@ function GeoMap({ worldData, chinaData, maxViews }: GeoMapProps) {
   const handleMouseLeave = useCallback(() => {
     setHoveredRegion(null);
   }, []);
-
-  const width = mode === 'china' ? 800 : 800;
-  const height = mode === 'china' ? 500 : 420;
 
   // 缓存 path 计算，避免 hover 时全量重算
   const pathCache = useMemo(() => {

@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import EsaCacheManager from '../../components/admin/cache/EsaCacheManager';
+---
+
+<AdminLayout title="缓存管理" description="阿里云 ESA 边缘缓存刷新" requiredRole="super_admin">
+  <EsaCacheManager client:only="react" />
+</AdminLayout>

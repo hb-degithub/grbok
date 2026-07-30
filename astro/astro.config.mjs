@@ -42,6 +42,8 @@ export default defineConfig({
             if (/[\\/]node_modules[\\/]gsap[\\/]/.test(id)) return 'gsap-vendor';
             if (/[\\/]node_modules[\\/]framer-motion[\\/]/.test(id)) return 'framer-vendor';
             if (/[\\/]node_modules[\\/]pocketbase[\\/]/.test(id)) return 'pocketbase-vendor';
+            if (/[\\/]node_modules[\\/]echarts[\\/]/.test(id)) return 'echarts-vendor';
+            if (/[\\/]node_modules[\\/]zrender[\\/]/.test(id)) return 'echarts-vendor';
           },
         },
       },

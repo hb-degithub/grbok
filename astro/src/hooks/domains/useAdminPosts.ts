@@ -36,13 +36,11 @@ export function useAdminPosts() {
     }
   }, [filter, page, query]);
 
-  useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
-
+  // 当 filter 或 query 变化时，重置 page 为 1 并获取数据
   useEffect(() => {
     setPage(1);
-  }, [filter, query]);
+    fetchPosts();
+  }, [filter, query, fetchPosts]);
 
   // Load available tags when editing
   useEffect(() => {
@@ -93,18 +91,18 @@ export function useAdminPosts() {
     if (!editing) return;
     setSaving(true);
     try {
-      const data: Record<string, unknown> = {
+      const data: Partial<Post> = {
         title: editing.title,
         slug: editing.slug,
         excerpt: editing.excerpt || '',
         content: editing.content || '',
         cover: editing.cover || '',
         status: editing.status,
-        is_pinned: (editing as any).is_pinned ?? false,
-        is_featured: (editing as any).is_featured ?? false,
-        seo_title: (editing as any).seo_title || '',
-        seo_description: (editing as any).seo_description || '',
-        seo_keywords: (editing as any).seo_keywords || '',
+        is_pinned: editing.is_pinned ?? false,
+        is_featured: editing.is_featured ?? false,
+        seo_title: editing.seo_title || '',
+        seo_description: editing.seo_description || '',
+        seo_keywords: editing.seo_keywords || '',
       };
       const publishedAt = 'published_at' in editing ? editing.published_at : '';
       if (editing.status === 'published' && !publishedAt) {

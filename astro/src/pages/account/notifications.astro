@@ -1,0 +1,8 @@
+---
+import AuthLayout from '../../layouts/AuthLayout.astro';
+import NotificationSettings from '../../components/auth/NotificationSettings';
+---
+
+<AuthLayout title="通知设置" description="管理邮件通知偏好" noindex>
+  <NotificationSettings client:load />
+</AuthLayout>

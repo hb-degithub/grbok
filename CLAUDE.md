@@ -189,3 +189,37 @@ Static files are served from `astro/dist/`, mounted read-only at `/srv` in Caddy
 - `pagefind` runs as a post-build step in `npm run build`.
 - Caddy admin UI (`/_/*`) is IP-whitelisted via `ADMIN_IP` env var.
 - `astro/dist/` is gitignored; build output only exists locally and in deploy artifacts.
+
+## Subagents (子智能体优先级约定)
+
+本项目在 `.codebuddy/agents/` 下配置了 16 个自定义子智能体，**优先于系统内置子代理（如内置 `code-explorer`）使用**。当任务与以下任一 description 关键词匹配时，应触发对应的自定义子智能体，而非回退到内置代理或主模型：
+
+| 子智能体 | 模型 | 职责 |
+|----------|------|------|
+| code-reviewer | Qwen3.8-Max-Preview | 代码审查（质量/安全/可维护性） |
+| security-auditor | Qwen3.8-Max-Preview | 安全审计（OWASP/注入/XSS） |
+| pb-migration-expert | Qwen3.8-Max-Preview | PocketBase 迁移脚本 |
+| frontend-ui-expert | Qwen3.8-Max-Preview | 前端 UI/组件/样式 |
+| devops-deployer | Qwen3.8-Max-Preview | Docker/Caddy/部署 |
+| test-writer | Qwen3.8-Max-Preview | 单元测试/端到端测试 |
+| pb-hooks-expert | Qwen3.8-Max-Preview | PocketBase 后端 hook |
+| seo-content-expert | Qwen3.8-Max-Preview | SEO/内容/Pagefind |
+| code-explorer | Qwen3.8-Max-Preview | 代码库探索（替代内置 code-explorer） |
+| debugger | Qwen3.8-Max-Preview | 调试/报错/堆栈追踪 |
+| api-designer | Qwen3.8-Max-Preview | Astro API 路由 / PocketBase 接口 |
+| refactoring-expert | Qwen3.8-Max-Preview | 重构/架构优化 |
+| documentation-writer | Qwen3.8-Max-Preview | 技术文档/注释 |
+| performance-optimizer | Qwen3.8-Max-Preview | 性能优化/加载速度 |
+| content-writer | Qwen3.8-Max-Preview | 博客文章/文案 |
+| git-workflow | Qwen3.8-Max-Preview | Git 操作/版本管理 |
+
+### 模型约定
+- **所有子智能体统一使用 `Qwen3.8-Max-Preview` 模型**，不再使用 `hy3` 或 `xopglm52`。
+- `Qwen3.8-Max-Preview` 为通义千问 3.8 Max 预览版模型，具备强大的代码理解和生成能力。
+- 主模型仅用于主会话编排，不应在子智能体中直接调用。
+- 子智能体配置文件中的 `model` 字段必须使用 **Markdown 链接格式**：
+  ```yaml
+  model: '[Qwen3.8-Max-Preview](qmodel_preview)'
+  ```
+- **注意**：直接使用显示名称 `Qwen3.8-Max-Preview` 会导致 40506 错误（model not found）。
+- 子智能体可通过 Agent 工具的 `subagent_type` 参数直接调用（如 `code-reviewer`），系统会自动加载配置文件中指定的模型。

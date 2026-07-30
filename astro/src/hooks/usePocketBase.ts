@@ -30,7 +30,7 @@ export function usePocketBase() {
     getPost: useCallback(async (slug: string) => {
       try {
         const result = await postService.getFirstListItem(
-          `slug = "${slug}" && status = "published"`,
+          pb.filter('slug = {:slug} && status = "published"', { slug }),
           { expand: 'author' }
         );
         return { data: result, error: null };
@@ -38,7 +38,7 @@ export function usePocketBase() {
         console.error('获取文章失败:', err);
         return { data: null, error: err };
       }
-    }, []),
+    }, [pb]),
 
     getComments: useCallback(async (postId: string) => {
       try {
@@ -131,7 +131,7 @@ export function usePosts(page = 1, perPage = 10, tagSlug?: string) {
             setTotalPages(1);
             return;
           }
-          filter += ` && id in '${postIds.join(',')}'`;
+          filter += pb.filter(' && id in {:postIds}', { postIds: postIds.join(',') });
         }
 
         const result = await pb.collection('posts').getList<Post>(page, perPage, {

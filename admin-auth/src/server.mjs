@@ -10,6 +10,7 @@ import { createMailRequestVerifier } from './mail/request-auth.mjs';
 import { createMailService } from './mail/service.mjs';
 import { createMailTransport } from './mail/transport.mjs';
 import { createGeoService } from './mail/geo.mjs';
+import { createEsaHttpHandler } from './esa/http.mjs';
 import { isVerifiedSessionValid } from './session-policy.mjs';
 import { createStepUpCredential, verifyStepUpCredential } from './step-up-policy.mjs';
 
@@ -245,7 +246,9 @@ export function startServer({
   const mailVerifier = createMailRequestVerifier({ secret: config.mailInternalSecret });
   const geoService = createGeoService({ mmdbPath: env.GEO_MMDB_PATH });
   const mailHttpHandler = createMailHttpHandler({ verifier: mailVerifier, service: mailService, config: mailConfig, geo: geoService });
-  const server = createServer({ config, mailHttpHandler });
+  // ESA 缓存刷新通道与邮件通道共用同一内网签名密钥（MAIL_INTERNAL_SECRET）
+  const esaHttpHandler = createEsaHttpHandler({ verifier: mailVerifier });
+  const server = createServer({ config, mailHttpHandler, esaHttpHandler });
 
   server.listen(port, host, () => {
     console.log(`admin-auth listening on ${host}:${port}`);

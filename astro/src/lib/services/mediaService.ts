@@ -3,7 +3,7 @@ import type { RecordModel } from 'pocketbase';
 
 export interface MediaAsset {
   id: string;
-  filename: string;
+  file: string;  // PocketBase 文件字段名
   original_name: string;
   mime_type: string;
   size: number;
@@ -95,7 +95,7 @@ class MediaService extends BaseService<MediaAssetRecord> {
 
   getFileUrl(record: MediaAsset, thumb?: string): string {
     const pb = this.getPocketBase();
-    return pb.files.getUrl(record as unknown as RecordModel, record.filename, thumb ? { thumb } : undefined);
+    return pb.files.getUrl(record as unknown as RecordModel, record.file, thumb ? { thumb } : undefined);
   }
 }
 

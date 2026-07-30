@@ -111,7 +111,8 @@ class AuthService extends BaseService<UserRecord> {
   getUserEmailVerified(): boolean | undefined {
     const pb = this.getPocketBase();
     if (pb.authStore.isValid && pb.authStore.record) {
-      return !!(pb.authStore.record as any).verified;
+      const record = pb.authStore.record as UserRecord;
+      return !!record.verified;
     }
     return undefined;
   }

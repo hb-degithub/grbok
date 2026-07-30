@@ -39,7 +39,7 @@ class StatsService extends BaseService<StatsRecord> {
   async getBlogStats(variant: 'public' | 'admin' = 'public'): Promise<StatsData> {
     const query = variant === 'admin'
       ? { range: '30d', detail: '1', geo: '1' }
-      : { range: '30d' };
+      : { range: '30d', geo: '1' }; // 公开变体也请求地理数据
 
     return this.send<StatsData>('/api/blog-stats', {
       method: 'GET',

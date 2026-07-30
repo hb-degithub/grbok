@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import CountUp from '../reactbits/CountUp';
 import { fadeUp, staggerContainer } from '../../lib/motion';
 import { useStats } from '../../hooks/domains/useStats';
-import GeoMap from './GeoMap';
+import DualModeGeoMap from './DualModeGeoMap';
 import { ALPHA2_TO_NUMERIC, PROVINCE_TO_ADCODE } from '../../lib/geoConstants';
 import type { StatsData } from '../../lib/services/statsService';
 
@@ -157,13 +157,13 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
         </motion.div>
       </div>
 
-      {/* 访客地理分布 - 仅 admin 变体显示 */}
-      {variant === 'admin' && geoCountries.length > 0 && (
+      {/* 访客地理分布 - 所有变体都显示 */}
+      {geoCountries.length > 0 && (
         <motion.div variants={fadeUp} className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
           <h3 className="mb-4 text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">访客地理分布</h3>
           <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
             {/* 地图 */}
-            <GeoMap
+            <DualModeGeoMap
               worldData={worldMapData}
               chinaData={chinaMapData}
               maxViews={maxGeoViews}

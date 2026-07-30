@@ -16,6 +16,8 @@ export interface User {
   avatar?: string;
   role?: string;
   verified?: boolean;
+  notify_comment_reply?: boolean;
+  notify_post_comment?: boolean;
   created: string;
   updated: string;
 }
@@ -59,6 +61,35 @@ class UserService extends BaseService<UserRecord> {
   isLoggedIn(): boolean {
     const pb = this.getPocketBase();
     return pb.authStore.isValid && !!pb.authStore.record;
+  }
+
+  /**
+   * 获取当前用户通知偏好
+   */
+  getNotificationPreferences(): { notify_comment_reply: boolean; notify_post_comment: boolean } {
+    const pb = this.getPocketBase();
+    const record = pb.authStore.record;
+    return {
+      notify_comment_reply: record?.notify_comment_reply !== false,
+      notify_post_comment: record?.notify_post_comment !== false,
+    };
+  }
+
+  /**
+   * 更新当前用户通知偏好
+   */
+  async updateNotificationPreferences(prefs: { notify_comment_reply?: boolean; notify_post_comment?: boolean }): Promise<{ success: boolean; error?: unknown }> {
+    try {
+      const pb = this.getPocketBase();
+      if (!pb.authStore.record?.id) {
+        throw new Error('用户未登录');
+      }
+      await pb.collection('users').update(pb.authStore.record.id, prefs);
+      return { success: true };
+    } catch (err) {
+      console.error('更新通知偏好失败:', err);
+      return { success: false, error: err };
+    }
   }
 }
 
