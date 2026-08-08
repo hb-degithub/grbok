@@ -3,7 +3,7 @@ import './SplitText.css';
 
 const SplitText = ({
   text,
-  className,
+  className = '',
   delay = 0,
   staggerDelay = 0.03,
   as = 'span',

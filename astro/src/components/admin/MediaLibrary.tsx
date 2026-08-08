@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useMediaLibrary } from '../../hooks/domains/useMediaLibrary';
 import { useAdminAuth } from '../../hooks/useAdminAuth';
 import { showToast } from '../ui/Toast';
@@ -16,7 +16,7 @@ const listVariants = {
   hidden: { opacity: 1 },
   visible: { transition: { staggerChildren: 0.03 } },
 };
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 8, scale: 0.98 },
   visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } },
 };
@@ -135,7 +135,7 @@ export default function MediaLibrary({ onSelect, onClose }: MediaLibraryProps) {
             >
               <img
                 src={getFileUrl(asset, '200x200')}
-                alt={asset.original_name}
+                alt={asset.alt || '媒体文件'}
                 className="h-full w-full object-cover"
                 loading="lazy"
               />
@@ -156,7 +156,7 @@ export default function MediaLibrary({ onSelect, onClose }: MediaLibraryProps) {
                   )}
                 </div>
                 <div className="text-white">
-                  <p className="truncate text-xs font-medium">{asset.original_name}</p>
+                  <p className="truncate text-xs font-medium">{asset.alt || '未命名'}</p>
                   <p className="text-[10px] opacity-80">{formatSize(asset.size)}</p>
                 </div>
               </div>

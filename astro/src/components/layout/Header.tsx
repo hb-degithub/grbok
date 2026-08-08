@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { motion, useScroll, useMotionValueEvent, AnimatePresence } from 'framer-motion';
 import Dock from '../reactbits/Dock';
 import SideNav from './SideNav';
@@ -99,11 +99,21 @@ export default function Header() {
     };
   }, []);
 
+  // 标记"本次 pointerdown 已因外部点击关闭"，防止随后 click 重新打开
+  const closedByOutsideClickRef = useRef(false);
+
   useEffect(() => {
     if (!themeMenuOpen && !moreMenuOpen) return;
     const handlePointerDown = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setThemeMenuOpen(false);
-      if (!moreMenuRef.current?.contains(event.target as Node)) setMoreMenuOpen(false);
+      closedByOutsideClickRef.current = false;
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setThemeMenuOpen(false);
+        closedByOutsideClickRef.current = true;
+      }
+      if (!moreMenuRef.current?.contains(event.target as Node)) {
+        setMoreMenuOpen(false);
+        closedByOutsideClickRef.current = true;
+      }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -122,7 +132,12 @@ export default function Header() {
   useMotionValueEvent(scrollY, 'change', (latest) => {
     const delta = latest - lastScrollY.current;
     if (latest < 80) setIsVisible(true);
-    else if (delta > 5) setIsVisible(false);
+    else if (delta > 5) {
+      setIsVisible(false);
+      // 滚动隐藏时关闭下拉菜单，避免菜单悬停原地
+      setThemeMenuOpen(false);
+      setMoreMenuOpen(false);
+    }
     else if (delta < -5) setIsVisible(true);
     lastScrollY.current = latest;
   });
@@ -140,9 +155,9 @@ export default function Header() {
     setThemeMenuOpen(false);
   };
 
-  const openSearch = () => {
+  const openSearch = useCallback(() => {
     window.dispatchEvent(new Event('blog-search-open'));
-  };
+  }, []);
 
   const isActive = (href: string) => {
     if (href === '/') return currentPath === '/';
@@ -167,7 +182,11 @@ export default function Header() {
       {
         icon: <Icon d={resolvedTheme === 'dark' ? 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z' : 'M12 3v2m0 14v2m7.071-16.071-1.414 1.414M6.343 17.657l-1.414 1.414M21 12h-2M5 12H3m16.071 7.071-1.414-1.414M6.343 6.343 4.929 4.929M16 12a4 4 0 11-8 0 4 4 0 018 0z'} />,
         label: `主题：${activeThemeLabel}`,
-        onClick: () => { setThemeMenuOpen((open) => !open); setMoreMenuOpen(false); },
+        onClick: () => {
+          if (closedByOutsideClickRef.current) { closedByOutsideClickRef.current = false; return; }
+          setThemeMenuOpen((open) => !open);
+          setMoreMenuOpen(false);
+        },
         hasPopup: 'menu',
         expanded: themeMenuOpen,
         active: false,
@@ -175,7 +194,11 @@ export default function Header() {
       {
         icon: <Icon d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />,
         label: '更多',
-        onClick: () => { setMoreMenuOpen((open) => !open); setThemeMenuOpen(false); },
+        onClick: () => {
+          if (closedByOutsideClickRef.current) { closedByOutsideClickRef.current = false; return; }
+          setMoreMenuOpen((open) => !open);
+          setThemeMenuOpen(false);
+        },
         hasPopup: 'menu',
         expanded: moreMenuOpen,
         active: MORE_LINKS.some((link) => isActive(link.href)),
@@ -208,7 +231,7 @@ export default function Header() {
     }
     return items;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPath, openSearch, resolvedTheme, activeThemeLabel, themeMenuOpen, moreMenuOpen, isLoading, isAuthenticated, user]);
+  }, [currentPath, resolvedTheme, activeThemeLabel, themeMenuOpen, moreMenuOpen, isLoading, isAuthenticated, user]);
 
   return (
     <>

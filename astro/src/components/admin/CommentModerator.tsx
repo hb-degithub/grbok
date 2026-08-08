@@ -1,9 +1,9 @@
 ﻿import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import { useAdminComments, type CommentFilter } from '../../hooks/domains/useAdminComments';
 import { cn } from '../../lib/utils';
 import ConfirmDialog from '../ui/ConfirmDialog';
-import type { Comment } from '../../types/pocketbase';
+import type { Comment } from '../../lib/services/adminCommentService';
 
 const statusColors: Record<string, string> = {
   pending: 'bg-warning/15 text-warning border-warning/30',
@@ -14,17 +14,17 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = { pending: '待审核', approved: '已通过', spam: '垃圾评论' };
 const filterLabels: Record<CommentFilter, string> = { pending: '待审核', all: '全部', approved: '已通过', spam: '垃圾评论' };
 
-const listVariants = {
+const listVariants: Variants = {
   hidden: { opacity: 1 },
   visible: { transition: { staggerChildren: 0.04 } }
 };
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 8 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } }
 };
 
 function getPostTitle(comment: Comment) {
-  return ((comment.expand?.post_id as unknown as { title?: string } | undefined)?.title) || comment.post_id;
+  return comment.expand?.post?.title || comment.post;
 }
 
 export default function CommentModerator() {

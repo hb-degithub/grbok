@@ -1,8 +1,8 @@
 import React from 'react';
-import { motion, type HTMLMotionProps } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
 
-interface InputProps extends Omit<HTMLMotionProps<'input'>, 'ref'> {
+interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'ref'> {
   label?: string;
   error?: string;
   helperText?: string;

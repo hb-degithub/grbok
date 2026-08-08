@@ -48,7 +48,7 @@ class VersionHistoryService extends BaseService<PostVersionRecord> {
       sort: '-updated',
       fields: 'id,title,slug',
     });
-    return result.items as Post[];
+    return result.items as unknown as Post[];
   }
 
   async compareVersions(leftId: string, rightId: string) {

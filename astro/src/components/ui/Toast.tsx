@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export interface ToastMessage {
   id: string;
   text: string;
-  type: 'success' | 'error' | 'info';
+  type: 'success' | 'error' | 'info' | 'warning';
 }
 
 let toastId = 0;
@@ -25,7 +25,7 @@ export default function ToastContainer() {
 
   useEffect(() => { globalAddToast = addToast; return () => { globalAddToast = null; }; }, [addToast]);
 
-  const colors: Record<string, string> = { success: 'bg-success/10 border-success/25 text-success', error: 'bg-danger/10 border-danger/25 text-danger', info: 'bg-accent/10 border-accent/25 text-accent' };
+  const colors: Record<string, string> = { success: 'bg-success/10 border-success/25 text-success', error: 'bg-danger/10 border-danger/25 text-danger', info: 'bg-accent/10 border-accent/25 text-accent', warning: 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400' };
 
   return (
     <div className="fixed bottom-4 right-4 z-[200] flex flex-col gap-2" style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>

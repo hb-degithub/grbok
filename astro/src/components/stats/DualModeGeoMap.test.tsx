@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import React from 'react';
 
 // Mock ECharts
@@ -25,6 +25,7 @@ class MockResizeObserver {
 global.ResizeObserver = MockResizeObserver as any;
 
 import DualModeGeoMap from './DualModeGeoMap';
+import { echarts } from '../../lib/echarts-map';
 
 const mockWorldData = {
   '156': { views: 1200, uv: 800, name: 'China' },
@@ -88,9 +89,15 @@ describe('DualModeGeoMap', () => {
     );
 
     await waitFor(() => {
-      const tabs = screen.getAllByRole('tab');
-      tabs[1].click(); // 切换到中国地图
+      expect(screen.getByRole('tablist')).toBeTruthy();
     });
+
+    // 等待图表实例创建完成（chartInstance 就绪后模式切换才生效）
+    await waitFor(() => {
+      expect(echarts.init).toHaveBeenCalled();
+    });
+
+    fireEvent.click(screen.getAllByRole('tab')[1]); // 切换到中国地图
 
     await waitFor(() => {
       expect(screen.getByText(/南海诸岛/)).toBeTruthy();

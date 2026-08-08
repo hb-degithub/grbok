@@ -15,6 +15,7 @@ import DebugProtection from '../components/effects/DebugProtection';
 import SplashOverlay from '../components/effects/SplashOverlay';
 import WelcomeOverlay from '../components/effects/WelcomeOverlay';
 import CursorGlow from '../components/effects/CursorGlow';
+import CursorAim from '../components/effects/CursorAim';
 import ToastContainer from '../components/ui/Toast';
 import { SITE_CONFIG } from '../config/site';
 
@@ -183,7 +184,8 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     <DebugProtection client:idle />
     <SplashOverlay client:idle />
     <WelcomeOverlay client:idle />
-    <CursorGlow client:only="react" />
+    <CursorGlow client:only="react" transition:persist="cursor-glow" />
+    <CursorAim client:only="react" transition:persist="cursor-aim" />
   <ToastContainer client:idle />
     <script define:vars={{ pbBase: import.meta.env.PUBLIC_POCKETBASE_URL || '' }}>
   // 访问统计探针：页面浏览（含客户端导航）通过 sendBeacon 上报。

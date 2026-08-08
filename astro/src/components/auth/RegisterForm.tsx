@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { usePocketBase } from '../../hooks/usePocketBase';
 import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
@@ -89,13 +89,13 @@ export default function RegisterForm() {
     setErrorMessage('注册失败，请检查信息后重试');
   };
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: { opacity: 0, y: 16 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.08, ease: [0.16, 1, 0.3, 1] } },
     exit: { opacity: 0, y: -16, transition: { duration: 0.25 } },
   };
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: { opacity: 0, y: 12 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
   };

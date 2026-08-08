@@ -2,9 +2,9 @@ import { motion, useReducedMotion } from 'framer-motion';
 import './ScrollFloat.css';
 
 const ScrollFloat = ({
-  children,
+  children = undefined,
   text,
-  className,
+  className = '',
   delay = 0,
   duration = 0.8,
 }) => {

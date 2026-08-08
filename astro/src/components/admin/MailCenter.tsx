@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useMailCenter, useSmtpConfig, useMailTemplate, type TabKey } from '../../hooks/domains/useMailCenter';
-import { mailService, type TemplateItem } from '../../lib/services/mailService';
+import type { TemplateItem } from '../../lib/services/mailService';
 import { describePbError } from '../../lib/pb-error';
 import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 import { getSecurityPolicies, putSecurityPolicies, type PolicyDto } from '../../lib/admin-security-policy';

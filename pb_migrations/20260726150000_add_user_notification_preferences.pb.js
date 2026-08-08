@@ -8,6 +8,8 @@ migrate((db) => {
   }
 
   // 添加通知偏好字段
+  // 注意：迁移脚本禁用原生数组方法（find/push/filter 等），
+  // 必须使用 PocketBase 提供的 getFieldByName / addField API
   const addField = (collection, field) => {
     try {
       const existing = collection.schema.getFieldByName(field.name);
@@ -55,10 +57,18 @@ migrate((db) => {
   const users = dao.findCollectionByNameOrId("users");
   
   if (users) {
-    // 回滚：移除字段
-    users.schema = users.schema.filter(f => 
-      f.name !== "notify_comment_reply" && f.name !== "notify_post_comment"
-    );
+    // 回滚：使用 PocketBase API 逐个移除字段
+    // 注意：迁移脚本禁用原生数组方法（filter 等），users.schema
+    // 是 SchemaFieldList 包装对象而非普通数组，不能使用 .filter()，
+    // 必须用 getFieldByName + removeField
+    const replyField = users.schema.getFieldByName("notify_comment_reply");
+    if (replyField && replyField.id) {
+      users.schema.removeField(replyField.id);
+    }
+    const postCommentField = users.schema.getFieldByName("notify_post_comment");
+    if (postCommentField && postCommentField.id) {
+      users.schema.removeField(postCommentField.id);
+    }
     dao.saveCollection(users);
   }
 });

@@ -9,6 +9,34 @@ import useBreakpoint from '../../hooks/useBreakpoint';
 
 const STORAGE_KEY = 'blog-welcomed';
 
+// Stepper 为 JSX forwardRef 组件，TS 无法推断其 props，这里显式标注以通过 astro check
+interface StepperImperative {
+  next: () => void;
+  back: () => void;
+  complete: () => void;
+  goTo: (step: number) => void;
+}
+interface StepperProps {
+  ref?: React.Ref<StepperImperative>;
+  initialStep?: number;
+  onStepChange?: (step: number) => void;
+  onFinalStepCompleted?: () => void;
+  stepCircleContainerClassName?: string;
+  stepContainerClassName?: string;
+  contentClassName?: string;
+  footerClassName?: string;
+  backButtonProps?: Record<string, unknown>;
+  nextButtonProps?: Record<string, unknown>;
+  backButtonText?: string;
+  nextButtonText?: string;
+  completeButtonText?: string;
+  disableStepIndicators?: boolean;
+  hideFooterNext?: (step: number) => boolean;
+  renderStepIndicator?: (props: unknown) => React.ReactNode;
+  children?: React.ReactNode;
+}
+const StepperTyped = Stepper as unknown as React.ComponentType<StepperProps>;
+
 const registerLimiter = new RateLimiter(5, 0.2);
 
 function hasBeenWelcomed(): boolean {
@@ -48,7 +76,7 @@ export default function WelcomeOverlay() {
   // registration succeeds — the registration step has no footer "next" button,
   // so the only way forward is a successful register (auto-advances) or the
   // explicit "skip registration" confirmation.
-  const stepperRef = useRef(null);
+  const stepperRef = useRef<StepperImperative | null>(null);
 
   // Track all pending timeouts so they can be cancelled on unmount — otherwise
   // they fire setState on a torn-down component (dev-mode warning, stepper
@@ -95,7 +123,13 @@ export default function WelcomeOverlay() {
     return () => { document.body.style.overflow = prev; };
   }, [visible]);
 
-  // ESC dismiss
+  const dismiss = useCallback(() => {
+    if (regStatus === 'loading') return; // 提交中禁止关闭
+    markWelcomed();
+    setVisible(false);
+  }, [regStatus]);
+
+  // ESC dismiss（注册提交中禁止关闭）
   useEffect(() => {
     if (!visible) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -103,12 +137,7 @@ export default function WelcomeOverlay() {
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [visible]);
-
-  const dismiss = useCallback(() => {
-    markWelcomed();
-    setVisible(false);
-  }, []);
+  }, [visible, dismiss]);
 
   const handleFinalStep = useCallback(() => {
     markWelcomed();
@@ -125,12 +154,13 @@ export default function WelcomeOverlay() {
     const trimmedName = regName.trim();
     const trimmedEmail = regEmail.trim();
 
-    if (!trimmedName || !trimmedEmail || !regPassword) {
+    if (!trimmedName || !regPassword) {
       setRegStatus('error');
-      setRegError('请填写昵称、邮箱和密码');
+      setRegError('请填写昵称和密码');
       return;
     }
-    if (!isValidEmail(trimmedEmail)) {
+    // 邮箱可选：仅在填写时校验格式
+    if (trimmedEmail && !isValidEmail(trimmedEmail)) {
       setRegStatus('error');
       setRegError('邮箱格式不正确');
       return;
@@ -150,7 +180,7 @@ export default function WelcomeOverlay() {
     setRegError('');
 
     const { success } = await registerReader({
-      email: trimmedEmail,
+      email: trimmedEmail || undefined,
       name: trimmedName,
       password: regPassword,
       passwordConfirm: regPassword,
@@ -205,14 +235,14 @@ export default function WelcomeOverlay() {
             transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
             className={isLandscapePhone ? 'w-full max-w-lg max-h-[90dvh] overflow-y-auto p-4' : 'w-full max-w-lg'}
           >
-            <Stepper
+            <StepperTyped
               ref={stepperRef}
               initialStep={1}
               onFinalStepCompleted={handleFinalStep}
               backButtonText="上一步"
               nextButtonText="下一步"
               completeButtonText="开始探索"
-              hideFooterNext={(step) => !isLoggedIn && step === registrationStepNumber}
+              hideFooterNext={(step: number) => !isLoggedIn && step === registrationStepNumber}
               stepCircleContainerClassName={isLandscapePhone ? 'landscape-compact' : ''}
               footerClassName={isLandscapePhone ? 'landscape-compact' : ''}
             >
@@ -318,7 +348,7 @@ export default function WelcomeOverlay() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
                         </div>
-                        <p className="text-sm font-medium text-teal-700 dark:text-teal-300">提交后请验证邮箱，验证完成后可评论</p>
+                        <p className="text-sm font-medium text-teal-700 dark:text-teal-300">{registeredEmail ? '提交后请验证邮箱，验证完成后可评论' : '注册成功！'}</p>
                       </motion.div>
                     ) : (
                       <div className="space-y-3">
@@ -335,7 +365,7 @@ export default function WelcomeOverlay() {
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">邮箱</label>
+                          <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">邮箱（可选）</label>
                           <input
                             type="email"
                             value={regEmail}
@@ -410,8 +440,8 @@ export default function WelcomeOverlay() {
                 </Step>
               )}
 
-              {/* Step 5: Email verification prompt (only after successful registration) */}
-              {!isLoggedIn && regStatus === 'success' && (
+              {/* Step 5: Email verification prompt (only after successful registration with email) */}
+              {!isLoggedIn && regStatus === 'success' && registeredEmail && (
                 <Step>
                   <div className="py-4">
                     <h2 className="mb-3 text-center text-xl font-bold text-zinc-900 dark:text-zinc-50">
@@ -469,7 +499,7 @@ export default function WelcomeOverlay() {
                   </p>
                 </div>
               </Step>
-            </Stepper>
+            </StepperTyped>
           </motion.div>
         </motion.div>
       )}

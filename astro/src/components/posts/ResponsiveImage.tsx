@@ -57,7 +57,7 @@ export default function ResponsiveImage({
       onError={(e) => {
         // 降级：加载失败时移除 srcset，仅用原始 URL
         const img = e.currentTarget;
-        if (img.srcSet) img.removeAttribute('srcset');
+        if (img.srcset) img.removeAttribute('srcset');
       }}
     />
   );

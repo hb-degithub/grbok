@@ -151,6 +151,9 @@ export default function SearchModal() {
     };
   }, [isOpen]);
 
+  // 搜索竞态防护：请求序号比对，丢弃过期响应
+  const searchSeqRef = useRef(0);
+
   useEffect(() => {
     if (!query.trim() || !isPagefindLoaded) {
       setResults([]);
@@ -158,18 +161,23 @@ export default function SearchModal() {
     }
 
     const timer = window.setTimeout(async () => {
+      const seq = ++searchSeqRef.current;
       setIsLoading(true);
       try {
         const pagefind = (window as any).pagefind;
         if (!pagefind) return;
         const search = await pagefind.search(query);
+        if (seq !== searchSeqRef.current) return; // 已有更新的请求，丢弃过期结果
         const items = await Promise.all(search.results.slice(0, 10).map((result: any) => result.data()));
+        if (seq !== searchSeqRef.current) return;
         setResults(items);
         setSelectedIndex(0);
       } catch (error) {
-        console.error('搜索失败:', error);
+        if (seq === searchSeqRef.current) {
+          console.error('搜索失败:', error);
+        }
       } finally {
-        setIsLoading(false);
+        if (seq === searchSeqRef.current) setIsLoading(false);
       }
     }, 250);
 
@@ -177,9 +185,10 @@ export default function SearchModal() {
   }, [query, isPagefindLoaded]);
 
   useEffect(() => {
-    const selectedElement = resultsRef.current?.children[selectedIndex] as HTMLElement | undefined;
-    selectedElement?.scrollIntoView({ block: 'nearest' });
-  }, [selectedIndex]);
+    // 按 role="option" 查询选项节点，避免 sr-only 等辅助元素导致索引错位
+    const el = resultsRef.current?.querySelectorAll('[role="option"]')[selectedIndex] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [selectedIndex, results]);
 
   const handleInputKeyDown = useCallback(
     (event: React.KeyboardEvent) => {

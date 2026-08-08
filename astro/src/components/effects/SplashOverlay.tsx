@@ -50,12 +50,11 @@ export default function SplashOverlay() {
   // Auto-dismiss after animation completes
   useEffect(() => {
     if (!visible) return;
-    const timer = setTimeout(handleComplete, 2500);
+    const timer = setTimeout(() => setVisible(false), 2500);
     return () => clearTimeout(timer);
   }, [visible]);
 
-  if (!visible) return null;
-
+  // 不提前 return null，让 AnimatePresence 播完 exit 动画再卸载
   return (
     <AnimatePresence onExitComplete={handleComplete}>
       {visible && (
@@ -67,7 +66,7 @@ export default function SplashOverlay() {
           transition={{ duration: 0.7, ease: 'easeInOut' }}
           className="fixed inset-0 z-[110] flex items-center justify-center bg-white dark:bg-zinc-950"
           role="status"
-          aria-label="Loading"
+          aria-label="页面加载中"
         >
           {/* Teal radial glow behind logo */}
           <motion.div

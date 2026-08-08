@@ -4,13 +4,23 @@ import AnimatedContent from '../components/reactbits/AnimatedContent';
 import BlurText from '../components/reactbits/BlurText';
 import ParticleField from '../components/effects/ParticleField';
 const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || "http://localhost:8090";
-let posts = [];
+interface ArchivePost {
+  id: string;
+  title: string;
+  slug: string;
+  published_at: string;
+}
+interface ArchiveGroup {
+  year: number;
+  months: { month: number; posts: ArchivePost[] }[];
+}
+let posts: ArchivePost[] = [];
 try {
   const url = PB_URL + "/api/collections/posts/records?sort=-published_at" + "&filter=" + encodeURIComponent('status="published"') + "&fields=id,title,slug,published_at";
   const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
   if (res.ok) { const data = await res.json(); posts = data.items ?? []; }
 } catch {}
-const groups = [];
+const groups: ArchiveGroup[] = [];
 for (const post of posts) {
   const d = new Date(post.published_at);
   const y = d.getFullYear(); const m = d.getMonth() + 1;
@@ -29,9 +39,9 @@ for (const post of posts) {
 <h1 class="text-3xl font-black"><BlurText client:visible text="文章归档" className="text-3xl font-black" /></h1>
 <p class="mt-2 text-zinc-500">共{posts.length}篇</p>
 {groups.map(y => <AnimatedContent client:visible>
-  <div key={y.year}>
+  <div>
   <h2 class="mt-8 text-2xl font-bold">{y.year}</h2>
-  {y.months.map(m => <div key={m.month} class="archive-month ml-4 mt-4">
+  {y.months.map(m => <div class="archive-month ml-4 mt-4">
     <h3 class="text-sm font-mono text-zinc-400">{m.month}月</h3>
     <div class="mt-2 space-y-1">
       {m.posts.map(p => <a href={"/posts/" + p.slug} class="flex items-center gap-3 py-1.5 text-sm transition-all duration-200 hover:pl-2 hover:text-teal-600 dark:hover:text-teal-400">

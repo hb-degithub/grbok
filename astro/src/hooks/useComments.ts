@@ -7,17 +7,22 @@ import type {
   CommentRealtimeEvent,
 } from '../types/pocketbase';
 
-export function useComments(postId: string, options: { enabled?: boolean } = {}) {
+export function useComments(postId: string, options: { enabled?: boolean; perPage?: number } = {}) {
   const enabled = options.enabled ?? true;
+  const perPage = options.perPage ?? 20;
   const [comments, setComments] = useState<NestedComment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
   // Server-provided submission error surfaced to the visitor. Reset to null
   // on every successful submit so stale copy can't linger across attempts.
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const fetchComments = useCallback(async () => {
+  const fetchComments = useCallback(async (pageNum = 1, append = false) => {
     if (!enabled) {
       setComments([]);
       setLoading(false);
@@ -25,17 +30,37 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
     }
 
     try {
-      setLoading(true);
-      const result = await commentService.getPublicComments(postId);
-      setComments(commentService.buildCommentTree(result));
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+      const result = await commentService.getPublicComments(postId, pageNum, perPage);
+      const newTree = commentService.buildCommentTree(result.items);
+      
+      if (append) {
+        setComments(prev => [...prev, ...newTree]);
+      } else {
+        setComments(newTree);
+      }
+      setTotalPages(result.totalPages);
+      setTotalItems(result.totalItems);
+      setPage(pageNum);
       setError(null);
     } catch (err) {
       console.error('Failed to fetch comments:', err);
       setError(err as Error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, [postId, enabled]);
+  }, [postId, enabled, perPage]);
+
+  const loadMore = useCallback(() => {
+    if (page < totalPages && !loadingMore) {
+      fetchComments(page + 1, true);
+    }
+  }, [page, totalPages, loadingMore, fetchComments]);
 
   useEffect(() => {
     // Guard against fetch races when postId changes rapidly: an in-flight
@@ -56,7 +81,9 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
         if (active) setLoading(true);
         const result = await commentService.getPublicComments(postId);
         if (!active) return;
-        setComments(commentService.buildCommentTree(result));
+        setComments(commentService.buildCommentTree(result.items));
+        setTotalPages(result.totalPages);
+        setTotalItems(result.totalItems);
         setError(null);
       } catch (err) {
         console.error('Failed to fetch comments:', err);
@@ -146,11 +173,17 @@ export function useComments(postId: string, options: { enabled?: boolean } = {})
   return {
     comments,
     loading,
+    loadingMore,
     error,
     isSubmitting,
     submitError,
+    page,
+    totalPages,
+    totalItems,
+    hasMore: page < totalPages,
     submitComment,
     refresh: fetchComments,
+    loadMore,
   };
 }
 

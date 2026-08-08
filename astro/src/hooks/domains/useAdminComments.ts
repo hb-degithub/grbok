@@ -8,60 +8,74 @@ export function useAdminComments() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<CommentFilter>('all');
+  const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const loadComments = useCallback(async (filterVal: CommentFilter = filter, pageNum = 1) => {
+  const loadComments = useCallback(async (filterVal: CommentFilter = filter, pageNum = 1, queryVal = query) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await adminCommentService.getComments(filterVal, pageNum);
+      const result = await adminCommentService.getComments(filterVal, pageNum, 20, queryVal);
       setComments(result.items);
       setTotalItems(result.totalItems);
+      setTotalPages(Math.max(1, Math.ceil(result.totalItems / 20)));
       setPage(pageNum);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败');
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, query]);
 
   useEffect(() => {
-    loadComments(filter);
-  }, [filter, loadComments]);
+    loadComments(filter, 1, query);
+  }, [filter, query, loadComments]);
 
-  const approveComment = useCallback(async (id: string) => {
+  const updateStatus = useCallback(async (id: string, status: Comment['status']) => {
     try {
-      await adminCommentService.approveComment(id);
-      await loadComments(filter, page);
+      await adminCommentService.updateStatus(id, status);
+      await loadComments(filter, page, query);
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败');
       return false;
     }
-  }, [filter, page, loadComments]);
+  }, [filter, page, query, loadComments]);
 
-  const rejectComment = useCallback(async (id: string) => {
+  const batchUpdateStatus = useCallback(async (ids: string[], status: Comment['status']) => {
     try {
-      await adminCommentService.rejectComment(id);
-      await loadComments(filter, page);
+      await adminCommentService.batchUpdateStatus(ids, status);
+      await loadComments(filter, page, query);
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : '操作失败');
       return false;
     }
-  }, [filter, page, loadComments]);
+  }, [filter, page, query, loadComments]);
+
+  const batchDelete = useCallback(async (ids: string[]) => {
+    try {
+      await adminCommentService.batchDelete(ids);
+      await loadComments(filter, page, query);
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '批量删除失败');
+      return false;
+    }
+  }, [filter, page, query, loadComments]);
 
   const deleteComment = useCallback(async (id: string) => {
     try {
       await adminCommentService.deleteComment(id);
-      await loadComments(filter, page);
+      await loadComments(filter, page, query);
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除失败');
       return false;
     }
-  }, [filter, page, loadComments]);
+  }, [filter, page, query, loadComments]);
 
   return {
     comments,
@@ -69,11 +83,14 @@ export function useAdminComments() {
     error,
     filter,
     setFilter,
+    query,
+    setQuery,
     page,
-    totalItems,
-    loadComments,
-    approveComment,
-    rejectComment,
+    setPage,
+    totalPages,
+    updateStatus,
     deleteComment,
+    batchUpdateStatus,
+    batchDelete,
   };
 }

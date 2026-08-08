@@ -51,14 +51,16 @@ function SkeletonComment({ delay = 0 }: { delay?: number }) {
 export default function CommentSection({ postId }: CommentSectionProps) {
   const { settings, loading: settingsLoading } = useSiteSettings();
   const commentsEnabled = !settingsLoading && settings.enable_comments;
-  const { comments, loading, error, submitError, submitComment, refresh } = useComments(postId, { enabled: commentsEnabled });
+  const { comments, loading, loadingMore, error, submitError, page, totalPages, totalItems, hasMore, submitComment, refresh, loadMore } = useComments(postId, { enabled: commentsEnabled });
   const [newCommentIds, setNewCommentIds] = useState<Set<string>>(new Set());
 
   // Track logged-in user's email verification status
   const [userEmailVerified, setUserEmailVerified] = useState<boolean | undefined>(undefined);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | undefined>(undefined);
   useEffect(() => {
     const sync = () => {
       setUserEmailVerified(authService.getUserEmailVerified());
+      setCurrentUserEmail(authService.getUserEmail());
     };
     sync();
     const unsub = authService.onAuthChange(sync);
@@ -160,7 +162,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
           <h3 className="mb-2 text-lg font-semibold text-red-700 dark:text-red-300">加载评论失败</h3>
           <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">{error.message}</p>
           <button
-            onClick={refresh}
+            onClick={() => refresh()}
             className="focus-ring inline-flex items-center gap-2 rounded-xl bg-zinc-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-zinc-800"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -212,8 +214,21 @@ export default function CommentSection({ postId }: CommentSectionProps) {
                 isNew={newCommentIds.has(comment.id)}
                 moderationEnabled={settings.comment_moderation}
                 serverError={submitError}
+                currentUserEmail={currentUserEmail}
               />
             ))}
+            {/* 加载更多 */}
+            {hasMore && (
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm text-zinc-600 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+                >
+                  {loadingMore ? '加载中...' : `加载更多（${totalItems - comments.length} 条）`}
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

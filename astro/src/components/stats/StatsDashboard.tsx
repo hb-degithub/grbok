@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import CountUp from '../reactbits/CountUp';
 import { fadeUp, staggerContainer } from '../../lib/motion';
 import { useStats } from '../../hooks/domains/useStats';
 import DualModeGeoMap from './DualModeGeoMap';
-import { ALPHA2_TO_NUMERIC, PROVINCE_TO_ADCODE } from '../../lib/geoConstants';
+import { ALPHA2_TO_NUMERIC, ALPHA2_TO_ZH_NAME, PROVINCE_TO_ADCODE } from '../../lib/geoConstants';
 import type { StatsData } from '../../lib/services/statsService';
 
 interface StatsDashboardProps {
@@ -18,12 +18,66 @@ const CATEGORY_LABELS: Record<string, string> = {
   bot: '爬虫',
 };
 
+/** 校验链接安全性，防止 javascript: 等协议注入 */
+function safeHref(path: string): string {
+  return path.startsWith('/') && !path.startsWith('//') ? path : '#';
+}
+
 export default function StatsDashboard({ variant = 'public' }: StatsDashboardProps) {
   const { data, error } = useStats({ variant });
+  // 确保 SSR 和客户端首次渲染一致（都显示骨架屏）
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   // 地理数据处理 - 使用可选链避免空值错误
   const geoCountries = data?.geo?.countries || [];
   const geoRegions = data?.geo?.regions || [];
+
+  // 以下计算在 data 存在时才会执行，使用 useMemo 缓存结果
+  // 注意：useMemo 必须在所有条件 return 之前调用，违反 Hooks 规则会导致崩溃
+  const { worldMapData, chinaMapData, maxGeoViews } = useMemo(() => {
+    const maxViews = Math.max(...geoCountries.map((c) => c.views), 1);
+
+    // 国际地图数据
+    // HK/TW/MO 已合并到中国（world-zh.json 中无独立条目），将数据归入 CN
+    const MERGE_TO_CN = new Set(['HK', 'TW', 'MO']);
+    const worldData: Record<string, { views: number; uv: number; name: string }> = {};
+    for (const c of geoCountries) {
+      const country = MERGE_TO_CN.has(c.country) ? 'CN' : c.country;
+      const numeric = ALPHA2_TO_NUMERIC[country];
+      // 使用中文国名匹配 world-zh.json 中的 properties.name
+      const zhName = ALPHA2_TO_ZH_NAME[country] || country;
+      if (!numeric) continue;
+      if (worldData[numeric]) {
+        // 合并数据（如 HK+TW+MO → CN）
+        worldData[numeric].views += c.views;
+        worldData[numeric].uv += c.uniqueVisitors;
+      } else {
+        worldData[numeric] = { views: c.views, uv: c.uniqueVisitors, name: zhName };
+      }
+    }
+
+    // 中国地图数据（按省份聚合）
+    const chinaData: Record<string, { views: number; uv: number; name: string }> = {};
+    const provinceMap: Record<string, { views: number; uv: number }> = {};
+    
+    // 从 regions 数据聚合中国各省份
+    for (const r of geoRegions) {
+      if (r.country === 'CN' && r.region) {
+        const prov = r.region;
+        if (!provinceMap[prov]) provinceMap[prov] = { views: 0, uv: 0 };
+        provinceMap[prov].views += r.views;
+        provinceMap[prov].uv += r.uniqueVisitors;
+      }
+    }
+    
+    for (const [prov, provData] of Object.entries(provinceMap)) {
+      const adcode = PROVINCE_TO_ADCODE[prov];
+      if (adcode) chinaData[adcode] = { views: provData.views, uv: provData.uv, name: prov };
+    }
+
+    return { worldMapData: worldData, chinaMapData: chinaData, maxGeoViews: maxViews };
+  }, [geoCountries, geoRegions]);
 
   if (error) {
     return (
@@ -33,7 +87,8 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
     );
   }
 
-  if (!data) {
+  // SSR 和客户端首次渲染都显示骨架屏，避免 hydration 不匹配
+  if (!mounted || !data) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
@@ -41,35 +96,6 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
         ))}
       </div>
     );
-  }
-
-  // 以下计算在 data 存在时才会执行，使用 useMemo 缓存结果
-  const maxGeoViews = Math.max(...geoCountries.map((c) => c.views), 1);
-
-  // 国际地图数据
-  const worldMapData: Record<string, { views: number; uv: number; name: string }> = {};
-  for (const c of geoCountries) {
-    const numeric = ALPHA2_TO_NUMERIC[c.country];
-    if (numeric) worldMapData[numeric] = { views: c.views, uv: c.uniqueVisitors, name: c.country };
-  }
-
-  // 中国地图数据（按省份聚合）
-  const chinaMapData: Record<string, { views: number; uv: number; name: string }> = {};
-  const provinceMap: Record<string, { views: number; uv: number }> = {};
-  
-  // 从 regions 数据聚合中国各省份
-  for (const r of geoRegions) {
-    if (r.country === 'CN' && r.region) {
-      const prov = r.region;
-      if (!provinceMap[prov]) provinceMap[prov] = { views: 0, uv: 0 };
-      provinceMap[prov].views += r.views;
-      provinceMap[prov].uv += r.uniqueVisitors;
-    }
-  }
-  
-  for (const [prov, provData] of Object.entries(provinceMap)) {
-    const adcode = PROVINCE_TO_ADCODE[prov];
-    if (adcode) chinaMapData[adcode] = { views: provData.views, uv: provData.uv, name: prov };
   }
 
   const cards = [
@@ -115,7 +141,9 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
                   width={10}
                   height={h}
                   rx={2}
-                  className="fill-teal-500/70 transition-colors hover:fill-teal-500 dark:fill-teal-400/70 dark:hover:fill-teal-400"
+                  tabIndex={0}
+                  aria-label={`${d.date}：${d.views} 次访问`}
+                  className="fill-teal-500/70 transition-colors hover:fill-teal-500 focus:fill-teal-500 focus:outline-none dark:fill-teal-400/70 dark:hover:fill-teal-400 dark:focus:fill-teal-400"
                 >
                   <title>{`${d.date}：${d.views} 次访问`}</title>
                 </rect>
@@ -134,7 +162,7 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
             {data.topPages.map((p, i) => (
               <li key={p.path} className="flex items-center gap-3">
                 <span className="w-5 shrink-0 text-right font-mono text-xs text-zinc-400">{i + 1}</span>
-                <a href={p.path} className="min-w-0 flex-1 truncate text-zinc-700 no-underline hover:text-teal-600 dark:text-zinc-300 dark:hover:text-teal-400">{p.path}</a>
+                <a href={safeHref(p.path)} className="min-w-0 flex-1 truncate text-zinc-700 no-underline hover:text-teal-600 dark:text-zinc-300 dark:hover:text-teal-400">{p.path}</a>
                 <span className="shrink-0 font-mono text-xs text-zinc-500 dark:text-zinc-400">{p.views}</span>
               </li>
             ))}
@@ -173,7 +201,7 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
               <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">国家/地区 TOP 10</h4>
               <div className="space-y-2">
                 {geoCountries.slice(0, 10).map((c, i) => (
-                  <div key={c.country} className="flex items-center gap-3">
+                  <div key={`${c.country}-${i}`} className="flex items-center gap-3">
                     <span className="w-5 shrink-0 text-right font-mono text-xs text-zinc-400">{i + 1}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">

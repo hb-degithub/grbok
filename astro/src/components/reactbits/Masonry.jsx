@@ -7,7 +7,7 @@ const Masonry = ({
   children,
   columns = { mobile: 1, tablet: 2, desktop: 3 },
   gap = 16,
-  className,
+  className = '',
 }) => {
   const { currentBreakpoint } = useBreakpoint();
 

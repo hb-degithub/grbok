@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { runAfterAdminCredentialRevoked } from '../../lib/admin-auth-lifecycle';
 import { clearAdminStepUp } from '../../lib/admin-step-up';
 import PixelButton from '../ui/PixelButton';
@@ -24,13 +24,13 @@ const adminRoles = new Set(['author', 'admin', 'super_admin']);
 // 强制 TOTP 二次验证的角色：仅 admin / super_admin；author 登录后直接进入后台
 const totpEnforcedRoles = new Set(['admin', 'super_admin']);
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0, y: 16 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.08, ease: [0.16, 1, 0.3, 1] } },
   exit: { opacity: 0, y: -16, transition: { duration: 0.25 } },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 12 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
 };

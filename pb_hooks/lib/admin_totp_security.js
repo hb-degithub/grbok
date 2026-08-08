@@ -9,6 +9,7 @@
 var stepUp = require('./admin_step_up.js');
 var audits = require('./admin_security_audit.js');
 var totp = require('./admin_totp.js');
+var rateLimit = require('./security_rate_limit.js');
 
 var INTERNAL_URL = String($os.getenv('ADMIN_AUTH_INTERNAL_URL') || '').trim() || 'http://admin-auth:8787';
 var INTERNAL_SECRET = String($os.getenv('ADMIN_AUTH_INTERNAL_SECRET') || '').trim();
@@ -170,6 +171,49 @@ function audit(c, txDao, user, actionCode, targetId, before, after) {
   });
 }
 
+// ---------- TOTP 验证限流（持久化，fail-closed） ----------
+// 策略：admin_totp_verify 5 次失败 / 5 分钟窗口；超限写 admin_totp_lockout
+// 锁定桶（1 次 / 15 分钟窗口），锁定期间直接拒绝，不再验证 TOTP 码。
+// 成功不消费桶（与 auth_otp 的 5 次尝试限制同语义，窗口滑动自然过期）。
+
+// 只读检查锁定桶：不写入事件，避免未锁定管理员被 consume 预置锁定。
+function totpVerifyLocked(txDao, userId, nowMs) {
+  var hash = rateLimit._subjectHash('admin_totp_lockout', userId);
+  var found;
+  try {
+    found = txDao.findRecordsByFilter(
+      'security_rate_buckets',
+      'policy = {:policy} && subject_hash = {:hash}',
+      '', 2, 0,
+      { policy: 'admin_totp_lockout', hash: hash },
+    );
+  } catch (_) {
+    throw new rateLimit.RateLimitUnavailableError('lockout bucket read failed');
+  }
+  if (!found || !found.length) return false;
+  var events = rateLimit._pruneEvents(
+    rateLimit._parseEvents(String(found[0].get('events_json')), nowMs),
+    nowMs, 900,
+  );
+  return events.length > 0;
+}
+
+// 失败计数：消费失败桶；超限时写入锁定桶并返回 true（刚触发锁定）。
+// 返回 false = 未超限（本次失败已计数）。
+function consumeTotpVerifyFailure(txDao, userId, nowMs) {
+  var result = rateLimit.consume(txDao, {
+    nowMs: nowMs,
+    entries: [{ policyKey: 'admin_totp_verify', subject: userId }],
+  });
+  if (result.allowed) return false;
+  // 超限：写入锁定桶（limit=1/900s，首次写入必然 allowed）
+  rateLimit.consume(txDao, {
+    nowMs: nowMs,
+    entries: [{ policyKey: 'admin_totp_lockout', subject: userId }],
+  });
+  return true;
+}
+
 // ---------- HTTP 处理器 ----------
 
 // GET /api/blog-admin/step-up/status（路由沿用，语义改 TOTP）
@@ -275,14 +319,27 @@ function totpConfirm(c) {
 
 // POST /api/blog-admin/totp/verify — step-up 验证（6 位码）
 // admin / super_admin 已绑定 TOTP 后均可调用验证并签发 step-up session。
+// 限流：锁定中与码错误统一返回 TOTP_CODE_INVALID，不泄露锁定状态。
 function totpVerify(c) {
   var user = requireAdmin(c, false);
   var input = body(c);
   var issued = null;
   var saved = null;
   $app.dao().runInTransaction(function (txDao) {
+    var nowMs = Date.now();
     var state = totpState(txDao, user.id);
     if (!isBound(state)) apiError(409, 'TOTP_NOT_BOUND');
+    // 锁定期间直接拒绝，不再验证 TOTP 码（限流存储故障时 fail-closed）
+    var locked = false;
+    try {
+      locked = totpVerifyLocked(txDao, user.id, nowMs);
+    } catch (_) {
+      apiError(500, 'TOTP_SECRET_UNAVAILABLE');
+    }
+    if (locked) {
+      audit(c, txDao, user, 'ADMIN_TOTP_VERIFY_LOCKED', state.id, null, { locked: true });
+      apiError(400, 'TOTP_CODE_INVALID');
+    }
     var plainHex;
     try {
       plainHex = totp.decryptSecret(state.getString('secret_enc'));
@@ -291,7 +348,21 @@ function totpVerify(c) {
     }
     var lastUsed = Number(state.get('last_used_timestep') || -1);
     var result = totp.verifyCode(totp.secretFromHex(plainHex), input.code, lastUsed);
-    if (!result.ok) apiError(400, result.replay ? 'TOTP_CODE_REPLAYED' : 'TOTP_CODE_INVALID');
+    if (!result.ok) {
+      // 只对验证失败计数（replay 同样视为失败尝试）
+      var justLocked = false;
+      try {
+        justLocked = consumeTotpVerifyFailure(txDao, user.id, nowMs);
+      } catch (_) {
+        apiError(500, 'TOTP_SECRET_UNAVAILABLE');
+      }
+      if (justLocked) {
+        audit(c, txDao, user, 'ADMIN_TOTP_VERIFY_LOCKED', state.id, null, { locked: true, reason: 'failure_threshold' });
+      } else {
+        audit(c, txDao, user, 'ADMIN_TOTP_VERIFY_FAILED', state.id, null, { ok: false });
+      }
+      apiError(400, result.replay ? 'TOTP_CODE_REPLAYED' : 'TOTP_CODE_INVALID');
+    }
     // 事务内更新防重放水线
     state.set('last_used_timestep', result.timestep);
     txDao.saveRecord(state);

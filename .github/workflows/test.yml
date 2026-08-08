@@ -16,15 +16,40 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: astro/package-lock.json
+          # 同时缓存 astro 与 admin-auth 两个子项目的依赖锁文件
+          cache-dependency-path: [astro/package-lock.json, admin-auth/package-lock.json]
 
+      # 安装 astro 前端依赖（npm ci 严格按锁文件安装）
       - name: Install dependencies
         run: cd astro && npm ci
 
+      # 前端单元测试：vitest 为构建前置硬门禁，失败即整体失败
       - name: Run unit tests
         run: cd astro && npx vitest run
-        continue-on-error: true # vitest 尚未加入 devDependencies，npx 临时安装可能失败
 
+      # admin-auth 后端服务测试：npm ci 安装后运行 node --test（mailpit 集成用例在无 MAILPIT_INTEGRATION 时自动跳过）
+      - name: Admin-auth tests
+        run: cd admin-auth && npm ci && npm test
+
+      # 校验 PocketBase fixture 语法 + 运行真实断言测试
+      # 1) find + xargs + node --check 对全部 *.pb.js 做语法门禁（xargs 会传播 node --check 的失败退出码）
+      # 2) node --test 运行 security-rate 日志安全与 mail-local 保留契约断言
+      # 任一条命令失败（set -e）即该步骤失败，形成 CI 硬门禁
+      - name: Validate pb fixtures
+        run: |
+          set -euo pipefail
+          find tests -name '*.pb.js' -print0 | xargs -0 -n1 node --check
+          node --test tests/security-rate/hook_log_safety.test.js tests/mail-local/account_retention_integration_contract.js
+
+      # 前端代码规范检查（eslint，项目级扁平配置 astro/eslint.config.mjs）
+      - name: Lint
+        run: cd astro && npm run lint
+
+      # 前端类型检查（astro check，覆盖 .astro 与 TS/TSX 文件）
+      - name: Check
+        run: cd astro && npm run check
+
+      # 生产构建（前端静态产物），随后上传制品
       - name: Build
         run: cd astro && npm run build
         env:

@@ -96,7 +96,7 @@ export default function VersionHistory() {
         </div>
         {(compareLeft || compareRight) && (
           <div className="mt-3 text-xs text-text-secondary">
-            已选择 {compareLeft ? 1 : 0 + compareRight ? 1 : 0} 个版本
+            已选择 (compareLeft ? 1 : 0) + (compareRight ? 1 : 0) 个版本
             {compareLeft && compareRight && '，点击"对比选中版本"查看差异'}
           </div>
         )}

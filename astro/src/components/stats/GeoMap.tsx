@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { feature } from 'topojson-client';
 import type { Topology, GeometryCollection } from 'topojson-specification';
-import type { Feature, MultiPolygon, Polygon } from 'geojson';
+import type { Feature, MultiPolygon, Polygon, GeoJsonProperties } from 'geojson';
 import { geoPath, geoMercator, geoEquirectangular } from 'd3-geo';
 import { ADCODE_TO_PROVINCE } from '../../lib/geoConstants';
 
@@ -16,7 +16,7 @@ interface GeoData {
   name: string;
 }
 
-interface RegionFeature extends Feature<MultiPolygon | Polygon> {
+interface RegionFeature extends Omit<Feature<MultiPolygon | Polygon, GeoJsonProperties>, 'properties'> {
   id?: string;
   properties?: {
     name?: string;
@@ -81,7 +81,7 @@ function GeoMap({ worldData, chinaData, maxViews }: GeoMapProps) {
 
         // 中国地图（GeoJSON）
         cachedChinaGeos = chinaGeoJson.features || [];
-        setChinaGeos(cachedChinaGeos);
+        setChinaGeos(cachedChinaGeos || []);
         setLoading(false);
       })
       .catch((err) => {

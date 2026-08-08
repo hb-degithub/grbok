@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import type { Post } from '../../types/pocketbase';
 
 interface PostCardProps {
@@ -7,7 +7,7 @@ interface PostCardProps {
   index?: number;
 }
 
-const makeCardVariants = (index: number) => ({
+const makeCardVariants = (index: number): Variants => ({
   hidden: { opacity: 0, y: 16 },
   visible: {
     opacity: 1,

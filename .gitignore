@@ -55,6 +55,9 @@ temp/
 # 临时调试文件 (仅根目录, 不影响 pb_hooks/*.pb.js 和 src 下的 js)
 /*.js
 /*.bat
+/temp-img-*
+/tmp-screenshot*
+/pb_login_page.png
 # Python test artifacts
 __pycache__/
 *.py[cod]

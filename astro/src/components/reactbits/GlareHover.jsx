@@ -2,7 +2,7 @@ import './GlareHover.css';
 
 const GlareHover = ({
   children,
-  className,
+  className = '',
   glareColor = 'rgba(255,255,255,0.12)',
 }) => {
   return (

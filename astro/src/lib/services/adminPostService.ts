@@ -46,10 +46,10 @@ class AdminPostService extends BaseService<PostRecord> {
       parts.push(pb.filter('(title ~ {:kw} || slug ~ {:kw} || excerpt ~ {:kw})', { kw: safeKeyword }));
     }
 
-    const filterString = parts.length > 0 ? parts.join(' && ') : undefined;
+    const filterString = parts.length > 0 ? parts.join(' && ') : '';
 
     return this.getList(page, perPage, {
-      filter: filterString,
+      filter: filterString || undefined, // 空字符串转为 undefined，避免 PocketBase 400
       sort: '-updated',
     });
   }
@@ -60,9 +60,12 @@ class AdminPostService extends BaseService<PostRecord> {
 
   async createPost(data: Partial<Post>) {
     const pb = this.getPocketBase();
+    if (!pb.authStore.record?.id) {
+      throw new Error('未登录，无法保存文章');
+    }
     return this.create({
       ...data,
-      author: pb.authStore.record?.id,
+      author: pb.authStore.record.id,
     });
   }
 

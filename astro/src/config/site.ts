@@ -19,7 +19,7 @@ export const SITE_CONFIG = {
   socialLinks: [
     { name: 'github', url: 'https://github.com' },
     { name: 'bilibili', url: 'https://space.bilibili.com/691237475' },
-  ],
+  ] as { name: string; url: string }[],
 } as const;
 
 export const HERO_CARDS = [

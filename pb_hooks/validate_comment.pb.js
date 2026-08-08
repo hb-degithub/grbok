@@ -72,13 +72,15 @@ onRecordBeforeCreateRequest((e) => {
 
   if (!boolSetting('enable_comments', true)) throw new BadRequestError('Comments are disabled.');
   if (!authorName) throw new BadRequestError('Author name is required.');
-  if (!authorEmail) throw new BadRequestError('Author email is required.');
   if (!content) throw new BadRequestError('Comment content is required.');
   if (!postId) throw new BadRequestError('Post does not exist.');
   if (authorName.length > 50) throw new BadRequestError('Author name is too long.');
-  if (authorEmail.length > 100) throw new BadRequestError('Author email is too long.');
   if (content.length > 2000) throw new BadRequestError('Comment content is too long.');
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(authorEmail)) throw new BadRequestError('Invalid email format.');
+  // 邮箱可选：仅在提供时校验格式
+  if (authorEmail) {
+    if (authorEmail.length > 100) throw new BadRequestError('Author email is too long.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(authorEmail)) throw new BadRequestError('Invalid email format.');
+  }
   if (hasSpamPattern(content)) throw new BadRequestError('Comment contains suspicious content.');
 
   // H4/H5: anti-impersonation + side-channel elimination.
@@ -93,10 +95,12 @@ onRecordBeforeCreateRequest((e) => {
   let ownerUser = null;
   let authenticatedOwner = null;
   record.set('author_user', '');
-  try {
-    ownerUser = $app.dao().findFirstRecordByFilter('users', 'email = {:email}', { email: authorEmail.toLowerCase() });
-  } catch (_) {
-    // No matching user — legitimate anonymous comment, fall through.
+  if (authorEmail) {
+    try {
+      ownerUser = $app.dao().findFirstRecordByFilter('users', 'email = {:email}', { email: authorEmail.toLowerCase() });
+    } catch (_) {
+      // No matching user — legitimate anonymous comment, fall through.
+    }
   }
 
   let impersonationAttempt = false;
@@ -161,13 +165,24 @@ onRecordBeforeCreateRequest((e) => {
   // the per-minute axis and is subsumed by it). All three entries are
   // consumed atomically inside a single transaction so a partial write can
   // never leak a quota decrement.
-  let normalizedEmail;
-  try {
-    normalizedEmail = rateLimit.normalizeEmail(authorEmail);
-  } catch (_) {
-    // Email shape was already validated above; treat normalization failure
-    // as a transient store error rather than a leak.
-    throw detailedError(503, 'COMMENT_UNAVAILABLE');
+  // 邮箱可选：未提供时跳过 email 维度限流
+  let normalizedEmail = null;
+  if (authorEmail) {
+    try {
+      normalizedEmail = rateLimit.normalizeEmail(authorEmail);
+    } catch (_) {
+      // Email shape was already validated above; treat normalization failure
+      // as a transient store error rather than a leak.
+      throw detailedError(503, 'COMMENT_UNAVAILABLE');
+    }
+  }
+
+  const limitEntries = [
+    { policyKey: 'comment_ip', subject: ip },
+    { policyKey: 'comment_post', subject: postId },
+  ];
+  if (normalizedEmail) {
+    limitEntries.push({ policyKey: 'comment_email', subject: normalizedEmail });
   }
 
   let decision;
@@ -175,11 +190,7 @@ onRecordBeforeCreateRequest((e) => {
     $app.dao().runInTransaction(function (txDao) {
       decision = rateLimit.consume(txDao, {
         nowMs: Date.now(),
-        entries: [
-          { policyKey: 'comment_ip', subject: ip },
-          { policyKey: 'comment_email', subject: normalizedEmail },
-          { policyKey: 'comment_post', subject: postId },
-        ],
+        entries: limitEntries,
       });
     });
     if (!decision || typeof decision.allowed !== 'boolean') throw new Error('invalid rate decision');
@@ -197,10 +208,21 @@ onRecordBeforeCreateRequest((e) => {
   record.set('author_name', authorName);
   record.set('author_email', authorEmail);
   record.set('content', content);
+  
+  // 等级权限：Lv3+ 用户评论免审核
+  var authorLevel = 1;
+  if (authenticatedOwner) {
+    try {
+      var authorUser = $app.dao().findRecordById('users', authenticatedOwner.id);
+      authorLevel = authorUser.getInt('level') || 1;
+    } catch (_) {}
+  }
+  
   // Impersonation attempts are never auto-published, even when moderation is
   // disabled — they must pass admin review. Legitimate comments respect the
   // moderation setting as before.
-  const baseStatus = boolSetting('comment_moderation', true) ? 'pending' : 'approved';
+  // Lv3+ 用户评论免审核（除非 moderation 强制开启）
+  const baseStatus = boolSetting('comment_moderation', true) && authorLevel < 3 ? 'pending' : 'approved';
   record.set('status', impersonationAttempt ? 'pending' : baseStatus);
   record.set('ip_address', ip || '');
 

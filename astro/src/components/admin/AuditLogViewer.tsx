@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import { useAuditLogs } from '../../hooks/domains/useAuditLogs';
 import { showToast } from '../ui/Toast';
 import { cn } from '../../lib/utils';
@@ -9,7 +9,7 @@ const listVariants = {
   hidden: { opacity: 1 },
   visible: { transition: { staggerChildren: 0.03 } },
 };
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 6 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: [0.16, 1, 0.3, 1] } },
 };

@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "qmind-knowledge@qoder-marketplace": true,
+    "architecture-visualization@qoder-marketplace": true
+  }
+}

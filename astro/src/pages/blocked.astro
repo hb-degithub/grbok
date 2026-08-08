@@ -1,0 +1,81 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="访问受限" description="您的请求被安全策略拦截" noindex>
+  <section class="relative z-10 mx-auto flex min-h-[60vh] w-full max-w-5xl items-center justify-center px-5 py-16 sm:px-8 lg:px-10">
+    <div class="text-center">
+      {/* 图标 */}
+      <div class="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800">
+        <svg class="h-10 w-10 text-zinc-500 dark:text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      </div>
+
+      {/* 标题 */}
+      <h1 class="mb-4 text-3xl font-black tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-4xl">
+        访问受限
+      </h1>
+
+      {/* 描述 */}
+      <p class="mx-auto mb-8 max-w-md text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+        您的请求被安全策略拦截。如果您认为这是误判，请联系网站管理员。
+      </p>
+
+      {/* 信息卡片 */}
+      <div class="mx-auto mb-8 max-w-sm rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-left dark:border-zinc-700 dark:bg-zinc-800">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-zinc-500 dark:text-zinc-400">请求 ID</span>
+          <span class="font-mono text-zinc-400 dark:text-zinc-500" id="requestId">-</span>
+        </div>
+        <div class="mt-2 flex items-center justify-between text-xs">
+          <span class="text-zinc-500 dark:text-zinc-400">拦截原因</span>
+          <span class="font-mono text-zinc-400 dark:text-zinc-500" id="blockReason">安全策略</span>
+        </div>
+        <div class="mt-2 flex items-center justify-between text-xs">
+          <span class="text-zinc-500 dark:text-zinc-400">时间</span>
+          <span class="font-mono text-zinc-400 dark:text-zinc-500" id="blockTime">-</span>
+        </div>
+      </div>
+
+      {/* 操作按钮 */}
+      <div class="flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+        <a
+          href="/"
+          class="inline-flex items-center gap-2 rounded-lg bg-teal-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-teal-700"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+          </svg>
+          返回首页
+        </a>
+        <button
+          onclick="history.back()"
+          class="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-5 py-2.5 text-sm font-medium text-zinc-600 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          返回上一页
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <script is:inline>
+    // 从 URL 参数中获取拦截信息
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      const requestId = params.get('requestId') || params.get('request_id');
+      const reason = params.get('reason') || params.get('rule');
+      
+      if (requestId) {
+        document.getElementById('requestId').textContent = requestId;
+      }
+      if (reason) {
+        document.getElementById('blockReason').textContent = reason;
+      }
+      document.getElementById('blockTime').textContent = new Date().toLocaleString('zh-CN');
+    })();
+  </script>
+</BaseLayout>

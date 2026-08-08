@@ -2,7 +2,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 
 const BlurText = ({
   text,
-  className,
+  className = '',
   delay = 0,
   duration = 0.6,
   blurAmount = 8,

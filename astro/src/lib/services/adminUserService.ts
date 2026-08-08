@@ -6,7 +6,7 @@ export interface AdminUser {
   email: string;
   name?: string;
   avatar?: string;
-  role: 'admin' | 'editor' | 'reader';
+  role: 'reader' | 'author' | 'admin' | 'super_admin';
   verified: boolean;
   created: string;
   updated: string;
@@ -47,7 +47,7 @@ class AdminUserService extends BaseService<UserRecord> {
   }
 
   async createUser(data: { email: string; password: string; passwordConfirm: string; name?: string; role?: string }): Promise<AdminUser> {
-    const record = await this.create(data);
+    const record = await this.create(data as unknown as Partial<UserRecord>);
     return record as unknown as AdminUser;
   }
 }

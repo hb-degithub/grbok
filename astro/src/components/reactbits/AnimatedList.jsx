@@ -5,9 +5,9 @@ import './AnimatedList.css';
 const AnimatedList = ({
   children,
   showGradients = true,
-  gradientColor,
+  gradientColor = '',
   itemDelay = 0.05,
-  className,
+  className = '',
 }) => {
   const prefersReducedMotion = useReducedMotion();
   const containerRef = useRef(null);

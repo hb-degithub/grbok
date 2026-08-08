@@ -2,7 +2,7 @@ import { BaseService } from './baseService';
 import type { RecordModel } from 'pocketbase';
 import type { PublicComment, NestedComment, CommentFormData, CommentRealtimeEvent } from '../../types/pocketbase';
 
-const PUBLIC_COMMENT_FIELDS = 'id,post_id,author_name,content,parent_id,status,created,updated';
+const PUBLIC_COMMENT_FIELDS = 'id,post_id,author_name,content,parent_id,status,created,updated,likes,edited,edited_at,deleted,author_level';
 
 interface CommentRecord extends RecordModel {
   post_id: string;
@@ -19,13 +19,30 @@ class CommentService extends BaseService<CommentRecord> {
   }
 
   /**
-   * 获取文章的公开评论列表
+   * 获取文章的公开评论列表（分页）
    */
-  async getPublicComments(postId: string): Promise<PublicComment[]> {
+  async getPublicComments(postId: string, page = 1, perPage = 20): Promise<{ items: PublicComment[]; totalItems: number; totalPages: number }> {
+    const pb = this.getPocketBase();
+    const result = await pb.collection('public_comments').getList<PublicComment>(page, perPage, {
+      filter: pb.filter('post_id = {:postId} && deleted = false', { postId }),
+      sort: '-created',
+      fields: PUBLIC_COMMENT_FIELDS,
+    });
+    return {
+      items: result.items,
+      totalItems: result.totalItems,
+      totalPages: result.totalPages,
+    };
+  }
+
+  /**
+   * 获取文章的公开评论列表（兼容旧版，一次性加载）
+   */
+  async getAllPublicComments(postId: string): Promise<PublicComment[]> {
     const pb = this.getPocketBase();
     return pb.collection('public_comments').getFullList<PublicComment>({
-      filter: pb.filter('post_id = {:postId}', { postId }),
-      sort: 'created',
+      filter: pb.filter('post_id = {:postId} && deleted = false', { postId }),
+      sort: '-created',
       fields: PUBLIC_COMMENT_FIELDS,
     });
   }
@@ -81,6 +98,59 @@ class CommentService extends BaseService<CommentRecord> {
     });
 
     return rootComments;
+  }
+
+  /**
+   * 点赞评论
+   */
+  async likeComment(commentId: string): Promise<{ likes: number }> {
+    const pb = this.getPocketBase();
+    return pb.send(`/api/comments/${commentId}/like`, { method: 'POST' });
+  }
+
+  /**
+   * 举报评论
+   */
+  async reportComment(commentId: string, reason: string): Promise<void> {
+    const pb = this.getPocketBase();
+    return pb.collection('comment_reports').create({
+      comment_id: commentId,
+      reason,
+      status: 'pending',
+    });
+  }
+
+  /**
+   * 发送编辑/删除验证码
+   */
+  async sendVerificationCode(email: string): Promise<{ ok: boolean; expiresAt: string }> {
+    const pb = this.getPocketBase();
+    return pb.send('/api/comments/verification/send', {
+      method: 'POST',
+      body: { email },
+    });
+  }
+
+  /**
+   * 编辑评论
+   */
+  async editComment(commentId: string, content: string, authorEmail: string, verificationCode: string): Promise<void> {
+    const pb = this.getPocketBase();
+    return pb.send(`/api/comments/${commentId}/edit`, {
+      method: 'POST',
+      body: { content, author_email: authorEmail, verification_code: verificationCode },
+    });
+  }
+
+  /**
+   * 删除评论（软删除）
+   */
+  async deleteComment(commentId: string, authorEmail: string, verificationCode: string): Promise<void> {
+    const pb = this.getPocketBase();
+    return pb.send(`/api/comments/${commentId}/delete`, {
+      method: 'POST',
+      body: { author_email: authorEmail, verification_code: verificationCode },
+    });
   }
 
   /**

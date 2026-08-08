@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { echarts, registerWorldMap, registerChinaMap, type EChartsInstance } from '../../lib/echarts-map';
 import { ADCODE_TO_PROVINCE } from '../../lib/geoConstants';
+import { playMapTransition } from '../../lib/map-particles';
 import type { EChartsOption } from 'echarts';
 
 /**
@@ -109,9 +110,11 @@ function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps)
         textStyle: { color: '#18181b', fontSize: 13 },
         formatter: (params: any) => {
           const { name, value, data: itemData } = params;
-          if (!value) return `<b>${name}</b><br/>暂无数据`;
+          const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c: string) =>
+            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
+          if (!value) return `<b>${esc(name)}</b><br/>暂无数据`;
           const uv = itemData?.uv ?? '-';
-          return `<b>${name}</b><br/>浏览量：${value}<br/>独立访客：${uv}`;
+          return `<b>${esc(name)}</b><br/>浏览量：${esc(value)}<br/>独立访客：${esc(uv)}`;
         },
       },
       visualMap: {
@@ -175,35 +178,74 @@ function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps)
     };
   }, [mode, worldData, chinaData, maxViews]);
 
-  // 更新图表
+  // 更新图表（仅在模式切换时 notMerge，数据更新时保留用户缩放/平移）
+  const prevMode = useRef(mode);
   useEffect(() => {
     if (!chartInstance.current || loading || error) return;
+    const isModeChange = prevMode.current !== mode;
+    prevMode.current = mode;
     const option = buildOption();
-    chartInstance.current.setOption(option, { notMerge: true });
-  }, [buildOption, loading, error]);
+    chartInstance.current.setOption(option, { notMerge: isModeChange });
+  }, [buildOption, loading, error, mode]);
 
-  // 模式切换（带 D3 过渡动画）
+  // 模式切换（粒子破碎→聚合过渡动画）
+  const [transitioning, setTransitioning] = useState(false);
+  const transitionRef = useRef<{ destroy: () => void } | null>(null);
+
+  // 组件卸载时中断动画
+  useEffect(() => {
+    return () => {
+      transitionRef.current?.destroy();
+      transitionRef.current = null;
+    };
+  }, []);
+
   const handleModeSwitch = useCallback(async (newMode: MapMode) => {
-    if (newMode === mode || !chartInstance.current) return;
+    if (newMode === mode || !chartInstance.current || transitioning) return;
 
-    // 使用 D3 的过渡效果：先淡出再切换
-    const el = chartRef.current;
-    if (el) {
-      el.style.transition = 'opacity 0.2s ease-out';
-      el.style.opacity = '0.3';
+    const containerEl = chartRef.current;
+    if (!containerEl) {
+      setMode(newMode);
+      return;
     }
 
-    setMode(newMode);
+    // 找到 ECharts 渲染的 Canvas 元素
+    const sourceCanvas = containerEl.querySelector('canvas');
+    if (!sourceCanvas) {
+      setMode(newMode);
+      return;
+    }
 
-    // 等待 React 状态更新后恢复透明度
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        if (el) {
-          el.style.opacity = '1';
-        }
-      }, 50);
-    });
-  }, [mode]);
+    setTransitioning(true);
+
+    // 隐藏 ECharts 地图，让粒子层完全覆盖（避免边界线透出）
+    containerEl.style.opacity = '0';
+    containerEl.style.transition = 'none';
+
+    try {
+      const handle = playMapTransition(sourceCanvas, containerEl, () => {
+        // 在过渡阶段切换 ECharts 地图
+        setMode(newMode);
+      }, {
+        onGatherNearComplete: () => {
+          // 聚合阶段 70% 时淡入新地图
+          containerEl.style.transition = 'opacity 0.3s ease-in';
+          containerEl.style.opacity = '1';
+        },
+      });
+      transitionRef.current = handle;
+      await handle.promise;
+    } catch {
+      // 动画失败时直接切换
+      setMode(newMode);
+    } finally {
+      transitionRef.current = null;
+      // 恢复 ECharts 地图可见性（如果回调未触发）
+      containerEl.style.opacity = '1';
+      containerEl.style.transition = '';
+      setTransitioning(false);
+    }
+  }, [mode, transitioning]);
 
   // 加载状态
   if (loading) {

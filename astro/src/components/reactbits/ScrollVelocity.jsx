@@ -8,7 +8,7 @@ const wrap = (min, max, v) => {
   return ((((v - min) % range) + range) % range) + min;
 };
 
-const ScrollingRow = ({ text, baseVelocity, scrollVelocity, scrollVelocityMultiplier, direction, className }) => {
+const ScrollingRow = ({ text, baseVelocity, scrollVelocity, scrollVelocityMultiplier, direction, className = '' }) => {
   const baseX = useMotionValue(0);
   const [repetitions, setRepetitions] = useState(4);
   const rowRef = useRef(null);
@@ -87,7 +87,7 @@ const ScrollingRow = ({ text, baseVelocity, scrollVelocity, scrollVelocityMultip
 
 const ScrollVelocity = ({
   text,
-  className,
+  className = '',
   baseVelocity = 2,
   scrollVelocityMultiplier = 0.5,
 }) => {

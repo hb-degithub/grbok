@@ -34,7 +34,7 @@ export function useStats(options: UseStatsOptions = {}): UseStatsReturn {
       setData(result);
     } catch (err) {
       console.error('获取统计数据失败：', err);
-      setError(err as Error);
+      setError(err instanceof Error ? err : new Error(String(err)));
     } finally {
       setLoading(false);
     }

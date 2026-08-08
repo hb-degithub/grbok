@@ -7,7 +7,7 @@ const Carousel = ({
   autoplay = true,
   autoplayInterval = 3000,
   loop = true,
-  className,
+  className = '',
 }) => {
   const slides = Children.toArray(children);
   const count = slides.length;

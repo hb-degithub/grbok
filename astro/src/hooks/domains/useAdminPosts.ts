@@ -89,11 +89,32 @@ export function useAdminPosts() {
 
   const savePost = useCallback(async (skipChecks = false) => {
     if (!editing) return;
+    
+    // 必填校验
+    if (!editing.title?.trim()) {
+      showToast('请填写文章标题', 'error');
+      return;
+    }
+    if (!editing.content?.trim()) {
+      showToast('请填写文章内容', 'error');
+      return;
+    }
+    
     setSaving(true);
     try {
+      // 自动生成 slug（如果为空）
+      let slug = editing.slug?.trim() || '';
+      if (!slug && editing.title) {
+        slug = editing.title
+          .toLowerCase()
+          .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+          .slice(0, 160);
+      }
+
       const data: Partial<Post> = {
         title: editing.title,
-        slug: editing.slug,
+        slug: slug,
         excerpt: editing.excerpt || '',
         content: editing.content || '',
         cover: editing.cover || '',

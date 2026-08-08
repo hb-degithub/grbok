@@ -52,6 +52,78 @@ onRecordBeforeCreateRequest((e) => {
     throw detailedError(429, 'COMMENT_REPORT_RATE_LIMITED', decision.retryAfterSeconds);
   }
 
+  // 服务端写入真实客户端 IP（客户端不应也不能提供自己的 IP）
+  record.set('reporter_ip', String(ip || 'unknown').slice(0, 45));
+
+  // 验证举报理由非空
+  if (!String(record.get('reason') || '').trim()) {
+    throw new BadRequestError('请填写举报理由');
+  }
+
+  if (typeof e.next === 'function') e.next();
+}, 'comment_reports');
+
+// 举报创建后通知管理员
+onRecordAfterCreateRequest((e) => {
+  var record = e.record;
+  if (!record) return;
+
+  try {
+    var commentId = record.getString('comment_id');
+    var reason = record.getString('reason');
+    var reporterIp = record.getString('reporter_ip');
+
+    // 查找评论内容
+    var comment = $app.dao().findRecordById('comments', commentId);
+    var commentContent = comment ? comment.getString('content') : '(已删除)';
+    var commentAuthor = comment ? comment.getString('author_name') : '未知';
+    var postId = comment ? comment.getString('post_id') : '';
+
+    // 查找文章标题
+    var postTitle = '(未知文章)';
+    var postUrl = '';
+    if (postId) {
+      try {
+        var post = $app.dao().findRecordById('posts', postId);
+        postTitle = post.getString('title');
+        var base = String($os.getenv('PUBLIC_SITE_URL') || $app.settings().meta.appUrl || 'https://hlydwz.com').replace(/\/$/, '');
+        postUrl = base + '/posts/' + encodeURIComponent(post.getString('slug') || post.id);
+      } catch (_) {}
+    }
+
+    // 查找所有管理员邮箱
+    var admins = $app.dao().findRecordsByFilter('users', 'role = "admin" || role = "super_admin"', '', 10, 0);
+    var adminEmails = [];
+    for (var i = 0; i < admins.length; i++) {
+      var email = String(admins[i].getString('email') || '').trim().toLowerCase();
+      if (email) adminEmails.push(email);
+    }
+
+    if (adminEmails.length === 0) return;
+
+    // 发送通知邮件给所有管理员
+    $app.dao().runInTransaction(function (txDao) {
+      for (var i = 0; i < adminEmails.length; i++) {
+        require(__hooks + '/lib/mail_outbox.js').enqueue(txDao, {
+          dedupeKey: 'comment_report:' + record.id + ':admin:' + adminEmails[i],
+          category: 'comment_report_notification',
+          recipient: adminEmails[i],
+          templateKey: 'comment_report',
+          variables: {
+            commentAuthor: commentAuthor,
+            commentContent: commentContent,
+            reportReason: reason,
+            reporterIp: reporterIp,
+            postTitle: postTitle,
+            postUrl: postUrl,
+          },
+        });
+      }
+    });
+  } catch (_) {
+    console.error('[comment-report] operation=notify result=INTERNAL_ERROR');
+  }
+
   if (typeof e.next === 'function') e.next();
 }, 'comment_reports');
 })();

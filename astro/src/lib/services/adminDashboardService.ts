@@ -60,7 +60,7 @@ class AdminDashboardService extends BaseService<RecordModel> {
       sort: '-updated',
       fields: 'id,title,status,updated',
     });
-    return result.items as RecentPost[];
+    return result.items as unknown as RecentPost[];
   }
 
   async getRecentComments(): Promise<RecentComment[]> {
@@ -69,7 +69,7 @@ class AdminDashboardService extends BaseService<RecordModel> {
       sort: '-created',
       fields: 'id,author_name,content,status,created',
     });
-    return result.items as RecentComment[];
+    return result.items as unknown as RecentComment[];
   }
 }
 

@@ -4,6 +4,7 @@ import { featureFlagService, type FeatureFlag } from '../../lib/services/feature
 export function useFeatureFlags() {
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadFlags = useCallback(async () => {
@@ -67,14 +68,35 @@ export function useFeatureFlags() {
     }
   }, [loadFlags]);
 
+  /** 新建或更新（依据 data 是否含 id） */
+  const saveFlag = useCallback(async (data: Omit<FeatureFlag, 'id' | 'created' | 'updated'> & { id?: string }) => {
+    setSaving(true);
+    try {
+      if (data.id) {
+        await featureFlagService.updateFlag(data.id, data);
+      } else {
+        await featureFlagService.createFlag(data);
+      }
+      await loadFlags();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '保存失败');
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }, [loadFlags]);
+
   return {
     flags,
     loading,
+    saving,
     error,
     loadFlags,
     toggleFlag,
     createFlag,
     updateFlag,
     deleteFlag,
+    saveFlag,
   };
 }

@@ -3,7 +3,8 @@ import type { RecordModel } from 'pocketbase';
 import { registerReader as registerReaderRequest, requestVerification as requestVerificationRequest } from '../blog-auth-client';
 
 export interface ReaderRegisterData {
-  email: string;
+  /** 邮箱（可选，未提供时不发送验证邮件） */
+  email?: string;
   name: string;
   password: string;
   passwordConfirm: string;

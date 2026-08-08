@@ -3,7 +3,7 @@ import './AnimatedContent.css';
 
 const AnimatedContent = ({
   children,
-  className,
+  className = '',
   distance = 20,
   delay = 0,
   duration = 0.6,

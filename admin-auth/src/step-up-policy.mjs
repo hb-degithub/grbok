@@ -1,3 +1,17 @@
+/**
+ * ============================================================================
+ * STEP-UP 凭证算法 —— 权威实现（SOURCE OF TRUTH）
+ * ============================================================================
+ * 本文件是 step-up HMAC 绑定校验算法的唯一权威实现。
+ *
+ * 镜像实现（禁止独立修改）：
+ *   - pb_hooks/lib/admin_step_up.js （PocketBase hooks 端 requireAdminStepUp）
+ *
+ * 任何对算法参数（namespace、拼接顺序、凭证格式、窗口值、比较方式）的修改
+ * 必须先在【本文件】完成，再逐行同步到镜像端，并核对 docs/step-up-shared-constants.md。
+ * 两端漂移 = 验证不一致 / 绕过路径（P0 安全风险）。
+ * ============================================================================
+ */
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 const b64url = (value) => Buffer.from(value).toString('base64url');

@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import TotpManager from './TotpManager';
 import SecurityRatePolicyForm from './SecurityRatePolicyForm';
+import SecurityStatus from './SecurityStatus';
 
 interface AuditItem { name: string; status: 'pass' | 'warn' | 'fail'; description: string; recommendation: string; }
 
@@ -35,6 +36,7 @@ export default function SecurityAudit() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-w-0 space-y-6">
       <TotpManager />
+      <SecurityStatus />
       <SecurityRatePolicyForm />
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="card min-w-0 rounded-xl p-4 text-center"><p className="font-display text-2xl font-black text-success">{passCount}</p><p className="break-words font-mono text-[10px] uppercase tracking-widest text-muted [overflow-wrap:anywhere]">通过</p></div>

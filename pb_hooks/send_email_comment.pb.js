@@ -60,8 +60,7 @@
             }
           }
         } catch (parentError) {
-          // 父评论不存在或已被删除，忽略回复通知
-          console.error('[comment-reply-mail] parent comment not found: ' + parentId);
+          // 父评论不存在或已被删除：预期场景，静默忽略回复通知（不记录敏感标识）
         }
       }
     } catch (_) {

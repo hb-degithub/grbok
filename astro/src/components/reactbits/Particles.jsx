@@ -99,7 +99,7 @@ const Particles = ({
   cameraDistance = 20,
   disableRotation = false,
   pixelRatio = 1,
-  className
+  className = ''
 }) => {
   const prefersReducedMotion = useReducedMotion();
   const containerRef = useRef(null);

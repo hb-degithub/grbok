@@ -7,7 +7,7 @@ export interface Comment {
   author_name: string;
   author_email?: string;
   content: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'spam';
   created: string;
   updated: string;
   expand?: {
@@ -19,7 +19,7 @@ export interface Comment {
   };
 }
 
-export type CommentFilter = 'all' | 'pending' | 'approved' | 'rejected';
+export type CommentFilter = 'all' | 'pending' | 'approved' | 'spam';
 
 type CommentRecord = Comment & RecordModel;
 
@@ -28,10 +28,15 @@ class AdminCommentService extends BaseService<CommentRecord> {
     super('comments');
   }
 
-  async getComments(filter: CommentFilter = 'all', page = 1, perPage = 20): Promise<{ items: Comment[]; totalItems: number }> {
-    const filterStr = filter === 'all' ? '' : `status = "${filter}"`;
+  async getComments(filter: CommentFilter = 'all', page = 1, perPage = 20, query = ''): Promise<{ items: Comment[]; totalItems: number }> {
+    const conditions: string[] = [];
+    if (filter !== 'all') conditions.push(`status = "${filter}"`);
+    if (query) {
+      const escaped = query.replace(/["\\]/g, '');
+      conditions.push(`(author_name ~ "${escaped}" || author_email ~ "${escaped}" || content ~ "${escaped}" || post_id.title ~ "${escaped}")`);
+    }
     const result = await this.getList(page, perPage, {
-      filter: filterStr,
+      filter: conditions.join(' && '),
       sort: '-created',
       expand: 'post',
     });
@@ -45,8 +50,26 @@ class AdminCommentService extends BaseService<CommentRecord> {
     await this.update(id, { status: 'approved' });
   }
 
-  async rejectComment(id: string): Promise<void> {
-    await this.update(id, { status: 'rejected' });
+  async markSpam(id: string): Promise<void> {
+    await this.update(id, { status: 'spam' });
+  }
+
+  async updateStatus(id: string, status: Comment['status']): Promise<void> {
+    await this.update(id, { status });
+  }
+
+  async batchUpdateStatus(ids: string[], status: Comment['status']): Promise<void> {
+    const pb = this.getPocketBase();
+    for (const id of ids) {
+      await pb.collection('comments').update(id, { status });
+    }
+  }
+
+  async batchDelete(ids: string[]): Promise<void> {
+    const pb = this.getPocketBase();
+    for (const id of ids) {
+      await pb.collection('comments').delete(id);
+    }
   }
 
   async deleteComment(id: string): Promise<void> {

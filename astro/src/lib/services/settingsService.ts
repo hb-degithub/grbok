@@ -67,15 +67,32 @@ class SettingsService extends BaseService<SettingRecordModel> {
 
   async saveSettings(settings: SiteSettings): Promise<void> {
     const pb = this.getPocketBase();
+    const failed: string[] = [];
+    
     for (const [key, value] of Object.entries(settings)) {
       try {
-        const existing = await pb.collection('settings').getFirstListItem(
-          pb.filter('key = {:key}', { key })
-        );
-        await this.update(existing.id, { value: String(value) });
+        let existing: SettingRecordModel | null = null;
+        try {
+          existing = await pb.collection('settings').getFirstListItem(
+            pb.filter('key = {:key}', { key })
+          );
+        } catch (e) {
+          // 仅"不存在"才走创建，其他错误（如权限）直接抛出
+          if ((e as { status?: number })?.status !== 404) throw e;
+        }
+        
+        if (existing) {
+          await this.update(existing.id, { value: String(value) });
+        } else {
+          await this.create({ key, value: String(value) });
+        }
       } catch {
-        await this.create({ key, value: String(value) });
+        failed.push(key);
       }
+    }
+    
+    if (failed.length > 0) {
+      throw new Error(`以下设置保存失败：${failed.join('、')}`);
     }
   }
 }

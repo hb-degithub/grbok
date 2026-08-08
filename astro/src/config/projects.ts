@@ -29,8 +29,8 @@ export const projects: Project[] = [
     name: '胡巴的博客',
     tagline: '自建全栈个人博客系统',
     description:
-      'Astro 群岛架构前端 + PocketBase 后端的全栈博客：RBAC 管理员体系、TOTP 身份验证器、评论系统、全文搜索、访问统计、Docker 一体化部署。',
-    tech: ['Astro 6', 'React 19', 'Tailwind CSS 4', 'PocketBase', 'Docker', 'Caddy'],
+      'Astro 6.4 纯静态生成前端 + PocketBase 0.22 后端的全栈博客：RBAC 管理员体系、TOTP 身份验证器、评论系统、Pagefind 全文搜索、访问统计、Docker Compose 一体化部署。',
+    tech: ['Astro 6.4', 'React 19', 'Tailwind CSS 4', 'PocketBase 0.22', 'admin-auth', 'Caddy 2.8', 'Docker Compose'],
     status: 'active',
     links: { demo: 'https://hlydwz.com', article: '/posts' },
     featured: true,

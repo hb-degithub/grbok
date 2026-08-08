@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useAdminPosts } from '../../hooks/domains/useAdminPosts';
 import { cn } from '../../lib/utils';
 import { sanitizeHtml } from '../../lib/security';
@@ -34,7 +34,7 @@ const listVariants = {
   hidden: { opacity: 1 },
   visible: { transition: { staggerChildren: 0.04 } }
 };
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 8 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } }
 };

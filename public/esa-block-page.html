@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>访问受限 - 胡巴的博客</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    body {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #fafafa; color: #18181b;
+    }
+    .container { text-align: center; max-width: 420px; padding: 0 24px; }
+    .icon {
+      width: 80px; height: 80px; margin: 0 auto 24px;
+      border-radius: 20px; background: #f4f4f5;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .icon svg { width: 40px; height: 40px; color: #71717a; }
+    h1 { font-size: 24px; font-weight: 700; margin-bottom: 12px; color: #18181b; }
+    .desc { font-size: 14px; color: #71717a; line-height: 1.6; margin-bottom: 24px; }
+    .info {
+      background: #f4f4f5; border-radius: 12px; padding: 16px;
+      font-size: 12px; color: #52525b; text-align: left;
+    }
+    .info p { margin: 4px 0; display: flex; justify-content: space-between; }
+    .info span { font-family: monospace; color: #a1a1aa; }
+    .footer {
+      margin-top: 32px; font-size: 12px; color: #a1a1aa;
+    }
+    .footer a { color: #14b8a6; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #09090b; color: #fafafa; }
+      h1 { color: #fafafa; }
+      .icon { background: #27272a; }
+      .icon svg { color: #a1a1aa; }
+      .info { background: #18181b; color: #a1a1aa; }
+      .info span { color: #71717a; }
+      .footer { color: #52525b; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+    </div>
+    <h1>访问受限</h1>
+    <p class="desc">您的请求被安全策略拦截。如果您认为这是误判，请联系网站管理员。</p>
+    <div class="info">
+      <p>请求 ID <span id="requestId">REQUEST_ID</span></p>
+      <p>规则 ID <span id="ruleId">RULE_ID</span></p>
+    </div>
+    <div class="footer">
+      <a href="https://hlydwz.com">返回首页</a>
+    </div>
+  </div>
+</body>
+</html>

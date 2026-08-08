@@ -30,7 +30,9 @@ function parse(c) {
   var password = String(body.password || '');
   var passwordConfirm = String(body.passwordConfirm || '');
   var inviteCode = String(body.inviteCode || '');
-  if (!validEmail(email) || !name || name.length > 80 || password.length < 8 || password.length > 72 || password !== passwordConfirm) {
+  // 邮箱可选：仅在提供时校验格式
+  if (email && !validEmail(email)) throw coded('INVALID_REGISTRATION');
+  if (!name || name.length > 80 || password.length < 8 || password.length > 72 || password !== passwordConfirm) {
     throw coded('INVALID_REGISTRATION');
   }
   return { email: email, name: name, password: password, passwordConfirm: passwordConfirm, inviteCode: inviteCode };
@@ -56,26 +58,30 @@ function enforceMode(txDao, inviteCode) {
 }
 
 function existingReader(txDao, email) {
+  if (!email) return null; // 未提供邮箱时不检查重复
   var rows = txDao.findRecordsByFilter('users', 'email = {:email}', '', 1, 0, { email: email });
   return rows && rows.length ? rows[0] : null;
 }
 
 function createReader(txDao, input) {
   var record = new Record(txDao.findCollectionByNameOrId('users'));
-  record.set('email', input.email);
+  // 邮箱可选：未提供时生成唯一占位邮箱，避免空串触发 unique 冲突
+  var email = input.email || ('reader_' + $security.randomStringWithAlphabet(20, 'abcdefghijklmnopqrstuvwxyz0123456789') + '@localhost.invalid');
+  record.set('email', email);
   record.set('username', 'reader_' + $security.randomStringWithAlphabet(16, 'abcdefghijklmnopqrstuvwxyz0123456789'));
   record.set('password', input.password);
   record.set('passwordConfirm', input.passwordConfirm);
   record.set('name', input.name);
   record.set('role', 'reader');
-  record.set('verified', false);
+  // 未提供邮箱时标记为已验证（无需验证）
+  record.set('verified', !input.email);
   record.refreshTokenKey();
   txDao.saveRecord(record);
   return record;
 }
 
 function requestInitialVerification(record, email, ip, nowMs) {
-  if (!record) return;
+  if (!record || !email) return; // 未提供邮箱时跳过验证邮件
   var allowed = false;
   try {
     $app.dao().runInTransaction(function (txDao) {

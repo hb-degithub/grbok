@@ -2,7 +2,6 @@
 import BaseLayout from './BaseLayout.astro';
 import AdminSidebar from '../components/admin/AdminSidebar';
 import AdminGuard from '../components/admin/AdminGuard';
-import ToastContainer from '../components/ui/Toast';
 import type { AdminRole } from '../hooks/useAdminAuth';
 
 interface Props {
@@ -59,7 +58,6 @@ const requiredRoleLabel: Record<AdminRole, string> = {
         </div>
       </main>
     </div>
-    <ToastContainer client:load />
   </AdminGuard>
 </BaseLayout>
 

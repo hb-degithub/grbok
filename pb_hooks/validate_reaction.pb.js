@@ -42,9 +42,14 @@ onRecordBeforeCreateRequest((e) => {
     throw new BadRequestError('Fingerprint is required');
   }
 
-  // IP-based rate limiting
-  const info = $apis.requestInfo(e.httpContext);
-  const ip = (info.clientIp || 'unknown').trim();
+  // IP-based rate limiting（统一使用 client_ip.js 获取真实 IP）
+  var rateLimit = require(__hooks + '/lib/security_rate_limit.js');
+  var ip;
+  try {
+    ip = rateLimit.normalizeIp(require(__hooks + '/lib/client_ip.js').clientIp(e.httpContext));
+  } catch (_) {
+    ip = 'unknown';
+  }
   const key = 'rxn:' + ip;
   const now = Date.now();
 

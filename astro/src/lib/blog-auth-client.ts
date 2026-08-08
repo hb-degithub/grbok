@@ -2,6 +2,7 @@ import { getPocketBase } from './pocketbase';
 import { normalizeAuthEmail, withAuthRequestHeaders } from './security';
 import type { ReaderRegisterData } from '../types/pocketbase';
 import type { User } from '../types/pocketbase';
+import type { RecordModel } from 'pocketbase';
 
 export interface AcceptedResponse {
   accepted: true;
@@ -16,7 +17,7 @@ export async function registerReader(input: RegisterInput): Promise<AcceptedResp
   const pb = getPocketBase();
   return withAuthRequestHeaders(pb, () => pb.send<AcceptedResponse>('/api/blog-auth/register', {
     method: 'POST',
-    body: { ...input, email: normalizeAuthEmail(input.email) },
+    body: { ...input, email: input.email ? normalizeAuthEmail(input.email) : undefined },
   }));
 }
 
@@ -39,7 +40,7 @@ export async function requestReaderOtp(email: string): Promise<ReaderOtpResponse
 export async function verifyReaderOtp(challengeId: string, code: string): Promise<AuthResponse> {
   const pb = getPocketBase();
   const result = await withAuthRequestHeaders(pb, () => pb.send<AuthResponse>('/api/blog-auth/otp/verify', { method: 'POST', body: { challengeId, code } }));
-  pb.authStore.save(result.token, result.record);
+  pb.authStore.save(result.token, result.record as unknown as RecordModel);
   return result;
 }
 

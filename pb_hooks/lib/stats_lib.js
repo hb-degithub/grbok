@@ -285,8 +285,8 @@ function blogStats(e) {
       };
     }
 
-    // 访客地理聚合（仅 admin，用于后台地图；不返回 visitor_hash 与单条记录）
-    if (e.queryParam('geo') === '1' && isAdminRequest(e)) {
+    // 访客地理聚合（geo=1 时对所有用户开放；仅返回聚合数字与国家/省份名称，不返回 visitor_hash 与单条记录）
+    if (e.queryParam('geo') === '1') {
       const countryRaw = queryRows(
         "SELECT country, COUNT(*) AS c, COUNT(DISTINCT visitor_hash) AS uv FROM page_views WHERE event = {:ev} AND created >= {:from} AND country != '' GROUP BY country ORDER BY c DESC",
         { ev: 'pageview', from: from }, { country: '', c: 0, uv: 0 });

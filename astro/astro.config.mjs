@@ -14,6 +14,10 @@ function buildStampPlugin() {
   const stamp = `/* _bs:${Date.now()} */`;
   return {
     name: 'build-stamp',
+    /**
+     * @param {string} code
+     * @param {string} id
+     */
     transform(code, id) {
       if (id.endsWith('.ts') || id.endsWith('.tsx') || id.endsWith('.js') || id.endsWith('.jsx')) {
         return stamp + '\n' + code;

@@ -21,7 +21,6 @@ const currentYear = new Date().getFullYear();
       <div class="flex items-center gap-3">
         {SITE_CONFIG.socialLinks.map((link) => (
           <a
-            key={link.name}
             href={link.url}
             target="_blank"
             rel="noopener noreferrer"
@@ -61,7 +60,7 @@ const currentYear = new Date().getFullYear();
       )}
     </div>
 
-    <p class="mt-4 text-center text-[10px] text-zinc-400 dark:text-zinc-600">Powered by Astro &amp; PocketBase</p>
+    <p class="mt-4 text-center text-[10px] text-zinc-400 dark:text-zinc-600">Powered by Astro 6.4, PocketBase 0.22 &amp; admin-auth</p>
   </div>
 </footer>
 

@@ -13,7 +13,8 @@ export interface User {
 }
 
 export interface ReaderRegisterData {
-  email: string;
+  /** 邮箱（可选，未提供时不发送验证邮件） */
+  email?: string;
   password: string;
   passwordConfirm: string;
   name?: string;
@@ -53,6 +54,16 @@ export interface PublicComment {
   status: 'pending' | 'approved' | 'spam';
   created: string;
   updated: string;
+  /** 点赞数 */
+  likes?: number;
+  /** 是否已编辑 */
+  edited?: boolean;
+  /** 编辑时间 */
+  edited_at?: string;
+  /** 是否已删除（软删除） */
+  deleted?: boolean;
+  /** 作者等级（1-5） */
+  author_level?: number;
   expand?: {
     post_id?: Post;
     parent_id?: PublicComment;

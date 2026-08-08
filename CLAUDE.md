@@ -64,6 +64,35 @@ pb_hooks/                 # PocketBase server-side hooks (.pb.js suffix required
 pb_migrations/            # PocketBase schema migrations
 pb_local/                 # Local dev PB data directory
 
+admin-auth/               # Internal service (Node.js >=22 ESM)
+  src/
+    server.mjs            # Entry (npm start), listens :8787
+    mail/                 # Mail gateway (nodemailer 9.0.3)
+    esa/                  # ESA cache management client (maxmind GeoIP)
+    config.mjs            # Env-driven config
+    session-policy.mjs    # Session policy
+    step-up-policy.mjs    # WebAuthn passkey MFA step-up policy
+  test/                   # node --test: server/mail/esa/session-policy/step-up-policy tests
+  Dockerfile              # node:22-alpine, npm ci --omit=dev, non-root USER node, EXPOSE 8787
+  # 边界: 内部服务，仅 docker 内部网络 expose :8787（Caddy 不直接暴露）;
+  #       PocketBase 通过 ADMIN_AUTH_INTERNAL_URL=http://admin-auth:8787 内部调用
+  # 职责: WebAuthn passkey MFA、step-up 认证、邮件网关（SMTP 发送）、ESA 缓存管理
+
+tests/                    # Integration test fixtures (non-production)
+  admin-security/         # legacy_session_seed / step_up_fixture .pb.js, webauthn_stub.mjs
+  frontend-backend/       # gallery / guestbook / stats fixture .pb.js
+  mail-local/             # account fixture + retention contracts
+  ops/                    # pytest: test_mail_archive.py, fakes/
+  security-rate/          # hook_log_safety.test.js + rate/policy/registration fixtures
+  # 边界: 仅测试夹具与本地集成测试，不属于部署产物
+
+scripts/                  # Ops / check / test scripts (PowerShell + Python + Shell)
+  check-*.ps1             # check-admin-routes, check-mail-config, check-real-ip-chain, check-pb-admin-auth, check-admin-recovery...
+  test-*.ps1              # test-mail-gateway-local, test-security-rate-local, test-admin-step-up, test-gallery-local...
+  pre-deploy-check.ps1, sensitive-check.ps1, admin-recovery.ps1
+  mail-archive.py, verify-pocketbase-migrations-linux.sh, run-mail-archive-1panel.sh
+  # 边界: 开发/部署辅助脚本，需 PowerShell (Windows) 或 Python/Shell (Linux)
+
 docs/                     # Reference docs: schema, security rules, rate-limit config
 tmp/                      # Temporary deployment artifacts
 .claude/                  # Claude Code IDE settings
@@ -174,13 +203,9 @@ Static files are served from `astro/dist/`, mounted read-only at `/srv` in Caddy
 
 ## Git History Summary
 
-27 commits (2026-06-22 ~ 2026-06-24), all authored by HB. Major phases:
-1. Init — project structure, Docker, Caddy, PB schema
-2. Astro scaffold — tailwind, mdx, sitemap, pocketbase SDK
-3. Features — auth (magic link + password), nested comments, pagefind search
-4. UI overhaul — animation system, glassmorphism, dark hero, premium design
-5. Admin panel — CRUD for posts/comments/tags/users/settings, security audit
-6. Bug fixes — hydration issues, encoding, Chinese error messages, CSS aliases
+快照于 2026-07-30（共 224 commits，2026-06-22 ~ 2026-07-30），作者均为 HB。首个提交 df9962f "chore: init project structure"，最新提交 113dfff "feat: 双模式地图、ESA缓存管理、邮件通知优化"。
+
+演进概览：项目初始化 → Astro 前端搭建 → 功能开发与 UI 迭代 → 管理后台与安全加固；详细分阶段改动（Phase 0 ~ Phase 4）见 [docs/TECHNICAL_EVOLUTION_DOC.md](docs/TECHNICAL_EVOLUTION_DOC.md)（2026-07-24 生成，含"分阶段改动详解"章节）。
 
 ## Gotchas
 - `login_security.pb.js` was previously disabled (`.disabled` suffix) because an early version caused login 400 errors. The current version is re-enabled and fixed (uses `realIP()` + `globalThis` bucket). If you change its rate-limiting logic, test the password login flow for both `users` and `admins` auth.

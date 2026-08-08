@@ -3,12 +3,14 @@ import BaseLayout from './BaseLayout.astro';
 
 interface Props {
   title: string;
+  description?: string;
+  noindex?: boolean;
 }
 
-const { title } = Astro.props;
+const { title, description, noindex } = Astro.props;
 ---
 
-<BaseLayout title={title}>
+<BaseLayout title={title} description={description} noindex={noindex}>
   <div class="flex min-h-[60vh] items-center justify-center">
     <div class="w-full max-w-md">
       <div class="rounded-lg border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">

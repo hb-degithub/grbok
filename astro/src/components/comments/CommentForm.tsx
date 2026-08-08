@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { RateLimiter } from '../../lib/security';
@@ -13,17 +13,17 @@ const NAME_MAX = 30;
 const CONTENT_MAX = 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0, y: 30 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, staggerChildren: 0.1 } },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 15 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
 };
 
-const successVariants = {
+const successVariants: Variants = {
   hidden: { scale: 0, opacity: 0 },
   visible: {
     scale: 1,
@@ -72,13 +72,14 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.author_name || !formData.author_email || !formData.content) {
+    if (!formData.author_name || !formData.content) {
       setStatus('error');
-      setErrorMessage('请填写所有必填字段');
+      setErrorMessage('请填写昵称和评论内容');
       return;
     }
 
-    if (!EMAIL_RE.test(formData.author_email)) {
+    // 邮箱可选：仅在填写时校验格式
+    if (formData.author_email && !EMAIL_RE.test(formData.author_email)) {
       setStatus('error');
       setErrorMessage('邮箱格式不正确');
       return;
@@ -242,12 +243,11 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
                 autoComplete="name"
               />
               <Input
-                label="邮箱"
+                label="邮箱（可选）"
                 type="email"
                 placeholder="your@email.com"
                 value={formData.author_email}
                 onChange={(e) => setFormData((prev) => ({ ...prev, author_email: e.target.value }))}
-                required
                 maxLength={100}
                 autoComplete="email"
               />

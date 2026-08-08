@@ -1,15 +1,15 @@
 ﻿import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 import { useAdminUsers } from '../../hooks/domains/useAdminUsers';
 import { useAdminAuth, type AdminRole } from '../../hooks/useAdminAuth';
 import ConfirmDialog from '../ui/ConfirmDialog';
-import type { User } from '../../types/pocketbase';
+import type { AdminUser } from '../../lib/services/adminUserService';
 
-const listVariants = {
+const listVariants: Variants = {
   hidden: { opacity: 1 },
   visible: { transition: { staggerChildren: 0.04 } }
 };
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 8 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } }
 };
@@ -35,7 +35,7 @@ export default function UserManager() {
   const { users, loading, error, updatingId, deletingId, updateRole, deleteUser, getAvatarUrl, setError } = useAdminUsers();
   const superAdminCount = users.filter((user) => user.role === 'super_admin').length;
 
-  const handleUpdateRole = (targetUser: User, role: AdminRole) => {
+  const handleUpdateRole = (targetUser: AdminUser, role: AdminRole) => {
     if (targetUser.role === role) return;
     if (targetUser.role === 'super_admin' && role !== 'super_admin' && superAdminCount <= 1) {
       setError('至少需要保留一个超级管理员。');
@@ -47,7 +47,7 @@ export default function UserManager() {
     }});
   };
 
-  const handleDeleteUser = (targetUser: User) => {
+  const handleDeleteUser = (targetUser: AdminUser) => {
     if (targetUser.role === 'super_admin' && superAdminCount <= 1) {
       setError('至少需要保留一个超级管理员，无法删除。');
       return;

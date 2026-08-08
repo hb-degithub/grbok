@@ -1,0 +1,31 @@
+metrics: true
+storage:
+  path: /data
+alerting:
+  custom:
+    enabled: false
+    url: "http://127.0.0.1:1/"
+endpoints:
+  - name: Blog Home
+    group: hlydwz.com
+    url: https://hlydwz.com/
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY] contains <title>"
+    alerts:
+      - type: custom
+        failure-threshold: 2
+        success-threshold: 1
+        send-on-resolved: true
+  - name: PocketBase Health
+    group: hlydwz.com
+    url: https://hlydwz.com/api/health
+    interval: 60s
+    conditions:
+      - "[STATUS] == 200"
+    alerts:
+      - type: custom
+        failure-threshold: 2
+        success-threshold: 1
+        send-on-resolved: true

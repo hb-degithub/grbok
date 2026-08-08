@@ -70,11 +70,9 @@ for hook in guard_user_role.pb.js validate_comment.pb.js send_email_comment.pb.j
 done
 
 if [ -f "pb_hooks/login_security.pb.js" ]; then
-    bad "pb_hooks/login_security.pb.js must stay disabled; use OpenResty login endpoint rate limits instead."
-elif [ -f "pb_hooks/login_security.pb.js.disabled" ]; then
-    ok "PocketBase login_security hook is disabled"
+    ok "PocketBase login_security hook is enabled (per-IP + per-email login rate limiting)"
 else
-    note "pb_hooks/login_security.pb.js.disabled was not found; ensure the login hook is not deployed under the active .pb.js name."
+    bad "Missing pb_hooks/login_security.pb.js; login rate limiting hook must be deployed."
 fi
 
 for caddyfile in Caddyfile Caddyfile.local; do

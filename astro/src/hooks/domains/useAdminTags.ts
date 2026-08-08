@@ -7,7 +7,7 @@ import { notifyStepUpExpired } from '../../lib/step-up-recovery';
 export function useAdminTags() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<Tag | null>(null);
+  const [editing, setEditing] = useState<Partial<Tag> | null>(null);
   const [saving, setSaving] = useState(false);
 
   const fetchTags = useCallback(async () => {

@@ -4,7 +4,7 @@ import './LoginGridScanBackground.css';
 // Lazy-load GridScan so the three.js + postprocessing vendor chunk (~700KB)
 // streams in AFTER the login form renders. The background is decorative; the
 // form is the functional content and must paint first.
-const GridScan = lazy(() => import('../reactbits/GridScan').then(m => ({ default: m.GridScan })));
+const GridScan = lazy(() => import('../reactbits/GridScan'));
 
 type Theme = 'light' | 'dark';
 

@@ -6,7 +6,7 @@ const CountUp = ({
   to,
   duration = 1.5,
   delay = 0,
-  className,
+  className = '',
 }) => {
   const prefersReducedMotion = useReducedMotion();
   const motionValue = useMotionValue(from);

@@ -1,0 +1,13 @@
+services:
+  gatus:
+    image: ghcr.io/twin/gatus:latest
+    container_name: gatus
+    restart: unless-stopped
+    mem_limit: 128m
+    ports:
+      - "127.0.0.1:8085:8080"
+    volumes:
+      - ./config:/config
+      - gatus-data:/data
+volumes:
+  gatus-data:

@@ -8,6 +8,25 @@
     encode zstd gzip
     root * /srv
 
+    # 请求体大小限制（防止大文件上传攻击）
+    request_body {
+        max_size 10MB
+    }
+
+    # HTTP 方法限制（只允许 GET/POST/OPTIONS，其他方法返回 405）
+    @disallowed_methods not method GET POST OPTIONS
+    handle @disallowed_methods {
+        respond "Method Not Allowed" 405
+    }
+
+    # User-Agent 过滤（拦截已知恶意爬虫/扫描器）
+    @bad_ua {
+        header User-Agent *sqlmap* *nikto* *nmap* *masscan* *acunetix* *nessus* *openvas* *w3af* *burp* *metasploit*
+    }
+    handle @bad_ua {
+        redir /blocked?reason=malicious-ua 302
+    }
+
     # /admin 是前端静态页面，需对所有用户开放（鉴权由前端 + PB API 层负责）；
     # /api/blog-admin/* 由 PocketBase hooks 鉴权（requireAdmin 检查角色+token），不卡 IP；
     # 仅 /_/ PB 后台、/api/admins 需 IP 白名单保护。
@@ -17,7 +36,7 @@
         not client_ip {$ADMIN_IP}
     }
     handle @blocked_admin_access {
-        respond "Forbidden" 403
+        redir /blocked?reason=admin-ip-restricted 302
     }
 
     header {
@@ -42,7 +61,7 @@
         not path /_astro/* /api/*
     }
     handle @bad_paths {
-        respond "Forbidden" 403
+        redir /blocked?reason=bad-path 302
     }
 
     # Service worker must never be cached long-term: browsers revalidate it on every

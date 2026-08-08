@@ -269,7 +269,7 @@ void main(){
 }
 `;
 
-export const GridScan = ({
+export default function GridScan({
   enableWebcam = false,
   showPreview = false,
   modelsPath = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights',
@@ -296,9 +296,9 @@ export const GridScan = ({
   enableGyro = false,
   scanOnClick = false,
   snapBackDelay = 250,
-  className,
-  style
-}) => {
+  className = '',
+  style = {}
+}) {
   const prefersReducedMotion = useReducedMotion();
   const containerRef = useRef(null);
   const videoRef = useRef(null);
@@ -821,7 +821,7 @@ export const GridScan = ({
       )}
     </div>
   );
-};
+}
 
 function srgbColor(hex) {
   const c = new THREE.Color(hex);
@@ -910,3 +910,4 @@ function centroid(points) {
 function dist2(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
+

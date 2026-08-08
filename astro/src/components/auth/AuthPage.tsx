@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import MagicLinkForm from './MagicLinkForm';
 import PasswordLoginForm from './PasswordLoginForm';
 import RegisterForm from './RegisterForm';
@@ -10,12 +10,12 @@ type AuthMode = 'password' | 'otp' | 'register';
 export default function AuthPage() {
   const [mode, setMode] = useState<AuthMode>('password');
 
-  const pageVariants = {
+  const pageVariants: Variants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { duration: 0.6, ease: 'easeOut', staggerChildren: 0.12 } },
   };
 
-  const childVariants = {
+  const childVariants: Variants = {
     hidden: { opacity: 0, y: 16 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } },
   };

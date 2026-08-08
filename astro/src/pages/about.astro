@@ -10,9 +10,9 @@ import FeatureCard from '../components/ui/FeatureCard';
 
 const techStack = [
   {
-    name: 'Astro 6',
-    desc: 'SSG 静态站点生成，群岛架构',
-    detail: '以静态生成为主的元框架，页面默认零 JS 输出，仅在需要的交互"岛屿"中按需水合 React 组件。',
+    name: 'Astro 6.4',
+    desc: '纯 SSG 静态生成，群岛架构',
+    detail: '纯静态生成（SSG）元框架，构建产物为纯 HTML/CSS/JS，页面默认零 JS 输出，仅在需要的交互"岛屿"中按需水合 React 组件。',
     points: [
       '群岛架构：静态 HTML + 按需水合，首屏 JS 体积最小化',
       'client:visible / client:idle 分级水合策略，非首屏组件延迟加载',
@@ -21,12 +21,12 @@ const techStack = [
   },
   {
     name: 'React 19',
-    desc: '交互组件 + Framer Motion 动效',
-    detail: '所有客户端交互岛屿由 React 驱动，动效层使用 Framer Motion 声明式编排。',
+    desc: '交互岛屿 + 动效组合（Framer Motion / GSAP / Three.js / OGL）',
+    detail: '所有客户端交互岛屿由 React 驱动，动效层组合使用 Framer Motion、GSAP、Three.js 与 OGL 按需编排。',
     points: [
       '评论系统、搜索弹窗、后台面板等交互岛屿',
       'Framer Motion 驱动滚动揭示、页面过渡与微交互',
-      'lazy() 拆包：OGL 粒子等重组件按需加载',
+      'lazy() 拆包：Three.js / OGL 粒子、GSAP 等重组件按需加载',
     ],
   },
   {
@@ -40,17 +40,17 @@ const techStack = [
     ],
   },
   {
-    name: 'PocketBase',
+    name: 'PocketBase 0.22',
     desc: 'BaaS 后端 — Auth / DB / API / 文件存储',
-    detail: '单文件 Go 后端，内嵌 SQLite，提供认证、数据库、实时订阅与文件存储的完整 BaaS 能力。',
+    detail: '单文件 Go 后端（SQLite BaaS），提供认证、数据库、实时订阅与文件存储的完整能力，26 个服务端 hooks 扩展业务逻辑。',
     points: [
-      'pb_hooks JS 钩子扩展服务端业务逻辑（限流、邮件、审计）',
+      '26 个 pb_hooks 服务端钩子：限流 / 评论验证 / 邮件 / 统计 / 审计',
       '迁移文件版本化管理数据库结构',
       'Realtime 订阅驱动评论实时更新',
     ],
   },
   {
-    name: 'Caddy 2',
+    name: 'Caddy 2.8',
     desc: '反向代理，自动 HTTPS，安全响应头',
     detail: '边缘入口网关，统一处理 TLS 终结、安全响应头、静态资源缓存策略与 API 反向代理。',
     points: [
@@ -60,13 +60,13 @@ const techStack = [
     ],
   },
   {
-    name: 'TOTP',
-    desc: '管理员 TOTP 双因素认证',
-    detail: '管理后台采用 TOTP（RFC 6238）动态码二次验证，兼容 Google Authenticator 等主流认证器。',
+    name: 'admin-auth',
+    desc: '内部服务 — TOTP MFA / SMTP / ESA 缓存',
+    detail: 'Node.js ≥22 内部认证服务，承载管理员 TOTP MFA step-up 认证、SMTP 邮件网关与阿里云 ESA 缓存刷新。',
     points: [
-      '扫码绑定，6 位动态码 30 秒轮换，防重放水线保护',
-      '敏感操作二次验证（step-up auth），会话绑定浏览器指纹',
-      '密钥加密存储，宿主机恢复码兜底防锁定',
+      'TOTP（RFC 6238）动态码二次验证，敏感操作 step-up auth',
+      '会话绑定浏览器指纹，密钥加密存储防锁定兜底',
+      '邮件网关与 ESA 边缘缓存刷新统一经内部服务',
     ],
   },
   {
@@ -74,7 +74,7 @@ const techStack = [
     desc: '离线全文搜索索引',
     detail: '构建时对静态产物建立全文搜索索引，搜索完全在浏览器端运行，零服务器依赖。',
     points: [
-      '构建后自动索引 31 个页面',
+      '构建后自动索引前台 20+ 页面',
       '中文分词支持，结果关键词高亮',
       '索引文件按 hash 长缓存，搜索毫秒级响应',
     ],
@@ -82,7 +82,7 @@ const techStack = [
   {
     name: 'Docker Compose',
     desc: '容器化编排与部署',
-    detail: 'Caddy + PocketBase + admin-auth 三容器编排，一条命令完成全栈部署。',
+    detail: 'Caddy 2.8 + PocketBase + admin-auth 三容器编排，一条命令完成全栈部署。',
     points: [
       '容器权限最小化，服务间内网通信',
       '数据卷持久化 SQLite 与上传文件',
@@ -192,10 +192,10 @@ const links = [
         </h2>
         <div class="space-y-4 text-zinc-500 dark:text-zinc-400">
           <p>
-            胡巴的博客是一个自建的全栈个人博客系统，使用 Astro + React + PocketBase 构建，自 2025 年运行至今。
+            胡巴的博客是一个自建的全栈个人博客系统，使用 Astro 6.4 + React 19 + PocketBase 0.22 构建，自 2025 年运行至今。
           </p>
           <p>
-            前端采用 Astro 群岛架构实现静态生成与交互组件的混合渲染，后端依托 PocketBase 提供 Auth、数据库与 API 服务，Caddy 负责反向代理与安全防护，Docker Compose 统一编排部署。
+            前端采用 Astro 纯静态生成（SSG）与 React 岛屿架构，后端依托 PocketBase 0.22 提供 Auth、数据库与 API 服务，Caddy 2.8 负责反向代理与安全防护，admin-auth 内部服务承载 TOTP 二次验证与邮件、ESA 缓存刷新，Docker Compose 统一编排部署。
           </p>
         </div>
       </div>

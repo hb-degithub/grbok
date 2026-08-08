@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAnnouncements } from '../../hooks/domains/useAnnouncements';
+import { useLatestAnnouncements } from '../../hooks/domains/useAnnouncements';
 import { cn } from '../../lib/utils';
 
 const typeStyles: Record<string, string> = {
@@ -11,7 +11,7 @@ const typeStyles: Record<string, string> = {
 };
 
 export default function AnnouncementBar() {
-  const { announcements } = useAnnouncements(3);
+  const { announcements } = useLatestAnnouncements(3);
   const [closed, setClosed] = useState<Set<string>>(new Set());
 
   if (announcements.length === 0) return null;

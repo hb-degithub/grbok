@@ -4,10 +4,10 @@ import type { RecordModel } from 'pocketbase';
 export interface MediaAsset {
   id: string;
   file: string;  // PocketBase 文件字段名
-  original_name: string;
-  mime_type: string;
+  alt: string;    // 文件名/描述
+  mime_type?: string;
   size: number;
-  url: string;
+  url?: string;
   thumbnail_url?: string;
   width?: number;
   height?: number;
@@ -50,7 +50,9 @@ class MediaService extends BaseService<MediaAssetRecord> {
     const pb = this.getPocketBase();
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('original_name', file.name);
+    formData.append('alt', file.name); // 使用已有字段 alt 存储文件名
+    formData.append('uploader', pb.authStore.record?.id || ''); // 必填字段
+    formData.append('size', String(file.size));
 
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -74,7 +76,13 @@ class MediaService extends BaseService<MediaAssetRecord> {
             reject(new Error('Invalid response'));
           }
         } else {
-          reject(new Error(`Upload failed: ${xhr.status}`));
+          // 解析 PocketBase 错误详情
+          let errorBody: unknown;
+          try { errorBody = JSON.parse(xhr.responseText); } catch { /* ignore */ }
+          const err = new Error(`Upload failed: ${xhr.status}`);
+          (err as any).status = xhr.status;
+          (err as any).response = { data: errorBody };
+          reject(err);
         }
       });
 

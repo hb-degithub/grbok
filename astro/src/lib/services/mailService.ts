@@ -32,6 +32,136 @@ export interface MailTemplate {
 type MailMessageRecord = MailMessage & RecordModel;
 type MailTemplateRecord = MailTemplate & RecordModel;
 
+// ---------- 邮件中心 /api/blog-admin/mail/* 接口的数据模型（由 admin-auth 网关提供） ----------
+
+export interface MailOverviewData {
+  gateway: {
+    configured?: boolean;
+    providerLabel?: string;
+    port?: number;
+    fromDomain?: string;
+    tlsMode?: string;
+    lastVerify?: string | null;
+    checkedAt?: string;
+    error?: string;
+  } | null;
+  summary: {
+    sent_24h: number;
+    failed_24h: number;
+    success_rate: number;
+    pending: number;
+    processing: number;
+    retry: number;
+    failed_outbox: number;
+  };
+  checked_at: string;
+}
+
+export interface MailQueueItem {
+  id: string;
+  status: string;
+  category: string;
+  template_key: string;
+  recipient_masked: string;
+  attempt: number;
+  next_attempt_at: string;
+  last_error_class: string;
+  created: string;
+}
+
+export interface MailLogItem {
+  id: string;
+  event_id: string;
+  category: string;
+  source_kind: string;
+  result: string;
+  duration_ms: number;
+  attempt: number;
+  error_class: string;
+  archive_batch_id: string;
+  created: string;
+}
+
+export interface MailVerifyData {
+  verified: boolean;
+  gateway: MailOverviewData['gateway'];
+  error: string | null;
+  checked_at: string;
+}
+
+export interface TemplateItem {
+  id: string;
+  key: string;
+  name: string;
+  category: string;
+  version: number;
+  is_current: boolean;
+  builtin: boolean;
+  subject_template: string;
+  variables: string[];
+  required_variables: string[];
+  content?: {
+    preheader?: string;
+    title?: string;
+    paragraphs?: string[];
+    action?: { label?: string; urlVariable?: string } | null;
+    footer?: string;
+  };
+}
+
+export interface MailRulePolicy {
+  key: string;
+  limit: number;
+  window_seconds: number;
+  version: number;
+}
+
+export interface MailRuleData {
+  policies: MailRulePolicy[];
+  system_sources: { key: string; label: string; source: string; editable: boolean }[];
+  note: string;
+}
+
+export interface MailSuppressItem {
+  id: string;
+  category: string;
+  recipient_masked: string;
+  last_error_class: string;
+  created: string;
+}
+
+export interface SmtpConfigView {
+  configured: boolean;
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  from_address: string;
+  from_name: string;
+  tls_mode: string;
+  has_password: boolean;
+  updated_at: string;
+}
+
+export interface SmtpConfigForm {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  from_address: string;
+  from_name: string;
+  tls_mode: string;
+}
+
+export interface MailTestResult {
+  sent: boolean;
+  to?: string;
+  subject?: string;
+  stage?: 'render' | 'smtp';
+  error?: string;
+}
+
 class MailService extends BaseService<MailMessageRecord> {
   constructor() {
     super('mail_messages');
@@ -134,6 +264,62 @@ class MailService extends BaseService<MailMessageRecord> {
   async deleteTemplate(id: string): Promise<void> {
     const pb = this.getPocketBase();
     await pb.collection('mail_templates').delete(id);
+  }
+
+  // ---------- 邮件中心网关接口（admin-auth 提供） ----------
+
+  async getMailOverview(): Promise<MailOverviewData> {
+    return this.getPocketBase().send<MailOverviewData>('/api/blog-admin/mail/overview', { method: 'GET' });
+  }
+
+  async getMailQueue(status = ''): Promise<{ items: MailQueueItem[] }> {
+    const params = status ? `?status=${encodeURIComponent(status)}` : '';
+    return this.getPocketBase().send<{ items: MailQueueItem[] }>(`/api/blog-admin/mail/queue${params}`, { method: 'GET' });
+  }
+
+  async getMailLogs(result = ''): Promise<{ items: MailLogItem[] }> {
+    const params = result ? `?result=${encodeURIComponent(result)}` : '';
+    return this.getPocketBase().send<{ items: MailLogItem[] }>(`/api/blog-admin/mail/logs${params}`, { method: 'GET' });
+  }
+
+  async verifyMail(): Promise<MailVerifyData> {
+    return this.getPocketBase().send<MailVerifyData>('/api/blog-admin/mail/verify', { method: 'POST' });
+  }
+
+  async getMailTemplates(): Promise<{ items: TemplateItem[] }> {
+    return this.getPocketBase().send<{ items: TemplateItem[] }>('/api/blog-admin/mail/templates', { method: 'GET' });
+  }
+
+  async getMailRules(): Promise<MailRuleData> {
+    return this.getPocketBase().send<MailRuleData>('/api/blog-admin/mail/rules', { method: 'GET' });
+  }
+
+  async getMailSuppress(): Promise<{ items: MailSuppressItem[] }> {
+    return this.getPocketBase().send<{ items: MailSuppressItem[] }>('/api/blog-admin/mail/suppress', { method: 'GET' });
+  }
+
+  async getSmtpConfigView(): Promise<SmtpConfigView> {
+    return this.getPocketBase().send<SmtpConfigView>('/api/blog-admin/mail/smtp', { method: 'GET' });
+  }
+
+  async saveSmtpConfigView(form: SmtpConfigForm): Promise<SmtpConfigView> {
+    return this.getPocketBase().send<SmtpConfigView>('/api/blog-admin/mail/smtp', { method: 'PUT', body: form });
+  }
+
+  async saveMailTemplate(payload: {
+    key: string;
+    subject_template: string;
+    preheader: string;
+    title: string;
+    paragraphs: string[];
+    footer: string;
+    action_label: string;
+  }): Promise<void> {
+    await this.getPocketBase().send('/api/blog-admin/mail/templates', { method: 'PUT', body: payload });
+  }
+
+  async sendMailTest(key: string): Promise<MailTestResult> {
+    return this.getPocketBase().send<MailTestResult>('/api/blog-admin/mail/test', { method: 'POST', body: { key } });
   }
 }
 
