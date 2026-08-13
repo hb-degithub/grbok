@@ -7,22 +7,10 @@ import TableOfContents from '../../components/posts/TableOfContents';
 import ReadingProgress from '../../components/effects/ReadingProgress';
 import { sanitizeHtml } from '../../lib/security';
 
-const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
+// SSR模式：禁用预渲染，每次请求时动态生成
+export const prerender = false;
 
-export async function getStaticPaths() {
-  try {
-    const pbUrl = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
-    const filter = encodeURIComponent('status="published"');
-    const res = await fetch(`${pbUrl}/api/collections/posts/records?filter=${filter}&fields=slug&perPage=200`, { signal: AbortSignal.timeout(3000) });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.items || [])
-      .filter((post: { slug?: string }) => post.slug)
-      .map((post: { slug: string }) => ({ params: { slug: post.slug } }));
-  } catch {
-    return [];
-  }
-}
+const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 
 const { slug } = Astro.params;
 

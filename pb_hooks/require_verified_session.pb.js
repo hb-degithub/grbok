@@ -1,3 +1,4 @@
+(function () {
 /// <reference path="../pb_data/types.d.ts" />
 
 onRecordBeforeCreateRequest(function (e) {
@@ -11,3 +12,4 @@ onRecordBeforeUpdateRequest(function (e) {
 onRecordBeforeDeleteRequest(function (e) {
   require(__hooks + '/lib/admin_step_up.js').requireProtectedWrite(e, 'delete');
 });
+})();

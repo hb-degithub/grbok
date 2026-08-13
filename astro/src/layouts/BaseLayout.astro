@@ -1,5 +1,5 @@
 ---
-import { ClientRouter } from 'astro:transitions';
+// import { ClientRouter } from 'astro:transitions'; // 暂时禁用，修复路由混乱问题
 import '@fontsource/geist-sans/400.css';
 import '@fontsource/geist-sans/500.css';
 import '@fontsource/geist-sans/700.css';
@@ -139,7 +139,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
       })();
     </script>
 
-    <ClientRouter />
+    <!-- <ClientRouter /> --> <!-- 暂时禁用，修复路由混乱问题 -->
   <style is:global>
   /* Astro view transitions */
   html {

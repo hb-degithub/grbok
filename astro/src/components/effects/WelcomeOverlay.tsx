@@ -349,6 +349,13 @@ export default function WelcomeOverlay() {
                           </svg>
                         </div>
                         <p className="text-sm font-medium text-teal-700 dark:text-teal-300">{registeredEmail ? '提交后请验证邮箱，验证完成后可评论' : '注册成功！'}</p>
+                        <button
+                          type="button"
+                          onClick={() => stepperRef.current?.next()}
+                          className="mt-3 rounded-full bg-teal-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-600"
+                        >
+                          继续
+                        </button>
                       </motion.div>
                     ) : (
                       <div className="space-y-3">

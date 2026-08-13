@@ -172,6 +172,20 @@
         file_server
     }
 
+    # SSR模式：动态页面反向代理到Node.js服务器
+    @ssr_pages {
+        path /posts/* /tags/* /archive /stats /
+        not path /_astro/* /pagefind/* /api/* /_/* /admin* /login* *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.webp *.avif *.woff *.woff2 *.ttf *.eot
+    }
+    handle @ssr_pages {
+        reverse_proxy localhost:4321 {
+            header_up X-Real-IP {client_ip}
+            header_up X-Forwarded-For {client_ip}
+            header_up X-Forwarded-Proto {scheme}
+            header_up Host {host}
+        }
+    }
+
     handle {
         header Cache-Control "public, max-age=60, s-maxage=60, must-revalidate"
         try_files {path} {path}/ =404

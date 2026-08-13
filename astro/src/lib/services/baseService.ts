@@ -13,11 +13,24 @@ export class BaseService<T extends RecordModel> {
   }
 
   /**
+   * 过滤对象中的 undefined 值，避免 PocketBase 序列化问题
+   */
+  private cleanData<D>(data: D): Partial<D> {
+    return Object.fromEntries(
+      Object.entries(data as Record<string, unknown>).filter(([_, v]) => v !== undefined)
+    ) as Partial<D>;
+  }
+
+  /**
    * 获取列表数据
    */
   async getList(page = 1, perPage = 50, options?: Record<string, unknown>): Promise<ListResult<T>> {
     const pb = getPocketBase();
-    return pb.collection(this.collection).getList<T>(page, perPage, options);
+    // 过滤掉 undefined 值，避免 PocketBase 将 undefined 序列化为字符串导致 400
+    const cleanOptions = options
+      ? Object.fromEntries(Object.entries(options).filter(([_, v]) => v !== undefined))
+      : undefined;
+    return pb.collection(this.collection).getList<T>(page, perPage, cleanOptions);
   }
 
   /**
@@ -49,7 +62,7 @@ export class BaseService<T extends RecordModel> {
    */
   async create(data: Partial<T>): Promise<T> {
     const pb = getPocketBase();
-    return pb.collection(this.collection).create<T>(data);
+    return pb.collection(this.collection).create<T>(this.cleanData(data));
   }
 
   /**
@@ -57,7 +70,7 @@ export class BaseService<T extends RecordModel> {
    */
   async update(id: string, data: Partial<T>): Promise<T> {
     const pb = getPocketBase();
-    return pb.collection(this.collection).update<T>(id, data);
+    return pb.collection(this.collection).update<T>(id, this.cleanData(data));
   }
 
   /**

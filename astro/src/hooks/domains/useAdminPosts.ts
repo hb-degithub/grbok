@@ -103,13 +103,31 @@ export function useAdminPosts() {
     setSaving(true);
     try {
       // 自动生成 slug（如果为空）
+      const SLUG_PATTERN = /^[a-zA-Z0-9\u4e00-\u9fff][a-zA-Z0-9\u4e00-\u9fff_-]*$/;
       let slug = editing.slug?.trim() || '';
       if (!slug && editing.title) {
         slug = editing.title
           .toLowerCase()
-          .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+          .replace(/[^\w\u4e00-\u9fff]+/g, '-')
           .replace(/^-+|-+$/g, '')
           .slice(0, 160);
+      }
+      // 整体不合法时先清洗，清洗后仍不合法才用时间戳兜底
+      if (!SLUG_PATTERN.test(slug)) {
+        slug = slug.replace(/[^\w\u4e00-\u9fff]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 160);
+      }
+      if (!slug || !SLUG_PATTERN.test(slug)) {
+        slug = `post-${Date.now()}`;
+      }
+
+      // slug 唯一性预检：冲突时自动追加后缀
+      if (!editing.id) {
+        try {
+          const existing = await adminPostService.getPosts(1, 1, { query: slug });
+          if (existing.items.some(p => p.slug === slug)) {
+            slug = `${slug}-${Date.now().toString(36)}`;
+          }
+        } catch { /* 查询失败时继续，让服务端校验 */ }
       }
 
       const data: Partial<Post> = {
@@ -139,9 +157,15 @@ export function useAdminPosts() {
         savedPostId = created.id;
       }
 
-      // Sync tags
+      // Sync tags（独立 try/catch，避免文章已建但标签失败导致重试重复 slug）
       if (savedPostId) {
-        await adminPostService.syncPostTags(savedPostId, selectedTagIds);
+        try {
+          await adminPostService.syncPostTags(savedPostId, selectedTagIds);
+        } catch (tagErr) {
+          if (!notifyStepUpExpired(tagErr)) {
+            showToast(describePbError(tagErr, '标签同步失败'), 'warning');
+          }
+        }
       }
 
       setEditing(null);

@@ -8,13 +8,13 @@ onRecordBeforeAuthWithPasswordRequest((e) => {
 }, 'users');
 
 onRecordAfterAuthWithPasswordRequest((e) => {
-  // 登录成功时清除失败计数
-  require(__hooks + '/lib/login_security_lib.js').clearAttempts(e);
-}, 'users');
-
-// 登录失败时记录失败计数（onRecordAuthWithPasswordError 在认证失败时触发）
-onRecordAuthWithPasswordError((e) => {
-  require(__hooks + '/lib/login_security_lib.js').recordLoginFailure(e);
+  // 登录成功时清除失败计数，登录失败时记录失败计数
+  const lib = require(__hooks + '/lib/login_security_lib.js');
+  if (e.authRecord) {
+    lib.clearAttempts(e);
+  } else {
+    lib.recordLoginFailure(e);
+  }
 }, 'users');
 
 onAdminBeforeAuthWithPasswordRequest((e) => {
@@ -22,10 +22,10 @@ onAdminBeforeAuthWithPasswordRequest((e) => {
 });
 
 onAdminAfterAuthWithPasswordRequest((e) => {
-  require(__hooks + '/lib/login_security_lib.js').clearAttempts(e);
-});
-
-// 管理员登录失败时记录失败计数
-onAdminAuthWithPasswordError((e) => {
-  require(__hooks + '/lib/login_security_lib.js').recordLoginFailure(e);
+  const lib = require(__hooks + '/lib/login_security_lib.js');
+  if (e.authRecord) {
+    lib.clearAttempts(e);
+  } else {
+    lib.recordLoginFailure(e);
+  }
 });

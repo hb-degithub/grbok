@@ -19,6 +19,7 @@
 	},
 	"dependencies": {
 		"@astrojs/mdx": "^6.0.3",
+		"@astrojs/node": "8.3.4",
 		"@astrojs/react": "^6.0.0",
 		"@astrojs/rss": "^4.0.18",
 		"@astrojs/sitemap": "^3.7.3",
@@ -57,6 +58,7 @@
 		"@playwright/test": "^1.61.1",
 		"@testing-library/react": "^16.3.2",
 		"@types/geojson": "^7946.0.16",
+		"@types/three": "^0.185.4",
 		"@types/topojson-client": "^3.1.5",
 		"@types/topojson-specification": "^1.0.5",
 		"eslint": "^9.0.0",

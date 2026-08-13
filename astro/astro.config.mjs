@@ -1,5 +1,6 @@
 ﻿// @ts-check
 import { defineConfig } from 'astro/config';
+import node from '@astrojs/node';
 
 import tailwindcss from '@tailwindcss/vite';
 import mdx from '@astrojs/mdx';
@@ -30,6 +31,10 @@ function buildStampPlugin() {
 // https://astro.build/config
 export default defineConfig({
   site,
+  output: 'server', // 启用SSR模式
+  adapter: node({
+    mode: 'standalone', // 独立模式，生成自包含的Node.js服务器
+  }),
 
   vite: {
     plugins: [tailwindcss(), buildStampPlugin()],

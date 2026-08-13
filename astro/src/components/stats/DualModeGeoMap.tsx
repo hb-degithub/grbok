@@ -1,15 +1,18 @@
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo, lazy, Suspense } from 'react';
 import { echarts, registerWorldMap, registerChinaMap, type EChartsInstance } from '../../lib/echarts-map';
 import { ADCODE_TO_PROVINCE } from '../../lib/geoConstants';
 import { playMapTransition } from '../../lib/map-particles';
 import type { EChartsOption } from 'echarts';
 
+// 懒加载 3D 地球组件（Three.js ~600KB，避免阻塞首屏）
+const Globe3D = lazy(() => import('./Globe3D'));
+
 /**
  * 双模式访客地理分布地图
- * - 国际模式：世界地图，按国家着色
- * - 国内模式：中国地图，按省份着色（符合自然资源部标准，含南海诸岛）
+ * - 2D 模式：ECharts 平面地图（世界/中国）
+ * - 3D 模式：Three.js 粒子地球（世界/中国）
  *
- * 技术：ECharts 地图渲染 + D3 辅助动画过渡
+ * 技术：ECharts 地图渲染 + Three.js 粒子地球 + D3 辅助动画过渡
  */
 
 interface GeoData {
@@ -28,19 +31,40 @@ interface DualModeGeoMapProps {
 }
 
 type MapMode = 'world' | 'china';
+type RenderMode = '2d' | '3d';
 
 // 颜色梯度（与现有 GeoMap 保持一致）
 const COLOR_RANGE = ['#ccfbf1', '#99f6e4', '#5eead4', '#2dd4bf', '#14b8a6', '#0d9488'];
 
+// 省份简称到全称的映射（用于匹配 DataV.GeoAtlas 的 properties.name）
+const PROVINCE_SHORT_TO_FULL: Record<string, string> = {
+  '北京': '北京市', '天津': '天津市', '上海': '上海市', '重庆': '重庆市',
+  '河北': '河北省', '山西': '山西省', '辽宁': '辽宁省', '吉林': '吉林省',
+  '黑龙江': '黑龙江省', '江苏': '江苏省', '浙江': '浙江省', '安徽': '安徽省',
+  '福建': '福建省', '江西': '江西省', '山东': '山东省', '河南': '河南省',
+  '湖北': '湖北省', '湖南': '湖南省', '广东': '广东省', '海南': '海南省',
+  '四川': '四川省', '贵州': '贵州省', '云南': '云南省', '陕西': '陕西省',
+  '甘肃': '甘肃省', '青海': '青海省', '台湾': '台湾省',
+  '内蒙古': '内蒙古自治区', '广西': '广西壮族自治区', '西藏': '西藏自治区',
+  '宁夏': '宁夏回族自治区', '新疆': '新疆维吾尔自治区',
+  '香港': '香港特别行政区', '澳门': '澳门特别行政区',
+};
+
 function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps) {
   const [mode, setMode] = useState<MapMode>('world');
+  const [renderMode, setRenderMode] = useState<RenderMode>('3d');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<EChartsInstance | null>(null);
 
-  // 初始化：注册地图数据
+  // 初始化：注册地图数据（仅 2D 模式需要）
   useEffect(() => {
+    if (renderMode !== '2d') {
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function init() {
@@ -60,19 +84,18 @@ function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps)
 
     init();
     return () => { cancelled = true; };
-  }, []);
+  }, [renderMode]);
 
-  // 初始化 ECharts 实例
+  // 初始化 ECharts 实例（仅 2D 模式）
   useEffect(() => {
-    if (loading || error || !chartRef.current) return;
+    if (renderMode !== '2d' || loading || error || !chartRef.current) return;
 
     const instance = echarts.init(chartRef.current, undefined, {
       renderer: 'canvas',
-      useDirtyRect: true, // 性能优化：脏矩形渲染
+      useDirtyRect: true,
     });
     chartInstance.current = instance;
 
-    // 响应式：监听容器尺寸变化
     const resizeObserver = new ResizeObserver(() => {
       instance.resize();
     });
@@ -83,22 +106,29 @@ function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps)
       instance.dispose();
       chartInstance.current = null;
     };
-  }, [loading, error]);
+  }, [loading, error, renderMode]);
 
   // 构建 ECharts 配置
   const buildOption = useCallback((): EChartsOption => {
     const isWorld = mode === 'world';
     const dataSource = isWorld ? worldData : chinaData;
 
-    // 转换为 ECharts 数据格式
-    const seriesData = Object.entries(dataSource).map(([id, data]) => ({
-      name: isWorld
-        ? data.name  // 世界地图用 name 匹配（ECharts 按 GeoJSON properties.name 匹配）
-        : (ADCODE_TO_PROVINCE[Number(id)] || data.name),
-      value: data.views,
-      uv: data.uv,
-      regionId: id,
-    }));
+    const seriesData = Object.entries(dataSource).map(([id, data]) => {
+      let name: string;
+      if (isWorld) {
+        name = data.name;
+      } else {
+        // 中国地图：ADCODE_TO_PROVINCE 返回简称（如"广东"），需转为全称（如"广东省"）匹配 GeoJSON
+        const shortName = ADCODE_TO_PROVINCE[Number(id)] || data.name;
+        name = PROVINCE_SHORT_TO_FULL[shortName] || shortName;
+      }
+      return {
+        name,
+        value: data.views,
+        uv: data.uv,
+        regionId: id,
+      };
+    });
 
     return {
       tooltip: {
@@ -133,12 +163,12 @@ function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps)
       },
       geo: {
         map: isWorld ? 'world' : 'china',
-        roam: true, // 启用缩放和平移
+        roam: true,
         zoom: isWorld ? 1.2 : 1.0,
-        center: isWorld ? undefined : [104.5, 36.5], // 中国地图中心（含南海）
+        center: isWorld ? undefined : [104.5, 36.5],
         scaleLimit: { min: 0.8, max: 8 },
         label: {
-          show: !isWorld, // 中国地图显示省份标签
+          show: !isWorld,
           fontSize: 9,
           color: '#52525b',
         },
@@ -155,10 +185,9 @@ function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps)
           },
           label: { show: true, color: '#134e4a', fontWeight: 'bold' },
         },
-        // 南海诸岛样式（确保合规显示）
         regions: isWorld ? [] : [
           {
-            name: '',  // 100000_JD 要素的 name 为空
+            name: '',
             itemStyle: { areaColor: '#f4f4f5', borderColor: '#a1a1aa' },
             label: { show: false },
           },
@@ -168,11 +197,10 @@ function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps)
         {
           type: 'map',
           map: isWorld ? 'world' : 'china',
-          geoIndex: 0, // 复用 geo 组件
+          geoIndex: 0,
           data: seriesData,
         },
       ],
-      // 动画配置
       animationDurationUpdate: 600,
       animationEasingUpdate: 'cubicInOut',
     };
@@ -181,18 +209,17 @@ function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps)
   // 更新图表（仅在模式切换时 notMerge，数据更新时保留用户缩放/平移）
   const prevMode = useRef(mode);
   useEffect(() => {
-    if (!chartInstance.current || loading || error) return;
+    if (renderMode !== '2d' || !chartInstance.current || loading || error) return;
     const isModeChange = prevMode.current !== mode;
     prevMode.current = mode;
     const option = buildOption();
     chartInstance.current.setOption(option, { notMerge: isModeChange });
-  }, [buildOption, loading, error, mode]);
+  }, [buildOption, loading, error, mode, renderMode]);
 
   // 模式切换（粒子破碎→聚合过渡动画）
   const [transitioning, setTransitioning] = useState(false);
   const transitionRef = useRef<{ destroy: () => void } | null>(null);
 
-  // 组件卸载时中断动画
   useEffect(() => {
     return () => {
       transitionRef.current?.destroy();
@@ -201,7 +228,19 @@ function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps)
   }, []);
 
   const handleModeSwitch = useCallback(async (newMode: MapMode) => {
-    if (newMode === mode || !chartInstance.current || transitioning) return;
+    if (newMode === mode || transitioning) return;
+
+    // 3D 模式下直接切换，无需粒子动画
+    if (renderMode === '3d') {
+      setMode(newMode);
+      return;
+    }
+
+    // 2D 模式使用粒子过渡动画
+    if (!chartInstance.current) {
+      setMode(newMode);
+      return;
+    }
 
     const containerEl = chartRef.current;
     if (!containerEl) {
@@ -209,7 +248,6 @@ function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps)
       return;
     }
 
-    // 找到 ECharts 渲染的 Canvas 元素
     const sourceCanvas = containerEl.querySelector('canvas');
     if (!sourceCanvas) {
       setMode(newMode);
@@ -217,18 +255,14 @@ function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps)
     }
 
     setTransitioning(true);
-
-    // 隐藏 ECharts 地图，让粒子层完全覆盖（避免边界线透出）
     containerEl.style.opacity = '0';
     containerEl.style.transition = 'none';
 
     try {
       const handle = playMapTransition(sourceCanvas, containerEl, () => {
-        // 在过渡阶段切换 ECharts 地图
         setMode(newMode);
       }, {
         onGatherNearComplete: () => {
-          // 聚合阶段 70% 时淡入新地图
           containerEl.style.transition = 'opacity 0.3s ease-in';
           containerEl.style.opacity = '1';
         },
@@ -236,31 +270,87 @@ function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps)
       transitionRef.current = handle;
       await handle.promise;
     } catch {
-      // 动画失败时直接切换
       setMode(newMode);
     } finally {
       transitionRef.current = null;
-      // 恢复 ECharts 地图可见性（如果回调未触发）
       containerEl.style.opacity = '1';
       containerEl.style.transition = '';
       setTransitioning(false);
     }
-  }, [mode, transitioning]);
+  }, [mode, transitioning, renderMode]);
 
-  // 加载状态
-  if (loading) {
+  // 渲染模式切换（带粒子过渡动画）
+  const handleRenderModeSwitch = useCallback(async (newRenderMode: RenderMode) => {
+    if (newRenderMode === renderMode || transitioning) return;
+
+    // 找到当前渲染的容器元素用于粒子采样
+    const currentContainer = chartRef.current?.closest('.relative') as HTMLElement;
+    const sourceCanvas = currentContainer?.querySelector('canvas');
+
+    if (sourceCanvas && currentContainer) {
+      // 有 Canvas 可采样，使用粒子过渡动画
+      setTransitioning(true);
+      currentContainer.style.opacity = '0';
+      currentContainer.style.transition = 'none';
+
+      try {
+        const handle = playMapTransition(sourceCanvas, currentContainer, () => {
+          setRenderMode(newRenderMode);
+          if (newRenderMode === '2d') {
+            setLoading(true);
+            setError(null);
+          }
+        }, {
+          onGatherNearComplete: () => {
+            currentContainer.style.transition = 'opacity 0.3s ease-in';
+            currentContainer.style.opacity = '1';
+          },
+        });
+        transitionRef.current = handle;
+        await handle.promise;
+      } catch {
+        setRenderMode(newRenderMode);
+        if (newRenderMode === '2d') {
+          setLoading(true);
+          setError(null);
+        }
+      } finally {
+        transitionRef.current = null;
+        currentContainer.style.opacity = '1';
+        currentContainer.style.transition = '';
+        setTransitioning(false);
+      }
+    } else {
+      // 无 Canvas 可采样，直接切换
+      setRenderMode(newRenderMode);
+      if (newRenderMode === '2d') {
+        setLoading(true);
+        setError(null);
+      }
+    }
+  }, [renderMode, transitioning]);
+
+  // WebGL 不可用时回退到 2D
+  const handleWebGLFallback = useCallback(() => {
+    setRenderMode('2d');
+    setLoading(true);
+    setError(null);
+  }, []);
+
+  // 加载状态（仅 2D 模式）
+  if (renderMode === '2d' && loading) {
     return (
-      <div className="flex h-[420px] items-center justify-center" role="status" aria-label="地图加载中">
+      <div className="flex h-[480px] items-center justify-center" role="status" aria-label="地图加载中">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
         <span className="ml-3 text-sm text-zinc-500">地图数据加载中…</span>
       </div>
     );
   }
 
-  // 错误状态
-  if (error) {
+  // 错误状态（仅 2D 模式）
+  if (renderMode === '2d' && error) {
     return (
-      <div className="flex h-[420px] flex-col items-center justify-center gap-3" role="alert">
+      <div className="flex h-[480px] flex-col items-center justify-center gap-3" role="alert">
         <span className="text-sm text-zinc-500">{error}</span>
         <button
           onClick={() => window.location.reload()}
@@ -274,52 +364,110 @@ function DualModeGeoMap({ worldData, chinaData, maxViews }: DualModeGeoMapProps)
 
   return (
     <div className="relative">
-      {/* 模式切换按钮 */}
-      <div className="mb-4 flex gap-2" role="tablist" aria-label="地图模式切换">
-        <button
-          role="tab"
-          aria-selected={mode === 'world'}
-          onClick={() => handleModeSwitch('world')}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-            mode === 'world'
-              ? 'bg-teal-600 text-white shadow-sm'
-              : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
-          }`}
-        >
-          🌍 国际地图
-        </button>
-        <button
-          role="tab"
-          aria-selected={mode === 'china'}
-          onClick={() => handleModeSwitch('china')}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-            mode === 'china'
-              ? 'bg-teal-600 text-white shadow-sm'
-              : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
-          }`}
-        >
-          🇨🇳 中国地图
-        </button>
+      {/* 切换按钮组 */}
+      <div className="mb-4 flex flex-wrap items-center gap-3" role="tablist" aria-label="地图模式切换">
+        {/* 2D/3D 切换 */}
+        <div className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800" role="group" aria-label="渲染模式">
+          <button
+            role="tab"
+            aria-selected={renderMode === '3d'}
+            onClick={() => handleRenderModeSwitch('3d')}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              renderMode === '3d'
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
+            }`}
+          >
+            3D
+          </button>
+          <button
+            role="tab"
+            aria-selected={renderMode === '2d'}
+            onClick={() => handleRenderModeSwitch('2d')}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              renderMode === '2d'
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
+            }`}
+          >
+            2D
+          </button>
+        </div>
+
+        {/* 分隔线 */}
+        <div className="h-5 w-px bg-zinc-200 dark:bg-zinc-700" />
+
+        {/* 世界/中国切换 */}
+        <div className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800" role="group" aria-label="地图区域">
+          <button
+            role="tab"
+            aria-selected={mode === 'world'}
+            onClick={() => handleModeSwitch('world')}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              mode === 'world'
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
+            }`}
+          >
+            世界
+          </button>
+          <button
+            role="tab"
+            aria-selected={mode === 'china'}
+            onClick={() => handleModeSwitch('china')}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              mode === 'china'
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
+            }`}
+          >
+            中国
+          </button>
+        </div>
       </div>
 
-      {/* ECharts 容器 */}
-      <div
-        className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700"
-        style={{ background: 'var(--color-zinc-50, #fafafa)' }}
-      >
-        <div
-          ref={chartRef}
-          className="h-[420px] w-full"
-          role="img"
-          aria-label={mode === 'china' ? '中国访客地理分布地图' : '国际访客地理分布地图'}
-        />
-      </div>
+      {/* 3D 模式 */}
+      {renderMode === '3d' && (
+        <Suspense
+          fallback={
+            <div className="flex h-[480px] items-center justify-center" role="status" aria-label="3D 地球加载中">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+              <span className="ml-3 text-sm text-zinc-500">3D 地球加载中…</span>
+            </div>
+          }
+        >
+          <Globe3D
+            worldData={worldData}
+            chinaData={chinaData}
+            maxViews={maxViews}
+            mode={mode}
+            onFallback={handleWebGLFallback}
+          />
+        </Suspense>
+      )}
 
-      {/* 中国地图合规声明 */}
-      {mode === 'china' && (
-        <p className="mt-2 text-center text-[10px] text-zinc-400">
-          地图数据来源：DataV.GeoAtlas | 含南海诸岛、钓鱼岛及赤尾屿 | 审图号：GS(2024)0650号
-        </p>
+      {/* 2D 模式 */}
+      {renderMode === '2d' && (
+        <>
+          <div
+            className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700"
+            style={{ background: 'var(--color-zinc-50, #fafafa)' }}
+          >
+            <div
+              ref={chartRef}
+              className="h-[480px] w-full"
+              role="img"
+              aria-label={mode === 'china' ? '中国访客地理分布地图' : '国际访客地理分布地图'}
+            />
+          </div>
+
+          {/* 中国地图合规声明 */}
+          {mode === 'china' && (
+            <p className="mt-2 text-center text-[10px] text-zinc-400">
+              地图数据来源：DataV.GeoAtlas | 含南海诸岛、钓鱼岛及赤尾屿 | 审图号：GS(2024)0650号
+            </p>
+          )}
+        </>
       )}
     </div>
   );

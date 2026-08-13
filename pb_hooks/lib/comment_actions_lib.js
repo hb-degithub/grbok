@@ -60,16 +60,21 @@ function likeComment(e) {
   var ip = getClientIP(e);
   checkRateLimit(ip, 'comment_like_ip');
 
-  var comment = findComment(commentId);
-  if (!comment) throw new NotFoundError('Comment not found');
-  if (comment.get('status') !== 'approved') throw new BadRequestError('Only approved comments can be liked');
-  if (comment.get('deleted')) throw new BadRequestError('Comment has been deleted');
+  // 使用事务防止并发丢更新
+  var result;
+  $app.dao().runInTransaction(function (txDao) {
+    var comment = txDao.findRecordById('comments', commentId);
+    if (!comment) throw new NotFoundError('Comment not found');
+    if (comment.get('status') !== 'approved') throw new BadRequestError('Only approved comments can be liked');
+    if (comment.get('deleted')) throw new BadRequestError('Comment has been deleted');
 
-  var currentLikes = comment.getInt('likes') || 0;
-  comment.set('likes', currentLikes + 1);
-  $app.dao().saveRecord(comment);
+    var currentLikes = comment.getInt('likes') || 0;
+    comment.set('likes', currentLikes + 1);
+    txDao.saveRecord(comment);
+    result = currentLikes + 1;
+  });
 
-  return e.json(200, { ok: true, likes: currentLikes + 1 });
+  return e.json(200, { ok: true, likes: result });
 }
 
 /**
@@ -107,8 +112,14 @@ function editComment(e) {
     throw new ForbiddenError('Invalid or expired verification code');
   }
 
-  // 过滤内容
-  var cleanContent = newContent.replace(/<[^>]*>/g, '').trim();
+  // 过滤内容（循环剥离至稳定，防止 <scr<script>ipt> 绕过）
+  var cleanContent = newContent;
+  var prev;
+  do {
+    prev = cleanContent;
+    cleanContent = cleanContent.replace(/<[^>]*>/g, '');
+  } while (cleanContent !== prev);
+  cleanContent = cleanContent.trim();
   if (!cleanContent) throw new BadRequestError('Content is required');
 
   comment.set('content', cleanContent);

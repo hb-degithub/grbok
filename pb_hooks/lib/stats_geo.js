@@ -206,6 +206,16 @@ function fromIpLookup(ip) {
 // e: 请求上下文（读头），ip: 已解析的真实访客 IP（来自 client_ip.js）
 function resolve(e, ip) {
   var geo = fromHeaders(e);
+  // 如果 ESA 头返回了国家但省份为空，尝试 GeoLite2 补充省份信息
+  if (geo && geo.country && !geo.region_code) {
+    var ipGeo = fromIpLookup(ip);
+    if (ipGeo && ipGeo.region_code) {
+      geo.region_code = ipGeo.region_code;
+      if (!geo.city && ipGeo.city) geo.city = ipGeo.city;
+      geo.source = 'esa_header+geolite2';
+    }
+    return geo;
+  }
   if (geo && geo.country) return geo;
   return fromIpLookup(ip) || { country: '', region_code: '', city: '', source: 'none' };
 }

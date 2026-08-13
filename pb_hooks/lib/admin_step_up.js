@@ -166,7 +166,13 @@ function requireAdminStepUp(ctx, options) {
 }
 
 function requireProtectedWrite(e, operation) {
-  var collection = e.record && e.record.collection ? e.record.collection().name : '';
+  var collection = '';
+  try {
+    collection = e.record && e.record.collection ? e.record.collection().name : '';
+  } catch (_) {
+    // e.record.collection() 在创建时可能失败，直接返回不拦截
+    return;
+  }
   if (PROTECTED_COLLECTIONS.indexOf(collection) === -1) return;
 
   var actor = currentActor(e);

@@ -12,22 +12,25 @@ onRecordAfterCreateRequest(function (e) {
     var authorUserId = String(record.getString('author_user') || '').trim();
     if (!authorUserId) return; // 匿名评论不升级
 
-    var user = $app.dao().findRecordById('users', authorUserId);
-    if (!user) return;
+    // 使用事务防止并发丢更新
+    $app.dao().runInTransaction(function (txDao) {
+      var user = txDao.findRecordById('users', authorUserId);
+      if (!user) return;
 
-    // 更新统计
-    var stats = user.get('stats') || {};
-    stats.comment_count = (stats.comment_count || 0) + 1;
-    user.set('stats', stats);
+      // 更新统计
+      var stats = user.get('stats') || {};
+      stats.comment_count = (stats.comment_count || 0) + 1;
+      user.set('stats', stats);
 
-    // 增加经验值（评论 +5）
-    var currentExp = user.getInt('experience') || 0;
-    user.set('experience', currentExp + 5);
+      // 增加经验值（评论 +5）
+      var currentExp = user.getInt('experience') || 0;
+      user.set('experience', currentExp + 5);
 
-    $app.dao().saveRecord(user);
+      txDao.saveRecord(user);
 
-    // 检查升级
-    checkAndUpgradeUser(user);
+      // 检查升级
+      checkAndUpgradeUser(user);
+    });
   } catch (_) {
     console.error('[user-level] operation=upgrade result=INTERNAL_ERROR');
   }
@@ -49,22 +52,25 @@ onRecordAfterUpdateRequest(function (e) {
     var authorUserId = String(record.getString('author_user') || '').trim();
     if (!authorUserId) return;
 
-    var user = $app.dao().findRecordById('users', authorUserId);
-    if (!user) return;
+    // 使用事务防止并发丢更新
+    $app.dao().runInTransaction(function (txDao) {
+      var user = txDao.findRecordById('users', authorUserId);
+      if (!user) return;
 
-    // 更新获赞统计
-    var stats = user.get('stats') || {};
-    stats.like_received = (stats.like_received || 0) + (newLikes - oldLikes);
-    user.set('stats', stats);
+      // 更新获赞统计
+      var stats = user.get('stats') || {};
+      stats.like_received = (stats.like_received || 0) + (newLikes - oldLikes);
+      user.set('stats', stats);
 
-    // 增加经验值（获赞 +10）
-    var currentExp = user.getInt('experience') || 0;
-    user.set('experience', currentExp + 10);
+      // 增加经验值（获赞 +10）
+      var currentExp = user.getInt('experience') || 0;
+      user.set('experience', currentExp + 10);
 
-    $app.dao().saveRecord(user);
+      txDao.saveRecord(user);
 
-    // 检查升级
-    checkAndUpgradeUser(user);
+      // 检查升级
+      checkAndUpgradeUser(user);
+    });
   } catch (_) {
     console.error('[user-level] operation=like-upgrade result=INTERNAL_ERROR');
   }
