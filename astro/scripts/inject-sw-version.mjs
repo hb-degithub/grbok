@@ -3,8 +3,8 @@ import path from 'path';
 
 const distPath = path.resolve('dist', 'sw.js');
 if (!fs.existsSync(distPath)) {
-  console.error('dist/sw.js not found');
-  process.exit(1);
+  console.log('dist/sw.js not found (SSR mode), skipping injection');
+  process.exit(0); // SSR模式下没有sw.js，正常退出
 }
 
 const now = new Date();

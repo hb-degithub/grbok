@@ -18,7 +18,7 @@ vi.mock('../../lib/echarts-map', () => ({
 
 // Mock Globe3D 组件（避免 Three.js 在测试环境中加载）
 vi.mock('./Globe3D', () => ({
-  default: () => <div data-testid="globe-3d">3D Globe</div>,
+  default: () => React.createElement('div', { 'data-testid': 'globe-3d' }, '3D Globe'),
 }));
 
 // Mock ResizeObserver

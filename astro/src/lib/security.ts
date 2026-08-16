@@ -1,6 +1,17 @@
 import DOMPurify from 'dompurify';
 import createDOMPurify from 'isomorphic-dompurify';
 
+// 修复SSR环境下的DOMPurify初始化
+let ssrDOMPurify: ReturnType<typeof createDOMPurify> | null = null;
+try {
+  if (typeof window === 'undefined') {
+    const factory = createDOMPurify as any;
+    ssrDOMPurify = typeof factory === 'function' ? factory() : factory.default?.();
+  }
+} catch (e) {
+  console.error('Failed to initialize SSR DOMPurify:', e);
+}
+
 const ALLOWED_TAGS = ['p', 'br', 'strong', 'em', 'a', 'code', 'pre', 'blockquote', 'ul', 'ol', 'li', 'h3', 'h4', 'img', 'hr', 'mark'];
 const VOID_TAGS = new Set(['br', 'hr', 'img']);
 const ALLOWED_ATTRS = new Set(['href', 'src', 'alt', 'title', 'target', 'rel']);
@@ -128,11 +139,9 @@ function writeAuthAttemptState(key: string, state: AuthAttemptState): void {
  * HTML and is bypassable. We now use `isomorphic-dompurify` (which wraps
  * jsdom) so SSR output matches client behaviour. The regex fallback is kept
  * only as a last resort if the isomorphic factory fails to initialise. */
-const ssrDOMPurify = typeof window === 'undefined' ? createDOMPurify() : null;
-
 export function sanitizeHtml(html: string): string {
   if (typeof window === 'undefined') {
-    if (ssrDOMPurify) {
+    if (ssrDOMPurify && typeof ssrDOMPurify.sanitize === 'function') {
       return ssrDOMPurify.sanitize(html, {
         ALLOWED_TAGS,
         ALLOWED_ATTR: Array.from(ALLOWED_ATTRS),

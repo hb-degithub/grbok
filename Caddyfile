@@ -178,10 +178,9 @@
         not path /_astro/* /pagefind/* /api/* /_/* /admin* /login* *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.webp *.avif *.woff *.woff2 *.ttf *.eot
     }
     handle @ssr_pages {
-        reverse_proxy localhost:4321 {
+        reverse_proxy 10.255.0.1:4321 {
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
-            header_up X-Forwarded-Proto {scheme}
             header_up Host {host}
         }
     }
