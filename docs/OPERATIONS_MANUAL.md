@@ -133,12 +133,18 @@ npm run build
 ```
 
 #### 步骤2: 打包上传
+
+> ⚠️ **不要用 PowerShell `Compress-Archive`**：它生成的 zip 使用反斜杠路径分隔符，Linux `unzip` 无法正确解压（2026-08-16 部署时实际踩坑）。在 Git Bash 中用 `tar` 打包。
+
 ```bash
-# 压缩构建产物
-Compress-Archive -Path dist\* -DestinationPath dist-deploy.zip -Force
+# 复制 package.json 到构建产物（SSR 运行时需要）
+cp package.json dist/
+
+# 压缩构建产物（在 Git Bash 中执行，勿用 PowerShell Compress-Archive）
+tar -czf dist-deploy.tar.gz -C dist .
 
 # 上传到服务器
-scp -o IdentitiesOnly=yes -i C:\tmp\blog-ssh\blog_deploy_ed25519 dist-deploy.zip root@47.115.134.238:/tmp/
+scp -o IdentitiesOnly=yes -i C:\tmp\blog-ssh\blog_deploy_ed25519 dist-deploy.tar.gz root@47.115.134.238:/tmp/
 ```
 
 #### 步骤3: 服务器部署
@@ -152,10 +158,10 @@ mv dist dist.backup.$(date +%Y%m%d_%H%M%S)
 
 # 解压新版本
 mkdir -p dist
-unzip -q /tmp/dist-deploy.zip -d dist
+tar -xzf /tmp/dist-deploy.tar.gz -C dist
 
-# 复制依赖文件
-cp dist.backup.*/package.json dist/
+# 复制依赖（node_modules 不打入压缩包，从旧版本继承；
+# 注意：若 package.json 依赖有变更，需在 dist 内执行 npm install --omit=dev）
 cp -r dist.backup.*/node_modules dist/
 
 # 重启SSR服务
