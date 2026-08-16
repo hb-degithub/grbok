@@ -4,11 +4,14 @@ import { sanitizeHtml } from '../../lib/security';
 import { cn } from '../../lib/utils';
 import useBreakpoint from '../../hooks/useBreakpoint';
 
-interface PagefindResult {
+interface SearchResult {
+  type: 'post' | 'tag';
   id: string;
+  title: string;
   url: string;
-  title?: string;
-  excerpt?: string;
+  excerpt: string;
+  score?: number;
+  published_at?: string;
 }
 
 const LISTBOX_ID = 'search-listbox';
@@ -60,10 +63,9 @@ function Kbd({ children }: { children: React.ReactNode }) {
 export default function SearchModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<PagefindResult[]>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [isPagefindLoaded, setIsPagefindLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const { isMobile } = useBreakpoint();
   const [isLandscapePhone, setIsLandscapePhone] = useState(false);
@@ -80,33 +82,6 @@ export default function SearchModal() {
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    const loadPagefind = async () => {
-      try {
-        setLoadError(false);
-        if ((window as any).pagefind) {
-          setIsPagefindLoaded(true);
-          return;
-        }
-
-        // pagefind.js 是 ESM（含 import.meta），classic <script> 加载会抛语法错误；
-        // 用动态 import 加载，挂到 window.pagefind 供搜索逻辑复用。
-        // 变量形式的路径避免 Vite 构建期静态解析（索引文件由 pagefind CLI 在构建后生成）。
-        const pagefindPath = '/pagefind/pagefind.js';
-        const pagefind = await import(/* @vite-ignore */ pagefindPath);
-        await pagefind.init?.();
-        (window as any).pagefind = pagefind;
-        setIsPagefindLoaded(true);
-      } catch (error) {
-        console.error('Pagefind 加载失败:', error);
-        setLoadError(true);
-        setIsPagefindLoaded(false);
-      }
-    };
-
-    loadPagefind();
-  }, []);
 
   useEffect(() => {
     const openSearch = () => setIsOpen(true);
@@ -155,7 +130,7 @@ export default function SearchModal() {
   const searchSeqRef = useRef(0);
 
   useEffect(() => {
-    if (!query.trim() || !isPagefindLoaded) {
+    if (!query.trim()) {
       setResults([]);
       return;
     }
@@ -163,18 +138,18 @@ export default function SearchModal() {
     const timer = window.setTimeout(async () => {
       const seq = ++searchSeqRef.current;
       setIsLoading(true);
+      setLoadError(false);
       try {
-        const pagefind = (window as any).pagefind;
-        if (!pagefind) return;
-        const search = await pagefind.search(query);
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=10`);
+        if (!response.ok) throw new Error('Search failed');
+        const data = await response.json();
         if (seq !== searchSeqRef.current) return; // 已有更新的请求，丢弃过期结果
-        const items = await Promise.all(search.results.slice(0, 10).map((result: any) => result.data()));
-        if (seq !== searchSeqRef.current) return;
-        setResults(items);
+        setResults(data.results || []);
         setSelectedIndex(0);
       } catch (error) {
         if (seq === searchSeqRef.current) {
           console.error('搜索失败:', error);
+          setLoadError(true);
         }
       } finally {
         if (seq === searchSeqRef.current) setIsLoading(false);
@@ -182,7 +157,7 @@ export default function SearchModal() {
     }, 250);
 
     return () => window.clearTimeout(timer);
-  }, [query, isPagefindLoaded]);
+  }, [query]);
 
   useEffect(() => {
     // 按 role="option" 查询选项节点，避免 sr-only 等辅助元素导致索引错位
