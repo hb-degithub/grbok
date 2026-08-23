@@ -7,7 +7,8 @@
 routerAdd('GET', '/api/search', (c) => {
   try {
     const query = c.queryParam('q') || '';
-    const limit = Math.min(parseInt(c.queryParam('limit') || '10', 10), 50);
+    const parsedLimit = parseInt(c.queryParam('limit') || '10', 10);
+    const limit = Number.isFinite(parsedLimit) ? Math.max(1, Math.min(parsedLimit, 50)) : 10;
     
     if (!query || query.trim().length < 2) {
       return c.json(200, { results: [], total: 0 });
@@ -18,13 +19,14 @@ routerAdd('GET', '/api/search', (c) => {
     
     // 搜索文章（标题、内容、摘要）
     try {
-      const postsFilter = `status="published" && (title~"${searchTerm}" || content~"${searchTerm}" || excerpt~"${searchTerm}")`;
+      const postsFilter = 'status="published" && (title~{:term} || content~{:term} || excerpt~{:term})';
       const posts = $app.dao().findRecordsByFilter(
         'posts',
         postsFilter,
         '-published_at',
         limit,
-        0
+        0,
+        { term: searchTerm }
       );
       
       posts.forEach((post) => {
@@ -54,13 +56,14 @@ routerAdd('GET', '/api/search', (c) => {
     
     // 搜索标签（名称、描述）
     try {
-      const tagsFilter = `name~"${searchTerm}" || description~"${searchTerm}"`;
+      const tagsFilter = 'name~{:term} || description~{:term}';
       const tags = $app.dao().findRecordsByFilter(
         'tags',
         tagsFilter,
         '-created',
         5,
-        0
+        0,
+        { term: searchTerm }
       );
       
       tags.forEach((tag) => {
@@ -87,7 +90,7 @@ routerAdd('GET', '/api/search', (c) => {
     });
   } catch (error) {
     console.error('搜索 API 错误:', error);
-    return c.json(500, { error: 'Search failed', message: String(error) });
+    return c.json(500, { error: 'SEARCH_FAILED' });
   }
 });
 
@@ -97,7 +100,8 @@ routerAdd('GET', '/api/search', (c) => {
 routerAdd('GET', '/api/search/suggest', (c) => {
   try {
     const query = c.queryParam('q') || '';
-    const limit = Math.min(parseInt(c.queryParam('limit') || '5', 10), 10);
+    const parsedLimit = parseInt(c.queryParam('limit') || '5', 10);
+    const limit = Number.isFinite(parsedLimit) ? Math.max(1, Math.min(parsedLimit, 10)) : 5;
     
     if (!query || query.trim().length < 1) {
       return c.json(200, { suggestions: [] });
@@ -108,13 +112,14 @@ routerAdd('GET', '/api/search/suggest', (c) => {
     
     // 从文章标题获取建议
     try {
-      const postsFilter = `status="published" && title~"${searchTerm}"`;
+      const postsFilter = 'status="published" && title~{:term}';
       const posts = $app.dao().findRecordsByFilter(
         'posts',
         postsFilter,
         '-published_at',
         limit,
-        0
+        0,
+        { term: searchTerm }
       );
       
       posts.forEach((post) => {
@@ -130,13 +135,14 @@ routerAdd('GET', '/api/search/suggest', (c) => {
     
     // 从标签名称获取建议
     try {
-      const tagsFilter = `name~"${searchTerm}"`;
+      const tagsFilter = 'name~{:term}';
       const tags = $app.dao().findRecordsByFilter(
         'tags',
         tagsFilter,
         '-created',
         3,
-        0
+        0,
+        { term: searchTerm }
       );
       
       tags.forEach((tag) => {
@@ -153,6 +159,6 @@ routerAdd('GET', '/api/search/suggest', (c) => {
     return c.json(200, { suggestions: suggestions.slice(0, limit) });
   } catch (error) {
     console.error('搜索建议 API 错误:', error);
-    return c.json(500, { error: 'Suggestion failed', message: String(error) });
+    return c.json(500, { error: 'SEARCH_SUGGESTION_FAILED' });
   }
 });

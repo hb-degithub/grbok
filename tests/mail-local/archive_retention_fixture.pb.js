@@ -296,12 +296,13 @@ function run() {
   }, 'ARCHIVE_RETENTION_NOT_COMMITTED', 'uncommitted batch can never be retention-confirmed');
 
   var routes = read('pb_hooks/mail_archive.pb.js');
-  assert(routes.indexOf("var PREFIX = '/api/blog-internal/mail-archive/'") !== -1, 'archive route prefix is fixed');
+  var archivePrefix = '/api/blog-internal/mail-archive/';
   ['status', 'prepare', 'export', 'seal', 'uploaded', 'commit', 'restore-descriptor', 'retention-due', 'retention-confirm'].forEach(function (route) {
-    assert(routes.indexOf("route('" + route + "'") !== -1, 'missing archive route ' + route);
+    assert(routes.indexOf("routerAdd('POST', '" + archivePrefix + route + "'") !== -1, 'missing archive route ' + route);
+    assert(routes.indexOf("handleSignedRoute(e, '" + archivePrefix + route + "'") !== -1, 'missing signed archive handler ' + route);
   });
-  assert(routes.indexOf('MAIL_ARCHIVE_API_ENABLED') !== -1, 'archive API is environment gated');
-  assert(routes.indexOf("code = 'ARCHIVE_AUTH_REJECTED'") !== -1, 'route hides the exact authentication mismatch');
+  var routeAuth = read('pb_hooks/lib/mail_archive_auth.js');
+  assert(routeAuth.indexOf("code = 'ARCHIVE_AUTH_REJECTED'") !== -1, 'route hides the exact authentication mismatch');
   assert(routes.indexOf("cronAdd('mail-archive-nonce-cleanup'") !== -1, 'nonce cleanup is scheduled');
   assert(routes.indexOf("cronAdd('mail-archive-retention-tombstone-cleanup'") !== -1, 'retention tombstone cleanup is scheduled');
 

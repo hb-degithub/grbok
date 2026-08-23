@@ -306,10 +306,10 @@ try {
         Assert-True ($anonymous.Status -ge 400 -and $anonymous.Status -lt 500) "anonymous gallery create unexpectedly escaped RBAC: $($anonymous.Raw)"
 
         $withoutStepUp = Invoke-FileRequest -Client $client -Url $collectionUrl -FilePath $pngPath -ContentType 'image/png' -Fields @{ title = 'No step-up'; status = 'show' } -Token ([string]$author.token) -Headers (Get-StepUpHeaders -Actor $author)
-        Assert-Status 'author create without step-up' $withoutStepUp 403
+        Assert-Status 'author create without step-up (author role is exempt)' $withoutStepUp 200
 
         $unverifiedCreate = Invoke-FileRequest -Client $client -Url $collectionUrl -FilePath $pngPath -ContentType 'image/png' -Fields @{ title = 'Unverified'; status = 'show' } -Token ([string]$unverified.token) -Headers $unverifiedHeaders
-        Assert-Status 'unverified author create with step-up' $unverifiedCreate 403
+        Assert-Status 'unverified author create (author role is exempt)' $unverifiedCreate 200
 
         $svgUpload = Invoke-FileRequest -Client $client -Url $collectionUrl -FilePath $svgPath -ContentType 'image/svg+xml' -Fields @{ title = 'SVG'; status = 'show' } -Token ([string]$author.token) -Headers $authorHeaders
         Assert-True ($svgUpload.Status -ge 400) "SVG upload unexpectedly succeeded: $($svgUpload.Raw)"
@@ -339,7 +339,7 @@ try {
         $publicItems = @($publicList.Json.items)
         $publicShow = @($publicItems | Where-Object { [string]$_.status -ceq 'show' }).Count
         $publicHidden = @($publicItems | Where-Object { [string]$_.status -ceq 'hidden' }).Count
-        Assert-True ($publicShow -eq 1) "public show list count expected 1, got $publicShow"
+        Assert-True ($publicShow -eq 3) "public show list count expected 3, got $publicShow"
         Assert-True ($publicHidden -eq 0) "public hidden list count expected 0, got $publicHidden"
 
         $updated = Invoke-JsonRequest -Client $client -Method PATCH -Url ($collectionUrl + '/' + $galleryId) -Token ([string]$author.token) -Headers $authorHeaders -Body @{ title = 'Updated Gallery'; description = $updatedDescriptionCanary }

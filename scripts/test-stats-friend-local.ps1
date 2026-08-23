@@ -157,7 +157,9 @@ function Assert-StaticContracts {
     $libPath = Join-Path $hooksSource 'lib\stats_lib.js'
     $migrationPath = Join-Path $migrationsSource '20260718100000_extend_page_views_friend_target.pb.js'
     $dashboardPath = Join-Path $repoRoot 'astro\src\components\stats\StatsDashboard.tsx'
-    foreach ($path in @($hookPath, $libPath, $migrationPath, $dashboardPath)) {
+    $statsServicePath = Join-Path $repoRoot 'astro\src\lib\services\statsService.ts'
+    $baseServicePath = Join-Path $repoRoot 'astro\src\lib\services\baseService.ts'
+    foreach ($path in @($hookPath, $libPath, $migrationPath, $dashboardPath, $statsServicePath, $baseServicePath)) {
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing stats/friend contract file: $path" }
     }
 
@@ -200,11 +202,19 @@ function Assert-StaticContracts {
     }
 
     $dashboard = Get-Content -Raw -Encoding UTF8 -LiteralPath $dashboardPath
-    foreach ($marker in @('getPocketBase', "pb.send<StatsData>('/api/blog-stats'")) {
-        if ($dashboard -notmatch [regex]::Escape($marker)) { throw "Missing authenticated stats frontend marker: $marker" }
-    }
+    if ($dashboard -notmatch [regex]::Escape('useStats')) { throw 'StatsDashboard must load stats via the useStats hook' }
     if ($dashboard -match 'fetch\s*\(' -or $dashboard -match 'const\s+PB_URL') {
         throw 'StatsDashboard must not use raw fetch/PB_URL'
+    }
+
+    $statsService = Get-Content -Raw -Encoding UTF8 -LiteralPath $statsServicePath
+    if ($statsService -notmatch [regex]::Escape("this.send<StatsData>('/api/blog-stats'")) {
+        throw 'statsService must call /api/blog-stats via typed send'
+    }
+
+    $baseService = Get-Content -Raw -Encoding UTF8 -LiteralPath $baseServicePath
+    foreach ($marker in @('getPocketBase', 'pb.send<R>(path, options)')) {
+        if ($baseService -notmatch [regex]::Escape($marker)) { throw "Missing authenticated stats frontend marker: $marker" }
     }
 }
 
@@ -232,6 +242,7 @@ foreach ($name in @(
 Copy-Item -LiteralPath (Join-Path $hooksSource 'stats_track.pb.js') -Destination $hooksPath -Force
 Copy-Item -LiteralPath (Join-Path $hooksSource 'lib\stats_lib.js') -Destination $libPath -Force
 Copy-Item -LiteralPath (Join-Path $hooksSource 'lib\mail_crypto.js') -Destination $libPath -Force
+Copy-Item -LiteralPath (Join-Path $hooksSource 'lib\client_ip.js') -Destination $libPath -Force
 Copy-Item -LiteralPath $fixtureSource -Destination (Join-Path $hooksPath 'stats_friend_fixture.pb.js') -Force
 
 [Environment]::SetEnvironmentVariable('MAIL_HASH_SECRET', (New-RandomSecret), 'Process')

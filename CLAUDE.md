@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   SYNC: Every agent turn starts by reading this file.
   PURPOSE: Architecture, conventions, and domain knowledge for "胡巴的博客".
   KEEP SHORT: Link to docs/ for deep dives.
@@ -15,13 +15,14 @@
 ## Tech Stack
 | Layer | Technology | Role |
 |-------|-----------|------|
-| Frontend (SSG) | Astro 6 + React 19 + TailwindCSS 4 | Static site, islands architecture |
+| Frontend (SSR) | Astro 6 + React 19 + TailwindCSS 4 | SSR pages and React islands |
 | Motion | Framer Motion 12 | Client-side animations |
 | Search | Pagefind | Offline full-text search |
 | Backend | PocketBase 0.22.21 (SQLite) | Auth, DB, API, file storage |
-| Web Server | Caddy 2.8.4-alpine | Auto HTTPS, reverse proxy, security headers |
+| Reverse Proxy | Caddy 2.8.4-alpine | Local reverse proxy, static assets, security headers |
+| Edge Protection | Alibaba Cloud ESA + SafeLine WAF | CDN/WAF and public ingress |
 | Email | PocketBase SMTP (Aliyun) + msmtp fallback | Verification, magic link, notifications |
-| Deployment | Docker Compose | Unified orchestration |
+| Deployment | systemd + Docker Compose | Astro SSR process plus containerized services |
 
 ## Architecture
 
@@ -29,13 +30,20 @@
 Browser
   |
   v
-Caddy (:80/:443)  ----------> Astro static files (/srv = astro/dist)
-  |                             (try_files -> SPA fallback /index.html)
-  |   /api/*  ----------> PocketBase :8090 (BaaS)
-  |   /_/*    ----------> PocketBase :8090 (admin UI, IP whitelist only)
+Alibaba Cloud ESA (CDN + WAF)
+  |
+  v
+SafeLine WAF (:80/:9443)
+  |
+  v
+Caddy (127.0.0.1:18080 -> container :80)
+  |
+  | +-- dynamic pages ------> Astro SSR (systemd, :4321)
+  | +-- /api/* and /_/* ----> PocketBase (Docker, :8090)
+  | +-- static assets ------> /srv = dist/client (read-only)
 ```
 
-Caddy applies security headers on every response. Astro is SSG — the build outputs pure static HTML/CSS/JS into `astro/dist/`.
+Production uses Astro SSR. The `blog-astro-ssr` systemd service runs `dist/server/entry.mjs` on port `4321`; Caddy proxies dynamic requests and serves the client build from `dist/client`. Caddy remains bound to loopback port `18080` behind SafeLine, while ESA provides the outer CDN/WAF layer.
 
 ## Directory Structure
 
@@ -83,7 +91,7 @@ tests/                    # Integration test fixtures (non-production)
   frontend-backend/       # gallery / guestbook / stats fixture .pb.js
   mail-local/             # account fixture + retention contracts
   ops/                    # pytest: test_mail_archive.py, fakes/
-  security-rate/          # hook_log_safety.test.js + rate/policy/registration fixtures
+  security-rate/          # hook/search/like regression tests + rate/policy/registration fixtures
   # 边界: 仅测试夹具与本地集成测试，不属于部署产物
 
 scripts/                  # Ops / check / test scripts (PowerShell + Python + Shell)
@@ -150,13 +158,14 @@ tmp/                      # Temporary deployment artifacts
 
 ## Database Schema
 
-Six collections, full details in [docs/pocketbase-schema.md](docs/pocketbase-schema.md):
+Seven core collections, full details in [docs/pocketbase-schema.md](docs/pocketbase-schema.md):
 
 | Collection | Type | Key relations |
 |-----------|------|---------------|
 | `users` | Auth | roles: admin / author / reader |
 | `posts` | Base | author -> users, status: draft / published / archived |
 | `comments` | Base | post_id -> posts, parent_id -> comments (nested) |
+| `comment_likes` | Base | comment -> comments, unique visitor hash per comment (server-only) |
 | `tags` | Base | unique slug |
 | `post_tags` | Base | post_id -> posts, tag_id -> tags (many-to-many) |
 | `settings` | Base | key-value as JSON |
@@ -191,15 +200,17 @@ Local service addresses:
 
 ## Deployment
 
-1. Generate encryption key: `openssl rand -hex 32`
-2. Copy `.env.example` -> `.env`, fill real values
-3. Run `security-check.sh` for pre-deploy validation (keys, IP, domain)
-4. Apply PocketBase security rules
-5. Enable OpenResty login rate limiting on public gateway
-6. Build Astro: `cd astro && npm run build`
-7. Start: `docker compose up -d`
+1. Generate encryption key: `openssl rand -hex 32`.
+2. Copy `.env.example` to `.env` and set production values.
+3. Run `security-check.sh` for pre-deploy validation (keys, IP, domain).
+4. Apply PocketBase security rules.
+5. Build Astro's SSR output: `cd astro && npm run build`.
+6. Deploy the generated `dist/client` and `dist/server` artifacts to `/opt/hlydwz-blog/current/dist`.
+7. Start or update Docker services: `docker compose up -d`.
+8. Restart the SSR service: `systemctl restart blog-astro-ssr`.
+9. Verify the ESA → SafeLine → Caddy → SSR/PocketBase request chain and service logs.
 
-Static files are served from `astro/dist/`, mounted read-only at `/srv` in Caddy container.
+Production serves static assets from `dist/client`, mounted read-only at `/srv` in the Caddy container. Dynamic Astro rendering is provided by `blog-astro-ssr` through `dist/server/entry.mjs`. See `docs/SERVER_DEPLOYMENT_INFO.md` and `docs/OPERATIONS_MANUAL.md` for the current production topology and runbook.
 
 ## Git History Summary
 
@@ -213,7 +224,7 @@ Static files are served from `astro/dist/`, mounted read-only at `/srv` in Caddy
 - Chinese text in PocketBase rules requires exact matching (past encoding issues).
 - `pagefind` runs as a post-build step in `npm run build`.
 - Caddy admin UI (`/_/*`) is IP-whitelisted via `ADMIN_IP` env var.
-- `astro/dist/` is gitignored; build output only exists locally and in deploy artifacts.
+- `astro/dist/` is gitignored; the SSR build produces both client assets and the server entry, and deployment artifacts live under `/opt/hlydwz-blog/current/dist`.
 
 ## Subagents (子智能体优先级约定)
 

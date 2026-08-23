@@ -3,7 +3,7 @@
 // 评论编辑/删除邮箱验证码服务
 // 使用 PocketBase 的 verificationCodes 集合存储验证码
 
-var rateLimit = require(__hooks + '/lib/security_rate_limit.js');
+var rateLimit = require('./security_rate_limit.js');
 
 var CODE_LENGTH = 6;
 var CODE_EXPIRY_MINUTES = 10;
@@ -21,7 +21,7 @@ function detailedError(status, code, retryAfter) {
 
 function getClientIP(e) {
   try {
-    return rateLimit.normalizeIp(require(__hooks + '/lib/client_ip.js').clientIp(e.httpContext));
+    return rateLimit.normalizeIp(require('./client_ip.js').clientIp(e));
   } catch (_) {
     return 'unknown';
   }
@@ -97,7 +97,7 @@ function sendVerificationCode(email, ip) {
   // 发送验证码邮件
   try {
     $app.dao().runInTransaction(function (txDao) {
-      require(__hooks + '/lib/mail_outbox.js').enqueue(txDao, {
+      require('./mail_outbox.js').enqueue(txDao, {
         dedupeKey: 'comment_verification:' + email + ':' + Date.now(),
         category: 'comment_verification',
         recipient: email,

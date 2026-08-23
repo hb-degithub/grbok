@@ -198,15 +198,28 @@ function totpVerifyLocked(txDao, userId, nowMs) {
   return events.length > 0;
 }
 
-// 失败计数：消费失败桶；超限时写入锁定桶并返回 true（刚触发锁定）。
-// 返回 false = 未超限（本次失败已计数）。
+// 失败计数：消费失败桶；达到阈值（5 次失败/300s 窗口）即写入锁定桶并返回
+// true（刚触发锁定）。返回 false = 未达阈值（本次失败已计数）。
 function consumeTotpVerifyFailure(txDao, userId, nowMs) {
   var result = rateLimit.consume(txDao, {
     nowMs: nowMs,
     entries: [{ policyKey: 'admin_totp_verify', subject: userId }],
   });
-  if (result.allowed) return false;
-  // 超限：写入锁定桶（limit=1/900s，首次写入必然 allowed）
+  if (result.allowed) {
+    // 失败桶刚写入本次事件；达到 5 次即视为触发锁定，避免第 6 次才锁的空窗。
+    var verifyHash = rateLimit._subjectHash('admin_totp_verify', userId);
+    var buckets = txDao.findRecordsByFilter(
+      'security_rate_buckets',
+      'policy = {:policy} && subject_hash = {:hash}',
+      '', 1, 0,
+      { policy: 'admin_totp_verify', hash: verifyHash },
+    );
+    var events = buckets && buckets.length
+      ? rateLimit._pruneEvents(rateLimit._parseEvents(String(buckets[0].get('events_json')), nowMs), nowMs, 300)
+      : [];
+    if (events.length < 5) return false;
+  }
+  // 已达阈值或超限：写入锁定桶（limit=1/900s，首次写入必然 allowed）
   rateLimit.consume(txDao, {
     nowMs: nowMs,
     entries: [{ policyKey: 'admin_totp_lockout', subject: userId }],
@@ -357,6 +370,8 @@ function totpVerify(c) {
         apiError(500, 'TOTP_SECRET_UNAVAILABLE');
       }
       if (justLocked) {
+        // 阈值当次既记 FAILED（本次验证失败）也记 LOCKED（触发锁定）
+        audit(c, txDao, user, 'ADMIN_TOTP_VERIFY_FAILED', state.id, null, { ok: false });
         audit(c, txDao, user, 'ADMIN_TOTP_VERIFY_LOCKED', state.id, null, { locked: true, reason: 'failure_threshold' });
       } else {
         audit(c, txDao, user, 'ADMIN_TOTP_VERIFY_FAILED', state.id, null, { ok: false });

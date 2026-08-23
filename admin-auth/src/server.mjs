@@ -17,6 +17,7 @@ import { createStepUpCredential, verifyStepUpCredential } from './step-up-policy
 export function createServer({
   config,
   mailHttpHandler = { handle: async () => false },
+  esaHttpHandler = { handle: async () => false },
   logger = console,
 }) {
   const rateLimitMap = new Map();
@@ -57,6 +58,11 @@ export function createServer({
 
       if (url.pathname.startsWith('/internal/mail/')) {
         const handled = await mailHttpHandler.handle(req, res, url);
+        if (handled) return;
+      }
+
+      if (url.pathname.startsWith('/internal/esa/')) {
+        const handled = await esaHttpHandler.handle(req, res, url);
         if (handled) return;
       }
 

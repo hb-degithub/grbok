@@ -7,6 +7,7 @@
 | `users` | 用户（博主 + 读者） | Auth |
 | `posts` | 文章 | Base |
 | `comments` | 评论 | Base |
+| `comment_likes` | 评论点赞防重（服务端私有） | Base |
 | `tags` | 标签 | Base |
 | `post_tags` | 文章-标签关联 | Base |
 | `settings` | 站点设置 | Base |
@@ -91,7 +92,25 @@
 
 ---
 
-## 4. tags (Base Collection)
+## 4. comment_likes (Base Collection)
+
+由迁移 `20260820120000_create_comment_likes.pb.js` 创建，仅供服务端评论点赞 hook 使用。
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `comment` | relation | ✅ | 评论 → comments；删除评论时级联清理 |
+| `visitor_hash` | text | ✅ | 服务端 HMAC(IP + User-Agent + commentId)，不保存原始访客信息 |
+
+### 规则
+- List/View/Create/Update/Delete rules 均为 `null`，公共 REST API 不可访问。
+- `POST /api/comments/:id/like` 通过服务端 DAO 写入并执行幂等检查。
+
+### 索引
+- `comment` + `visitor_hash` (unique compound)
+
+---
+
+## 5. tags (Base Collection)
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
@@ -112,7 +131,7 @@
 
 ---
 
-## 5. post_tags (Base Collection)
+## 6. post_tags (Base Collection)
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
@@ -131,7 +150,7 @@
 
 ---
 
-## 6. settings (Base Collection)
+## 7. settings (Base Collection)
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|

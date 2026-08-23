@@ -11,7 +11,7 @@ function Assert-True {
     if (-not $Condition) { throw "PREDEPLOY_MANIFEST_TEST: $Message" }
 }
 
-Assert-True ($source -match '\$totalStages\s*=\s*28\b') 'aggregate stage count must be 28'
+Assert-True ($source -match '\$totalStages\s*=\s*30\b') 'aggregate stage count must be 30'
 Assert-True (-not $source.Contains('Read-Host')) 'aggregate gate must remain noninteractive'
 
 foreach ($required in @(
@@ -19,6 +19,10 @@ foreach ($required in @(
     "'test-offline-ci-contract'",
     "'test-hook-log-safety'",
     'hook_log_safety.test.js',
+    "'test-search-api-injection'",
+    'search_api_injection.test.js',
+    "'test-comment-like-dedup'",
+    'comment_like_dedup.test.js',
     "'post-build sensitive-check'",
     "'test-account-retention-local -All'",
     "'test-security-rate-local -All'",

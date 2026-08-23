@@ -103,7 +103,7 @@ class CommentService extends BaseService<CommentRecord> {
   /**
    * 点赞评论
    */
-  async likeComment(commentId: string): Promise<{ likes: number }> {
+  async likeComment(commentId: string): Promise<{ likes: number; alreadyLiked?: boolean }> {
     const pb = this.getPocketBase();
     return pb.send(`/api/comments/${commentId}/like`, { method: 'POST' });
   }

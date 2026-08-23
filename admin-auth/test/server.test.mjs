@@ -251,6 +251,32 @@ it('delegates mail routes before legacy auth without affecting health or step-up
   } finally { await new Promise((resolve) => isolatedFromMail.close(resolve)); }
 });
 
+it('delegates ESA routes before legacy auth', async () => {
+  const calls = [];
+  const esaHttpHandler = {
+    async handle(req, res, url) {
+      calls.push({ method: req.method, pathname: url.pathname });
+      res.writeHead(202, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+      res.end('{"esa":true}');
+      return true;
+    },
+  };
+  const isolated = createServer({ config, esaHttpHandler });
+  const url = await listenOnFetchSafePort(isolated);
+  try {
+    const response = await fetch(`${url}/internal/esa/purge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'purgeall', urls: [] }),
+    });
+    assert.equal(response.status, 202);
+    assert.deepEqual(await response.json(), { esa: true });
+    assert.deepEqual(calls, [{ method: 'POST', pathname: '/internal/esa/purge' }]);
+  } finally {
+    await new Promise((resolve) => isolated.close(resolve));
+  }
+});
+
 it('contains hostile top-level handler errors in a stable 500 response', async () => {
   const hostile = new Proxy({}, {
     get() { throw new Error('top-level secret'); },

@@ -17,7 +17,7 @@ $failures = [System.Collections.Generic.List[string]]::new()
 $skips = [System.Collections.Generic.List[string]]::new()
 $passed = 0
 $stage = 0
-$totalStages = 28
+$totalStages = 30
 $isWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
 $isLinux = (-not $isWindows) -and (Test-Path -LiteralPath '/proc/sys/kernel/ostype')
 
@@ -180,6 +180,8 @@ if ($Ci) {
 }
 try {
     Invoke-Stage 'test-hook-log-safety' $node @('tests\security-rate\hook_log_safety.test.js') $repoRoot
+    Invoke-Stage 'test-search-api-injection' $node @('tests\security-rate\search_api_injection.test.js') $repoRoot
+    Invoke-Stage 'test-comment-like-dedup' $node @('tests\security-rate\comment_like_dedup.test.js') $repoRoot
     Invoke-Stage 'Astro build' $npm @('run', 'build') (Join-Path $repoRoot 'astro')
 }
 finally {

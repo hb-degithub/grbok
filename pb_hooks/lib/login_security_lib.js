@@ -44,8 +44,13 @@ function getClientIP(e) {
 }
 
 function getEmailFromBody(e) {
+  // e.requestInfo() 在 PB 0.22.21 JSVM 认证事件上不存在；
+  // 与 stats_lib.js readBody 同款：readerToString + JSON.parse，失败回退 ''，
+  // 保持限流语义不变（取不到 email 时仅按 IP 限流）。
   try {
-    const body = e.requestInfo()?.body || {};
+    const ctx = (e && e.httpContext) ? e.httpContext : e;
+    const raw = readerToString(ctx.request().body, 4097);
+    const body = raw ? JSON.parse(raw) : {};
     return String(body.identity || '').trim().toLowerCase();
   } catch (_) {
     return '';

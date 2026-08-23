@@ -241,7 +241,7 @@ function blogStats(e) {
     const baseStatsRows = queryRows(
       `SELECT 
         COUNT(*) AS total_views,
-        SUM(CASE WHEN created >= {:todayFrom} THEN 1 ELSE 0 END) AS today_views,
+        COALESCE(SUM(CASE WHEN created >= {:todayFrom} THEN 1 ELSE 0 END), 0) AS today_views,
         COUNT(DISTINCT visitor_hash) AS unique_visitors
       FROM page_views 
       WHERE event = {:ev} AND created >= {:from}`,

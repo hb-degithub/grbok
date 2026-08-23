@@ -415,7 +415,7 @@ try {
     Assert-MailpitInfo -Port $MailpitUiPort
     Wait-HttpReady -Uri "http://127.0.0.1:$GatewayPort/health" -Processes @($mailpitProcess, $gatewayProcess)
 
-    $integrationProcess = Start-IsolatedNativeProcess -Name 'mail-gateway-integration-test' -Executable $nodePath -Arguments @('--test', 'test\mail\mailpit.integration.test.mjs') -WorkingDirectory $adminAuthRoot -Environment $integrationEnvironment
+    $integrationProcess = Start-IsolatedNativeProcess -Name 'mail-gateway-integration-test' -Executable $nodePath -Arguments @('--test', '--test-isolation=none', 'test\mail\mailpit.integration.test.mjs') -WorkingDirectory $adminAuthRoot -Environment $integrationEnvironment
     Wait-StopRequest -Path $stopRequestFile -TestProcess $integrationProcess
     $mailpitStopErrors = @(Stop-ManagedProcess -Managed $mailpitProcess)
     if ($mailpitStopErrors.Count -ne 0) { throw ($mailpitStopErrors -join '; ') }
@@ -430,9 +430,25 @@ try {
     Save-ManagedProcessOutput -Managed $gatewayProcess -Path (Join-Path $resolvedRunRoot 'gateway.log')
     Wait-TcpPortClosed -Port $GatewayPort | Out-Null
 
-    $regressionProcess = Start-IsolatedNativeProcess -Name 'mail-gateway-regression-test' -Executable $nodePath -Arguments @('--test') -WorkingDirectory $adminAuthRoot -Environment $regressionEnvironment
-    $regressionOutput = Wait-ManagedProcessResult -Managed $regressionProcess -TimeoutSeconds 60
-    [IO.File]::WriteAllLines((Join-Path $resolvedRunRoot 'regression.log'), $regressionOutput, [Text.UTF8Encoding]::new($false))
+    # 逐文件独立进程回归：Windows 沙箱下 node --test 默认隔离会 spawn 子进程（EPERM），
+    # 而单进程 --test-isolation=none 又会因全局 fetch 桩相互污染，因此每文件单独运行。
+    $regressionLines = [System.Collections.Generic.List[string]]::new()
+    $regressionFailures = [System.Collections.Generic.List[string]]::new()
+    $regressionTestFiles = Get-ChildItem -LiteralPath (Join-Path $adminAuthRoot 'test') -Recurse -File -Filter '*.test.mjs' | Sort-Object FullName
+    foreach ($testFile in $regressionTestFiles) {
+        $regressionProcess = Start-IsolatedNativeProcess -Name ('mail-gateway-regression-' + $testFile.BaseName) -Executable $nodePath -Arguments @('--test', '--test-isolation=none', $testFile.FullName) -WorkingDirectory $adminAuthRoot -Environment $regressionEnvironment
+        try {
+            foreach ($line in @(Wait-ManagedProcessResult -Managed $regressionProcess -TimeoutSeconds 60)) { $regressionLines.Add([string]$line) }
+        } catch {
+            $regressionFailures.Add($testFile.Name + ': ' + $_.Exception.Message)
+        } finally {
+            foreach ($stopError in @(Stop-ManagedProcess -Managed $regressionProcess)) { throw $stopError }
+            Dispose-ManagedProcess -Managed $regressionProcess
+            $regressionProcess = $null
+        }
+    }
+    [IO.File]::WriteAllLines((Join-Path $resolvedRunRoot 'regression.log'), $regressionLines, [Text.UTF8Encoding]::new($false))
+    if ($regressionFailures.Count -ne 0) { throw ("mail gateway regression failures: " + ($regressionFailures -join '; ')) }
 
     $cleanupErrors = @(Invoke-AllCleanup)
     if ($cleanupErrors.Count -ne 0) { throw ($cleanupErrors -join '; ') }

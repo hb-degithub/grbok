@@ -94,9 +94,19 @@ async function loadModule({ rateLimit, totpBehavior, auditRows, bucketRows }) {
     ApiError: class ApiError extends Error {
       constructor(status, code) { super(code); this.status = status; this.code = code; }
     },
-    Record: class Record {},
+    Record: class Record {
+      set() {}
+      get() { return undefined; }
+      getString() { return ''; }
+    },
     readerToString() { return '{}'; },
-    $os: { getenv() { return ''; } },
+    $os: {
+      getenv(name) {
+        if (name === 'ADMIN_AUTH_INTERNAL_SECRET') return 'test-internal-secret-32-chars!!!!!!';
+        if (name === 'ADMIN_AUTH_INTERNAL_URL') return 'http://127.0.0.1:8787';
+        return '';
+      },
+    },
     $app: { dao() { return dao; } },
     $security: {
       randomStringWithAlphabet() { return 'r'.repeat(22); },
@@ -170,7 +180,9 @@ test('totp verify locks out after 5 failures and rejects while locked', async ()
   assert.throws(() => security.totpVerify(requestContext()), /TOTP_CODE_INVALID/);
   const lockAudits = auditRows.filter((row) => row.event.actionCode === 'ADMIN_TOTP_VERIFY_LOCKED');
   assert.equal(lockAudits.length, 1);
-  assert.deepEqual(lockAudits[0].event.after, { locked: true, reason: 'failure_threshold' });
+  // 审计负载在 VM 上下文内构造，跨上下文对象不能用 deepStrictEqual 比较
+  assert.equal(lockAudits[0].event.after.locked, true);
+  assert.equal(lockAudits[0].event.after.reason, 'failure_threshold');
 
   // 锁定期间：直接拒绝，统一文案 TOTP_CODE_INVALID（不泄露锁定状态），不再消费失败桶
   const auditsBefore = auditRows.length;
@@ -178,7 +190,7 @@ test('totp verify locks out after 5 failures and rejects while locked', async ()
   const newAudits = auditRows.slice(auditsBefore);
   assert.equal(newAudits.length, 1);
   assert.equal(newAudits[0].event.actionCode, 'ADMIN_TOTP_VERIFY_LOCKED');
-  assert.deepEqual(newAudits[0].event.after, { locked: true });
+  assert.equal(newAudits[0].event.after.locked, true);
 });
 
 test('totp verify success does not consume the failure bucket', async () => {
