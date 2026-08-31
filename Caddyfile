@@ -115,7 +115,12 @@
         /api/collections/_pb_users_auth_/auth-with-otp/ \
         /api/collections/_pb_users_auth_/records \
         /api/collections/_pb_users_auth_/records/
-    respond @blockedAccountMailRequests 404
+    # 注意：必须用 handle 包裹（参与互斥路由的特异性排序，精确路径胜过 handle /api/*）；
+    # 裸 respond 指令在 Caddy 2.8 的指令排序中位于所有 handle 之后，会被 /api/* 抢先代理到
+    # PB，导致本拦截静默失效（2026-08-31 实测踩坑，adapt JSON 中 respond 排在 route 17 末位）。
+    handle @blockedAccountMailRequests {
+        respond "Not Found" 404
+    }
 
     handle /api/blog-internal/mail-archive/* {
         respond "Not Found" 404
