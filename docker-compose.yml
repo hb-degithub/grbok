@@ -1,4 +1,4 @@
-﻿version: "3.8"
+version: "3.8"
 
 services:
   caddy:
@@ -13,8 +13,10 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     environment:
-      # Caddy 层 IP 白名单已停用：ADMIN_IP 为空时回退为全网段（不拦截 /_ 与 /api/admins）
-      - ADMIN_IP=${ADMIN_IP:-0.0.0.0/0}
+      # /_ 与 /api/admins 公网默认全封（Caddyfile 仅放行回环 127.0.0.1 = SSH 隧道，
+      # 以及此处显式配置的 ADMIN_IP）。默认 192.0.2.1 为保留测试地址（永不匹配），
+      # 切勿改回 0.0.0.0/0 —— 那会重新把 PB 管理后台暴露到公网。
+      - ADMIN_IP=${ADMIN_IP:-192.0.2.1}
       - OPENRESTY_TRUSTED_PROXY=${OPENRESTY_TRUSTED_PROXY}
     networks:
       - blog_network

@@ -29,23 +29,33 @@
 
     # /admin 是前端静态页面，需对所有用户开放（鉴权由前端 + PB API 层负责）；
     # /api/blog-admin/* 由 PocketBase hooks 鉴权（requireAdmin 检查角色+token），不卡 IP；
-    # 仅 /_/ PB 后台、/api/admins 需 IP 白名单保护。
+    # /_/ PB 后台、/api/admins 默认公网全封（2026-08-31 起：原 ADMIN_IP 白名单因服务器
+    # .env 留空 + compose 默认 0.0.0.0/0 而实质失效，管理后台登录页公网暴露）。
+    # 仅放行：Docker 网关 10.255.2.1（宿主机回环来源 = SSH 隧道
+    # ssh -L 18080:127.0.0.1:18080 后访问 http://localhost:18080/_/）与显式配置的
+    # ADMIN_IP（CIDR，可多个）。
+    # compose 默认值为保留测试地址 192.0.2.1（永不匹配），避免空值导致放行异常。
     @blocked_admin_access {
         path /_/* /api/admins/*
         not path /_astro/* /pagefind/*
-        not client_ip {$ADMIN_IP}
+        not client_ip 127.0.0.1 10.255.2.1 {$ADMIN_IP}
     }
     handle @blocked_admin_access {
-        redir /blocked?reason=admin-ip-restricted 302
+        respond "Not Found" 404
     }
 
+    # 兼容旧路径：RSS 与 sitemap 的实际地址分别是 /feed.xml 与 /sitemap-index.xml
+    redir /sitemap.xml /sitemap-index.xml 301
+    redir /rss.xml /feed.xml 301
+
     header {
-        X-Frame-Options "DENY"
-        X-Content-Type-Options "nosniff"
+        # X-Frame-Options / X-Content-Type-Options / Referrer-Policy 由 ESA 边缘层统一注入
+        # （2026-08-31 起）：此前 Caddy 与 ESA 双层重复注入导致
+        # "X-Frame-Options: SAMEORIGIN, DENY" 等冲突值被浏览器直接忽略。
+        # 防撞脸兜底由下方 CSP 的 frame-ancestors 'none' 承担（现代浏览器均支持）。
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         Cross-Origin-Opener-Policy "same-origin"
         Cross-Origin-Resource-Policy "same-site"
-        Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
         # CSP: style-src allows 'unsafe-inline' - Framer Motion drives animations via inline styles at runtime;
         # without it, all JS-set styles are blocked and islands render broken (stacked/hidden).
@@ -162,22 +172,6 @@
 
     handle /admin* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
-        try_files {path} {path}/ =404
-        file_server
-    }
-
-    handle /login* {
-        header X-Robots-Tag "noindex, nofollow, noarchive"
-        try_files {path} {path}/ =404
-        file_server
-    }
-
-    # SSR模式：动态页面反向代理到Node.js服务器
-    @ssr_pages {
-        path /posts/* /tags/* /archive /stats /
-        not path /_astro/* /pagefind/* /api/* /_/* /admin* /login* *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.webp *.avif *.woff *.woff2 *.ttf *.eot
-    }
-    handle @ssr_pages {
         reverse_proxy 10.255.0.1:4321 {
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
@@ -185,10 +179,33 @@
         }
     }
 
+    handle /login* {
+        header X-Robots-Tag "noindex, nofollow, noarchive"
+        reverse_proxy 10.255.0.1:4321 {
+            header_up X-Real-IP {client_ip}
+            header_up X-Forwarded-For {client_ip}
+            header_up Host {host}
+        }
+    }
+
+    # SSR 模式（2026-08-31 重构）：构建产物不再产出任何预渲染页面（dist/client 仅静态资产），
+    # 所有页面一律代理到 Astro SSR（10.255.0.1:4321）。
+    # 仅当 /srv 中存在对应真实文件（_astro/pagefind/图片/robots/sitemap 等资产）时才由
+    # Caddy 直接提供。切勿回退到 try_files 优先于代理的旧结构——旧结构曾让 SSG 时代的
+    # 过期页面副本长期遮蔽 SSR 路由（含 feed.xml localhost 泄露）。
     handle {
-        header Cache-Control "public, max-age=60, s-maxage=60, must-revalidate"
-        try_files {path} {path}/ =404
-        file_server
+        @existing_file file {path} {path}/index.html
+        handle @existing_file {
+            header Cache-Control "public, max-age=60, s-maxage=60, must-revalidate"
+            file_server
+        }
+        handle {
+            reverse_proxy 10.255.0.1:4321 {
+                header_up X-Real-IP {client_ip}
+                header_up X-Forwarded-For {client_ip}
+                header_up Host {host}
+            }
+        }
     }
 
     handle_errors {

@@ -38,12 +38,12 @@ SafeLine WAF (:80/:9443)
   v
 Caddy (127.0.0.1:18080 -> container :80)
   |
-  | +-- dynamic pages ------> Astro SSR (systemd, :4321)
+  | +-- all pages ----------> Astro SSR (systemd, :4321)
   | +-- /api/* and /_/* ----> PocketBase (Docker, :8090)
-  | +-- static assets ------> /srv = dist/client (read-only)
+  | +-- real files only -----> /srv = dist/client (read-only)
 ```
 
-Production uses Astro SSR. The `blog-astro-ssr` systemd service runs `dist/server/entry.mjs` on port `4321`; Caddy proxies dynamic requests and serves the client build from `dist/client`. Caddy remains bound to loopback port `18080` behind SafeLine, while ESA provides the outer CDN/WAF layer.
+Production uses Astro SSR. The `blog-astro-ssr` systemd service runs `dist/server/entry.mjs` on port `4321`. The SSR build emits **no prerendered pages** — `dist/client` contains only static assets — so Caddy proxies every page route to SSR and only serves files that actually exist in `/srv` (2026-08-31 routing rework; before that, stale SSG-era page fossils shadowed SSR routes). Caddy remains bound to loopback port `18080` behind SafeLine, while ESA provides the outer CDN/WAF layer.
 
 ## Directory Structure
 
@@ -128,7 +128,7 @@ tmp/                      # Temporary deployment artifacts
 - DOMPurify on rendered user content (comments).
 - `security.ts` provides browser fingerprint, CSRF, and rate limiting utilities.
 - Admin pages are guarded by `AdminGuard` (server-side token validation + email verification + passkey MFA).
-- Caddy handles: HSTS, CSP, X-Frame-Options, directory-scan blocking, admin UI IP whitelist.
+- Caddy handles: HSTS, CSP, directory-scan blocking; X-Frame-Options / X-Content-Type-Options / Referrer-Policy are owned by the ESA edge (removed from Caddy 2026-08-31 to fix double-injection conflicts). `/_/*` + `/api/admins/*` are publicly blocked (404); access only via SSH tunnel (`ssh -L 18080:127.0.0.1:18080`, allowlisted client IPs: docker gateway 10.255.2.1 / loopback) or explicit `ADMIN_IP`.
 - `login_security.pb.js` is ENABLED — per-IP (10/15min) + per-email (5/15min) password-login rate limiting. It uses `realIP()` (not the spoofable `X-Forwarded-For`) and a `globalThis`-persisted bucket, which fixed the 400-error regression that originally forced it to be disabled.
 - `validate_comment.pb.js` logs IP address but excludes it from public API responses; also enforces email verification for registered commenters.
 - `configure_smtp.pb.js` auto-configures SMTP on PB startup from `ALIYUN_SMTP_*` env vars (only if SMTP not already enabled).
@@ -223,7 +223,9 @@ Production serves static assets from `dist/client`, mounted read-only at `/srv` 
 - React components must use `export default`, never named exports.
 - Chinese text in PocketBase rules requires exact matching (past encoding issues).
 - `pagefind` runs as a post-build step in `npm run build`.
-- Caddy admin UI (`/_/*`) is IP-whitelisted via `ADMIN_IP` env var.
+- `/_/*` and `/api/admins/*` are publicly blocked (404) at Caddy; use SSH tunnel (`ssh -L 18080:127.0.0.1:18080 root@<server>` → `http://localhost:18080/_/`) or set `ADMIN_IP` in server `.env`. Never set compose `ADMIN_IP` default back to `0.0.0.0/0` — that publicly exposed the PB admin UI until 2026-08-31.
+- `astro.config.mjs` must keep object-form export + explicit `loadEnv` — function-form `defineConfig(({command})=>...)` loses the adapter (NoAdapterInstalled), and `.env` files never reach `process.env` on their own. Production builds hard-fail if `site` is localhost (bypass: `ALLOW_LOCALHOST_SITE=1`).
+- The SSR build emits no prerendered pages; if old static page fossils appear under the server `/srv` tree they will shadow SSR routes — deploys must not restore `index.html`/page dirs into `astro/dist`.
 - `astro/dist/` is gitignored; the SSR build produces both client assets and the server entry, and deployment artifacts live under `/opt/hlydwz-blog/current/dist`.
 
 ## Subagents (子智能体优先级约定)
