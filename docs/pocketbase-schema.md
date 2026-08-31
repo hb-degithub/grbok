@@ -68,16 +68,16 @@
 |------|------|------|------|
 | `post_id` | relation | ✅ | 所属文章 → posts |
 | `author_name` | text | ✅ | 评论者昵称 |
-| `author_email` | email | ✅ | 评论者邮箱 |
+| `author_email` | email | ❌ | 评论者邮箱（2026-08-31 起非必填：schema 必填曾导致匿名评论 400，邮箱由 hook 层按可选处理） |
 | `content` | text | ✅ | 评论内容 |
 | `parent_id` | relation | ❌ | 父评论 → comments（支持嵌套） |
-| `status` | select | ✅ | 状态: `pending` / `approved` / `spam` |
+| `status` | select | ❌ | 状态: `pending` / `approved` / `spam`（2026-08-31 起非必填：hook 兜底写入，前端不发送该字段） |
 | `ip_address` | text | ❌ | 评论者 IP（用于反垃圾） |
 
 ### 规则
 - **List rule**: `status = "approved" || @request.auth.role = "admin"`
 - **View rule**: `status = "approved" || @request.auth.role = "admin"`
-- **Create rule**: 任何人可评论（需填写昵称和邮箱；前端默认写入 `pending`）
+- **Create rule**: 任何人可评论（昵称必填、邮箱可选；`status` 由 hook 默认写入 `pending`）
 - **Update rule**: `@request.auth.role = "admin"`
 - **Delete rule**: `@request.auth.role = "admin"`
 

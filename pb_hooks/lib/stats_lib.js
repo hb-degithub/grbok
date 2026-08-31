@@ -144,6 +144,48 @@ function trackingUnavailable(e) {
   return e.json(503, { ok: false, error: 'TRACKING_UNAVAILABLE' });
 }
 
+// 从上报 path 中提取文章 slug。path 已过 isValidPath 校验（以 / 开头、无 .. 与反斜杠）。
+// 容忍查询参数/哈希与尾部斜杠；非 /posts/<slug> 或 slug 中含多级路径时返回 ''。
+// 仅用字符串操作（JSVM 禁用部分原生数组方法，见项目已知陷阱）。
+function extractPostSlug(path) {
+  var p = String(path || '');
+  var q = p.indexOf('?');
+  if (q !== -1) p = p.slice(0, q);
+  var h = p.indexOf('#');
+  if (h !== -1) p = p.slice(0, h);
+  while (p.length > 1 && p.charAt(p.length - 1) === '/') p = p.slice(0, p.length - 1);
+  var prefix = '/posts/';
+  if (p.indexOf(prefix) !== 0) return '';
+  var slug = p.slice(prefix.length);
+  if (!slug || slug.indexOf('/') !== -1) return '';
+  return slug;
+}
+
+// 浏览量计数：path 指向 /posts/<slug> 时将对应 posts.views +1。
+// 文章不存在/查询失败一律静默跳过（绝不能让浏览上报因此失败）；
+// views 可能为 null（历史数据），兜底为 0 再 +1；
+// slug 可能是 URL 编码形式（浏览器 location.pathname 对非 ASCII 会编码），先试原样再试解码。
+function incrementPostViews(path) {
+  var slug = extractPostSlug(path);
+  if (!slug) return;
+  var dao = $app.dao();
+  var post = null;
+  try {
+    post = dao.findFirstRecordByFilter('posts', 'slug = {:slug}', { slug: slug });
+  } catch (_) {
+    try {
+      post = dao.findFirstRecordByFilter('posts', 'slug = {:slug}', { slug: decodeURIComponent(slug) });
+    } catch (_) {
+      post = null;
+    }
+  }
+  if (!post) return;
+  var current = Number(post.get('views'));
+  if (!isFinite(current) || current < 0) current = 0;
+  post.set('views', current + 1);
+  dao.saveRecord(post);
+}
+
 function trackView(e) {
   const ip = getClientIP(e);
   if (!ip) return trackingUnavailable(e);
@@ -211,6 +253,13 @@ function trackView(e) {
   } catch (_) {
     console.error('[stats][STATS_TRACK_SAVE_FAILED]');
     return trackingUnavailable(e);
+  }
+
+  // page_views 落库成功后才递增文章浏览量；失败静默（不影响已成功的上报响应）。
+  if (event === 'pageview') {
+    try {
+      incrementPostViews(path);
+    } catch (_) {}
   }
 
   return e.json(202, { ok: true });

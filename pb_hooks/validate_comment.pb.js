@@ -229,6 +229,17 @@ onRecordBeforeCreateRequest((e) => {
   if (typeof e.next === 'function') e.next();
 }, 'comments');
 
+// 隐私：创建评论的公开 API 响应不回显真实 IP（与本文件顶部注释承诺一致）。
+// PB 0.22 中 onRecordAfterCreateRequest 在记录已落库后、响应序列化前触发，
+// 这里只清空内存中 e.record 的 ip_address（不再二次 save），因此只影响响应体，
+// 数据库仍保留真实 IP 供审核/限流使用。
+onRecordAfterCreateRequest((e) => {
+  try {
+    if (e.record) e.record.set('ip_address', '');
+  } catch (_) {}
+  if (typeof e.next === 'function') e.next();
+}, 'comments');
+
 onRecordBeforeUpdateRequest((e) => {
   if (!e.record || !e.record.id) return;
   const persisted = $app.dao().findRecordById('comments', e.record.id);
