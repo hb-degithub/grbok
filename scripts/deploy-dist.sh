@@ -26,18 +26,18 @@ set -euo pipefail
 
 # ── 可配置变量 ────────────────────────────────────────────────────────────────
 
-# SSH 连接信息
-SSH_HOST="root@47.115.134.238"
-SSH_PORT="22"
+# 安全修复：敏感值从环境变量读取，不再硬编码到版本控制
+# 使用方法：export DEPLOY_SSH_HOST="root@your-server" DEPLOY_SSH_KEY="/path/to/key"
+SSH_HOST="${DEPLOY_SSH_HOST:?环境变量 DEPLOY_SSH_HOST 未设置，请执行: export DEPLOY_SSH_HOST='root@your-server-ip'}"
+SSH_PORT="${DEPLOY_SSH_PORT:-22}"
 
 # SSH 私钥路径
 # Windows (Git Bash): 指向 Windows 侧私钥文件
-#   示例: /c/tmp/blog-ssh/blog_deploy_ed25519
-#   对应 Windows 路径: C:\tmp\blog-ssh\blog_deploy_ed25519
+#   示例: /c/path/to/blog_deploy_ed25519
 # Linux/WSL: 指向 Linux 侧私钥文件
 #   示例: /root/.ssh/blog_deploy_ed25519 或 ~/.ssh/blog_deploy_ed25519
 # 注意: 确保私钥权限为 600 (chmod 600)
-SSH_KEY="${SSH_KEY:-/c/tmp/blog-ssh/blog_deploy_ed25519}"
+SSH_KEY="${DEPLOY_SSH_KEY:?环境变量 DEPLOY_SSH_KEY 未设置，请执行: export DEPLOY_SSH_KEY='/path/to/blog_deploy_ed25519'}"
 
 # 远端部署路径（Caddy bind mount 的宿主机侧）
 REMOTE_DIST_DIR="/opt/hlydwz-blog/current/astro/dist"
@@ -179,6 +179,9 @@ echo ""
 # 关键: 使用 <dist>/ 源路径末尾带斜杠，表示同步目录内容而非目录本身，
 #       确保远端目录 inode 不变，bind mount 保持有效。
 RSYNC_OPTS="-avz --delete --progress"
+# StrictHostKeyChecking=accept-new: 首次连接自动记录主机指纹，后续严格校验。
+# 不要用 "yes"——新机器/CI 上首次运行会因 known_hosts 缺失直接失败；
+# 也不用 "no"——完全关闭中间人防护。
 SSH_CMD="ssh -i $SSH_KEY -p $SSH_PORT -o StrictHostKeyChecking=accept-new"
 
 # 执行 rsync

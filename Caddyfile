@@ -27,14 +27,23 @@
         redir /blocked?reason=malicious-ua 302
     }
 
-    # /admin 是前端静态页面，需对所有用户开放（鉴权由前端 + PB API 层负责）；
-    # /api/blog-admin/* 由 PocketBase hooks 鉴权（requireAdmin 检查角色+token），不卡 IP；
-    # /_/ PB 后台、/api/admins 默认公网全封（2026-08-31 起：原 ADMIN_IP 白名单因服务器
-    # .env 留空 + compose 默认 0.0.0.0/0 而实质失效，管理后台登录页公网暴露）。
-    # 仅放行：Docker 网关 10.255.2.1（宿主机回环来源 = SSH 隧道
-    # ssh -L 18080:127.0.0.1:18080 后访问 http://localhost:18080/_/）与显式配置的
-    # ADMIN_IP（CIDR，可多个）。
-    # compose 默认值为保留测试地址 192.0.2.1（永不匹配），避免空值导致放行异常。
+    # /admin 前端静态页面：SSG 构建期无 cookie，服务端无法做 Astro.redirect，
+    # 鉴权完全交给客户端 AdminGuard（JS 水合后执行）。这意味着未认证用户可直接
+    # 获取后台页面 HTML 结构（表单字段、API 端点等），构成信息泄露与攻击面扩大。
+    # 修复：在 Caddy 层对 /admin 与 /admin/* 添加 IP 白名单，与 /_/* 、/api/admins/* 同级防护。
+    # 注意：path matcher 中 /admin/* 不匹配裸路径 /admin，两者都需列出。
+    # 仅放行：Docker 网关 10.255.2.1（SSH 隧道回环）与显式配置的 ADMIN_IP。
+    # 管理员在非白名单网络访问会收到 404，须通过 SSH 隧道或固定 IP 访问。
+    @blocked_admin_pages {
+        path /admin /admin/*
+        not client_ip 127.0.0.1 10.255.2.1 {$ADMIN_IP}
+    }
+    handle @blocked_admin_pages {
+        header X-Robots-Tag "noindex"
+        header Cache-Control "no-store"
+        respond "Not Found" 404
+    }
+
     @blocked_admin_access {
         path /_/* /api/admins/*
         not path /_astro/* /pagefind/*

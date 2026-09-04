@@ -23,17 +23,7 @@ param(
     [string]$DistDir = "./astro/dist"
 )
 
-# ── 可配置变量 ────────────────────────────────────────────────────────────────
-
-$SshHost = "root@47.115.134.238"
-$SshPort = "22"
-$SshKey = "C:\tmp\blog-ssh\blog_deploy_ed25519"
-$RemoteDistDir = "/opt/hlydwz-blog/current/astro/dist"
-$RemoteCaddyContainer = "blog-caddy"
-$OriginUrl = "http://127.0.0.1:18080/"
-$PublicUrl = "https://hlydwz.com/"
-
-# ── 颜色输出 ──────────────────────────────────────────────────────────────────
+# ── 颜色输出（必须在所有调用点之前定义，保证逐行执行/嵌入场景可用）────────────
 
 function Write-Info  { param([string]$Msg) Write-Host "[INFO] $Msg" -ForegroundColor Cyan }
 function Write-Ok    { param([string]$Msg) Write-Host "[OK] $Msg" -ForegroundColor Green }
@@ -49,6 +39,20 @@ function Exit-WithError {
     }
     exit $ExitCode
 }
+
+# ── 可配置变量 ────────────────────────────────────────────────────────────────
+
+# 安全修复：敏感值从环境变量读取，不再硬编码到版本控制
+# 使用方法：$env:DEPLOY_SSH_HOST = "root@your-server"; $env:DEPLOY_SSH_KEY = "C:\path\to\key"
+$SshHost = $env:DEPLOY_SSH_HOST
+if (-not $SshHost) { Exit-WithError "环境变量 DEPLOY_SSH_HOST 未设置" "请设置： `$env:DEPLOY_SSH_HOST = 'root@your-server-ip'" 1 }
+$SshPort = if ($env:DEPLOY_SSH_PORT) { $env:DEPLOY_SSH_PORT } else { "22" }
+$SshKey = $env:DEPLOY_SSH_KEY
+if (-not $SshKey) { Exit-WithError "环境变量 DEPLOY_SSH_KEY 未设置" "请设置： `$env:DEPLOY_SSH_KEY = 'C:\path\to\blog_deploy_ed25519'" 1 }
+$RemoteDistDir = "/opt/hlydwz-blog/current/astro/dist"
+$RemoteCaddyContainer = "blog-caddy"
+$OriginUrl = "http://127.0.0.1:18080/"
+$PublicUrl = "https://hlydwz.com/"
 
 # ── 前置检查 ──────────────────────────────────────────────────────────────────
 

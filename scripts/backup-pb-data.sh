@@ -96,32 +96,66 @@ if [ -d "${PB_VOLUME_SRC}/storage" ]; then
     log "storage/ 已复制"
 fi
 
-# ---------------- 3. 打包 tar.gz ----------------
-if ! tar czf "${ARCHIVE}" -C "${TMPDIR_BAK}" .; then
-    log "[ERROR] tar 打包失败"
-    rm -f "${ARCHIVE}"
+# 安全修复：备份归档使用 age 加密（如可用），否则回退到 chmod 600 + 目录 700
+# 使用方法：在服务器上安装 age (apt install age / yum install age)，并设置环境变量
+#   export BACKUP_AGE_RECIPIENT="age1..."（age 公钥）
+# 如未设置 age，则仅使用文件权限保护（原有行为，但增加警告日志）
+# 恢复命令：age -d -i <私钥文件> pb_data-YYYYMMDD-HHMM.tar.gz.age | tar xz -C <目标目录>
+#
+# 打包前校验源快照：age 加密后无法 tar tzf 抽查包内容，
+# 空包/截断包要到恢复时才会暴露，故必须在加密前确认源数据完好。
+if [ ! -s "${TMPDIR_BAK}/data.db" ]; then
+    log "[ERROR] data.db 快照不存在或为空，终止备份"
     exit 1
 fi
-chmod 600 "${ARCHIVE}"   # 收紧文件权限（含 TOTP 密钥、SMTP 密码等敏感数据）
-log "已生成: ${ARCHIVE} ($(du -h "${ARCHIVE}" | cut -f1))"
+if [ "$(sqlite3 "${TMPDIR_BAK}/data.db" 'PRAGMA quick_check;')" != "ok" ]; then
+    log "[ERROR] data.db 快照 quick_check 失败，终止备份"
+    exit 1
+fi
+
+if command -v age >/dev/null 2>&1 && [ -n "${BACKUP_AGE_RECIPIENT:-}" ]; then
+    if ! tar czf - -C "${TMPDIR_BAK}" . | age -r "${BACKUP_AGE_RECIPIENT}" -o "${ARCHIVE}.age"; then
+        log "[ERROR] tar + age 加密打包失败"
+        rm -f "${ARCHIVE}.age"
+        exit 1
+    fi
+    chmod 600 "${ARCHIVE}.age"
+    log "已生成加密备份: ${ARCHIVE}.age ($(du -h "${ARCHIVE}.age" | cut -f1))"
+    # 更新 ARCHIVE 变量指向加密文件，供后续完整性检查使用
+    ARCHIVE="${ARCHIVE}.age"
+else
+    if ! tar czf "${ARCHIVE}" -C "${TMPDIR_BAK}" .; then
+        log "[ERROR] tar 打包失败"
+        rm -f "${ARCHIVE}"
+        exit 1
+    fi
+    chmod 600 "${ARCHIVE}"   # 收紧文件权限（含 TOTP 密钥、SMTP 密码等敏感数据）
+    log "已生成: ${ARCHIVE} ($(du -h "${ARCHIVE}" | cut -f1))"
+    log "[WARN] 备份未加密，仅依赖文件权限保护。建议安装 age 并设置 BACKUP_AGE_RECIPIENT 启用加密。"
+fi
 
 # 抽查包内包含 data.db（防止空包/损坏包未被发现）
 # 注意：勿用 grep -q —— 在 set -o pipefail 下匹配后立即退出会使 tar 收
 # SIGPIPE 退出 141，管道被 pipefail 判为非零，误判"缺少 data.db"。
-DB_CNT="$(tar tzf "${ARCHIVE}" | grep -c '\./data\.db$' || true)"
-if [ "${DB_CNT}" -eq 0 ]; then
-    log "[ERROR] 备份包缺少 data.db，标记失败并删除"
-    rm -f "${ARCHIVE}"
-    exit 1
+# 加密备份无法直接抽查，跳过此检查（age 解密需要私钥，备份脚本不应持有）
+if [[ "${ARCHIVE}" != *.age ]]; then
+    DB_CNT="$(tar tzf "${ARCHIVE}" | grep -c '\./data\.db$' || true)"
+    if [ "${DB_CNT}" -eq 0 ]; then
+        log "[ERROR] 备份包缺少 data.db，标记失败并删除"
+        rm -f "${ARCHIVE}"
+        exit 1
+    fi
+else
+    log "加密备份跳过包内文件抽查（需私钥解密）"
 fi
 
 # ---------------- 4. 滚动删除超过保留期的旧备份 ----------------
-DELETED_COUNT="$(find "${BACKUP_DIR}" -maxdepth 1 -name 'pb_data-*.tar.gz' -mtime "+${RETENTION_DAYS}" | wc -l)"
+DELETED_COUNT="$(find "${BACKUP_DIR}" -maxdepth 1 \( -name 'pb_data-*.tar.gz' -o -name 'pb_data-*.tar.gz.age' \) -mtime "+${RETENTION_DAYS}" | wc -l)"
 if [ "${DELETED_COUNT}" -gt 0 ]; then
-    find "${BACKUP_DIR}" -maxdepth 1 -name 'pb_data-*.tar.gz' -mtime "+${RETENTION_DAYS}" -delete
+    find "${BACKUP_DIR}" -maxdepth 1 \( -name 'pb_data-*.tar.gz' -o -name 'pb_data-*.tar.gz.age' \) -mtime "+${RETENTION_DAYS}" -delete
     log "已删除 ${DELETED_COUNT} 个超过 ${RETENTION_DAYS} 天的旧备份"
 fi
 
-log "===== 备份完成（${STAMP}），当前保留: $(find "${BACKUP_DIR}" -maxdepth 1 -name 'pb_data-*.tar.gz' | wc -l) 份 ====="
+log "===== 备份完成（${STAMP}），当前保留: $(find "${BACKUP_DIR}" -maxdepth 1 \( -name 'pb_data-*.tar.gz' -o -name 'pb_data-*.tar.gz.age' \) | wc -l) 份 ====="
 trim_log
 exit 0

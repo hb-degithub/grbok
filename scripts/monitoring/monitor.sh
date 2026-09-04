@@ -12,7 +12,8 @@ ST=${SD}/.monitor-state
 DEDUP=3600
 RECIPIENT=ops@example.com
 mkdir -p ${ST}
-log(){ echo "[$(date \"+%F %T\")] $*" >> ${LOG}; }
+chmod 700 ${ST}  # 安全修复：状态目录仅 root 可读写，防止告警静默攻击
+log(){ echo "[$(date \"%F %T\")] $*" >> ${LOG}; }
 should_alert(){ local k=$1 now ts; now=$(date +%s); if [ -f ${ST}/${k}.ts ]; then ts=$(cat ${ST}/${k}.ts); if [ $((now-ts)) -lt ${DEDUP} ]; then return 1; fi; fi; echo ${now} > ${ST}/${k}.ts; return 0; }
 clear_state(){ rm -f ${ST}/$1.ts; }
 alert(){ local k=$1 m=$2; if should_alert ${k}; then log "ALERT[${k}] ${m} recipient:${RECIPIENT}"; fi; }
