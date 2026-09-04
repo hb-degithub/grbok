@@ -54,10 +54,10 @@ export default function GitHubRepoCard({ owner, repo, className }: Props) {
     }
 
     let cancelled = false;
-    // 可选 token：通过环境变量 GITHUB_TOKEN 配置，提升 API 限流到 5000/小时
-    const ghToken = import.meta.env.GITHUB_TOKEN || '';
+    // 安全修复：GITHUB_TOKEN 不再注入客户端 bundle（任何访问者都可从浏览器提取）。
+    // 改为无认证请求（60 次/小时/IP 的公开限流），配合 localStorage 缓存足够使用。
+    // 如需更高限额，应通过服务端代理转发 GitHub API 请求。
     const headers: Record<string, string> = { Accept: 'application/vnd.github.v3+json' };
-    if (ghToken) headers.Authorization = `Bearer ${ghToken}`;
 
     fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`, { headers })
       .then((res) => {
@@ -66,9 +66,10 @@ export default function GitHubRepoCard({ owner, repo, className }: Props) {
       })
       .then((json: RepoData) => {
         if (cancelled) return;
-        // 安全校验：确保 html_url 是 https 协议，防止篡改注入
-        if (typeof json.html_url === 'string' && !json.html_url.startsWith('https://')) {
-          throw new Error('Invalid html_url protocol');
+        // 安全校验：html_url 必须是 https 字符串，缺失/非字符串/协议不符一律拒绝，
+        // 防止 <a href={undefined}> 静默渲染或 javascript: 协议注入
+        if (typeof json.html_url !== 'string' || !json.html_url.startsWith('https://')) {
+          throw new Error('Invalid html_url');
         }
         setData(json);
         setStatus('loaded');

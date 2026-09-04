@@ -179,11 +179,15 @@ export default function WelcomeOverlay() {
     setRegStatus('loading');
     setRegError('');
 
+    // 提交前清空明文密码 state（不论成功失败），避免驻留 React 状态
+    const passwordToSubmit = regPassword;
+    setRegPassword(''); // 立即清空
+
     const { success } = await registerReader({
       email: trimmedEmail || undefined,
       name: trimmedName,
-      password: regPassword,
-      passwordConfirm: regPassword,
+      password: passwordToSubmit,
+      passwordConfirm: passwordToSubmit,
     });
 
     if (success) {

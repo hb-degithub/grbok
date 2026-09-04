@@ -30,7 +30,8 @@ class VersionHistoryService extends BaseService<PostVersionRecord> {
   }
 
   async getVersions(postId?: string, page: number = 1, perPage: number = 20) {
-    const filter = postId ? `post_id = "${postId}"` : undefined;
+    // 安全修复：使用 pb.filter() 参数化查询，防止过滤器字符串注入
+    const filter = postId ? this.filter('post_id = {:postId}', { postId }) : undefined;
     return this.getList(page, perPage, {
       sort: '-created',
       expand: 'post_id,editor',
