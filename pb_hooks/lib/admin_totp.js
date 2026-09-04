@@ -239,7 +239,11 @@ function buildOtpauthUri(base32Secret, accountName, issuer) {
 
 // ---------- secret 加密存储（HMAC 密钥派生 + XOR 流 + 完整性校验）----------
 // JSVM 无 AES，采用 PB_ENCRYPTION_KEY 派生密钥流加密 + HMAC 完整性标签。
-// 格式: v1.<nonce_hex>.<cipher_hex>.<tag_hex>
+// 格式: <version>.<nonce_hex>.<cipher_hex>.<tag_hex>
+//   v1 = 恒等 KDF（历史密文，仅读取兼容）
+//   v2 = KDF 拉伸（新写入统一使用；迭代轮数兼顾 goja 解释执行性能）
+
+var KDF_ITERATIONS = 1000; // goja 解释执行，10000 轮单次解密可达数百毫秒，有 DoS 风险
 
 function encryptionKey() {
   var key = String($os.getenv('PB_ENCRYPTION_KEY') || '').trim();
@@ -247,9 +251,19 @@ function encryptionKey() {
   return key;
 }
 
+// KDF 拉伸：对原始密钥进行多轮 HMAC-SHA256 迭代，增加暴力破解成本
+function deriveKey(rawKey, salt, iterations) {
+  var derived = rawKey;
+  for (var i = 0; i < iterations; i++) {
+    derived = $security.hs256(salt + ':' + i, derived);
+  }
+  return derived;
+}
+
 function encryptSecret(plainHex) {
-  var key = encryptionKey();
+  var rawKey = encryptionKey();
   var nonce = $security.randomStringWithAlphabet(16, 'abcdef0123456789');
+  var key = deriveKey(rawKey, nonce, KDF_ITERATIONS);
   var plain = String(plainHex);
   var cipher = '';
   for (var i = 0; i < plain.length; i += 64) {
@@ -264,18 +278,23 @@ function encryptSecret(plainHex) {
     }
     cipher += out;
   }
-  var tag = $security.hs256('v1.' + nonce + '.' + cipher, key);
-  return 'v1.' + nonce + '.' + cipher + '.' + tag;
+  var tag = $security.hs256('v2.' + nonce + '.' + cipher, key);
+  return 'v2.' + nonce + '.' + cipher + '.' + tag;
 }
 
 function decryptSecret(payload) {
-  var key = encryptionKey();
+  var rawKey = encryptionKey();
   var parts = String(payload || '').split('.');
-  if (parts.length !== 4 || parts[0] !== 'v1') throw new Error('TOTP_SECRET_INVALID');
+  if (parts.length !== 4 || (parts[0] !== 'v1' && parts[0] !== 'v2')) {
+    throw new Error('TOTP_SECRET_INVALID');
+  }
+  var version = parts[0];
   var nonce = parts[1];
   var cipher = parts[2];
   var tag = parts[3];
-  var expectedTag = $security.hs256('v1.' + nonce + '.' + cipher, key);
+  // v1 为恒等 KDF（历史格式），v2 为 KDF 拉伸
+  var key = version === 'v2' ? deriveKey(rawKey, nonce, KDF_ITERATIONS) : rawKey;
+  var expectedTag = $security.hs256(version + '.' + nonce + '.' + cipher, key);
   if (!$security.equal(expectedTag, tag)) throw new Error('TOTP_SECRET_TAMPERED');
   var plain = '';
   for (var i = 0; i < cipher.length; i += 64) {

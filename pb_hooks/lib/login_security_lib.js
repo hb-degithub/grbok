@@ -1,13 +1,16 @@
 // 密码登录速率限制（per-IP + per-email）— 全部逻辑在此。
-// login_security.pb.js 只做薄注册（PB 0.22 JSVM 的 onAdmin* 回调按源码重 eval，
-// 访问不到文件级闭包，故回调内 require 本模块；onRecord* 与 onAdmin* 经
+// login_security.pb.js 只做薄注册（回调内 require 本模块；onRecord* 与 onAdmin* 经
 // globalThis 共享同一组限流桶）。
+// 限流状态为单实例内存实现：PB 进程重启后计数清零，多实例部署不共享状态。
+// 如需持久化/跨实例共享，应接入 pb_hooks/lib/security_rate_limit.js 的
+// consume(policyKey, subject) API（基于 security_rate_buckets 集合）。
 const MAX_ATTEMPTS_PER_IP = 10;      // 同一IP 15分钟内最多10次
 const MAX_ATTEMPTS_PER_EMAIL = 5;    // 同一邮箱 15分钟内最多5次
 const WINDOW_MS = 15 * 60 * 1000;    // 15分钟窗口
 const LOCKOUT_THRESHOLD = 5;         // 连续失败5次锁定
 const LOCKOUT_MS = 15 * 60 * 1000;   // 锁定15分钟
 
+// 内存限流桶（globalThis 供各 hook 文件共享）
 const loginRateBuckets = globalThis.loginRateBuckets || (globalThis.loginRateBuckets = {});
 const loginFailCounts = globalThis.loginFailCounts || (globalThis.loginFailCounts = {});
 const loginLockouts = globalThis.loginLockouts || (globalThis.loginLockouts = {});

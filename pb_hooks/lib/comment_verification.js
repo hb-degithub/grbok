@@ -55,11 +55,8 @@ function sendVerificationCode(email, ip) {
   checkRateLimit(email, 'comment_verification_email');
   checkRateLimit(ip, 'comment_verification_ip');
 
-  // 生成 6 位数字验证码
-  var code = '';
-  for (var i = 0; i < CODE_LENGTH; i++) {
-    code += Math.floor(Math.random() * 10);
-  }
+  // 生成 6 位数字验证码（CSPRNG，替代 Math.random() 防预测）
+  var code = $security.randomStringWithAlphabet(CODE_LENGTH, '0123456789');
 
   // 存储验证码（10 分钟过期）
   var expiresAt = new Date(Date.now() + CODE_EXPIRY_MINUTES * 60 * 1000).toISOString();

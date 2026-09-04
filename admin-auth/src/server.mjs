@@ -23,8 +23,34 @@ export function createServer({
   const rateLimitMap = new Map();
   let lastRlCleanup = Date.now();
 
+  // 仅当请求来源是可信代理时才采纳 X-Forwarded-For / X-Real-IP；
+  // 否则伪造该头可让每个请求落到独立限流桶，完全绕过限速。
+  // 可信来源：本机回环 + Docker 默认网桥网关（172.16.0.0/12 覆盖默认
+  // bridge 与用户自定义 bridge；overlay 网关 10.x 不在此服务路径上）。
+  const TRUSTED_PROXY_RANGES = [
+    /^127\./,
+    /^::1$/,
+    /^172\.(1[6-9]|2\d|3[01])\./,
+  ];
+
+  function isTrustedProxy(ip) {
+    return TRUSTED_PROXY_RANGES.some((re) => re.test(ip));
+  }
+
+  function clientIpForRateLimit(req) {
+    const remote = req.socket.remoteAddress || '';
+    if (isTrustedProxy(remote)) {
+      const forwardedFor = req.headers['x-forwarded-for'];
+      const realIp = req.headers['x-real-ip'];
+      const candidate = (forwardedFor ? String(forwardedFor).split(',')[0].trim() : null)
+        || (realIp ? String(realIp).trim() : null);
+      if (candidate) return candidate;
+    }
+    return remote || 'unknown';
+  }
+
   function isLegacyRateLimited(req, res) {
-    const clientIp = req.socket.remoteAddress || 'unknown';
+    const clientIp = clientIpForRateLimit(req);
     const now = Date.now();
     const rlKey = 'rl:' + clientIp;
     const rlEntry = rateLimitMap.get(rlKey);
@@ -37,7 +63,8 @@ export function createServer({
     } else {
       rateLimitMap.set(rlKey, { windowStart: now, count: 1 });
     }
-    if (now - lastRlCleanup > 5 * 60 * 1000) {
+    // 清理间隔需大于限流窗口（60s），避免窗口边界条目被漏清/误清
+    if (now - lastRlCleanup > 2 * 60000) {
       lastRlCleanup = now;
       for (const [key, value] of rateLimitMap) {
         if (now - value.windowStart > 60000) rateLimitMap.delete(key);
