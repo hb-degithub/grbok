@@ -182,6 +182,32 @@ function requireProtectedWrite(e, operation) {
   // 仅 admin / super_admin 强制 step-up（2FA）；author 的写操作豁免
   if (role === 'author') return;
 
+  // posts 草稿豁免：写草稿（status != 'published'）不强制 step-up，
+  // 只有正式发布/下架（status == 'published'）才要求 TOTP 二次验证。
+  // 兼顾写作流畅性与"发布即公开"的核心防护。删除操作不在此豁免内。
+  if ((operation === 'create' || operation === 'update') && collection === 'posts') {
+    var postStatus = '';
+    try {
+      postStatus = String(e.record.get('status') || '').trim();
+    } catch (_) {
+      postStatus = '';
+    }
+    // 更新时还要考虑"旧状态是已发布、现在改为草稿"的下架场景——
+    // 下架同样改变公开可见性，不豁免（要求 step-up）。
+    var wasPublished = false;
+    if (operation === 'update') {
+      try {
+        var storedPost = $app.dao().findRecordById('posts', e.record.id);
+        wasPublished = String(storedPost.get('status') || '').trim() === 'published';
+      } catch (_) {
+        wasPublished = true; // 读不到旧状态时按敏感处理，fail closed
+      }
+    }
+    var isPublished = postStatus === 'published';
+    if (!isPublished && !wasPublished) return; // 纯草稿操作，豁免
+    // 其余情况（发布新文 / 已发布文的任何修改 / 下架）继续走 step-up
+  }
+
   if (operation === 'update' && collection === 'users' && e.record.id === actor.id) {
     var stored = $app.dao().findRecordById('users', actor.id);
     var changedUnsafe = false;
