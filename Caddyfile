@@ -13,8 +13,9 @@
         max_size 10MB
     }
 
-    # HTTP 方法限制（只允许 GET/POST/OPTIONS，其他方法返回 405）
-    @disallowed_methods not method GET POST OPTIONS
+    # HTTP 方法限制：静态资源/页面只需 GET，但 PocketBase REST 写操作必须放行
+    # PATCH（update）/PUT（upsert）/DELETE（删除），否则管理员无法修改/删除文章。
+    @disallowed_methods not method GET POST PATCH PUT DELETE OPTIONS
     handle @disallowed_methods {
         respond "Method Not Allowed" 405
     }
