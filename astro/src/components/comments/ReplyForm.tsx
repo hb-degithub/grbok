@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -38,21 +38,28 @@ const textareaClass =
  * height:auto 过渡实现平滑展开收起；textarea 用 parentId 派生 id 关联 label。
  */
 export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderationEnabled = true, serverError }: ReplyFormProps) {
-  // 登录用户自动填充昵称/邮箱，免重复输入
-  const getInitialFormData = (): CommentFormData => {
+  // SSR 期（window === undefined）getPocketBase() 每次创建新实例且 authStore 为空，
+  // 此时 getCurrentUser() 恒为 null。必须在浏览器端水合后通过 useEffect 同步登录态，
+  // 避免 SSR/水合不匹配（hydration mismatch）。
+  const [formData, setFormData] = useState<CommentFormData>({
+    author_name: '',
+    author_email: '',
+    content: '',
+    parent_id: parentId,
+  });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
     const user = authService.getCurrentUser();
     if (user) {
-      return {
+      setFormData((prev) => ({
+        ...prev,
         author_name: user.name || '',
         author_email: user.email || '',
-        content: '',
-        parent_id: parentId,
-      };
+      }));
+      setIsLoggedIn(true);
     }
-    return { author_name: '', author_email: '', content: '', parent_id: parentId };
-  };
-  const [formData, setFormData] = useState<CommentFormData>(getInitialFormData);
-  const isLoggedIn = authService.isAuthenticated();
+  }, []);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 

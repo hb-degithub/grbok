@@ -56,21 +56,28 @@ const textareaClass =
  * 支持 `aria-describedby` 错误播报；成功态用 emerald 打勾动画。
  */
 export default function CommentForm({ postId, onSubmit, moderationEnabled = true, userEmailVerified, serverError }: CommentFormProps) {
-  // 登录用户自动填充昵称/邮箱，免重复输入；游客仍手动填写
-  const getInitialFormData = (): CommentFormData => {
+  // SSR 期（window === undefined）getPocketBase() 每次创建新实例且 authStore 为空，
+  // 此时 getCurrentUser() 恒为 null。必须在浏览器端水合后通过 useEffect 同步登录态，
+  // 避免 SSR/水合不匹配（hydration mismatch）。
+  const [formData, setFormData] = useState<CommentFormData>({
+    author_name: '',
+    author_email: '',
+    content: '',
+    parent_id: null,
+  });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
     const user = authService.getCurrentUser();
     if (user) {
-      return {
+      setFormData((prev) => ({
+        ...prev,
         author_name: user.name || '',
         author_email: user.email || '',
-        content: '',
-        parent_id: null,
-      };
+      }));
+      setIsLoggedIn(true);
     }
-    return { author_name: '', author_email: '', content: '', parent_id: null };
-  };
-  const [formData, setFormData] = useState<CommentFormData>(getInitialFormData);
-  const isLoggedIn = authService.isAuthenticated();
+  }, []);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const statusTimerRef = useRef<number | null>(null);
