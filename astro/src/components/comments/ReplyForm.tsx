@@ -3,6 +3,7 @@ import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { RateLimiter } from '../../lib/security';
+import { authService } from '../../lib/services/authService';
 import type { CommentFormData } from '../../types/pocketbase';
 
 const replyLimiter = new RateLimiter(3, 1/12);
@@ -37,12 +38,21 @@ const textareaClass =
  * height:auto 过渡实现平滑展开收起；textarea 用 parentId 派生 id 关联 label。
  */
 export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, moderationEnabled = true, serverError }: ReplyFormProps) {
-  const [formData, setFormData] = useState<CommentFormData>({
-    author_name: '',
-    author_email: '',
-    content: '',
-    parent_id: parentId,
-  });
+  // 登录用户自动填充昵称/邮箱，免重复输入
+  const getInitialFormData = (): CommentFormData => {
+    const user = authService.getCurrentUser();
+    if (user) {
+      return {
+        author_name: user.name || '',
+        author_email: user.email || '',
+        content: '',
+        parent_id: parentId,
+      };
+    }
+    return { author_name: '', author_email: '', content: '', parent_id: parentId };
+  };
+  const [formData, setFormData] = useState<CommentFormData>(getInitialFormData);
+  const isLoggedIn = authService.isAuthenticated();
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -79,7 +89,12 @@ export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, 
 
     if (success) {
       setStatus('success');
-      setFormData({ author_name: '', author_email: '', content: '', parent_id: parentId });
+      // 登录用户保留昵称/邮箱，仅清空内容；游客全清
+      if (isLoggedIn) {
+        setFormData((prev) => ({ ...prev, content: '', parent_id: parentId }));
+      } else {
+        setFormData({ author_name: '', author_email: '', content: '', parent_id: parentId });
+      }
       setTimeout(() => {
         setStatus('idle');
         onClose();
@@ -153,26 +168,28 @@ export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, 
             ) : (
               /* ==================== 表单状态 ==================== */
               <div className="space-y-3">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Input
-                    label="昵称"
-                    placeholder="你的昵称"
-                    value={formData.author_name}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, author_name: e.target.value }))}
-                    required
-                    maxLength={NAME_MAX}
-                    autoComplete="name"
-                  />
-                  <Input
-                    label="邮箱（可选）"
-                    type="email"
-                    placeholder="your@email.com"
-                    value={formData.author_email}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, author_email: e.target.value }))}
-                    maxLength={100}
-                    autoComplete="email"
-                  />
-                </div>
+                {!isLoggedIn && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Input
+                      label="昵称"
+                      placeholder="你的昵称"
+                      value={formData.author_name}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, author_name: e.target.value }))}
+                      required
+                      maxLength={NAME_MAX}
+                      autoComplete="name"
+                    />
+                    <Input
+                      label="邮箱（可选）"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={formData.author_email}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, author_email: e.target.value }))}
+                      maxLength={100}
+                      autoComplete="email"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label htmlFor={contentId} className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">

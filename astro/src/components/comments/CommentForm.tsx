@@ -56,12 +56,21 @@ const textareaClass =
  * 支持 `aria-describedby` 错误播报；成功态用 emerald 打勾动画。
  */
 export default function CommentForm({ postId, onSubmit, moderationEnabled = true, userEmailVerified, serverError }: CommentFormProps) {
-  const [formData, setFormData] = useState<CommentFormData>({
-    author_name: '',
-    author_email: '',
-    content: '',
-    parent_id: null,
-  });
+  // 登录用户自动填充昵称/邮箱，免重复输入；游客仍手动填写
+  const getInitialFormData = (): CommentFormData => {
+    const user = authService.getCurrentUser();
+    if (user) {
+      return {
+        author_name: user.name || '',
+        author_email: user.email || '',
+        content: '',
+        parent_id: null,
+      };
+    }
+    return { author_name: '', author_email: '', content: '', parent_id: null };
+  };
+  const [formData, setFormData] = useState<CommentFormData>(getInitialFormData);
+  const isLoggedIn = authService.isAuthenticated();
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const statusTimerRef = useRef<number | null>(null);
@@ -102,7 +111,12 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
 
     if (success) {
       setStatus('success');
-      setFormData({ author_name: '', author_email: '', content: '', parent_id: null });
+      // 登录用户保留昵称/邮箱，仅清空内容；游客全清
+      if (isLoggedIn) {
+        setFormData((prev) => ({ ...prev, content: '', parent_id: null }));
+      } else {
+        setFormData({ author_name: '', author_email: '', content: '', parent_id: null });
+      }
       if (statusTimerRef.current !== null) window.clearTimeout(statusTimerRef.current);
       statusTimerRef.current = window.setTimeout(() => setStatus('idle'), 2000);
     } else {
@@ -228,30 +242,36 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
             <motion.div variants={itemVariants}>
               <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">发表评论</h3>
               <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-                {moderationEnabled ? '你的邮箱不会被公开显示，评论审核后展示' : '你的邮箱不会被公开显示'}
+                {isLoggedIn
+                  ? `以 ${formData.author_name || formData.author_email} 的身份评论${moderationEnabled ? '，审核后展示' : ''}`
+                  : moderationEnabled
+                    ? '你的邮箱不会被公开显示，评论审核后展示'
+                    : '你的邮箱不会被公开显示'}
               </p>
             </motion.div>
 
-            <motion.div variants={itemVariants} className="grid gap-4 sm:grid-cols-2">
-              <Input
-                label="昵称"
-                placeholder="你的昵称"
-                value={formData.author_name}
-                onChange={(e) => setFormData((prev) => ({ ...prev, author_name: e.target.value }))}
-                required
-                maxLength={NAME_MAX}
-                autoComplete="name"
-              />
-              <Input
-                label="邮箱（可选）"
-                type="email"
-                placeholder="your@email.com"
-                value={formData.author_email}
-                onChange={(e) => setFormData((prev) => ({ ...prev, author_email: e.target.value }))}
-                maxLength={100}
-                autoComplete="email"
-              />
-            </motion.div>
+            {!isLoggedIn && (
+              <motion.div variants={itemVariants} className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  label="昵称"
+                  placeholder="你的昵称"
+                  value={formData.author_name}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, author_name: e.target.value }))}
+                  required
+                  maxLength={NAME_MAX}
+                  autoComplete="name"
+                />
+                <Input
+                  label="邮箱（可选）"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={formData.author_email}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, author_email: e.target.value }))}
+                  maxLength={100}
+                  autoComplete="email"
+                />
+              </motion.div>
+            )}
 
             <motion.div variants={itemVariants}>
               <label htmlFor="comment-content" className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
