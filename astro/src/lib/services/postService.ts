@@ -32,6 +32,22 @@ class PostService extends BaseService<PostRecord> {
     });
     return { items: result.items, totalItems: result.totalItems };
   }
+
+  /**
+   * 点赞文章（服务端 HMAC 防重复；重复请求返回 alreadyLiked）
+   */
+  async likePost(postId: string): Promise<{ likes: number; alreadyLiked?: boolean }> {
+    const pb = this.getPocketBase();
+    return pb.send(`/api/posts/${postId}/like`, { method: 'POST' });
+  }
+
+  /**
+   * 收藏/取消收藏文章（toggle 语义）
+   */
+  async toggleBookmark(postId: string): Promise<{ bookmarked: boolean; count: number }> {
+    const pb = this.getPocketBase();
+    return pb.send(`/api/posts/${postId}/bookmark`, { method: 'POST' });
+  }
 }
 
 export const postService = new PostService();

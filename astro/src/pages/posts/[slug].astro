@@ -4,6 +4,7 @@ import ScrollReveal from '../../components/ui/ScrollReveal';
 import ShareButton from '../../components/ui/ShareButton';
 import CommentSection from '../../components/comments/CommentSection';
 import TableOfContents from '../../components/posts/TableOfContents';
+import PostActions from '../../components/posts/PostActions';
 import ReadingProgress from '../../components/effects/ReadingProgress';
 import { sanitizeHtml } from '../../lib/security';
 
@@ -24,6 +25,7 @@ interface Post {
   status: string;
   published_at: string;
   views: number;
+  likes?: number;
   expand?: {
     author?: {
       name: string;
@@ -126,8 +128,12 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
         </header>
       </ScrollReveal>
 
-      <div class="prose mb-16 max-w-full break-words [overflow-wrap:anywhere] reveal-content">
+      <div class="prose mb-8 max-w-full break-words [overflow-wrap:anywhere] reveal-content">
         <div set:html={safeContent} />
+      </div>
+
+      <div class="mb-8 flex justify-center border-b border-zinc-200 pb-8 dark:border-zinc-800">
+        <PostActions postId={post.id} initialLikes={post.likes ?? 0} client:visible />
       </div>
 
       <ScrollReveal delay={0.3} client:visible>
