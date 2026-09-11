@@ -114,16 +114,21 @@ function requestInitialVerification(record, email, ip, nowMs) {
         ],
       }).allowed;
     });
-  } catch (_) { return; }
-  if (allowed) {
-    // 走新 SMTP 体系：生成 verification token 入队 mail_outbox（异步发送、带去重/重试），
-    // 替代 $mails.sendRecordVerification（PB 原生 MTA 只读环境变量，不走后台 SMTP 配置）。
-    try {
-      require('./auth_facade.js').enqueueVerificationMail(record);
-    } catch (error) {
-      var code = String(error && error.code || error && error.message || 'INTERNAL_ERROR').slice(0, 64);
-      console.error('[account-mail] operation=registration-verification recordId=' + (record && record.id ? record.id : '') + ' result=' + code);
-    }
+  } catch (err) {
+    console.error('[account-mail] operation=registration-ratelimit recordId=' + (record && record.id ? record.id : '') + ' result=ERROR detail=' + String(err && err.message || err).slice(0, 120));
+    return;
+  }
+  if (!allowed) {
+    console.error('[account-mail] operation=registration-ratelimit recordId=' + (record && record.id ? record.id : '') + ' result=RATE_LIMITED');
+    return;
+  }
+  // 走新 SMTP 体系：生成 verification token 入队 mail_outbox（异步发送、带去重/重试），
+  // 替代 $mails.sendRecordVerification（PB 原生 MTA 只读环境变量，不走后台 SMTP 配置）。
+  try {
+    require('./auth_facade.js').enqueueVerificationMail(record);
+  } catch (error) {
+    var code = String(error && error.code || error && error.message || 'INTERNAL_ERROR').slice(0, 64);
+    console.error('[account-mail] operation=registration-verification recordId=' + (record && record.id ? record.id : '') + ' result=' + code);
   }
 }
 
@@ -156,6 +161,7 @@ function handle(c, deps) {
     if (error && error.code === 'INVALID_REGISTRATION') return response(c, 400, 'INVALID_REGISTRATION', referenceId);
     var message = String(error && error.message || '').toLowerCase();
     if (message.indexOf('unique') !== -1 || message.indexOf('already exists') !== -1) return response(c, 202, 'REGISTRATION_SUBMITTED', referenceId);
+    console.error('[register] operation=create-user result=UNAVAILABLE detail=' + String(error && error.message || error).slice(0, 200));
     return response(c, 503, 'REGISTRATION_UNAVAILABLE', referenceId);
   }
   if (outcome && outcome.limited) return response(c, 429, 'REGISTRATION_RATE_LIMITED', referenceId, outcome.limited);

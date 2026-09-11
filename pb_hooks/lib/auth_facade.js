@@ -85,9 +85,16 @@ function forwardAccountMail(category, e) {
 // 替代直接调用 $mails.sendRecordVerification（PB 原生 MTA 仅读环境变量）。
 // 失败不阻塞注册流程，仅记录结构化日志。
 function enqueueVerificationMail(record) {
-  if (!record || record.verified() || !record.getString('email')) return;
+  if (!record || !record.getString('email')) return;
+  if (record.verified()) {
+    console.error('[account-mail] operation=verification-enqueue recordId=' + record.id + ' result=SKIPPED_ALREADY_VERIFIED');
+    return;
+  }
   // 与 forwardAccountMail 一致：账户邮件特性未启用时不入队，避免注定失败的邮件堆积。
-  if (!isFeatureEnabled()) return;
+  if (!isFeatureEnabled()) {
+    console.error('[account-mail] operation=verification-enqueue recordId=' + record.id + ' result=SKIPPED_FEATURE_DISABLED');
+    return;
+  }
   var outbox = require('./mail_outbox.js');
   var startedAt = Date.now();
   try {

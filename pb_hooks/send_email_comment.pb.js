@@ -63,8 +63,8 @@
           // 父评论不存在或已被删除：预期场景，静默忽略回复通知（不记录敏感标识）
         }
       }
-    } catch (_) {
-      console.error('[comment-mail] operation=enqueue result=INTERNAL_ERROR');
+    } catch (err) {
+      console.error('[comment-mail] operation=enqueue result=INTERNAL_ERROR detail=' + String(err && err.message || err).slice(0, 200));
     }
     if (typeof e.next === 'function') e.next();
   }, 'comments');
