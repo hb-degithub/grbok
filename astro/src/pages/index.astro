@@ -257,7 +257,9 @@ const [postsCount, tagsCount] = await Promise.all([
       linear-gradient(135deg, #fafaf9 0%, #ffffff 42%, #f4f1eb 100%);
   }
 
-  .dark .journal-hero {
+  /* 暗色背景规则：.dark 类在 html 上（BaseLayout 渲染），Astro scoped 会给
+     .dark 也加组件作用域属性导致永不匹配，必须 :global 前缀声明。 */
+  :global(.dark) .journal-hero {
     background:
       radial-gradient(circle at 18% 20%, rgba(168, 162, 158, 0.13), transparent 30%),
       radial-gradient(circle at 76% 18%, rgba(45, 212, 191, 0.08), transparent 26%),
@@ -273,7 +275,7 @@ const [postsCount, tagsCount] = await Promise.all([
     mask-image: linear-gradient(to bottom, black 0%, black 72%, transparent 100%);
   }
 
-  .dark .journal-paper {
+  :global(.dark) .journal-paper {
     opacity: 0.34;
     background-image:
       radial-gradient(circle at 1px 1px, rgba(250, 250, 249, 0.16) 1px, transparent 0),
@@ -291,7 +293,7 @@ const [postsCount, tagsCount] = await Promise.all([
     transform-origin: top center;
   }
 
-  .dark .journal-grid {
+  :global(.dark) .journal-grid {
     color: rgb(245 245 244);
     opacity: 0.12;
   }
@@ -301,7 +303,7 @@ const [postsCount, tagsCount] = await Promise.all([
     animation: journal-scan 7s ease-in-out infinite;
   }
 
-  .dark .journal-scan {
+  :global(.dark) .journal-scan {
     background: linear-gradient(to bottom, rgba(255,255,255,0.08), transparent);
   }
 
@@ -318,8 +320,8 @@ const [postsCount, tagsCount] = await Promise.all([
     border-top: 0;
   }
 
-  .dark .journal-corner,
-  .dark .journal-corner-b {
+  :global(.dark) .journal-corner,
+  :global(.dark) .journal-corner-b {
     border-color: rgba(168, 162, 158, 0.28);
   }
 
