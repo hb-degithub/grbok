@@ -69,10 +69,30 @@ function createReader(txDao, input) {
   var email = input.email || ('reader_' + $security.randomStringWithAlphabet(20, 'abcdefghijklmnopqrstuvwxyz0123456789') + '@localhost.invalid');
   record.set('email', email);
   record.set('username', 'reader_' + $security.randomStringWithAlphabet(16, 'abcdefghijklmnopqrstuvwxyz0123456789'));
-  record.set('password', input.password);
-  record.set('passwordConfirm', input.passwordConfirm);
+  // PB 0.27 起 record.set('password') 不再触发 hash（passwordHash 落库为空、
+  // 用户永远无法登录），必须走 setPassword() 由框架完成加盐哈希；
+  // passwordConfirm 是 SDK 侧字段，服务端写入无需设置。
+  record.setPassword(input.password);
   record.set('name', input.name);
   record.set('role', 'reader');
+  // 等级字段落地即初始化：number 字段缺省落库 0 会让 LevelBadge 显示 Lv0，
+  // 且 user_level_up 的统计依赖完整的 stats 结构（与 20260808120000 迁移对齐）
+  record.set('level', 1);
+  record.set('experience', 0);
+  record.set('stats', {
+    comment_count: 0,
+    like_received: 0,
+    article_views: 0,
+    login_days: 0,
+    last_login_at: null,
+  });
+  record.set('level_config', {
+    pinned_comments_limit: 0,
+    badge_style: 'default',
+    avatar_frame: 'none',
+    custom_title: '',
+  });
+  record.set('level_history', []);
   // 未提供邮箱时标记为已验证（无需验证）
   record.set('verified', !input.email);
   record.refreshTokenKey();
