@@ -4,6 +4,9 @@ var DEFAULTS = {
   account_mail_email: { limit: 2, windowSeconds: 900 },
   account_mail_ip: { limit: 5, windowSeconds: 900 },
   account_mail_global: { limit: 30, windowSeconds: 60 },
+  // 验证邮件 category 级全局配额（mail_outbox.enqueue 按 category 名消耗）；
+  // 按邮箱/IP 维度由 registration_facade 的 account_mail_* 三轴承担
+  account_verification: { limit: 60, windowSeconds: 60 },
   registration_ip: { limit: 3, windowSeconds: 3600 },
   registration_ipv6_64: { limit: 10, windowSeconds: 3600 },
   registration_global: { limit: 20, windowSeconds: 60 },
@@ -36,6 +39,7 @@ var BOUNDS = {
   account_mail_email: { minLimit: 1, maxLimit: 5, minWindow: 300, maxWindow: 3600 },
   account_mail_ip: { minLimit: 2, maxLimit: 20, minWindow: 300, maxWindow: 3600 },
   account_mail_global: { minLimit: 10, maxLimit: 120, minWindow: 60, maxWindow: 900 },
+  account_verification: { minLimit: 60, maxLimit: 60, minWindow: 60, maxWindow: 60 },
   registration_ip: { minLimit: 1, maxLimit: 10, minWindow: 3600, maxWindow: 3600 },
   registration_ipv6_64: { minLimit: 2, maxLimit: 30, minWindow: 3600, maxWindow: 3600 },
   registration_global: { minLimit: 5, maxLimit: 60, minWindow: 60, maxWindow: 60 },
