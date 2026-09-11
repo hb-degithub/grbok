@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -48,17 +48,31 @@ export default function ReplyForm({ isOpen, onClose, onSubmit, parentId = null, 
     parent_id: parentId,
   });
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const authedUserRef = useRef(false);
 
   useEffect(() => {
-    const user = authService.getCurrentUser();
-    if (user) {
-      setFormData((prev) => ({
-        ...prev,
-        author_name: user.name || '',
-        author_email: user.email || '',
-      }));
-      setIsLoggedIn(true);
-    }
+    const syncAuth = () => {
+      const user = authService.isAuthenticated() ? authService.getCurrentUser() : null;
+      if (user) {
+        authedUserRef.current = true;
+        setFormData((prev) => ({
+          ...prev,
+          author_name: user.name || '',
+          author_email: user.email || '',
+        }));
+        setIsLoggedIn(true);
+      } else {
+        // 登出或 token 失效：清掉自动填充的账号信息，避免残留在游客表单里
+        if (authedUserRef.current) {
+          authedUserRef.current = false;
+          setFormData((prev) => ({ ...prev, author_name: '', author_email: '' }));
+        }
+        setIsLoggedIn(false);
+      }
+    };
+    syncAuth();
+    const unsub = authService.onAuthChange(syncAuth);
+    return () => { unsub?.(); };
   }, []);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');

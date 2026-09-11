@@ -66,17 +66,31 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
     parent_id: null,
   });
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const authedUserRef = useRef(false);
 
   useEffect(() => {
-    const user = authService.getCurrentUser();
-    if (user) {
-      setFormData((prev) => ({
-        ...prev,
-        author_name: user.name || '',
-        author_email: user.email || '',
-      }));
-      setIsLoggedIn(true);
-    }
+    const syncAuth = () => {
+      const user = authService.isAuthenticated() ? authService.getCurrentUser() : null;
+      if (user) {
+        authedUserRef.current = true;
+        setFormData((prev) => ({
+          ...prev,
+          author_name: user.name || '',
+          author_email: user.email || '',
+        }));
+        setIsLoggedIn(true);
+      } else {
+        // 登出或 token 失效：清掉自动填充的账号信息，避免残留在游客表单里
+        if (authedUserRef.current) {
+          authedUserRef.current = false;
+          setFormData((prev) => ({ ...prev, author_name: '', author_email: '' }));
+        }
+        setIsLoggedIn(false);
+      }
+    };
+    syncAuth();
+    const unsub = authService.onAuthChange(syncAuth);
+    return () => { unsub?.(); };
   }, []);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
