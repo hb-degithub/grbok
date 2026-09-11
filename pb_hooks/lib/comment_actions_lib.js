@@ -159,6 +159,16 @@ function likeComment(e) {
     comment.set('likes', currentLikes + 1);
     txDao.saveRecord(comment);
     result = currentLikes + 1;
+
+    // 获赞统计与经验（仅注册用户作者）；统计失败不阻断点赞主流程
+    var authorUserId = String(comment.get('author_user') || '').trim();
+    if (authorUserId) {
+      try {
+        require('./user_level_lib.js').addLikeReceived(txDao, authorUserId, 1);
+      } catch (likeErr) {
+        console.error('[user-level] operation=like-received result=INTERNAL_ERROR detail=' + String(likeErr && likeErr.message || likeErr).slice(0, 200));
+      }
+    }
   });
 
   var response = { ok: true, likes: result };
