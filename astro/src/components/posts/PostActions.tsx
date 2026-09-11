@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '../../lib/utils';
 import { postService } from '../../lib/services/postService';
 
@@ -29,6 +28,19 @@ export default function PostActions({ postId, initialLikes = 0 }: PostActionsPro
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isBookmarking, setIsBookmarking] = useState(false);
 
+  // 操作失败的可见反馈：仅写 console 时用户无感知，这里给出短暂内联提示
+  const [actionError, setActionError] = useState<string | null>(null);
+  const errorTimerRef = useRef<number | null>(null);
+  useEffect(() => () => {
+    if (errorTimerRef.current !== null) window.clearTimeout(errorTimerRef.current);
+  }, []);
+
+  const showActionError = (message: string) => {
+    setActionError(message);
+    if (errorTimerRef.current !== null) window.clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = window.setTimeout(() => setActionError(null), 3000);
+  };
+
   // SSR 安全：仅在浏览器端水合后读取 localStorage，恢复用户本地状态
   useEffect(() => {
     if (!postId) return;
@@ -49,6 +61,7 @@ export default function PostActions({ postId, initialLikes = 0 }: PostActionsPro
       const result = await postService.likePost(postId);
       setLikes(result.likes);
       setIsLiked(true);
+      setActionError(null);
       try {
         window.localStorage.setItem(`post-like:${postId}`, '1');
       } catch {
@@ -56,6 +69,7 @@ export default function PostActions({ postId, initialLikes = 0 }: PostActionsPro
       }
     } catch (err) {
       console.error('点赞失败:', err);
+      showActionError('点赞失败，请稍后再试');
     } finally {
       setIsLiking(false);
     }
@@ -67,6 +81,7 @@ export default function PostActions({ postId, initialLikes = 0 }: PostActionsPro
     try {
       const result = await postService.toggleBookmark(postId);
       setIsBookmarked(result.bookmarked);
+      setActionError(null);
       try {
         window.localStorage.setItem(`post-bookmark:${postId}`, result.bookmarked ? '1' : '0');
       } catch {
@@ -74,6 +89,7 @@ export default function PostActions({ postId, initialLikes = 0 }: PostActionsPro
       }
     } catch (err) {
       console.error('收藏失败:', err);
+      showActionError('收藏失败，请稍后再试');
     } finally {
       setIsBookmarking(false);
     }
@@ -96,7 +112,7 @@ export default function PostActions({ postId, initialLikes = 0 }: PostActionsPro
         <svg className="h-4 w-4" fill={isLiked ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
         </svg>
-        {likes > 0 && <span>{likes}</span>}
+        <span>{likes}</span>
       </button>
 
       {/* 收藏 */}
@@ -116,6 +132,13 @@ export default function PostActions({ postId, initialLikes = 0 }: PostActionsPro
         </svg>
         {isBookmarked ? '已收藏' : '收藏'}
       </button>
+
+      {/* 操作失败的可见反馈 */}
+      {actionError && (
+        <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+          {actionError}
+        </p>
+      )}
     </div>
   );
 }
