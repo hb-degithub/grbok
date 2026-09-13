@@ -6,6 +6,7 @@ import { sanitizeHtml } from '../../lib/security';
 import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import MediaLibrary from './MediaLibrary';
+import { mediaService } from '../../lib/services/mediaService';
 import type { Post } from '../../lib/services/adminPostService';
 
 type PostDraft = Omit<Post, 'id' | 'created' | 'updated' | 'author' | 'published_at' | 'views'> & { id?: string };
@@ -70,6 +71,37 @@ export default function PostManager() {
 
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
   const [showMediaLibrary, setShowMediaLibrary] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+
+  // 粘贴/拖拽图片到正文：上传到媒体库后在光标处插入 Markdown 图片语法。
+  // 插入 1024x0 缩略图（白名单见 pb_migrations/20260912000000），原图不直接进正文。
+  const uploadAndInsertImage = async (file: File, textarea: HTMLTextAreaElement) => {
+    const insertAt = textarea.selectionStart ?? Number.MAX_SAFE_INTEGER;
+    setImageUploading(true);
+    try {
+      const asset = await mediaService.uploadAsset(file);
+      const url = mediaService.getFileUrl(asset, '1024x0');
+      const snippet = `\n![${asset.alt || file.name}](${url})\n`;
+      // 上传期间用户可能继续输入，必须用函数式更新避免覆盖新内容
+      setEditing((prev) => {
+        if (!prev) return prev;
+        const content = prev.content || '';
+        const at = Math.min(insertAt, content.length);
+        return { ...prev, content: content.slice(0, at) + snippet + content.slice(at) };
+      });
+      setDirty(true);
+      showToast('图片已上传并插入正文', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? `图片上传失败：${err.message}` : '图片上传失败', 'error');
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const pickImageFiles = (files: FileList | File[] | null): File[] => {
+    if (!files) return [];
+    return Array.from(files).filter((f) => f.type.startsWith('image/'));
+  };
 
   const handleDelete = (id: string) => {
     setConfirmState({
@@ -383,6 +415,23 @@ export default function PostManager() {
                 <textarea
                   value={editing.content || ''}
                   onChange={(e) => { setEditing({ ...editing, content: e.target.value }); setDirty(true); }}
+                  onPaste={(e) => {
+                    const files = pickImageFiles(e.clipboardData?.files ?? null);
+                    if (files.length === 0) return;
+                    e.preventDefault();
+                    files.forEach((f) => { void uploadAndInsertImage(f, e.currentTarget); });
+                  }}
+                  onDrop={(e) => {
+                    const files = pickImageFiles(e.dataTransfer?.files ?? null);
+                    if (files.length === 0) return;
+                    e.preventDefault();
+                    files.forEach((f) => { void uploadAndInsertImage(f, e.currentTarget); });
+                  }}
+                  onDragOver={(e) => {
+                    // 只有拖拽文件时才拦截默认行为，避免影响文本拖选
+                    if (Array.from(e.dataTransfer?.types ?? []).includes('Files')) e.preventDefault();
+                  }}
+                  placeholder={imageUploading ? '图片上传中…' : '支持 Markdown；可直接粘贴或拖拽图片到此处上传'}
                   rows={12}
                   className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-bg-soft px-4 py-2.5 font-mono text-sm text-text outline-none focus:border-accent"
                 />

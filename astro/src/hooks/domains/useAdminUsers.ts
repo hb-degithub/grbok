@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { adminUserService, type AdminUser } from '../../lib/services/adminUserService';
+import { buildFileUrl } from '../../lib/pocketbase';
 import type { AdminRole } from '../useAdminAuth';
 
 function avatarUrlOf(user: AdminUser): string {
   if (!user.avatar) return '';
-  return user.avatar.startsWith('http') ? user.avatar : `${import.meta.env.PUBLIC_POCKETBASE_URL || ''}/api/files/users/${user.id}/${user.avatar}`;
+  return user.avatar.startsWith('http') ? user.avatar : buildFileUrl('users', user.id, user.avatar);
 }
 
 export function useAdminUsers() {

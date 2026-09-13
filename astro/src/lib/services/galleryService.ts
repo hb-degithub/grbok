@@ -1,4 +1,5 @@
 import { BaseService } from './baseService';
+import { buildFileUrl } from '../pocketbase';
 import type { RecordModel } from 'pocketbase';
 
 /**
@@ -61,12 +62,9 @@ class GalleryService extends BaseService<GalleryItem> {
    * 获取图片 URL
    */
   getPhotoUrl(item: GalleryItem, thumb?: string): string {
-    const pb = this.getPocketBase();
     const fileName = Array.isArray(item.photo) ? item.photo[0] : item.photo;
     if (!fileName) return '';
-    const base = pb.baseUrl.replace(/\/$/, '');
-    const path = `api/files/gallery_items/${item.id}/${fileName}`;
-    return thumb ? `${base}/${path}?thumb=${thumb}` : `${base}/${path}`;
+    return buildFileUrl('gallery_items', item.id, fileName, thumb);
   }
 }
 

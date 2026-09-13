@@ -9,6 +9,24 @@ import { installAdminStepUpHeaders } from './admin-step-up';
 const __BUILD_VER = '20260702160418';
 const POCKETBASE_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 
+// 文件（图片）URL 基地址：生产可指向独立图片域名（ESA 图片优化加速），
+// 缺省回退到 PocketBase API 同源，本地开发零配置。
+// 仅 <img> 等被动加载走该域名；API 数据请求始终走 POCKETBASE_URL。
+const FILES_BASE_URL = (import.meta.env.PUBLIC_PB_FILES_URL || POCKETBASE_URL).replace(/\/$/, '');
+
+export function getFilesBaseUrl(): string {
+  return FILES_BASE_URL;
+}
+
+/**
+ * 构造 PocketBase 文件下载 URL（collection 名或 id 均可，PB 按名/id 解析）。
+ * thumb 仅对白名单尺寸生效，见 pb_migrations/20260912000000_add_image_thumbs_whitelist.pb.js。
+ */
+export function buildFileUrl(collection: string, recordId: string, filename: string, thumb?: string): string {
+  const url = `${FILES_BASE_URL}/api/files/${encodeURIComponent(collection)}/${encodeURIComponent(recordId)}/${encodeURIComponent(filename)}`;
+  return thumb ? `${url}?thumb=${encodeURIComponent(thumb)}` : url;
+}
+
 /**
  * 创建新的 PocketBase 实例
  * SSR 环境下每次请求创建新实例，避免状态污染。

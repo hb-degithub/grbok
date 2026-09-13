@@ -1,4 +1,5 @@
 ﻿import { BaseService } from './baseService';
+import { buildFileUrl } from '../pocketbase';
 import type { RecordModel } from 'pocketbase';
 
 export interface MediaAsset {
@@ -102,8 +103,7 @@ class MediaService extends BaseService<MediaAssetRecord> {
   }
 
   getFileUrl(record: MediaAsset, thumb?: string): string {
-    const pb = this.getPocketBase();
-    return pb.files.getUrl(record as unknown as RecordModel, record.file, thumb ? { thumb } : undefined);
+    return buildFileUrl('media_assets', record.id, record.file, thumb);
   }
 }
 

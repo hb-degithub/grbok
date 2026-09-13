@@ -8,7 +8,7 @@
  */
 
 import { useMemo } from 'react';
-import { getPocketBase } from '../../lib/pocketbase';
+import { getFilesBaseUrl } from '../../lib/pocketbase';
 
 interface ResponsiveImageProps {
   /** PocketBase collection 名（如 'posts'） */
@@ -35,12 +35,12 @@ export default function ResponsiveImage({
   className,
   sizes = '(max-width: 640px) 100vw, 50vw',
 }: ResponsiveImageProps) {
-  // 复用 PocketBase 单例的 baseUrl，确保与 SDK 一致
+  // 文件基地址可指向独立图片域名（PUBLIC_PB_FILES_URL），API 请求不受影响
   const { base, srcset } = useMemo(() => {
-    const pbUrl = getPocketBase().baseUrl.replace(/\/$/, '');
+    const filesBase = getFilesBaseUrl();
     // 对路径段做 URL 编码，防止中文/特殊字符文件名损坏
     const enc = (s: string) => encodeURIComponent(s);
-    const base = `${pbUrl}/api/files/${enc(collection)}/${enc(recordId)}/${enc(filename)}`;
+    const base = `${filesBase}/api/files/${enc(collection)}/${enc(recordId)}/${enc(filename)}`;
     const srcset = BREAKPOINTS.map((w) => `${base}?thumb=${w}x0 ${w}w`).join(', ');
     return { base, srcset };
   }, [collection, recordId, filename]);
