@@ -49,9 +49,9 @@ services:
     ports:
       - "127.0.0.1:8090:8090"
     volumes:
-      - pb_data:/pb/pb_data
-      - pb_migrations:/pb/pb_migrations
-      - pb_hooks:/pb/pb_hooks
+      - pb_data:/pb_data
+      - ./pb_migrations:/pb_migrations:ro
+      - ./pb_hooks:/pb_hooks:ro
     environment:
       - PB_ENCRYPTION_KEY=${PB_ENCRYPTION_KEY}
       - TZ=${TZ:-Asia/Shanghai}
@@ -71,7 +71,7 @@ services:
       - MAIL_OTP_ENABLED=${MAIL_OTP_ENABLED:-false}
       - PUBLIC_SITE_URL=${PUBLIC_SITE_URL:-https://hlydwz.com}
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/index.html90/api/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8090/api/health"]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -99,7 +99,3 @@ services:
 volumes:
   pb_data:
     name: blog_pb_data_local
-  pb_migrations:
-    name: blog_pb_migrations_local
-  pb_hooks:
-    name: blog_pb_hooks_local
