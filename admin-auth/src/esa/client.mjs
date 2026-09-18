@@ -1,4 +1,5 @@
 import { createHmac, randomUUID } from 'node:crypto';
+import { env } from 'node:process';
 import { getStsCredentials } from './sts.mjs';
 
 const ENDPOINT = 'https://esa.cn-hangzhou.aliyuncs.com';
@@ -41,7 +42,7 @@ function canonicalizedQuery(params) {
     .join('&');
 }
 
-export function signRpcRequest({ accessKeyId, accessKeySecret, securityToken, action, params, nonce, timestamp }) {
+export function signRpcRequest({ accessKeyId, accessKeySecret, securityToken, action, params, nonce, timestamp, method = 'POST' }) {
   const all = {
     Format: 'JSON',
     Version: API_VERSION,
@@ -56,7 +57,7 @@ export function signRpcRequest({ accessKeyId, accessKeySecret, securityToken, ac
   // STS 临时凭据必须把 SecurityToken 纳入签名参数
   if (securityToken) all.SecurityToken = securityToken;
   const query = canonicalizedQuery(all);
-  const stringToSign = `POST&%2F&${percentEncode(query)}`;
+  const stringToSign = `${method}&%2F&${percentEncode(query)}`;
   const signature = createHmac('sha1', `${accessKeySecret}&`).update(stringToSign, 'utf8').digest('base64');
   return { query, signature };
 }
@@ -82,13 +83,19 @@ function validateCredentials(credentials) {
   return { accessKeyId, accessKeySecret, siteId: sid };
 }
 
-// 凭据解析顺序:手动配置(后台缓存页) → ECS 实例 RAM 角色 STS(元数据服务)。
-// 两者皆无时报 ESA_NOT_CONFIGURED。
+// 凭据解析顺序:手动配置(后台缓存页) → 环境变量(ESA_ACCESS_KEY_ID/SECRET,
+// 轻量云无实例角色时的落地方式) → ECS 实例 RAM 角色 STS(元数据服务)。
+// 三者皆无时报 ESA_NOT_CONFIGURED。
 let siteIdCache = 0;
 
 async function resolveCredentials(input) {
   const manual = validateCredentials(input);
   if (manual) return manual;
+  const envId = String(env.ESA_ACCESS_KEY_ID || '').trim();
+  const envSecret = String(env.ESA_ACCESS_KEY_SECRET || '').trim();
+  if (envId && envSecret) {
+    return { accessKeyId: envId, accessKeySecret: envSecret, siteId: Number(env.ESA_SITE_ID) || 0 };
+  }
   const sts = await getStsCredentials();
   if (!sts) throw new EsaError('ESA_NOT_CONFIGURED', false);
   return { ...sts, siteId: 0 };
@@ -127,9 +134,16 @@ function mapUpstreamError(status, body) {
   return new EsaError('ESA_UPSTREAM_ERROR', status >= 500, message || code || `HTTP ${status}`);
 }
 
+// ESA 各 action 的 HTTP 方法不一致(2026-09-18 实测):
+// 查询类(List*/Describe*/Get*)仅支持 GET,写操作(PurgeCaches 等)仅支持 POST。
+function methodFor(action) {
+  return /^(List|Describe|Get)/.test(action) ? 'GET' : 'POST';
+}
+
 // 不解析 siteId 的原始 RPC 调用(供 resolveSiteId 自举用)
 async function callRpcRaw({ credentials, action, params }) {
   const { accessKeyId, accessKeySecret, securityToken } = credentials;
+  const method = methodFor(action);
   const { query, signature } = signRpcRequest({
     accessKeyId,
     accessKeySecret,
@@ -138,17 +152,25 @@ async function callRpcRaw({ credentials, action, params }) {
     params,
     nonce: randomUUID(),
     timestamp: utcTimestamp(),
+    method,
   });
-  const body = `${query}&Signature=${percentEncode(signature)}`;
 
   let response;
   try {
-    response = await fetch(`${ENDPOINT}/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
+    if (method === 'GET') {
+      response = await fetch(`${ENDPOINT}/?${query}&Signature=${percentEncode(signature)}`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    } else {
+      const body = `${query}&Signature=${percentEncode(signature)}`;
+      response = await fetch(`${ENDPOINT}/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body,
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+    }
   } catch (error) {
     throw new EsaError('ESA_UPSTREAM_ERROR', true, error);
   }

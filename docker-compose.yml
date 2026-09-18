@@ -81,6 +81,10 @@ services:
       - ALIYUN_SMTP_PASSWORD=${ALIYUN_SMTP_PASSWORD:-}
       - ALIYUN_FROM_EMAIL=${ALIYUN_FROM_EMAIL:-}
       - ALIYUN_FROM_NAME=${ALIYUN_FROM_NAME:-}
+      # ESA API 凭据(轻量云无实例 RAM 角色时的落地方式;ECS 上可留空走 STS)
+      - ESA_ACCESS_KEY_ID=${ESA_ACCESS_KEY_ID:-}
+      - ESA_ACCESS_KEY_SECRET=${ESA_ACCESS_KEY_SECRET:-}
+      - ESA_SITE_ID=${ESA_SITE_ID:-}
     networks:
       - blog_network
     user: "node"
