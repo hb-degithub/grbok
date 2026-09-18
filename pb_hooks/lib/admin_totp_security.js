@@ -10,6 +10,7 @@ var stepUp = require('./admin_step_up.js');
 var audits = require('./admin_security_audit.js');
 var totp = require('./admin_totp.js');
 var rateLimit = require('./security_rate_limit.js');
+var clientIpModule = require('./client_ip.js');
 
 var INTERNAL_URL = String($os.getenv('ADMIN_AUTH_INTERNAL_URL') || '').trim() || 'http://admin-auth:8787';
 var INTERNAL_SECRET = String($os.getenv('ADMIN_AUTH_INTERNAL_SECRET') || '').trim();
@@ -53,9 +54,13 @@ function isLoopbackAddress(value) {
   return true;
 }
 
+// 2026-09-18 安全修复：realIP() 派生自可伪造的 X-Forwarded-For，
+// 远程攻击者伪造 127.0.0.1 即可通过本检查（已实测）。改用 client_ip.js
+// 的 ali-real-client-ip 优先取值；SSH 隧道等无 ESA 头场景回退 realIP()，
+// 其 remoteAddr 为 127.0.0.1，行为不变。
 function requireLoopbackRealIp(c) {
   var actual = '';
-  try { actual = String(c.realIP() || '').trim(); } catch (_) {}
+  try { actual = String(clientIpModule.clientIp(c) || '').trim(); } catch (_) {}
   if (!isLoopbackAddress(actual)) apiError(403, 'ADMIN_NETWORK_DENIED');
 }
 

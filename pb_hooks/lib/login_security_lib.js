@@ -15,6 +15,7 @@ const loginRateBuckets = globalThis.loginRateBuckets || (globalThis.loginRateBuc
 const loginFailCounts = globalThis.loginFailCounts || (globalThis.loginFailCounts = {});
 const loginLockouts = globalThis.loginLockouts || (globalThis.loginLockouts = {});
 const cleanupRef = globalThis.loginLastCleanupRef || (globalThis.loginLastCleanupRef = { t: Date.now() });
+const clientIpModule = require('./client_ip.js');
 
 function loginMaybeCleanup() {
   const now = Date.now();
@@ -35,15 +36,17 @@ function loginMaybeCleanup() {
   }
 }
 
+// 2026-09-18 安全修复：realIP() 派生自 X-Forwarded-For，可被客户端伪造
+// （实测可绕过 Caddy 管理面白名单与 per-IP 限流）。统一改走 client_ip.js：
+// 优先 ESA 注入并覆盖的 ali-real-client-ip 头，缺失时才回退 realIP()
+// （本地开发/SSH 隧道场景）。取不到 IP 时用统一桶兜底，而非跳过限流。
 function getClientIP(e) {
   try {
-    const real = e.httpContext?.realIP?.();
-    if (real && real.trim()) return real.trim();
-    // 回退到远端地址
-    const addr = e.httpContext?.request?.remoteAddr;
-    if (addr) return addr.split(':')[0];
+    const ctx = (e && e.httpContext) ? e.httpContext : e;
+    const v = clientIpModule.clientIp(ctx);
+    if (v && String(v).trim()) return String(v).trim();
   } catch (_) {}
-  return 'unknown'; // 用统一桶兜底，而非跳过
+  return 'unknown';
 }
 
 function getEmailFromBody(e) {
@@ -95,19 +98,24 @@ function clearFailure(key) {
 function checkAndRecord(e) {
   const ip = getClientIP(e);
   const email = getEmailFromBody(e);
+  // 邮箱维度一律与 IP 组合键控：纯 per-email 锁定/限速会让任何人用受害者邮箱
+  // 故意失败 5 次即可把受害者锁在门外（账号锁定 DoS，2026-09-18 审计发现）。
+  // IP 现在经 client_ip.js 取真实值，组合键仍可限住单点爆破；
+  // 分布式爆破由 per-IP 轴兜底，admin 账号另有 TOTP step-up 兜底。
+  const emailIp = email ? email + '|' + ip : '';
 
   // 检查是否被锁定
   if (ip && isLockedOut('login:lock:ip:' + ip)) {
     throw new BadRequestError('登录尝试过于频繁，请15分钟后再试');
   }
-  if (email && isLockedOut('login:lock:email:' + email)) {
+  if (emailIp && isLockedOut('login:lock:emailip:' + emailIp)) {
     throw new BadRequestError('登录尝试过于频繁，请15分钟后再试');
   }
 
   if (ip && !rateLimit('login:ip:' + ip, MAX_ATTEMPTS_PER_IP)) {
     throw new BadRequestError('登录尝试过于频繁，请15分钟后再试');
   }
-  if (email && !rateLimit('login:email:' + email, MAX_ATTEMPTS_PER_EMAIL)) {
+  if (emailIp && !rateLimit('login:emailip:' + emailIp, MAX_ATTEMPTS_PER_EMAIL)) {
     throw new BadRequestError('登录尝试过于频繁，请15分钟后再试');
   }
 
@@ -122,8 +130,8 @@ function clearAttempts(e) {
     clearFailure('login:lock:ip:' + ip);
   }
   if (email) {
-    delete loginRateBuckets['login:email:' + email];
-    clearFailure('login:lock:email:' + email);
+    delete loginRateBuckets['login:emailip:' + email + '|' + ip];
+    clearFailure('login:lock:emailip:' + email + '|' + ip);
   }
   if (typeof e.next === 'function') e.next();
 }
@@ -133,7 +141,7 @@ function recordLoginFailure(e) {
   const ip = getClientIP(e);
   const email = getEmailFromBody(e);
   if (ip) recordFailure('login:lock:ip:' + ip);
-  if (email) recordFailure('login:lock:email:' + email);
+  if (email) recordFailure('login:lock:emailip:' + email + '|' + ip);
 }
 
 module.exports = {

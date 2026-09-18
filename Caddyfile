@@ -1,7 +1,11 @@
 {
     servers {
         trusted_proxies static {$OPENRESTY_TRUSTED_PROXY}
-        client_ip_headers X-Forwarded-For X-Real-IP
+        # ali-real-client-ip 优先：ESA 边缘节点注入并覆盖客户端伪造值（2026-09-18 实测），
+        # 放在 X-Forwarded-For 之前可免疫 XFF 伪造；无该头的链路（SSH 隧道/本地直连）
+        # 自动回退 XFF → RemoteAddr。注意 Caddy 仅在 immediate peer 属于 trusted_proxies
+        # 时才采信这些头，雷池/OpenResty 回源地址必须在 $OPENRESTY_TRUSTED_PROXY 内。
+        client_ip_headers Ali-Real-Client-Ip X-Forwarded-For X-Real-IP
     }
 }
 # 图片专用域名（ESA 图片优化加速域）：仅放行 PocketBase 文件下载，
@@ -62,8 +66,10 @@ http://img.hlydwz.com {
     # 页面级 IP 拦截的边际收益低于可用性损失。/_/* 与 /api/admins/* 的
     # 服务端白名单保持不变（保护 PB 原生后台与管理员 API）。
 
+    # 裸路径 /_ 与 /api/admins 也必须列出：Caddy 的 /foo/* 不匹配 /foo 本身
+    # （2026-09-18 实测 GET /api/admins 绕过拦截直达 PB 返回 401）。
     @blocked_admin_access {
-        path /_/* /api/admins/*
+        path /_ /_/* /api/admins /api/admins/*
         not path /_astro/* /pagefind/*
         not client_ip 127.0.0.1 10.255.2.1 {$ADMIN_IP}
     }
@@ -155,8 +161,10 @@ http://img.hlydwz.com {
         respond "Not Found" 404
     }
 
-    handle /api/admins/* {
+    @admin_api_proxy path /api/admins /api/admins/*
+    handle @admin_api_proxy {
         header X-Robots-Tag "noindex, nofollow, noarchive"
+        header Cache-Control "no-store"
         reverse_proxy pocketbase:8090 {
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
@@ -204,11 +212,14 @@ http://img.hlydwz.com {
     }
 
     @pb_admin {
-        path /_/*
+        path /_ /_/*
         not path /_astro/*
     }
     handle @pb_admin {
         header X-Robots-Tag "noindex, nofollow, noarchive"
+        # 2026-09-18：ESA 曾把伪造 XFF 拿到的 PB 后台 HTML 缓存 30 天并全网分发，
+        # 管理界面响应必须禁止一切缓存
+        header Cache-Control "no-store"
         reverse_proxy pocketbase:8090 {
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
@@ -218,6 +229,9 @@ http://img.hlydwz.com {
 
     handle /admin* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
+        # SSR HTML 一律禁止 CDN 缓存：2026-09-18 发现 ESA 把旧版 HTML 缓存 15 天，
+        # 重新部署后旧 HTML 引用已删除的带 hash 岛屿 chunk(404),搜索等交互全灭
+        header Cache-Control "no-cache, must-revalidate"
         reverse_proxy 10.255.0.1:4321 {
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
@@ -227,6 +241,7 @@ http://img.hlydwz.com {
 
     handle /login* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
+        header Cache-Control "no-cache, must-revalidate"
         reverse_proxy 10.255.0.1:4321 {
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
@@ -246,6 +261,8 @@ http://img.hlydwz.com {
             file_server
         }
         handle {
+            # SSR HTML 禁缓存(同上,防止 HTML 与 hash chunk 版本错配)
+            header Cache-Control "no-cache, must-revalidate"
             reverse_proxy 10.255.0.1:4321 {
                 header_up X-Real-IP {client_ip}
                 header_up X-Forwarded-For {client_ip}
