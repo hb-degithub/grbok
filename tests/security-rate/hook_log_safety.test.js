@@ -12,15 +12,24 @@ var expectedLogs = {
   'pb_hooks/send_email_comment.pb.js': '[comment-mail] operation=enqueue result=INTERNAL_ERROR',
 };
 
+// 2026-09-18 起允许的稳定后缀:截断到 200 字符的 error.message(不含 stack/对象),
+// 便于排障同时不泄露内部结构。除此之外不得出现其他异常插值。
+var ALLOWED_DETAIL_SUFFIX = " + String(err && err.message || err).slice(0, 200));";
+
 Object.keys(expectedLogs).forEach(function (relativePath) {
   var source = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
   assert(source.indexOf(expectedLogs[relativePath]) !== -1, relativePath + ' must log its stable error code');
   var logCalls = source.match(/console\.error\s*\([^;\n]*\);/g) || [];
-  var expectedCall = "console.error('" + expectedLogs[relativePath] + "');";
-  assert.deepStrictEqual(logCalls, [expectedCall], relativePath + ' must emit only its stable literal log record');
-  assert(!/\.(?:message|stack)\b/.test(source), relativePath + ' must not read exception details');
-  assert(!/String\s*\(\s*(?:error|err)\b/.test(source), relativePath + ' must not stringify exceptions');
-  assert(!/console\.error\([^\n]*(?:\+\s*(?:error|err)\b|\$\{\s*(?:error|err)\s*\})/.test(source), relativePath + ' must not interpolate exceptions');
+  var plainCall = "console.error('" + expectedLogs[relativePath] + "');";
+  var detailCall = "console.error('" + expectedLogs[relativePath] + " detail='" + ALLOWED_DETAIL_SUFFIX;
+  logCalls.forEach(function (call) {
+    assert(
+      call === plainCall || call === detailCall,
+      relativePath + ' must emit only stable literal log records (got: ' + call.slice(0, 120) + ')',
+    );
+  });
+  assert(!/\.stack\b/.test(source), relativePath + ' must not log exception stacks');
+  assert(!/console\.error\([^\n]*\$\{\s*(?:error|err)\s*\}/.test(source), relativePath + ' must not interpolate exception objects');
 });
 
 var outbox = require(path.join(repoRoot, 'pb_hooks', 'lib', 'mail_outbox.js'));
