@@ -1,0 +1,24 @@
+# 依赖自动更新:每周检查,产出 PR 后走与人工提交完全相同的 CI 审查门禁
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /astro
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: [dependencies, automated]
+
+  - package-ecosystem: npm
+    directory: /admin-auth
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels: [dependencies, automated]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies, ci, automated]

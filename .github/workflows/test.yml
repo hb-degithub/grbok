@@ -4,7 +4,8 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [codex/*]
+    # main 直推与 codex/* 分支全覆盖:任何人的提交合入都必经本流水线
+    branches: [main, codex/*]
 
 jobs:
   test-and-build:
@@ -71,3 +72,57 @@ jobs:
           path: astro/test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  # CD:仅在 main 分支推送且 CI 全绿时触发;需仓库配置 vars.DEPLOY_ENABLED=true
+  # 与 secrets.SSH_HOST/SSH_USER/SSH_PRIVATE_KEY(可选 SSH_PORT)后才会真正执行,
+  # 未配置时自动跳过而不是失败。仅部署前端 SSR 产物;pb_hooks/Caddy 变更仍需人工。
+  deploy:
+    name: Deploy to production
+    needs: test-and-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: astro-dist
+          path: astro/dist/
+
+      - name: Package SSR dist
+        run: cd astro/dist && tar -czf "$RUNNER_TEMP/dist_pkg.tar.gz" client server
+
+      - name: Upload package to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          source: "${{ runner.temp }}/dist_pkg.tar.gz"
+          target: /tmp/
+
+      - name: Atomic sync & restart on server
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          PKG: ${{ runner.temp }}/dist_pkg.tar.gz
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          envs: PKG
+          script: |
+            set -e
+            CUR=/opt/hlydwz-blog/current
+            rm -rf /tmp/dist_pkg && mkdir -p /tmp/dist_pkg
+            tar xzf "$PKG" -C /tmp/dist_pkg
+            # 与 scripts/deploy-ssr.sh 同一套原地同步逻辑:404.html 与 pagefind 不属于构建产物
+            rsync -a --delete --exclude='404.html' --exclude='404.html.bak*' --exclude='pagefind/' /tmp/dist_pkg/client/ $CUR/astro/dist/
+            rsync -a --delete /tmp/dist_pkg/client/ $CUR/dist/client/
+            rsync -a --delete /tmp/dist_pkg/server/ $CUR/dist/server/
+            rsync -a /tmp/dist_pkg/client/ $CUR/dist/
+            systemctl restart blog-astro-ssr
+            sleep 4
+            curl -fsS -o /dev/null -w 'SSR smoke: %{http_code}\n' http://127.0.0.1:4321/
+            curl -fsS -o /dev/null -w 'Web smoke: %{http_code}\n' https://hlydwz.com/
+            rm -rf /tmp/dist_pkg "$PKG"

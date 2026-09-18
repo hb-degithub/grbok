@@ -1,0 +1,43 @@
+name: Security Review
+
+# 每个 PR 与 main 推送必跑的自动安全审查(硬门禁,不允许跳过):
+# 1) gitleaks 全量密钥/凭据扫描(防 .env、私钥、token 入库)
+# 2) astro 与 admin-auth 两个子项目的生产依赖漏洞审计(npm audit,high 及以上即失败)
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 全历史扫描,防止凭据"提交后又删除"仍留在历史里
+
+      - name: Run gitleaks
+        run: >-
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest
+          detect --source /repo --verbose --redact
+
+  dependency-audit:
+    name: Dependency audit (npm)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: [astro/package-lock.json, admin-auth/package-lock.json]
+
+      - name: Audit astro (production deps)
+        run: cd astro && npm ci --ignore-scripts && npm audit --audit-level=high --omit=dev
+
+      - name: Audit admin-auth (production deps)
+        run: cd admin-auth && npm ci --ignore-scripts && npm audit --audit-level=high --omit=dev

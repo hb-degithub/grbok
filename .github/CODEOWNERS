@@ -1,0 +1,3 @@
+# 任何 PR 都会自动请求仓库所有者审查(GitHub 按 CODEOWNERS 自动 assign reviewer)
+# 配合分支保护规则(Require review from Code Owners)即形成强制审查
+* @hb-degithub
