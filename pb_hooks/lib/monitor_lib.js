@@ -147,6 +147,7 @@ function saveHostMetrics(e) {
   record.set('net_tx_kbps', clampNum(body.txKbps, 0, 10485760));
   record.set('disk_pct', clampNum(body.diskPct, 0, 100));
   record.set('load1', clampNum(body.load1, 0, 1024));
+  record.set('cpu_cores', clampNum(body.cpuCores, 0, 1024));
   try {
     $app.dao().saveRecord(record);
   } catch (err) {
@@ -173,6 +174,8 @@ function publicHostSnapshot(dao) {
     rxKbps: Math.round(s.get('net_rx_kbps')),
     txKbps: Math.round(s.get('net_tx_kbps')),
     load1: Math.round(s.get('load1') * 100) / 100,
+    cpuCores: s.getInt('cpu_cores') || null,
+    memTotalMb: Math.round(s.get('mem_total_mb')) || null,
     at: s.getString('created'),
   };
 }

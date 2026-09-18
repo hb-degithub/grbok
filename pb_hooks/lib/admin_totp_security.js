@@ -130,7 +130,8 @@ function requestMeta(c) {
   var userAgent = header(c, 'User-Agent');
   var ip = require('./client_ip.js').clientIp(c);
   if (!clientSession || !fingerprint || !userAgent || !ip) apiError(400, 'INVALID_REQUEST');
-  return { clientSession: clientSession, fingerprint: fingerprint, userAgent: userAgent, ip: ip };
+  // IP 按网段绑定(/24 / /64):出口 IP 漂移不失效会话,签发与校验双侧一致
+  return { clientSession: clientSession, fingerprint: fingerprint, userAgent: userAgent, ip: stepUp.ipBindKey(ip) };
 }
 
 // 签发 step-up 会话（复用 admin-auth，与因子无关）

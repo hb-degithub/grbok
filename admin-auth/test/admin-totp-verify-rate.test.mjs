@@ -146,7 +146,7 @@ async function loadModule({ rateLimit, totpBehavior, auditRows, bucketRows }) {
       if (name === './admin_security_audit.js') {
         return { writeSecurityAudit(daoArg, secureContext, event) { auditRows.push({ secureContext, event }); } };
       }
-      if (name === './admin_step_up.js') return {};
+      if (name === './admin_step_up.js') return { ipBindKey(ip) { return ip; } };
       if (name === './client_ip.js') return { clientIp() { return '127.0.0.1'; } };
       return {};
     },

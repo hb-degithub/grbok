@@ -32,8 +32,22 @@ interface HostSnapshot {
   rxKbps: number;
   txKbps: number;
   load1: number;
+  cpuCores: number | null;
+  memTotalMb: number | null;
   at: string;
 }
+
+/** 从 ESA 的 via 响应头解析边缘节点编号(如 ens-cache6.jp14 → JP14) */
+function parseEdgeNode(via: string | null): string | null {
+  if (!via) return null;
+  const m = via.match(/ens-cache\d+\.([a-z0-9-]+)/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
+// 已验证的 ESA 节点编号 → 地域(见到的再补充,未知编号原样展示)
+const EDGE_REGIONS: Record<string, string> = {
+  JP14: '日本(东京)',
+};
 
 const STATUS_REFRESH_MS = 30_000;
 const PING_INTERVAL_MS = 15_000;
@@ -127,6 +141,8 @@ export default function StatusPanel() {
   const [status, setStatus] = useState<PublicStatus | null>(null);
   const [statusError, setStatusError] = useState(false);
   const [pings, setPings] = useState<number[]>([]);
+  const [staticMs, setStaticMs] = useState<number | null>(null);
+  const [edgeNode, setEdgeNode] = useState<string | null>(null);
   const [pinging, setPinging] = useState(false);
   const timerRef = useRef<number[]>([]);
 
@@ -145,11 +161,14 @@ export default function StatusPanel() {
     if (pinging) return;
     setPinging(true);
     try {
+      // 动态:回源 API 心跳
       const batch: number[] = [];
       for (let i = 0; i < PING_COUNT; i++) {
         const start = performance.now();
         try {
-          await fetch(`/api/public/ping?t=${Date.now()}`, { cache: 'no-store' });
+          const res = await fetch(`/api/public/ping?t=${Date.now()}`, { cache: 'no-store' });
+          const node = parseEdgeNode(res.headers.get('via'));
+          if (node) setEdgeNode(node);
           batch.push(Math.round(performance.now() - start));
         } catch {
           // 单次失败跳过,不影响其余样本
@@ -158,6 +177,14 @@ export default function StatusPanel() {
       if (batch.length) {
         const avg = Math.round(batch.reduce((a, b) => a + b, 0) / batch.length);
         setPings((prev) => [...prev.slice(-(PING_HISTORY - 1)), avg]);
+      }
+      // 静态:CDN 缓存的小图标(测边缘命中速度;URL 固定以命中缓存)
+      try {
+        const sStart = performance.now();
+        await fetch('/favicon.svg', { cache: 'force-cache' });
+        setStaticMs(Math.round(performance.now() - sStart));
+      } catch {
+        /* 静态探测失败不影响主流程 */
       }
     } finally {
       setPinging(false);
@@ -215,7 +242,14 @@ export default function StatusPanel() {
               {currentPing !== null ? `${currentPing}` : '—'}
               <span className="ml-1 text-sm font-normal text-zinc-400">ms</span>
             </p>
-            <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">当前平均</p>
+            <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">动态接口(回源)</p>
+          </div>
+          <div>
+            <p className="font-mono text-xl font-semibold tabular-nums text-zinc-700 dark:text-zinc-200">
+              {staticMs !== null ? `${staticMs}` : '—'}
+              <span className="ml-1 text-xs font-normal text-zinc-400">ms</span>
+            </p>
+            <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">静态资源(CDN 边缘)</p>
           </div>
           <div>
             <p className="font-mono text-xl font-semibold tabular-nums text-zinc-700 dark:text-zinc-200">
@@ -228,6 +262,12 @@ export default function StatusPanel() {
             <PingSparkline pings={pings} />
           </div>
         </div>
+        {edgeNode && (
+          <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
+            你当前接入的 ESA 边缘节点:<span className="font-mono font-semibold text-zinc-600 dark:text-zinc-300">{edgeNode}</span>
+            {EDGE_REGIONS[edgeNode] ? `(${EDGE_REGIONS[edgeNode]})` : ''}
+          </p>
+        )}
       </section>
 
       {/* 服务器性能 */}
@@ -246,6 +286,11 @@ export default function StatusPanel() {
               <Gauge label="磁盘占用" value={status.host.diskPct} />
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+              {(status.host.cpuCores || status.host.memTotalMb) && (
+                <span className="font-mono font-semibold text-zinc-700 dark:text-zinc-200">
+                  规格 {status.host.cpuCores ? `${status.host.cpuCores} 核` : ''}{status.host.cpuCores && status.host.memTotalMb ? ' · ' : ''}{status.host.memTotalMb ? `${(status.host.memTotalMb / 1024).toFixed(1)} GB` : ''}
+                </span>
+              )}
               <span>
                 实时带宽 ↓ <span className="font-mono font-semibold text-teal-600 dark:text-teal-300">{formatKbps(status.host.rxKbps)}</span>
                 {'  '}↑ <span className="font-mono font-semibold text-indigo-500 dark:text-indigo-300">{formatKbps(status.host.txKbps)}</span>
