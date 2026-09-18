@@ -18,7 +18,11 @@ jobs:
           node-version: 22
           cache: npm
           # 同时缓存 astro 与 admin-auth 两个子项目的依赖锁文件
-          cache-dependency-path: [astro/package-lock.json, admin-auth/package-lock.json]
+          # 注意:必须用块标量多行写法——GitHub 工作流解析器在此位置不接受
+          # 流式序列 [a, b](报 "A sequence was not expected",曾致 CI 长期零任务失败)
+          cache-dependency-path: |
+            astro/package-lock.json
+            admin-auth/package-lock.json
 
       # 安装 astro 前端依赖（npm ci 严格按锁文件安装）
       - name: Install dependencies

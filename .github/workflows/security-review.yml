@@ -34,7 +34,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: [astro/package-lock.json, admin-auth/package-lock.json]
+          # 同 test.yml:块标量多行写法,GitHub 解析器不接受此处的 [a, b] 流式序列
+          cache-dependency-path: |
+            astro/package-lock.json
+            admin-auth/package-lock.json
 
       - name: Audit astro (production deps)
         run: cd astro && npm ci --ignore-scripts && npm audit --audit-level=high --omit=dev
