@@ -22,6 +22,9 @@ const SOURCE_DESC = [
   { key: 'app', name: '应用内防护', desc: '限流、校验与审核(代码层)' },
 ] as const;
 
+// ESA 卡片在"未接入"时的补充说明(2026-09-18 实测:basic 版无公开统计 API)
+const ESA_UNAVAILABLE_HINT = 'ESA 基础版无公开统计 API;开通日志服务(SLS)后可接入';
+
 function stateBadge(state: SourceState) {
   switch (state) {
     case 'ok':
@@ -88,6 +91,9 @@ export default function ProtectionPanel() {
                 <span className={cn('rounded px-1.5 py-0.5 text-[10px] font-medium', badge.cls)}>{badge.text}</span>
               </div>
               <p className="mt-1 text-[11px] leading-4 text-zinc-400 dark:text-zinc-500">{s.desc}</p>
+              {s.key === 'esa' && state !== 'ok' && (
+                <p className="mt-1 text-[10px] leading-4 text-zinc-400/80 dark:text-zinc-500/80">{ESA_UNAVAILABLE_HINT}</p>
+              )}
             </div>
           );
         })}
