@@ -48,6 +48,21 @@ interface HostData {
   buckets: HostBucket[];
 }
 
+interface ProtectionSnapshot {
+  ok: boolean;
+  detected: number;
+  blocked: number;
+  sampledAt: string;
+  error: string;
+  at: string;
+}
+
+interface ProtectionData {
+  latest10: ProtectionSnapshot[];
+  lastSuccessAt: string | null;
+  consecutiveFailures: number;
+}
+
 const TARGET_COLORS: Record<string, string> = {
   site_http: '#14b8a6',
   pb_self: '#6366f1',
@@ -164,6 +179,8 @@ export default function MonitorDashboard() {
   const [summary, setSummary] = useState<{ targets: TargetSummary[] } | null>(null);
   const [series, setSeries] = useState<{ buckets: SeriesBucket[]; failures: FailureItem[] } | null>(null);
   const [host, setHost] = useState<HostData | null>(null);
+  const [protection, setProtection] = useState<ProtectionData | null>(null);
+  const [protectionError, setProtectionError] = useState(false);
   const [hours, setHours] = useState(24);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -180,6 +197,14 @@ export default function MonitorDashboard() {
       setSeries(ser);
       setHost(hst);
       setError('');
+      // 防护采集为独立区块:其失败不得影响本页其他监控数据
+      try {
+        const prot = await pb.send<ProtectionData>('/api/blog-admin/monitor/protection', { method: 'GET' });
+        setProtection(prot);
+        setProtectionError(false);
+      } catch {
+        setProtectionError(true);
+      }
     } catch (err) {
       setError('监控数据加载失败(权限或接口异常)');
       console.error('[monitor] load failed:', err);
@@ -332,6 +357,59 @@ export default function MonitorDashboard() {
           </div>
         ) : (
           <p className="py-6 text-center text-xs text-muted">{loading ? '加载中…' : '所选时段内没有失败样本,运行良好。'}</p>
+        )}
+      </section>
+
+      {/* 防护采集(雷池 WAF 统计) */}
+      <section className="rounded-xl border border-border bg-white p-4 shadow-xs">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold text-text">防护采集(雷池 WAF,近 24h)</h3>
+          {protection && (
+            <p className="font-mono text-[11px] text-muted">
+              最近成功 {protection.lastSuccessAt ? new Date(protection.lastSuccessAt.replace(' ', 'T')).toLocaleString() : '从未'}
+              {protection.consecutiveFailures > 0 && (
+                <span className="ml-2 rounded bg-warning/10 px-1.5 py-0.5 text-warning">连续失败 {protection.consecutiveFailures}</span>
+              )}
+            </p>
+          )}
+        </div>
+        {protectionError && (
+          <p className="py-4 text-center text-xs text-muted">防护采集接口不可用(不影响本页其他监控)。</p>
+        )}
+        {!protectionError && !protection && <p className="py-4 text-center text-xs text-muted">加载中…</p>}
+        {!protectionError && protection && (
+          <>
+            {protection.latest10.length === 0 ? (
+              <p className="py-4 text-center text-xs text-muted">暂无采集快照(cron 每分钟写入)。</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-border text-muted">
+                      <th className="py-2 pr-3 font-medium">采集时间</th>
+                      <th className="py-2 pr-3 font-medium">窗口截止</th>
+                      <th className="py-2 pr-3 font-medium">检测</th>
+                      <th className="py-2 pr-3 font-medium">拦截</th>
+                      <th className="py-2 font-medium">状态</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {protection.latest10.map((s, i) => (
+                      <tr key={`${s.at}-${i}`} className="border-b border-border/50 last:border-0">
+                        <td className="whitespace-nowrap py-2 pr-3 font-mono text-text-secondary">{new Date(s.at.replace(' ', 'T')).toLocaleString()}</td>
+                        <td className="whitespace-nowrap py-2 pr-3 font-mono text-text-secondary">{s.sampledAt ? new Date(s.sampledAt).toLocaleString() : '—'}</td>
+                        <td className="py-2 pr-3 font-mono text-text-secondary">{s.ok ? s.detected : '—'}</td>
+                        <td className="py-2 pr-3 font-mono text-text-secondary">{s.ok ? s.blocked : '—'}</td>
+                        <td className={cn('max-w-56 truncate py-2 font-mono', s.ok ? 'text-success' : 'text-danger')} title={s.error}>
+                          {s.ok ? '正常' : `失败: ${s.error || 'unknown'}`}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </section>
     </div>

@@ -16,6 +16,7 @@ const OVERALL_TEXT: Record<string, string> = {
 export default function StatusMini() {
   const [status, setStatus] = useState<StatusMiniData | null>(null);
   const [userPing, setUserPing] = useState<number | null>(null);
+  const [blocked24h, setBlocked24h] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -24,6 +25,16 @@ export default function StatusMini() {
       setStatus(await res.json());
     } catch {
       setStatus(null);
+    }
+    // 防护统计为可选增强:失败/未接入时静默不显示,不影响主状态
+    try {
+      const res = await fetch('/api/public/protection', { cache: 'no-store' });
+      if (res.ok) {
+        const p = await res.json();
+        setBlocked24h(p?.safeline?.state === 'ok' && typeof p.safeline.blocked === 'number' ? p.safeline.blocked : null);
+      }
+    } catch {
+      /* 防护统计不可用时忽略 */
     }
   }, []);
 
@@ -100,6 +111,12 @@ export default function StatusMini() {
           <p className="mt-0.5 text-[10px] text-zinc-400 dark:text-zinc-500">你的延迟</p>
         </div>
       </div>
+      {blocked24h !== null && (
+        <p className="mt-3 flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2 text-[11px] text-zinc-500 dark:bg-zinc-950/50 dark:text-zinc-400">
+          <span>24h 攻击拦截</span>
+          <span className="font-mono font-bold tabular-nums text-red-500 dark:text-red-400">{blocked24h} 次</span>
+        </p>
+      )}
     </a>
   );
 }

@@ -422,6 +422,11 @@ function getAdminHostSeries(e) {
   }
 }
 
+// 供 protection_lib 等兄弟模块复用的内部判定
+function isInternalRequest(e) {
+  return isInternalCaller(clientIpOf(e && e.httpContext ? e.httpContext : e));
+}
+
 module.exports = {
   runProbes: runProbes,
   cleanupExpired: cleanupExpired,
@@ -430,4 +435,6 @@ module.exports = {
   getAdminSeries: getAdminSeries,
   saveHostMetrics: saveHostMetrics,
   getAdminHostSeries: getAdminHostSeries,
+  requireMonitorAdmin: requireMonitorAdmin,
+  isInternalRequest: isInternalRequest,
 };
