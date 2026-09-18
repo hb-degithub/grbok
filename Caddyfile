@@ -77,6 +77,12 @@ http://img.hlydwz.com {
         respond "Not Found" 404
     }
 
+    # Astro 内置图片优化端点:前端未使用(图片走 PB 文件域名),
+    # 且当前 astro 6.4 受 GHSA-26w7-cxv4-gfx2(AVIF RCE)影响——在升级到 7.2.8+ 之前直接 404 封堵
+    handle /_image* {
+        respond "Not Found" 404
+    }
+
     # 兼容旧路径：RSS 与 sitemap 的实际地址分别是 /feed.xml 与 /sitemap-index.xml
     redir /sitemap.xml /sitemap-index.xml 301
     redir /rss.xml /feed.xml 301

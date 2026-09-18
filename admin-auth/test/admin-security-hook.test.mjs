@@ -110,7 +110,8 @@ test('security policy step-up requires verified super admin on the configured ad
   assert.throws(() => stepUp.requireAdminStepUp(stepUpContext({ ip: '203.0.113.99' }, selector, rawSecret), options), /ADMIN_NETWORK_DENIED/);
   assert.equal(stepUp.requireAdminStepUp(stepUpContext({}, selector, rawSecret), options).actorId, 'admin-user');
 
-  const routeSource = await readFile(new URL('../../pb_hooks/security_policy_admin.pb.js', import.meta.url), 'utf8');
+  // step-up 选项已随重构下沉到 lib/security_policy_route_helpers.js(统一入口)
+  const routeSource = await readFile(new URL('../../pb_hooks/lib/security_policy_route_helpers.js', import.meta.url), 'utf8');
   assert.match(routeSource, /requireVerifiedEmail:\s*true/);
   assert.match(routeSource, /requireSuperAdmin:\s*true/);
   assert.match(routeSource, /requireTrustedAdminIp:\s*true/);

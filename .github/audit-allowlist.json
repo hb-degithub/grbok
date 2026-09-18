@@ -1,0 +1,6 @@
+{
+  "node-fetch": {
+    "reason": "仅经 face-api.js → @tensorflow/tfjs-core 引入,打包进浏览器端人脸识别组件(GridScan),不在服务端执行;修复需 face-api.js 破坏性升级",
+    "until": "2027-01-01"
+  }
+}

@@ -19,10 +19,15 @@ jobs:
         with:
           fetch-depth: 0 # 全历史扫描,防止凭据"提交后又删除"仍留在历史里
 
+      # 固定版本的官方二进制,避免 docker:latest 漂移(实测 latest 可能被拉到远古缓存版)
+      - name: Install gitleaks
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.0/gitleaks_8.30.0_linux_x64.tar.gz | tar xz gitleaks
+          sudo mv gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
       - name: Run gitleaks
-        run: >-
-          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:latest
-          detect --source /repo --verbose --redact
+        run: gitleaks detect --source . --redact --verbose
 
   dependency-audit:
     name: Dependency audit (npm)
@@ -40,7 +45,7 @@ jobs:
             admin-auth/package-lock.json
 
       - name: Audit astro (production deps)
-        run: cd astro && npm ci --ignore-scripts && npm audit --audit-level=high --omit=dev
+        run: cd astro && npm ci --ignore-scripts && node ../.github/scripts/audit-gate.mjs
 
       - name: Audit admin-auth (production deps)
-        run: cd admin-auth && npm ci --ignore-scripts && npm audit --audit-level=high --omit=dev
+        run: cd admin-auth && npm ci --ignore-scripts && node ../.github/scripts/audit-gate.mjs
