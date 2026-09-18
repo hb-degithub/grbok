@@ -41,6 +41,10 @@ const currentYear = new Date().getFullYear();
 
     <!-- 备案链接 -->
     <div class="mt-8 flex flex-col items-center gap-3 border-t border-zinc-200/70 pt-6 dark:border-zinc-800/70 sm:flex-row sm:justify-center sm:gap-6">
+      <a href="/status" class="beian-link">
+        <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
+        <span>运行状态</span>
+      </a>
       {SITE_CONFIG.icp.url && (
         <a href={SITE_CONFIG.icp.url} target="_blank" rel="noopener noreferrer" class="beian-link">
           <span>{SITE_CONFIG.icp.text}</span>

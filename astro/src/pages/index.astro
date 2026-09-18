@@ -9,6 +9,7 @@ import HotArticles from '../components/sidebar/HotArticles';
 import RecentComments from '../components/sidebar/RecentComments';
 import FriendLinks from '../components/sidebar/FriendLinks';
 import HomeSideNav from '../components/sidebar/HomeSideNav';
+import StatusMini from '../components/sidebar/StatusMini';
 import MagicBento from '../components/reactbits/MagicBento';
 import CountUp from '../components/reactbits/CountUp';
 import Carousel from '../components/reactbits/Carousel';
@@ -92,8 +93,15 @@ const [postsCount, tagsCount] = await Promise.all([
       </div>
     </section>
 
-    <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
-      <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">快速入口</h3>
+      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
+        <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">运行状态</h3>
+        <div class="mt-4">
+          <StatusMini client:visible />
+        </div>
+      </section>
+
+      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
+        <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">快速入口</h3>
       <div class="mt-4 grid gap-2">
         <HomeAuthQuickEntry client:visible />
         <a href="/about" class="side-link group flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 text-sm font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>关于博主</span><svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></a>
@@ -168,10 +176,10 @@ const [postsCount, tagsCount] = await Promise.all([
       </section>
       <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
         <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">站点状态</h3>
-        <div class="mt-4 space-y-3 text-sm text-zinc-500 dark:text-zinc-400">
-          <div class="flex items-center justify-between"><span>正常运行</span><span class="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_16px_rgba(16,185,129,0.6)]"></span></div>
-          <div class="flex items-center justify-between"><span>内容积累</span><span>{postsCount} / {tagsCount}</span></div>
+        <div class="mt-4">
+          <StatusMini client:visible />
         </div>
+        <p class="mt-4 text-sm leading-7 text-zinc-500 dark:text-zinc-400">内容积累 {postsCount} 篇文章 / {tagsCount} 个标签</p>
       </section>
     </div>
 

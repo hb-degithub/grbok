@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import MonitorDashboard from '../../../components/admin/MonitorDashboard';
+---
+
+<AdminLayout title="运行监控" requiredRole="admin">
+  <MonitorDashboard client:only="react" />
+</AdminLayout>

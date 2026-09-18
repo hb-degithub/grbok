@@ -1,0 +1,23 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ScrollReveal from '../components/ui/ScrollReveal';
+import StatusPanel from '../components/status/StatusPanel';
+---
+
+<BaseLayout title="运行状态" description="站点服务可用性、API 状态与你的访问延迟实时监测">
+  <section class="relative z-10 mx-auto w-full max-w-5xl px-5 py-16 sm:px-8 lg:px-10">
+    <div class="mb-10">
+      <ScrollReveal client:visible>
+        <div class="mb-4 flex items-center gap-3">
+          <span class="h-px w-8 bg-zinc-400 dark:bg-zinc-500"></span>
+          <span class="font-mono text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Status</span>
+        </div>
+        <h1 class="text-4xl font-black tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-5xl">运行状态</h1>
+        <p class="mt-3 max-w-xl text-zinc-500 dark:text-zinc-400">
+          站内探针每分钟对页面、API 与邮件网关做一次可达性采样，页面每 30 秒自动刷新；延迟卡片由你的浏览器实时实测。
+        </p>
+      </ScrollReveal>
+    </div>
+    <StatusPanel client:load />
+  </section>
+</BaseLayout>
