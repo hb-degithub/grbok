@@ -51,8 +51,12 @@ jobs:
         run: cd astro && npm run lint
 
       # 前端类型检查（astro check，覆盖 .astro 与 TS/TSX 文件）
+      # 注意:astro.config.mjs 对生产构建强制要求 PUBLIC_SITE_URL,与 Build 步同参
       - name: Check
         run: cd astro && npm run check
+        env:
+          PUBLIC_SITE_URL: https://blog.example.com
+          PUBLIC_POCKETBASE_URL: http://localhost:8090
 
       # 生产构建（前端静态产物），随后上传制品
       - name: Build

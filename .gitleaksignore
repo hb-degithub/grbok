@@ -1,0 +1,11 @@
+# gitleaks 豁免清单(按 fingerprint 精确豁免,2026-09-18 审计确认):
+# - 前 6 条:测试夹具/文档中的示例密钥与占位符(security-check.sh 中为示例比对值)
+# - 最后 1 条:.env.local 历史提交(3cc4954)中的 PB_ENCRYPTION_KEY 与当前生产值不同
+#   (2026-09-18 哈希比对确认),为早期模板值;若未来复用该值将重新触发告警
+db951b35780b15cda86268c846cce4c3d6b1091d:admin-auth/test/step-up-policy.test.mjs:generic-api-key:15
+db951b35780b15cda86268c846cce4c3d6b1091d:admin-auth/test/step-up-policy.test.mjs:generic-api-key:35
+e27695dc92cfced26512e0c3b864bd4a27578451:admin-auth/test/mail/request-auth.test.mjs:generic-api-key:10
+fc7f5080c339dea1760115b6176132502c80b5ef:docs/superpowers/plans/2026-07-16-admin-step-up-passkey-security.md:generic-api-key:56
+fc7f5080c339dea1760115b6176132502c80b5ef:docs/superpowers/plans/2026-07-16-admin-step-up-passkey-security.md:generic-api-key:67
+93514042a63c8f290c8d4db3ac116a4c176ebd69:security-check.sh:generic-api-key:38
+3cc495446880a4a62ba747c7f11fceaafb214347:.env.local:generic-api-key:24
