@@ -338,11 +338,16 @@ function totpConfirm(c) {
 // POST /api/blog-admin/totp/verify — step-up 验证（6 位码）
 // admin / super_admin 已绑定 TOTP 后均可调用验证并签发 step-up session。
 // 限流：锁定中与码错误统一返回 TOTP_CODE_INVALID，不泄露锁定状态。
+// 2026-09-18 修复:预期失败(锁定中/验证码错误)在事务内记录计数与审计后
+// 正常返回,提交后再抛错——原先在事务内直接 apiError 抛出,PB 回滚整个事务,
+// 失败计数与审计全部丢失,锁定机制形同虚设(爆破面)。
+// 意外错误(存储/解密故障)仍在事务内抛出:回滚并 fail-closed 拒绝。
 function totpVerify(c) {
   var user = requireAdmin(c, false);
   var input = body(c);
   var issued = null;
   var saved = null;
+  var failureCode = null;
   $app.dao().runInTransaction(function (txDao) {
     var nowMs = Date.now();
     var state = totpState(txDao, user.id);
@@ -356,7 +361,8 @@ function totpVerify(c) {
     }
     if (locked) {
       audit(c, txDao, user, 'ADMIN_TOTP_VERIFY_LOCKED', state.id, null, { locked: true });
-      apiError(400, 'TOTP_CODE_INVALID');
+      failureCode = 'TOTP_CODE_INVALID';
+      return;
     }
     var plainHex;
     try {
@@ -381,7 +387,8 @@ function totpVerify(c) {
       } else {
         audit(c, txDao, user, 'ADMIN_TOTP_VERIFY_FAILED', state.id, null, { ok: false });
       }
-      apiError(400, result.replay ? 'TOTP_CODE_REPLAYED' : 'TOTP_CODE_INVALID');
+      failureCode = result.replay ? 'TOTP_CODE_REPLAYED' : 'TOTP_CODE_INVALID';
+      return;
     }
     // 事务内更新防重放水线
     state.set('last_used_timestep', result.timestep);
@@ -390,6 +397,8 @@ function totpVerify(c) {
     saved = saveStepUpRecord(txDao, issued);
     audit(c, txDao, user, 'ADMIN_STEP_UP_VERIFIED', saved.id, null, { active: true, factor: 'totp' });
   });
+  // 事务已提交(失败计数与审计已落库),此处再返回统一错误
+  if (failureCode) apiError(400, failureCode);
   return c.json(200, { verified: true, credential: issued.credential, expiresAt: saved.getString('expires_at') });
 }
 

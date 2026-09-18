@@ -6,11 +6,12 @@ import {
   shouldClearRecoveryCodeAfterStatus,
 } from '../src/lib/admin-recovery-header.ts';
 
-test('recovery code header is limited to status, recovery options, and recovery verify', () => {
+test('recovery code header is limited to status and TOTP setup/confirm', () => {
+  // TOTP 时代(2026-09 替代 Passkey):一次性恢复码只允许随状态查询与绑定相关请求发出
   for (const path of [
     '/api/blog-admin/step-up/status',
-    '/api/blog-admin/passkeys/registration/options',
-    '/api/blog-admin/passkeys/registration/verify',
+    '/api/blog-admin/totp/setup',
+    '/api/blog-admin/totp/confirm',
   ]) {
     assert.equal(isAdminRecoveryHeaderPath(path), true, path);
   }
@@ -19,8 +20,10 @@ test('recovery code header is limited to status, recovery options, and recovery 
     '/api/blog-admin/step-up/options',
     '/api/blog-admin/step-up/verify',
     '/api/blog-admin/step-up/revoke',
+    '/api/blog-admin/totp/verify',
+    '/api/blog-admin/totp/revoke',
     '/api/blog-admin/passkeys',
-    '/api/blog-admin/passkeys/key/revoke',
+    '/api/blog-admin/passkeys/registration/options',
     '/api/collections/settings/records',
     '/api/collections/users/auth-refresh',
   ]) {

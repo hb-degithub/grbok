@@ -76,8 +76,28 @@ async function loadModule({ rateLimit, totpBehavior, auditRows, bucketRows }) {
       return [];
     },
     findCollectionByNameOrId() { return {}; },
-    saveRecord(record) { if (record === state) state.saved = true; },
-    runInTransaction(fn) { fn(dao); },
+    saveRecord(record) {
+      if (dao.failNextSave) { dao.failNextSave = false; throw new Error('storage down'); }
+      if (record === state) state.saved = true;
+    },
+    // 2026-09-18 修正:真实 PocketBase 在回调抛错时回滚整个事务。
+    // 旧替身"抛错也保留写入"掩盖了 totpVerify 预期失败路径的计数丢失 bug。
+    runInTransaction(fn) {
+      const bucketSnapshot = Array.from(rateLimit._dump(), ([k, v]) => [k, [...v]]);
+      const auditCount = auditRows.length;
+      const lastUsedSnapshot = state.lastUsed;
+      const savedSnapshot = state.saved;
+      try {
+        fn(dao);
+      } catch (error) {
+        rateLimit._reset();
+        for (const [k, v] of bucketSnapshot) rateLimit._dump().set(k, v);
+        auditRows.length = auditCount;
+        state.lastUsed = lastUsedSnapshot;
+        state.saved = savedSnapshot;
+        throw error;
+      }
+    },
   };
   const context = vm.createContext({
     module,
@@ -132,7 +152,7 @@ async function loadModule({ rateLimit, totpBehavior, auditRows, bucketRows }) {
     },
   });
   vm.runInContext(source, context, { filename: 'admin_totp_security.js' });
-  return { security: module.exports, state };
+  return { security: module.exports, state, dao };
 }
 
 function adminContext() {
@@ -246,4 +266,67 @@ test('totp verify lockout expires after the lockout window', async () => {
   } finally {
     Date.now = realDateNow;
   }
+});
+
+test('locked period rejects without computing the TOTP code', async () => {
+  const rateLimit = createRateLimitStub();
+  const auditRows = [];
+  let calculations = 0;
+  const { security } = await loadModule({
+    rateLimit,
+    auditRows,
+    totpBehavior: { verifyCode() { calculations++; return { ok: false, timestep: -1, replay: false }; } },
+  });
+  for (let i = 0; i < 5; i++) {
+    assert.throws(() => security.totpVerify(requestContext()), /TOTP_CODE_INVALID/);
+  }
+  assert.equal(calculations, 5, '前 5 次失败各验码一次');
+  // 锁定后:直接拒绝,不再调用 verifyCode
+  assert.throws(() => security.totpVerify(requestContext()), /TOTP_CODE_INVALID/);
+  assert.throws(() => security.totpVerify(requestContext()), /TOTP_CODE_INVALID/);
+  assert.equal(calculations, 5, '锁定期间不得再计算动态码');
+});
+
+test('replayed code is rejected with replay code and counted once', async () => {
+  const rateLimit = createRateLimitStub();
+  const auditRows = [];
+  const { security } = await loadModule({
+    rateLimit,
+    auditRows,
+    totpBehavior: { verifyCode() { return { ok: false, timestep: 42, replay: true }; } },
+  });
+  assert.throws(
+    () => security.totpVerify(requestContext()),
+    (error) => error && error.status === 400 && error.code === 'TOTP_CODE_REPLAYED',
+  );
+  assert.equal(auditRows.filter((row) => row.event.actionCode === 'ADMIN_TOTP_VERIFY_FAILED').length, 1);
+});
+
+test('unexpected storage failure rolls back and rejects', async () => {
+  const rateLimit = createRateLimitStub();
+  const auditRows = [];
+  const { security, state, dao } = await loadModule({
+    rateLimit,
+    auditRows,
+    totpBehavior: { verifyCode() { return { ok: true, timestep: 42, replay: false }; } },
+  });
+  // 成功路径上的状态保存抛错(模拟存储故障):整个事务应回滚,请求被拒绝
+  dao.failNextSave = true;
+  assert.throws(() => security.totpVerify(requestContext()));
+  assert.equal(state.saved, false, '存储故障不得写入状态');
+  assert.equal(state.lastUsed, -1, '存储故障不得推进防重放水线');
+  assert.equal(auditRows.length, 0, '存储故障不得写入审计');
+});
+
+test('unexpected crypto failure rolls back without consuming buckets', async () => {
+  const rateLimit = createRateLimitStub();
+  const auditRows = [];
+  const { security } = await loadModule({
+    rateLimit,
+    auditRows,
+    totpBehavior: { verifyCode() { throw new Error('crypto backend down'); } },
+  });
+  assert.throws(() => security.totpVerify(requestContext()));
+  assert.equal(auditRows.length, 0, '意外故障不得写入审计');
+  assert.equal(rateLimit._dump().size, 0, '意外故障不得消费限流桶');
 });
