@@ -1,8 +1,10 @@
 import { createHmac, randomUUID } from 'node:crypto';
+import { getStsCredentials } from './sts.mjs';
 
 const ENDPOINT = 'https://esa.cn-hangzhou.aliyuncs.com';
 const API_VERSION = '2024-09-10';
 const TIMEOUT_MS = 10_000;
+const SITE_DOMAIN = 'hlydwz.com';
 
 export const ESA_ERROR_CODES = Object.freeze([
   'ESA_NOT_CONFIGURED',
@@ -39,7 +41,7 @@ function canonicalizedQuery(params) {
     .join('&');
 }
 
-export function signRpcRequest({ accessKeyId, accessKeySecret, action, params, nonce, timestamp }) {
+export function signRpcRequest({ accessKeyId, accessKeySecret, securityToken, action, params, nonce, timestamp }) {
   const all = {
     Format: 'JSON',
     Version: API_VERSION,
@@ -51,6 +53,8 @@ export function signRpcRequest({ accessKeyId, accessKeySecret, action, params, n
     Action: action,
     ...params,
   };
+  // STS 临时凭据必须把 SecurityToken 纳入签名参数
+  if (securityToken) all.SecurityToken = securityToken;
   const query = canonicalizedQuery(all);
   const stringToSign = `POST&%2F&${percentEncode(query)}`;
   const signature = createHmac('sha1', `${accessKeySecret}&`).update(stringToSign, 'utf8').digest('base64');
@@ -63,19 +67,49 @@ function utcTimestamp(date = new Date()) {
 
 function validateCredentials(credentials) {
   if (!credentials || typeof credentials !== 'object' || Array.isArray(credentials)) {
-    throw new EsaError('ESA_NOT_CONFIGURED', false);
+    return null;
   }
   const { accessKeyId, accessKeySecret, siteId } = credentials;
-  if (typeof accessKeyId !== 'string' || accessKeyId.length === 0 || accessKeyId.length > 128) {
+  const akOk = typeof accessKeyId === 'string' && accessKeyId.length > 0 && accessKeyId.length <= 128;
+  const skOk = typeof accessKeySecret === 'string' && accessKeySecret.length > 0 && accessKeySecret.length <= 512;
+  // 手动配置存在但凭据本身无效:立即报配置错误,不静默回退(避免掩盖配置笔误)
+  if (!akOk || !skOk) throw new EsaError('ESA_NOT_CONFIGURED', false);
+  if (siteId !== undefined && siteId !== null && siteId !== 0 && (!Number.isSafeInteger(Number(siteId)) || Number(siteId) < 0)) {
     throw new EsaError('ESA_NOT_CONFIGURED', false);
   }
-  if (typeof accessKeySecret !== 'string' || accessKeySecret.length === 0 || accessKeySecret.length > 512) {
-    throw new EsaError('ESA_NOT_CONFIGURED', false);
-  }
-  if (!Number.isSafeInteger(siteId) || siteId <= 0) {
-    throw new EsaError('ESA_NOT_CONFIGURED', false);
-  }
-  return { accessKeyId, accessKeySecret, siteId };
+  const sid = Number(siteId) || 0;
+  if (sid < 0) throw new EsaError('ESA_NOT_CONFIGURED', false);
+  return { accessKeyId, accessKeySecret, siteId: sid };
+}
+
+// 凭据解析顺序:手动配置(后台缓存页) → ECS 实例 RAM 角色 STS(元数据服务)。
+// 两者皆无时报 ESA_NOT_CONFIGURED。
+let siteIdCache = 0;
+
+async function resolveCredentials(input) {
+  const manual = validateCredentials(input);
+  if (manual) return manual;
+  const sts = await getStsCredentials();
+  if (!sts) throw new EsaError('ESA_NOT_CONFIGURED', false);
+  return { ...sts, siteId: 0 };
+}
+
+async function resolveSiteId(credentials, explicitSiteId) {
+  if (explicitSiteId > 0) return explicitSiteId;
+  if (credentials.siteId > 0) return credentials.siteId;
+  if (siteIdCache > 0) return siteIdCache;
+  // 手动配置缺 siteId 或纯 STS 模式:用 ListSites 按主域名反查并缓存
+  const payload = await callRpcRaw({
+    credentials,
+    action: 'ListSites',
+    params: { PageSize: '50' },
+  });
+  const sites = Array.isArray(payload.Sites) ? payload.Sites : [];
+  const hit = sites.find((s) => String(s.SiteName || '') === SITE_DOMAIN) || sites[0];
+  const id = Number(hit && hit.SiteId);
+  if (!Number.isSafeInteger(id) || id <= 0) throw new EsaError('ESA_NOT_CONFIGURED', false);
+  siteIdCache = id;
+  return id;
 }
 
 function mapUpstreamError(status, body) {
@@ -93,13 +127,15 @@ function mapUpstreamError(status, body) {
   return new EsaError('ESA_UPSTREAM_ERROR', status >= 500, message || code || `HTTP ${status}`);
 }
 
-async function callRpc({ credentials, action, params }) {
-  const { accessKeyId, accessKeySecret, siteId } = validateCredentials(credentials);
+// 不解析 siteId 的原始 RPC 调用(供 resolveSiteId 自举用)
+async function callRpcRaw({ credentials, action, params }) {
+  const { accessKeyId, accessKeySecret, securityToken } = credentials;
   const { query, signature } = signRpcRequest({
     accessKeyId,
     accessKeySecret,
+    securityToken,
     action,
-    params: { SiteId: String(siteId), ...params },
+    params,
     nonce: randomUUID(),
     timestamp: utcTimestamp(),
   });
@@ -130,6 +166,16 @@ async function callRpc({ credentials, action, params }) {
     throw new EsaError('ESA_UPSTREAM_ERROR', true, 'empty response');
   }
   return payload;
+}
+
+async function callRpc({ credentials: input, action, params }) {
+  const credentials = await resolveCredentials(input);
+  const siteId = await resolveSiteId(credentials, Number(input && input.siteId) || 0);
+  return callRpcRaw({
+    credentials,
+    action,
+    params: { SiteId: String(siteId), ...params },
+  });
 }
 
 const VALID_PURGE_TYPES = new Set(['purgeall', 'file', 'directory']);

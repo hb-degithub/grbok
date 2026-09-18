@@ -99,10 +99,10 @@ function normalizeUrls(input) {
   return { files: files, directories: directories };
 }
 
+// 手动凭据可为空:admin-auth 侧会回退到 ECS 实例 RAM 角色的 STS 临时凭据
+// (2026-09-18 起,后台缓存页不再强制填写 AccessKey)
 function requireCredentials() {
-  var credentials = config.resolve($app.dao());
-  if (!credentials) throw error('ESA_NOT_CONFIGURED', 503);
-  return credentials;
+  return config.resolve($app.dao()) || null;
 }
 
 function writeTask(security, fields) {
