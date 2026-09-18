@@ -65,7 +65,9 @@ export default function ProtectionPanel() {
   }, [load]);
 
   const safeline = data?.safeline;
-  const hasNumbers = safeline && safeline.detected !== null && safeline.blocked !== null;
+  const detectedCount = safeline?.detected ?? null;
+  const blockedCount = safeline?.blocked ?? null;
+  const hasNumbers = safeline != null && detectedCount !== null && blockedCount !== null;
 
   return (
     <section className="rounded-2xl border border-zinc-200/70 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900/60">
@@ -106,12 +108,12 @@ export default function ProtectionPanel() {
         {!error && hasNumbers && (
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-4 text-center dark:border-zinc-800 dark:bg-zinc-950/40">
-              <p className="font-mono text-2xl font-bold tabular-nums text-zinc-900 dark:text-zinc-50">{safeline.detected}</p>
+              <p className="font-mono text-2xl font-bold tabular-nums text-zinc-900 dark:text-zinc-50">{detectedCount}</p>
               <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">检测记录</p>
             </div>
             <div className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-4 text-center dark:border-zinc-800 dark:bg-zinc-950/40">
-              <p className={cn('font-mono text-2xl font-bold tabular-nums', safeline.blocked > 0 ? 'text-red-500 dark:text-red-400' : 'text-zinc-900 dark:text-zinc-50')}>
-                {safeline.blocked}
+              <p className={cn('font-mono text-2xl font-bold tabular-nums', blockedCount > 0 ? 'text-red-500 dark:text-red-400' : 'text-zinc-900 dark:text-zinc-50')}>
+                {blockedCount}
               </p>
               <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">攻击拦截</p>
             </div>
