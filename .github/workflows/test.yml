@@ -102,7 +102,7 @@ jobs:
           target: /tmp/
 
       - name: Atomic sync & restart on server
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         env:
           PKG: ${{ runner.temp }}/dist_pkg.tar.gz
         with:
