@@ -1,0 +1,8 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import AiSettingsPanel from '../../../components/admin/AiSettingsPanel';
+---
+
+<AdminLayout title="AI 助手" description="AI 接入配置、文章生成与评论管家" requiredRole="super_admin">
+  <AiSettingsPanel client:only="react" />
+</AdminLayout>

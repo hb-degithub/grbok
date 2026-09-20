@@ -3,7 +3,9 @@ import { motion, type Variants } from 'framer-motion';
 import { useAdminComments, type CommentFilter } from '../../hooks/domains/useAdminComments';
 import { cn } from '../../lib/utils';
 import ConfirmDialog from '../ui/ConfirmDialog';
-import type { Comment } from '../../lib/services/adminCommentService';
+import { showToast } from '../ui/Toast';
+import { describePbError } from '../../lib/pb-error';
+import { adminCommentService, type Comment } from '../../lib/services/adminCommentService';
 
 const statusColors: Record<string, string> = {
   pending: 'bg-warning/15 text-warning border-warning/30',
@@ -12,7 +14,15 @@ const statusColors: Record<string, string> = {
 };
 
 const statusLabels: Record<string, string> = { pending: '待审核', approved: '已通过', spam: '垃圾评论' };
-const filterLabels: Record<CommentFilter, string> = { pending: '待审核', all: '全部', approved: '已通过', spam: '垃圾评论' };
+const filterLabels: Record<CommentFilter, string> = { pending: '待审核', all: '全部', approved: '已通过', spam: '垃圾评论', ai: 'AI 回复' };
+
+/** AI 审核结论徽章：approve=绿 / spam=红 / unsure=黄 / error=灰 */
+const verdictConfig: Record<string, { label: string; className: string }> = {
+  approve: { label: 'AI:通过', className: 'border-success/30 bg-success/10 text-success' },
+  spam: { label: 'AI:垃圾', className: 'border-danger/30 bg-danger/10 text-danger' },
+  unsure: { label: 'AI:存疑', className: 'border-warning/30 bg-warning/10 text-warning' },
+  error: { label: 'AI:失败', className: 'border-border bg-bg-soft text-muted' },
+};
 
 const listVariants: Variants = {
   hidden: { opacity: 1 },
@@ -30,7 +40,36 @@ function getPostTitle(comment: Comment) {
 export default function CommentModerator() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
-  const { comments, loading, filter, setFilter, query, setQuery, page, setPage, totalPages, updateStatus, deleteComment, batchUpdateStatus, batchDelete } = useAdminComments();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [savingContent, setSavingContent] = useState(false);
+  const { comments, loading, filter, setFilter, query, setQuery, page, setPage, totalPages, updateStatus, refresh, deleteComment, batchUpdateStatus, batchDelete } = useAdminComments();
+
+  const startEditContent = (comment: Comment) => {
+    setEditingId(comment.id);
+    setEditContent(comment.content);
+  };
+
+  const cancelEditContent = () => {
+    setEditingId(null);
+    setEditContent('');
+  };
+
+  const saveContent = async (id: string) => {
+    const next = editContent.trim();
+    if (!next || savingContent) return;
+    setSavingContent(true);
+    try {
+      await adminCommentService.updateContent(id, next);
+      showToast('已保存', 'success');
+      cancelEditContent();
+      void refresh();
+    } catch (err) {
+      showToast(describePbError(err, '保存失败'), 'error');
+    } finally {
+      setSavingContent(false);
+    }
+  };
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -72,7 +111,7 @@ export default function CommentModerator() {
     <div className="min-w-0 space-y-4">
       <section className="card max-w-full overflow-hidden rounded-md p-3 shadow-xs sm:p-4">
         <div className="flex flex-wrap items-center gap-2">
-          {(['pending', 'all', 'approved', 'spam'] as const).map((f) => (
+          {(['pending', 'all', 'approved', 'spam', 'ai'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -102,9 +141,32 @@ export default function CommentModerator() {
                     <span className="flex items-center gap-2"><input type="checkbox" checked={selectedIds.includes(comment.id)} onChange={() => toggleSelect(comment.id)} className="h-4 w-4 rounded border-border accent-accent" /> <span className="break-words text-sm font-semibold text-text [overflow-wrap:anywhere]">{comment.author_name}</span></span>
                     <span className="break-all font-mono text-[10px] text-muted">{comment.author_email}</span>
                     <span className={'rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase ' + (statusColors[comment.status] || '')}>{statusLabels[comment.status] || comment.status}</span>
+                    {comment.is_ai && <span className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 font-mono text-[10px] text-accent" title="由 AI 生成的回复">AI</span>}
+                    {comment.ai_verdict && verdictConfig[comment.ai_verdict] && (
+                      <span className="inline-flex min-w-0 flex-col gap-0.5">
+                        <span className={'w-fit rounded-md border px-2 py-0.5 font-mono text-[10px] ' + verdictConfig[comment.ai_verdict].className} title={comment.ai_reason || undefined}>{verdictConfig[comment.ai_verdict].label}</span>
+                        {comment.ai_reason && <span className="max-w-[220px] truncate text-[10px] text-muted" title={comment.ai_reason}>{comment.ai_reason}</span>}
+                      </span>
+                    )}
                             {riskHints(comment).map(hint => <span key={hint} className="rounded-md border border-warning/25 bg-warning/10 px-2 py-0.5 font-mono text-[10px] text-warning ml-1">{hint}</span>)}
                   </div>
-                  <p className="whitespace-pre-wrap break-words text-sm leading-6 text-text-secondary [overflow-wrap:anywhere]">{comment.content}</p>
+                  {editingId === comment.id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        rows={3}
+                        maxLength={2000}
+                        className="w-full rounded-md border border-border bg-bg-soft px-3 py-2 text-sm text-text outline-none transition focus:border-accent focus:bg-white"
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button onClick={() => saveContent(comment.id)} disabled={!editContent.trim() || savingContent} className="inline-flex h-8 items-center rounded-md border border-accent/30 bg-accent/10 px-3 text-xs text-accent transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-40">{savingContent ? '保存中…' : '保存'}</button>
+                        <button onClick={cancelEditContent} disabled={savingContent} className="inline-flex h-8 items-center rounded-md border border-border px-3 text-xs text-text-secondary transition-colors hover:border-border-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-40">取消</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-wrap break-words text-sm leading-6 text-text-secondary [overflow-wrap:anywhere]">{comment.content}</p>
+                  )}
                   <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-2 font-mono text-[10px] text-muted">
                     <span className="break-words [overflow-wrap:anywhere]">{new Date(comment.created).toLocaleString('zh-CN')}</span>
                     <span className="break-words [overflow-wrap:anywhere]">文章：{getPostTitle(comment)}</span>
@@ -116,6 +178,9 @@ export default function CommentModerator() {
                   </button>}
                   {comment.status !== 'spam' && <button onClick={() => updateStatus(comment.id, 'spam')} className="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-md border border-warning/25 bg-warning/10 px-3 text-xs text-warning hover:bg-warning/15" title="标记垃圾评论">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg><span className="max-lg:hidden">垃圾</span>
+                  </button>}
+                  {comment.is_ai && comment.status === 'pending' && editingId !== comment.id && <button onClick={() => startEditContent(comment)} className="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-md border border-accent/25 bg-accent/10 px-3 text-xs text-accent hover:bg-accent/15" title="编辑 AI 回复草稿">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg><span className="max-lg:hidden">编辑</span>
                   </button>}
                   <button onClick={() => handleDeleteComment(comment.id)} className="inline-flex min-h-10 min-w-10 items-center justify-center gap-2 rounded-md border border-danger/25 bg-danger/10 px-3 text-xs text-danger hover:bg-danger/15" title="删除">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg><span className="max-lg:hidden">删除</span>

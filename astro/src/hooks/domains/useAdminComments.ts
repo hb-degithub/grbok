@@ -44,6 +44,9 @@ export function useAdminComments() {
     }
   }, [filter, page, query, loadComments]);
 
+  /** 按当前筛选/页码/关键词重新拉取列表（供外部写入后刷新，如 AI 草稿正文保存） */
+  const refresh = useCallback(() => loadComments(filter, page, query), [loadComments, filter, page, query]);
+
   const batchUpdateStatus = useCallback(async (ids: string[], status: Comment['status']) => {
     try {
       await adminCommentService.batchUpdateStatus(ids, status);
@@ -89,6 +92,7 @@ export function useAdminComments() {
     setPage,
     totalPages,
     updateStatus,
+    refresh,
     deleteComment,
     batchUpdateStatus,
     batchDelete,

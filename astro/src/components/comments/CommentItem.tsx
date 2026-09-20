@@ -292,6 +292,14 @@ export default function CommentItem({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <p className="break-words font-medium text-zinc-900 dark:text-white">{comment.author_name}</p>
+                {comment.is_ai && (
+                  <span
+                    className="inline-flex shrink-0 items-center rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent"
+                    title="该回复由 AI 生成"
+                  >
+                    AI
+                  </span>
+                )}
                 {comment.author_level && <LevelBadge level={comment.author_level} size="sm" />}
               </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">

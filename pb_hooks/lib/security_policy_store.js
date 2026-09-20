@@ -33,6 +33,10 @@ var DEFAULTS = {
   comment_reply_notification: { limit: 60, windowSeconds: 60 },
   account_retention_notice: { limit: 10, windowSeconds: 60 },
   outbound_global: { limit: 60, windowSeconds: 60 },
+  // AI 写作助手：按管理员 actorId 计（ai_admin.js 的 subject = actorId）
+  ai_assist: { limit: 10, windowSeconds: 60 },
+  // AI 一键成文：单次生成 token 成本高，配额更紧、窗口更宽
+  ai_article: { limit: 5, windowSeconds: 300 },
 };
 
 var BOUNDS = {
@@ -64,6 +68,8 @@ var BOUNDS = {
   comment_reply_notification: { minLimit: 60, maxLimit: 60, minWindow: 60, maxWindow: 60 },
   account_retention_notice: { minLimit: 10, maxLimit: 10, minWindow: 60, maxWindow: 60 },
   outbound_global: { minLimit: 60, maxLimit: 60, minWindow: 60, maxWindow: 60 },
+  ai_assist: { minLimit: 5, maxLimit: 30, minWindow: 60, maxWindow: 300 },
+  ai_article: { minLimit: 2, maxLimit: 20, minWindow: 120, maxWindow: 1800 },
 };
 
 function coded(code, message) {

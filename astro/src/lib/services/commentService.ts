@@ -2,7 +2,7 @@ import { BaseService } from './baseService';
 import type { RecordModel } from 'pocketbase';
 import type { PublicComment, NestedComment, CommentFormData, CommentRealtimeEvent } from '../../types/pocketbase';
 
-const PUBLIC_COMMENT_FIELDS = 'id,post_id,author_name,content,parent_id,status,created,updated,likes,edited,edited_at,deleted,author_level';
+const PUBLIC_COMMENT_FIELDS = 'id,post_id,author_name,content,parent_id,status,created,updated,likes,edited,edited_at,deleted,author_level,is_ai';
 
 interface CommentRecord extends RecordModel {
   post_id: string;

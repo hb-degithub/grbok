@@ -29,6 +29,7 @@ const navItems: NavItem[] = [
   { href: '/admin/mail', label: '邮件中心', icon: 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', section: '系统', requiredRole: 'super_admin', hint: '邮件' },
   { href: '/admin/cache', label: '缓存管理', icon: 'M4 4v5h5M20 20v-5h-5M5.5 9A7.5 7.5 0 0118.36 6M18.5 15a7.5 7.5 0 01-12.86 3', section: '系统', requiredRole: 'super_admin', hint: 'ESA' },
   { href: '/admin/audit', label: '审计日志', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4', section: '系统', requiredRole: 'super_admin', hint: '操作记录' },
+  { href: '/admin/ai', label: 'AI 助手', icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z', section: '系统', requiredRole: 'super_admin', hint: 'AI' },
 ];
 
 const roleLabels: Record<AdminRole, string> = {

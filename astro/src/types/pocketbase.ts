@@ -64,6 +64,12 @@ export interface PublicComment {
   deleted?: boolean;
   /** 作者等级（1-5） */
   author_level?: number;
+  /** 该条评论由 AI 生成（前台显示 AI 徽标） */
+  is_ai?: boolean;
+  /** AI 审核结论：''|'approve'|'spam'|'unsure'|'error'（空=未审核，仅后台可见） */
+  ai_verdict?: string;
+  /** AI 审核理由（仅后台可见） */
+  ai_reason?: string;
   expand?: {
     post_id?: Post;
     parent_id?: PublicComment;

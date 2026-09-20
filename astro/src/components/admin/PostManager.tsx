@@ -1,13 +1,16 @@
-﻿import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useAdminPosts } from '../../hooks/domains/useAdminPosts';
+import { useAiAssist } from '../../hooks/domains/useAiAssist';
 import { cn } from '../../lib/utils';
 import { sanitizeHtml } from '../../lib/security';
 import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import MediaLibrary from './MediaLibrary';
+import AiArticleGenerator from './AiArticleGenerator';
 import { mediaService } from '../../lib/services/mediaService';
-import type { Post } from '../../lib/services/adminPostService';
+import { adminPostService, type Post } from '../../lib/services/adminPostService';
+import type { AssistMetaResult } from '../../lib/services/aiAssistService';
 
 type PostDraft = Omit<Post, 'id' | 'created' | 'updated' | 'author' | 'published_at' | 'views'> & { id?: string };
 type PostFilter = 'all' | 'published' | 'draft' | 'archived';
@@ -64,6 +67,7 @@ export default function PostManager() {
     allTags,
     selectedTagIds,
     setSelectedTagIds,
+    fetchPosts,
     updateStatus,
     deletePost,
     savePost,
@@ -72,6 +76,10 @@ export default function PostManager() {
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
   const [showMediaLibrary, setShowMediaLibrary] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
+  const [showAiGenerator, setShowAiGenerator] = useState(false);
+  const [metaResult, setMetaResult] = useState<AssistMetaResult | null>(null);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
+  const { assisting, runMeta, runPolish, runContinue } = useAiAssist();
 
   // 粘贴/拖拽图片到正文：上传到媒体库后在光标处插入 Markdown 图片语法。
   // 插入 1024x0 缩略图（白名单见 pb_migrations/20260912000000），原图不直接进正文。
@@ -141,6 +149,159 @@ export default function PostManager() {
     setShowMediaLibrary(false);
   };
 
+  // ---------- AI 辅助写作 ----------
+
+  const editingOpen = editing !== null;
+  useEffect(() => {
+    if (!editingOpen) setMetaResult(null);
+  }, [editingOpen]);
+
+  /** 回填单个字段并标记未保存（弹窗关闭时会清空 AI 建议） */
+  const patchEditing = (patch: Partial<Post>) => {
+    setEditing((prev) => (prev ? ({ ...prev, ...patch } as Post) : prev));
+    setDirty(true);
+  };
+
+  /** 在正文 [start, end) 区间写入 text；函数式更新避免覆盖异步等待期间的新输入 */
+  const replaceContentRange = (start: number, end: number, text: string) => {
+    setEditing((prev) => {
+      if (!prev) return prev;
+      const content = prev.content || '';
+      const from = Math.max(0, Math.min(start, content.length));
+      const to = Math.max(from, Math.min(end, content.length));
+      return { ...prev, content: content.slice(0, from) + text + content.slice(to) };
+    });
+    setDirty(true);
+  };
+
+  /** 取正文 textarea 当前选区（两个下标相等表示无选区） */
+  const readSelection = () => {
+    const el = contentRef.current;
+    const content = editing?.content || '';
+    const start = el?.selectionStart ?? 0;
+    const end = el?.selectionEnd ?? 0;
+    return { content, start, end, selected: end > start ? content.slice(start, end) : '' };
+  };
+
+  const handleAiMeta = async () => {
+    if (!editing) return;
+    if (!editing.title?.trim() && !editing.content?.trim()) {
+      showToast('请先填写标题或正文，AI 才能给出建议', 'error');
+      return;
+    }
+    try {
+      const result = await runMeta(editing.title || '', editing.content || '');
+      setMetaResult(result);
+      showToast('已生成标题与摘要建议，点击即可回填', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'AI 生成失败', 'error');
+    }
+  };
+
+  const handleAiPolish = async () => {
+    if (!editing) return;
+    const { start, end, selected } = readSelection();
+    if (!selected.trim()) {
+      showToast('请先在正文中选中要润色的文字', 'error');
+      return;
+    }
+    try {
+      const { text } = await runPolish(selected);
+      replaceContentRange(start, end, text);
+      showToast('已用 AI 润色结果替换选中文字', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'AI 润色失败', 'error');
+    }
+  };
+
+  const handleAiContinue = async () => {
+    if (!editing) return;
+    const { content, start, end, selected } = readSelection();
+    if (!content.trim()) {
+      showToast('请先填写正文内容，AI 才能续写', 'error');
+      return;
+    }
+    const hasSelection = !!contentRef.current && end > start;
+    // 有选区时以选区为锚点，否则用文末 200 字作为上下文
+    const anchor = hasSelection ? selected : content.slice(-200);
+    try {
+      const { text } = await runContinue(content, anchor);
+      // 有选区插到选区之后，无选区追加到文末
+      const at = hasSelection ? end : content.length;
+      replaceContentRange(at, at, text);
+      showToast('已插入 AI 续写内容', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'AI 续写失败', 'error');
+    }
+  };
+
+  const handleApplyTitle = (title: string) => {
+    patchEditing({ title });
+    showToast('已回填标题', 'success');
+  };
+
+  const applyExcerpt = (excerpt: string) => {
+    patchEditing({ excerpt });
+    showToast('已回填摘要', 'success');
+  };
+
+  const handleApplyExcerpt = () => {
+    const excerpt = metaResult?.excerpt || '';
+    if (!excerpt) return;
+    // 已有内容时先确认，避免覆盖人工撰写的结果
+    if ((editing?.excerpt || '').trim()) {
+      setConfirmState({
+        open: true,
+        title: '覆盖摘要',
+        message: '摘要已有内容，确定用 AI 建议覆盖吗？',
+        onConfirm: () => applyExcerpt(excerpt),
+      });
+      return;
+    }
+    applyExcerpt(excerpt);
+  };
+
+  // 按 name 忽略大小写匹配现有标签，命中的并入已选标签（不改动未命中的项）
+  const handleApplyTags = () => {
+    const names = metaResult?.tag_names || [];
+    if (names.length === 0) return;
+    const normalized = names.map((name) => name.trim().toLowerCase());
+    const matched = allTags.filter((tag) => normalized.includes(tag.name.trim().toLowerCase()));
+    if (matched.length === 0) {
+      showToast('AI 建议的标签未匹配到现有标签', 'info');
+      return;
+    }
+    const toAdd = matched.filter((tag) => !selectedTagIds.includes(tag.id)).map((tag) => tag.id);
+    if (toAdd.length === 0) {
+      showToast('AI 建议的标签已在选中列表中', 'info');
+      return;
+    }
+    setSelectedTagIds([...selectedTagIds, ...toAdd]);
+    setDirty(true);
+    showToast(`已并入 ${toAdd.length} 个标签`, 'success');
+  };
+
+  const handleApplySeoDescription = () => {
+    const seoDescription = metaResult?.seo_description || '';
+    if (!seoDescription) return;
+    patchEditing({ seo_description: seoDescription });
+    showToast('已回填 SEO 描述', 'success');
+  };
+
+  // AI 生成成功后按 id 取回完整文章（含正文）打开编辑弹窗供人工审阅；
+  // 取回失败则仅刷新列表，文章已在服务端落库，不会丢。
+  const handleAiCreated = async (created: { id: string }) => {
+    try {
+      const full = await adminPostService.getPostById(created.id);
+      setEditing(full);
+      setDirty(false);
+    } catch (err) {
+      console.error('获取 AI 生成文章失败:', err);
+      showToast('文章已生成，正在刷新列表', 'warning');
+      fetchPosts();
+    }
+  };
+
   const filteredPosts = useMemo(() => {
     return posts;
   }, [posts]);
@@ -176,6 +337,13 @@ export default function PostManager() {
             />
             <button onClick={handleNew} className="btn-primary min-h-10 px-4 text-xs">
               + 新建文章
+            </button>
+            <button
+              onClick={() => setShowAiGenerator(true)}
+              className="btn-ghost min-h-10 px-4 text-xs"
+              title="用 AI 依据主题与大纲生成草稿"
+            >
+              ✨ AI 生成
             </button>
           </div>
         </div>
@@ -299,6 +467,111 @@ export default function PostManager() {
               <h2 className="mb-6 break-words font-display text-lg font-bold uppercase tracking-wide text-text [overflow-wrap:anywhere]">
                 {editing.id ? '编辑文章' : '新建文章'}
               </h2>
+
+              {/* AI 工具条：三个动作共用 assisting 状态防重入 */}
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-muted">AI</span>
+                <button
+                  onClick={handleAiMeta}
+                  disabled={assisting !== null}
+                  className="btn-ghost min-h-8 px-3 text-xs disabled:opacity-50"
+                >
+                  {assisting === 'meta' ? '生成中…' : 'AI 标题/摘要/标签'}
+                </button>
+                <button
+                  onClick={handleAiPolish}
+                  disabled={assisting !== null}
+                  className="btn-ghost min-h-8 px-3 text-xs disabled:opacity-50"
+                >
+                  {assisting === 'polish' ? '生成中…' : 'AI 润色'}
+                </button>
+                <button
+                  onClick={handleAiContinue}
+                  disabled={assisting !== null}
+                  className="btn-ghost min-h-8 px-3 text-xs disabled:opacity-50"
+                >
+                  {assisting === 'continue' ? '生成中…' : 'AI 续写'}
+                </button>
+              </div>
+
+              {metaResult && (
+                <div className="mb-4 space-y-3 rounded-lg border border-accent/25 bg-accent/5 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-accent">AI 建议</span>
+                    <button
+                      onClick={() => setMetaResult(null)}
+                      className="min-h-8 rounded-md px-2 text-xs text-text-secondary hover:bg-accent/10"
+                    >
+                      收起
+                    </button>
+                  </div>
+
+                  {metaResult.titles.length > 0 && (
+                    <div>
+                      <div className="mb-1.5 text-xs text-text-secondary">候选标题（点击回填）</div>
+                      <div className="flex flex-wrap gap-2">
+                        {metaResult.titles.map((title, i) => (
+                          <button
+                            key={`${i}-${title}`}
+                            onClick={() => handleApplyTitle(title)}
+                            className="rounded-md border border-border bg-bg-soft px-3 py-1.5 text-left text-xs text-text hover:border-accent hover:text-accent"
+                          >
+                            {title}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {metaResult.excerpt && (
+                    <div>
+                      <div className="mb-1.5 text-xs text-text-secondary">摘要</div>
+                      <p className="text-xs leading-5 text-text">{metaResult.excerpt}</p>
+                      <button
+                        onClick={handleApplyExcerpt}
+                        className="btn-ghost mt-2 min-h-8 px-3 text-xs"
+                      >
+                        回填摘要
+                      </button>
+                    </div>
+                  )}
+
+                  {metaResult.tag_names.length > 0 && (
+                    <div>
+                      <div className="mb-1.5 text-xs text-text-secondary">建议标签</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {metaResult.tag_names.map((name, i) => (
+                          <span
+                            key={`${i}-${name}`}
+                            className="rounded-full bg-bg-soft px-2.5 py-0.5 text-xs text-text-secondary"
+                          >
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                      <button
+                        onClick={handleApplyTags}
+                        className="btn-ghost mt-2 min-h-8 px-3 text-xs"
+                      >
+                        并入已选标签
+                      </button>
+                    </div>
+                  )}
+
+                  {metaResult.seo_description && (
+                    <div>
+                      <div className="mb-1.5 text-xs text-text-secondary">SEO 描述</div>
+                      <p className="text-xs leading-5 text-text">{metaResult.seo_description}</p>
+                      <button
+                        onClick={handleApplySeoDescription}
+                        className="btn-ghost mt-2 min-h-8 px-3 text-xs"
+                      >
+                        回填 SEO 描述
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-4">
@@ -413,6 +686,7 @@ export default function PostManager() {
               <div className="mt-4">
                 <label className="mb-1.5 block font-mono text-xs uppercase tracking-widest text-text-secondary">内容</label>
                 <textarea
+                  ref={contentRef}
                   value={editing.content || ''}
                   onChange={(e) => { setEditing({ ...editing, content: e.target.value }); setDirty(true); }}
                   onPaste={(e) => {
@@ -479,6 +753,12 @@ export default function PostManager() {
         danger
         onConfirm={() => { confirmState.onConfirm(); setConfirmState(s => ({ ...s, open: false })); }}
         onCancel={() => setConfirmState(s => ({ ...s, open: false }))}
+      />
+
+      <AiArticleGenerator
+        open={showAiGenerator}
+        onClose={() => setShowAiGenerator(false)}
+        onCreated={handleAiCreated}
       />
     </div>
   );
