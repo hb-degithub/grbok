@@ -6,6 +6,7 @@
 // consume(policyKey, subject) API（基于 security_rate_buckets 集合）。
 const MAX_ATTEMPTS_PER_IP = 10;      // 同一IP 15分钟内最多10次
 const MAX_ATTEMPTS_PER_EMAIL = 5;    // 同一邮箱 15分钟内最多5次
+const MAX_ATTEMPTS_PER_EMAIL_ANY_IP = 30; // 同一邮箱跨IP汇总 15分钟内最多30次（2026-09-20）
 const WINDOW_MS = 15 * 60 * 1000;    // 15分钟窗口
 const LOCKOUT_THRESHOLD = 5;         // 连续失败5次锁定
 const LOCKOUT_MS = 15 * 60 * 1000;   // 锁定15分钟
@@ -118,6 +119,12 @@ function checkAndRecord(e) {
   if (emailIp && !rateLimit('login:emailip:' + emailIp, MAX_ATTEMPTS_PER_EMAIL)) {
     throw new BadRequestError('登录尝试过于频繁，请15分钟后再试');
   }
+  // 2026-09-20 审计：直连源站路径可伪造 ali-real-client-ip 轮换 IP 绕过 per-IP 限流
+  // （密码喷洒面）。增加跨 IP 按邮箱聚合的兜底窗口：滑窗限速（非锁定态），正常用户
+  // 等窗口滑动即可重试；攻击者对单邮箱每 15 分钟至多 30 次尝试。
+  if (email && !rateLimit('login:emailany:' + email, MAX_ATTEMPTS_PER_EMAIL_ANY_IP)) {
+    throw new BadRequestError('登录尝试过于频繁，请15分钟后再试');
+  }
 
   if (typeof e.next === 'function') e.next();
 }
@@ -132,6 +139,7 @@ function clearAttempts(e) {
   if (email) {
     delete loginRateBuckets['login:emailip:' + email + '|' + ip];
     clearFailure('login:lock:emailip:' + email + '|' + ip);
+    delete loginRateBuckets['login:emailany:' + email];
   }
   if (typeof e.next === 'function') e.next();
 }

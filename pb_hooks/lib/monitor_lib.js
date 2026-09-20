@@ -162,7 +162,9 @@ function latestHostSample(dao) {
   return rows && rows.length ? rows[0] : null;
 }
 
-// 公开的主机快照:仅百分比与速率,不含绝对容量(脱敏)
+// 公开的主机快照:仅百分比与速率,不含绝对容量与规格(脱敏)。
+// 2026-09-20 审计:cpuCores/memTotalMb 曾对外暴露主机规格(与脱敏口径矛盾),已移除;
+// 规格仅保留在后台接口 getAdminHostSeries(需 admin 角色)。
 function publicHostSnapshot(dao) {
   var s = null;
   try { s = latestHostSample(dao); } catch (_) {}
@@ -174,8 +176,6 @@ function publicHostSnapshot(dao) {
     rxKbps: Math.round(s.get('net_rx_kbps')),
     txKbps: Math.round(s.get('net_tx_kbps')),
     load1: Math.round(s.get('load1') * 100) / 100,
-    cpuCores: s.getInt('cpu_cores') || null,
-    memTotalMb: Math.round(s.get('mem_total_mb')) || null,
     at: s.getString('created'),
   };
 }
@@ -266,8 +266,27 @@ function getPublicStatus(e) {
   }
 }
 
+// PB 0.22 的 routerAdd 自定义路由不会填充 e.auth（恒为 null），
+// 鉴权记录要从请求上下文回退链读取（2026-09-19 生产实测：裸读 e.auth
+// 导致监控后台接口全员 403，protection_lib 经本函数同受影响）。
+function resolveAuth(e) {
+  try {
+    if (e.auth && e.auth.id) return e.auth;
+  } catch (_) {}
+  try {
+    var info = $apis.requestInfo(e);
+    if (info && info.auth && info.auth.id) return info.auth;
+    if (info && info.authRecord && info.authRecord.id) return info.authRecord;
+  } catch (_) {}
+  try {
+    var record = e.get('authRecord') || e.get('auth');
+    if (record && record.id) return record;
+  } catch (_) {}
+  return null;
+}
+
 function requireMonitorAdmin(e) {
-  var auth = e.auth;
+  var auth = resolveAuth(e);
   if (!auth || !auth.id) return null;
   var role = auth.getString('role');
   if (role !== 'admin' && role !== 'super_admin') return null;
