@@ -7,6 +7,9 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:${CADDY_HTTP_PORT:-18080}:80"
+      # 管理通道：PB 原生后台/超管 API 专用（Caddyfile :8080 块），仅宿主机/SSH 隧道可达。
+      # 公网 80 上这些路径已无条件 404（2026-09-20 审计修复：头伪造与网关源 IP 均不可作判据）。
+      - "127.0.0.1:18081:8080"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./astro/dist:/srv:ro
@@ -114,7 +117,10 @@ services:
         max-file: "3"
 
   pocketbase:
-    image: ghcr.io/muchobien/pocketbase:0.22.21
+    # 2026-09-20 安全升级：0.22.21 → 0.22.48（CVE-2026-82410 panic-DoS 修复于 0.22.48，
+    # GHSA-pq7p-mc74-g65w OAuth2 预劫持修复于 0.22.42）。muchobien 镜像线止于 0.22.32，
+    # 故用官方 release 二进制自建等价镜像：bash scripts/build-pb-image.sh 0.22.48
+    image: pocketbase:0.22.48-hlydwz
     container_name: blog-pocketbase
     restart: unless-stopped
     volumes:
