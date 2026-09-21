@@ -7,7 +7,7 @@
 //
 // 鉴权：先 requireTrustedAdminIp（lib/ai_admin.js 内复制 mail_admin.js:17-22 的实现），
 // 再 admin_step_up.requireAdminStepUp。settings/test 用 super_admin + 邮箱已验证；
-// article/assist 允许 author 角色（step-up 本身已限制 role ∈ author/admin/super_admin）。
+// article/assist/comments.* 允许 author/admin 角色（step-up 本身已限制 role ∈ author/admin/super_admin）。
 //
 // 限流：ai_assist / ai_article 两把策略键在 lib/security_policy_store.js 的
 // DEFAULTS/BOUNDS 与 20260921000300_add_ai_rate_policies.pb.js 迁移中双侧注册。
@@ -36,4 +36,15 @@ routerAdd('POST', '/api/blog-admin/ai/article', function (c) {
 routerAdd('POST', '/api/blog-admin/ai/assist', function (c) {
   return require(__hooks + '/lib/ai_admin.js').assist(c);
 }, $apis.bodyLimit(65536));
+
+// POST /api/blog-admin/ai/comments/moderate — 评论审核页手动触发单条 AI 审核
+routerAdd('POST', '/api/blog-admin/ai/comments/moderate', function (c) {
+  return require(__hooks + '/lib/ai_admin.js').moderateComment(c);
+}, $apis.bodyLimit(8192));
+
+// POST /api/blog-admin/ai/comments/reply — 评论审核页手动触发单条 AI 回复
+routerAdd('POST', '/api/blog-admin/ai/comments/reply', function (c) {
+  return require(__hooks + '/lib/ai_admin.js').replyComment(c);
+}, $apis.bodyLimit(8192));
+
 })();

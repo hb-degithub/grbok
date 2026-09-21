@@ -46,6 +46,8 @@ export interface AssistTextResult {
 
 const ARTICLE_PATH = '/api/blog-admin/ai/article';
 const ASSIST_PATH = '/api/blog-admin/ai/assist';
+const COMMENT_MODERATE_PATH = '/api/blog-admin/ai/comments/moderate';
+const COMMENT_REPLY_PATH = '/api/blog-admin/ai/comments/reply';
 
 /** 后端稳定错误码（lib/ai_client.js，前缀 AI_）→ 用户可读文案 */
 const AI_ERROR_MESSAGES: Record<string, string> = {
@@ -149,4 +151,48 @@ function readText(data: Partial<AssistTextResult> | undefined): AssistTextResult
   const text = asString(data?.text);
   if (!text.trim()) throw new Error('AI 未返回有效内容，请重试');
   return { text };
+}
+
+/** 单条评论 AI 审核结果（评论审核页手动触发） */
+export interface CommentModerateResult {
+  verdict: 'approve' | 'spam' | 'unsure' | 'error' | 'skipped' | string;
+  reason: string;
+  status: string;
+}
+
+/** 单条评论 AI 回复触发结果 */
+export interface CommentReplyResult {
+  outcome: 'created' | 'skipped' | 'failed' | string;
+  reason: string;
+  replyId: string;
+  status: string;
+}
+
+/** 评论审核页行内按钮：对待审核评论立即执行 AI 审核（含显式重审） */
+export async function moderateComment(commentId: string): Promise<CommentModerateResult> {
+  const data = await sendAi<Partial<CommentModerateResult>>(
+    COMMENT_MODERATE_PATH,
+    { commentId },
+    'AI 审核失败',
+  );
+  return {
+    verdict: asString(data?.verdict) || 'error',
+    reason: asString(data?.reason),
+    status: asString(data?.status),
+  };
+}
+
+/** 评论审核页行内按钮：对已通过评论立即生成 AI 回复（草稿或按模式直发） */
+export async function replyComment(commentId: string): Promise<CommentReplyResult> {
+  const data = await sendAi<Partial<CommentReplyResult>>(
+    COMMENT_REPLY_PATH,
+    { commentId },
+    'AI 回复失败',
+  );
+  return {
+    outcome: asString(data?.outcome) || 'failed',
+    reason: asString(data?.reason),
+    replyId: asString(data?.replyId),
+    status: asString(data?.status),
+  };
 }

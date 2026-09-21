@@ -103,50 +103,62 @@ function processModeration(cfg, stats) {
   ) || [];
 
   for (var i = 0; i < pending.length; i++) {
-    var comment = pending[i];
-    // 查询与处理之间状态可能已变（管理员已审 / 已处理），跳过避免重复调用 AI
-    if (comment.get('status') !== 'pending' || comment.getBool('ai_moderated')) continue;
-
-    var post = findOrNull('posts', comment.getString('post_id'));
-    var title = post ? post.getString('title') : '';
-    var verdict = 'unsure';
-    var reason = '';
-    var failed = false;
-
     try {
-      var result = aiClient.chatJson({
-        config: cfg,
-        maxTokens: 300,
-        temperature: 0,
-        system: MODERATION_SYSTEM,
-        user: '文章标题：' + title +
-          '\n评论内容：' + String(comment.getString('content') || '').slice(0, MODERATION_CONTENT_MAX),
-      });
-      var data = (result && result.data) || {};
-      var rawVerdict = String(data.verdict == null ? '' : data.verdict).trim().toLowerCase();
-      // 模型输出越界一律按 unsure（由人工复核），不盲目放行
-      if (rawVerdict === 'approve' || rawVerdict === 'spam' || rawVerdict === 'unsure') verdict = rawVerdict;
-      reason = stripTags(data.reason == null ? '' : data.reason).trim();
+      moderateOne(cfg, pending[i], stats);
     } catch (error) {
-      // 失败标记为 error 转人工：绝不能留 ai_moderated=false，否则每分钟重试烧钱
-      failed = true;
-      verdict = 'error';
-      reason = 'AI 调用失败: ' + errorCode(error);
+      console.log('[ai-comment-worker] moderation item error: ' + String((error && error.message) || error).slice(0, 200) + ' comment=' + pending[i].id);
       stats.errors++;
-      console.log('[ai-comment-worker] moderation failed: ' + errorCode(error) + ' comment=' + comment.id);
     }
-
-    comment.set('ai_moderated', true);
-    comment.set('ai_verdict', verdict);
-    comment.set('ai_reason', String(reason || '').slice(0, REASON_MAX));
-    if (!failed && isAutoMode(cfg.commentMode)) {
-      if (verdict === 'approve') comment.set('status', 'approved');
-      else if (verdict === 'spam') comment.set('status', 'spam');
-      // unsure 保持 pending，交人工
-    }
-    dao.saveRecord(comment);
-    if (!failed) stats.moderated++;
   }
+}
+
+// 单条审核（cron 批量与 ai_admin 手动触发共用）。返回 verdict：
+// 'approve'|'spam'|'unsure'|'error'|'skipped'（状态已变无需处理）。
+function moderateOne(cfg, comment, stats) {
+  // 查询与处理之间状态可能已变（管理员已审 / 已处理），跳过避免重复调用 AI
+  if (comment.get('status') !== 'pending' || comment.getBool('ai_moderated')) return 'skipped';
+
+  var dao = $app.dao();
+  var post = findOrNull('posts', comment.getString('post_id'));
+  var title = post ? post.getString('title') : '';
+  var verdict = 'unsure';
+  var reason = '';
+  var failed = false;
+
+  try {
+    var result = aiClient.chatJson({
+      config: cfg,
+      maxTokens: 300,
+      temperature: 0,
+      system: MODERATION_SYSTEM,
+      user: '文章标题：' + title +
+        '\n评论内容：' + String(comment.getString('content') || '').slice(0, MODERATION_CONTENT_MAX),
+    });
+    var data = (result && result.data) || {};
+    var rawVerdict = String(data.verdict == null ? '' : data.verdict).trim().toLowerCase();
+    // 模型输出越界一律按 unsure（由人工复核），不盲目放行
+    if (rawVerdict === 'approve' || rawVerdict === 'spam' || rawVerdict === 'unsure') verdict = rawVerdict;
+    reason = stripTags(data.reason == null ? '' : data.reason).trim();
+  } catch (error) {
+    // 失败标记为 error 转人工：绝不能留 ai_moderated=false，否则每分钟重试烧钱
+    failed = true;
+    verdict = 'error';
+    reason = 'AI 调用失败: ' + errorCode(error);
+    stats.errors++;
+    console.log('[ai-comment-worker] moderation failed: ' + errorCode(error) + ' comment=' + comment.id);
+  }
+
+  comment.set('ai_moderated', true);
+  comment.set('ai_verdict', verdict);
+  comment.set('ai_reason', String(reason || '').slice(0, REASON_MAX));
+  if (!failed && isAutoMode(cfg.commentMode)) {
+    if (verdict === 'approve') comment.set('status', 'approved');
+    else if (verdict === 'spam') comment.set('status', 'spam');
+    // unsure 保持 pending，交人工
+  }
+  dao.saveRecord(comment);
+  if (!failed) stats.moderated++;
+  return verdict;
 }
 
 // ---------- 回复 ----------
@@ -172,20 +184,27 @@ function processReplies(cfg, stats) {
   }
 }
 
+// 单条回复处理（cron 批量与 ai_admin 手动触发共用；cutoffMs 传 -1 可绕过 backlog 守卫
+// ——管理员显式触发视为明确意图）。返回 { outcome, reason?, replyId?, status? }：
+//   created          —— 已生成回复（replyId/status 附带）
+//   skipped:<reason> —— 命中跳过条件（backlog/missing-post/post-author/existing-ai-child/ai-ancestor/depth-limit/state）
+//   failed:<code>    —— AI 调用失败或产出为空
 function processOneReply(dao, cfg, comment, stats, cutoffMs) {
-  if (comment.get('status') !== 'approved' || comment.getBool('is_ai') || comment.getBool('ai_replied')) return;
+  if (comment.get('status') !== 'approved' || comment.getBool('is_ai') || comment.getBool('ai_replied')) {
+    return { outcome: 'skipped', reason: 'state' };
+  }
 
   // 防历史 backlog 洪水：只回复最近 72 小时内的评论，更旧的直接标记跳过
   var createdMs = dateMs(comment.get('created'));
   if (!isFinite(createdMs) || createdMs < cutoffMs) {
     markHandled(dao, comment, 'backlog');
-    return;
+    return { outcome: 'skipped', reason: 'backlog' };
   }
 
   var post = findOrNull('posts', comment.getString('post_id'));
   if (!post) {
     markHandled(dao, comment, 'missing-post');
-    return;
+    return { outcome: 'skipped', reason: 'missing-post' };
   }
 
   // 1. 评论者就是文章作者本人
@@ -193,24 +212,24 @@ function processOneReply(dao, cfg, comment, stats, cutoffMs) {
   var postAuthorId = String(post.getString('author') || '');
   if (authorUserId && postAuthorId && authorUserId === postAuthorId) {
     markHandled(dao, comment, 'post-author');
-    return;
+    return { outcome: 'skipped', reason: 'post-author' };
   }
 
   // 2. 该评论下已有 AI 子评论（回复可能已生成但父标记未落库，防重复）
   if (hasAiChild(dao, comment.id)) {
     markHandled(dao, comment, 'existing-ai-child');
-    return;
+    return { outcome: 'skipped', reason: 'existing-ai-child' };
   }
 
   // 3./4. 父链检查：AI↔AI 循环防护 + 嵌套深度
   var scan = ancestorScan(dao, comment);
   if (scan.hasAi) {
     markHandled(dao, comment, 'ai-ancestor');
-    return;
+    return { outcome: 'skipped', reason: 'ai-ancestor' };
   }
   if (scan.depth >= MAX_NESTING_DEPTH) {
     markHandled(dao, comment, 'depth-limit');
-    return;
+    return { outcome: 'skipped', reason: 'depth-limit' };
   }
 
   var title = post.getString('title');
@@ -234,14 +253,15 @@ function processOneReply(dao, cfg, comment, stats, cutoffMs) {
     text = stripTags((result && result.content) || '').trim().slice(0, REPLY_TEXT_MAX);
   } catch (error) {
     console.log('[ai-comment-worker] reply generation failed: ' + errorCode(error) + ' comment=' + comment.id);
-    failReply(dao, comment, errorCode(error), stats, true);
-    return;
+    var code = errorCode(error);
+    failReply(dao, comment, code, stats, true);
+    return { outcome: 'failed', reason: code };
   }
   if (!text) {
     // 清洗后为空（例如模型只输出了 HTML 标记）视为失败
     console.log('[ai-comment-worker] reply generation empty: comment=' + comment.id);
     failReply(dao, comment, 'AI_EMPTY_REPLY', stats, true);
-    return;
+    return { outcome: 'failed', reason: 'AI_EMPTY_REPLY' };
   }
 
   var reply = createReply(dao, cfg, comment, text);
@@ -251,6 +271,7 @@ function processOneReply(dao, cfg, comment, stats, cutoffMs) {
 
   // full_auto 回复直接发出 → 补发给被回复者的通知（通知失败不影响回复本身）
   if (cfg.commentMode === 'full_auto') notifyReplyAuthor(dao, comment, reply, post);
+  return { outcome: 'created', replyId: reply.id, status: reply.getString('status') };
 }
 
 function hasAiChild(dao, commentId) {
@@ -362,10 +383,11 @@ function notifyReplyAuthor(dao, comment, reply, post) {
 
 module.exports = {
   run: run,
+  moderateOne: moderateOne,
+  processOneReply: processOneReply,
   _internal: {
     processModeration: processModeration,
     processReplies: processReplies,
-    processOneReply: processOneReply,
     ancestorScan: ancestorScan,
     hasAiChild: hasAiChild,
     createReply: createReply,

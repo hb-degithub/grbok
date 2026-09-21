@@ -17,6 +17,7 @@ var aiConfig = require('./ai_config.js');
 var aiClient = require('./ai_client.js');
 var stepUp = require('./admin_step_up.js');
 var rateLimit = require('./security_rate_limit.js');
+var commentWorker = require('./ai_comment_worker.js');
 
 var ADMIN_ROLES = ['author', 'admin', 'super_admin'];
 
@@ -360,6 +361,7 @@ function generateArticle(c) {
     post.set('seo_title', '');
     post.set('seo_description', seoDescription);
     post.set('seo_keywords', '');
+    post.set('is_ai', true);
     txDao.saveRecord(post);
     postId = post.id;
     attachExistingTags(txDao, postId, tagNames);
@@ -444,10 +446,78 @@ function assist(c) {
   apiError(400, 'INVALID_REQUEST');
 }
 
+// ---------- 评论单条手动触发（评论审核页行内按钮；复用 worker 单条逻辑） ----------
+// 与 cron 批量的差异：管理员显式点击视为明确意图 —— 重审允许清除旧结论重跑，
+// 回复绕过 72h backlog 守卫；其余跳过条件（已有 AI 子回复/父链 AI/深度）仍生效。
+function loadCommentOr404(id) {
+  var comment = null;
+  try { comment = $app.dao().findRecordById('comments', id); } catch (_) {}
+  if (!comment) apiError(404, 'COMMENT_NOT_FOUND');
+  return comment;
+}
+
+function requireAiConfigured() {
+  var cfg = aiConfig.resolve($app.dao());
+  if (!cfg) apiError(400, 'AI_NOT_CONFIGURED');
+  return cfg;
+}
+
+// POST /api/blog-admin/ai/comments/moderate —— 对 pending 评论立即执行 AI 审核
+function moderateComment(c) {
+  var secure = requireAdminSecure(c);
+  var input = readBody(c, 8193);
+  consumeQuota('ai_assist', secure.actorId);
+
+  var id = text(input.commentId || input.comment_id, 64);
+  if (!id) apiError(400, 'INVALID_REQUEST');
+  var cfg = requireAiConfigured();
+  var comment = loadCommentOr404(id);
+
+  if (comment.getString('status') !== 'pending') apiError(400, 'INVALID_STATE: 仅待审核评论可执行 AI 审核');
+  // 显式重审：清除旧标记让 worker 重跑（按钮只在已有结论时显示为"重审"）
+  comment.set('ai_moderated', false);
+
+  var stats = { moderated: 0, replied: 0, errors: 0 };
+  var verdict = commentWorker.moderateOne(cfg, comment, stats);
+  return c.json(200, {
+    verdict: verdict,
+    reason: comment.getString('ai_reason'),
+    status: comment.getString('status'),
+  });
+}
+
+// POST /api/blog-admin/ai/comments/reply —— 对 approved 评论立即生成 AI 回复
+function replyComment(c) {
+  var secure = requireAdminSecure(c);
+  var input = readBody(c, 8193);
+  consumeQuota('ai_assist', secure.actorId);
+
+  var id = text(input.commentId || input.comment_id, 64);
+  if (!id) apiError(400, 'INVALID_REQUEST');
+  var cfg = requireAiConfigured();
+  var comment = loadCommentOr404(id);
+
+  if (comment.getString('status') !== 'approved') apiError(400, 'INVALID_STATE: 仅已通过评论可生成 AI 回复');
+  if (comment.getBool('is_ai')) apiError(400, 'INVALID_STATE: AI 评论无需 AI 回复');
+  // 显式重试（例如曾被 cron 按 backlog 跳过）：重置标记；cutoff=-1 绕过时间守卫
+  comment.set('ai_replied', false);
+
+  var stats = { moderated: 0, replied: 0, errors: 0 };
+  var outcome = commentWorker.processOneReply($app.dao(), cfg, comment, stats, -1) || {};
+  return c.json(200, {
+    outcome: outcome.outcome || 'unknown',
+    reason: outcome.reason || '',
+    replyId: outcome.replyId || '',
+    status: outcome.status || '',
+  });
+}
+
 module.exports = {
   settingsRead: settingsRead,
   settingsSave: settingsSave,
   testConnection: testConnection,
   generateArticle: generateArticle,
   assist: assist,
+  moderateComment: moderateComment,
+  replyComment: replyComment,
 };

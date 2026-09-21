@@ -198,6 +198,24 @@ export default function PostManager() {
     }
   };
 
+  // 列表行"AI 优化"：直接打开该文的编辑弹窗并对其跑 meta 建议（无需先点编辑再点工具条）
+  const handleAiOptimize = async (post: Post) => {
+    setEditing(post);
+    setDirty(false);
+    setMetaResult(null);
+    if (!post.title?.trim() && !post.content?.trim()) {
+      showToast('该文缺少标题与正文，AI 无法给出建议', 'info');
+      return;
+    }
+    try {
+      const result = await runMeta(post.title || '', post.content || '');
+      setMetaResult(result);
+      showToast('已生成标题与摘要建议，点击即可回填', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'AI 生成失败', 'error');
+    }
+  };
+
   const handleAiPolish = async () => {
     if (!editing) return;
     const { start, end, selected } = readSelection();
@@ -389,6 +407,14 @@ export default function PostManager() {
                         精选
                       </span>
                     )}
+                    {post.is_ai && (
+                      <span
+                        className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 font-mono text-[10px] uppercase text-accent"
+                        title="本文由 AI 一键成文创建"
+                      >
+                        AI 生成
+                      </span>
+                    )}
                   </div>
                   <h3 className="mt-2 font-medium text-text">{post.title}</h3>
                   <p className="mt-1 line-clamp-2 text-sm text-text-secondary">{post.excerpt}</p>
@@ -399,6 +425,16 @@ export default function PostManager() {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    onClick={() => handleAiOptimize(post)}
+                    disabled={assisting !== null}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-md text-text-secondary hover:bg-accent/10 hover:text-accent disabled:opacity-50"
+                    title="AI 优化（生成标题/摘要/标签建议）"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
+                  </button>
                   <button
                     onClick={() => handleEdit(post)}
                     className="inline-flex h-10 w-10 items-center justify-center rounded-md text-text-secondary hover:bg-accent/10 hover:text-accent"
