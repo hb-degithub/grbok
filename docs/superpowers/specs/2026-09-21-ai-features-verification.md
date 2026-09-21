@@ -50,3 +50,12 @@
 - [x] 评论提交/审核/公开视图/限流策略库（30 行一致）全链路
 - [x] vitest 47/47、build 通过
 - 部署提醒：生产部署后需在「AI 设置」页完成端点配置并启用；AI 功能默认全关（enabled=false / comment_mode=off / 违禁词关闭），不产生行为变化
+
+## 8. 管理模块内嵌 AI（2026-09-21 第二轮，commit 98467bf，已部署）
+- [x] posts 新增 `is_ai` 字段（迁移 20260921000400 生产已应用），AI 一键成文落库写入，文章列表显示「AI 生成」徽标
+- [x] PostManager 列表行「AI 优化」按钮：打开编辑弹窗并自动出 meta 建议
+- [x] CommentModerator 顶部 AI 状态条（super_admin 可见）：启用状态/档位/违禁词数/设置入口
+- [x] 评论行内「AI 审核/重审」（pending）与「AI 回复」（approved）按钮，立即执行不等 cron
+- [x] 新路由 `POST /api/blog-admin/ai/comments/moderate`、`/reply`（admin+step-up+ai_assist 限流）：本地 403/404 门控实测、生产 403/404 实测；回复手动触发绕过 72h 守卫，存量评论可补回
+- [x] worker 重构（moderateOne/processOneReply 单条入口）回归通过（assist 一轮审核+草稿）
+- [x] 终验：vitest 47/47、build 通过、SSR/后台评论/文章页 200、公开评论 API 200
