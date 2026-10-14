@@ -61,7 +61,15 @@
   routerAdd('POST', '/api/blog-auth/otp/verify', function (e) {
     var otp = require(__hooks + '/lib/auth_otp.js');
     try { return $apis.recordAuthResponse($app, e, otp.verifyOtp(e), { otp: true }); }
-    catch (_) { return e.json(400, { code: 'INVALID_OR_EXPIRED_CODE' }); }
+    catch (error) {
+      // 2026-10-14 #7：per-IP 持久化限流命中时返回 429（其余错误保持 400 不区分，
+      // 不泄露 challenge 是否存在/是否过期）。
+      if (otp.isRateLimited(error)) {
+        var publicErrors = require(__hooks + '/lib/public_errors.js');
+        return e.json(429, publicErrors.detailedRateLimit('IP_RATE_LIMITED', error.retryAfter, publicErrors.referenceId()));
+      }
+      return e.json(400, { code: 'INVALID_OR_EXPIRED_CODE' });
+    }
   }, $apis.bodyLimit(4096));
 
   cronAdd('reader-otp-challenge-cleanup', '0 * * * *', function () {

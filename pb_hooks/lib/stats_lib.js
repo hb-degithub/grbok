@@ -68,10 +68,28 @@ function classifyUA(ua) {
   return 'desktop';
 }
 
+// 路径长度上限（与旧实现一致，显式命名）。
+const MAX_PATH_LENGTH = 200;
+
+// 允许的路径字符集白名单（2026-10-14 渗透测试 #9 修复；旧实现在 :71-76 只做
+// 长度/前缀/`..`/反斜杠校验，<b>hi</b>、\x00、任意文本都能写进公开 topPages）。
+//   * RFC 3986 unreserved（A-Za-z0-9 - . _ ~）与 sub-delims/:/@（!$&'()*+,;=:@）
+//   * 路径分隔符 /、百分号编码引导符 %（另由 PATH_BAD_ESCAPE_PATTERN 要求后接两位十六进制）
+//   * 查询/片段分隔符 ? #（location.pathname 不含它们，extractPostSlug 也会剥离，放行无害）
+//   * CJK 汉字 / 日文假名 / 韩文音节的"原字符"：浏览器 location.pathname 通常已把非 ASCII
+//     百分号编码为 %XX，但直接放行这些码位不会引入 HTML 注入面（< > " ' 反引号 与全部
+//     控制字符都不在集合内），却能避免误伤 /tags/中文 这类路由。
+// 明确拒绝：空白（含 \t \n \u3000）、\x00-\x1f、\x7f、< > " ` \ { } | ^ 等。
+const PATH_ALLOWED_PATTERN = /^[A-Za-z0-9\-._~!$&'()*+,;=:@\/%?#\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]+$/;
+// 每个 % 必须是合法百分号编码引导：浏览器只会产出 %XX，裸 % 或 %zz 一律拒绝。
+const PATH_BAD_ESCAPE_PATTERN = /%(?![0-9A-Fa-f]{2})/;
+
 function isValidPath(path) {
-  if (typeof path !== 'string' || path.length === 0 || path.length > 200) return false;
+  if (typeof path !== 'string' || path.length === 0 || path.length > MAX_PATH_LENGTH) return false;
   if (path[0] !== '/' || path.startsWith('//')) return false;
   if (path.includes('..') || path.includes('\\')) return false;
+  if (!PATH_ALLOWED_PATTERN.test(path)) return false;
+  if (PATH_BAD_ESCAPE_PATTERN.test(path)) return false;
   return true;
 }
 
@@ -425,4 +443,7 @@ module.exports = {
   blogStats: blogStats,
   friendLinkStats: friendLinkStats,
   retentionCleanup: retentionCleanup,
+  // 供测试夹具直接穷举字符集白名单（tests/security-rate/login_otp_rate_fixture.pb.js）
+  isValidPath: isValidPath,
+  MAX_PATH_LENGTH: MAX_PATH_LENGTH,
 };
