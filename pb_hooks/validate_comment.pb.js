@@ -71,6 +71,9 @@ onRecordBeforeCreateRequest((e) => {
   const parentId = String(record.get('parent_id') || '').trim();
   const authorName = stripTags(record.get('author_name'));
   const authorEmail = String(record.get('author_email') || '').trim();
+  // #8（2026-10-14）：最终落库的邮箱。冒名评论（邮箱属于他人账号）会被剥离为空，
+  // 因此不能用 const 的 authorEmail 直接落库（见下方 impersonationAttempt 分支）。
+  let effectiveAuthorEmail = authorEmail;
   const content = stripTags(record.get('content'));
 
   if (!boolSetting('enable_comments', true)) throw new BadRequestError('Comments are disabled.');
@@ -138,6 +141,21 @@ onRecordBeforeCreateRequest((e) => {
       // Anonymous or wrong-user comment using a registered email. Silently
       // force into pending; response stays identical to the anonymous path.
       impersonationAttempt = true;
+
+      // 2026-10-14 渗透测试 #8：该邮箱属于**他人**账号，剥离作者邮箱，
+      // 避免以他人身份落库/展示（此前的实现会原样保存并仅置 pending）。
+      // 响应仍与匿名路径同构（评审队列 pending），不额外泄露邮箱是否已注册。
+      try {
+        $app.logger().warn(
+          '[validate-comment] stripped author_email owned by another account',
+          'postId', String(postId || ''),
+          'ownerUserId', String(ownerUser.id || ''),
+          'attemptedEmail', String(authorEmail || '')
+        );
+      } catch (_) {}
+      effectiveAuthorEmail = '';
+      record.set('author_email', '');
+      record.set('author_user', '');
     } else if (!ownerUser.verified()) {
       // Authenticated owner but email not verified — keep the verification
       // gate. No side-channel: the requester is the account owner and
@@ -223,7 +241,7 @@ onRecordBeforeCreateRequest((e) => {
   }
 
   record.set('author_name', authorName);
-  record.set('author_email', authorEmail);
+  record.set('author_email', effectiveAuthorEmail);
   record.set('content', content);
 
   // AI 管线字段只能由服务端 worker 写入，客户端提交一律清零
