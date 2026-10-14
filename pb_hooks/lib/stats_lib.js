@@ -281,6 +281,20 @@ function blogStats(e) {
   }
 
   const range = e.queryParam('range') === '7d' ? '7d' : '30d';
+  const wantGeo = e.queryParam('geo') === '1';
+  const adminRequest = isAdminRequest(e);
+  const wantDetail = e.queryParam('detail') === '1' && adminRequest;
+
+  // 聚合结果 60s 进程缓存：page_views 的 COUNT DISTINCT 全表扫描随数据量增长，
+  // /stats 页与首页 StatusMini 重复查询直接命中内存。detail 结果含管理视角数据，
+  // 与公开结果分键存放，缓存 key 携带 admin 标记防串。
+  const cacheKey = range + '|' + (wantGeo ? 'g1' : 'g0') + '|' + (wantDetail ? 'd1' : 'd0') + (adminRequest ? '|a1' : '|a0');
+  const queryCache = globalThis.statsQueryResultCache || (globalThis.statsQueryResultCache = {});
+  const cached = queryCache[cacheKey];
+  if (cached && cached.expiry > Date.now()) {
+    return e.json(200, cached.data);
+  }
+
   const from = rangeStart(range);
   const todayFrom = new Date(new Date().setHours(0, 0, 0, 0))
     .toISOString().replace('T', ' ').slice(0, 19);
@@ -322,7 +336,7 @@ function blogStats(e) {
       })),
     };
 
-    if (e.queryParam('detail') === '1' && isAdminRequest(e)) {
+    if (wantDetail) {
       const uaRaw = queryRows(
         'SELECT ua_category, COUNT(*) AS c FROM page_views WHERE event = {:ev} AND created >= {:from} GROUP BY ua_category ORDER BY c DESC',
         { ev: 'pageview', from: from }, { ua_category: '', c: 0 });
@@ -335,7 +349,7 @@ function blogStats(e) {
     }
 
     // 访客地理聚合（geo=1 时对所有用户开放；仅返回聚合数字与国家/省份名称，不返回 visitor_hash 与单条记录）
-    if (e.queryParam('geo') === '1') {
+    if (wantGeo) {
       const countryRaw = queryRows(
         "SELECT country, COUNT(*) AS c, COUNT(DISTINCT visitor_hash) AS uv FROM page_views WHERE event = {:ev} AND created >= {:from} AND country != '' GROUP BY country ORDER BY c DESC",
         { ev: 'pageview', from: from }, { country: '', c: 0, uv: 0 });
@@ -358,6 +372,7 @@ function blogStats(e) {
       };
     }
 
+    queryCache[cacheKey] = { expiry: Date.now() + 60 * 1000, data: response };
     return e.json(200, response);
   } catch (_) {
     console.error('[stats][STATS_QUERY_FAILED]');

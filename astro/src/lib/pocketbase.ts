@@ -1,5 +1,6 @@
 import PocketBase from 'pocketbase';
 import { installAdminStepUpHeaders } from './admin-step-up';
+import { wrapPocketBaseSend } from './pb-cache';
 
 /**
  * PocketBase 工厂函数
@@ -35,6 +36,8 @@ export function buildFileUrl(collection: string, recordId: string, filename: str
  */
 export function createPocketBase(): PocketBase {
   const instance = new PocketBase(POCKETBASE_URL);
+  // 匿名 GET 30s 缓存（SSR 进程级共享 / 浏览器 tab 级），写后自动失效
+  wrapPocketBaseSend(instance);
   if (typeof window !== 'undefined') {
     installAdminStepUpHeaders(instance);
   }

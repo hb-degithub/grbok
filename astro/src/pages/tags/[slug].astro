@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostList from '../../components/posts/PostList';
 import ScrollReveal from '../../components/ui/ScrollReveal';
+import { cachedFetchJson } from '../../lib/pb-cache';
 
 // SSR模式：禁用预渲染，每次请求时动态生成
 export const prerender = false;
@@ -19,9 +20,11 @@ interface Tag {
 
 async function fetchTag(tagSlug: string): Promise<Tag | null> {
   try {
-    const res = await fetch(`${PB_URL}/api/collections/tags/records?filter=${encodeURIComponent('slug="' + tagSlug.replace(/["\\]/g, '') + '"')}`, { signal: AbortSignal.timeout(3000) });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const data = await res.json();
+    const data = await cachedFetchJson<{ items?: Tag[] }>(
+      `${PB_URL}/api/collections/tags/records?filter=${encodeURIComponent('slug="' + tagSlug.replace(/["\\]/g, '') + '"')}`,
+      { signal: AbortSignal.timeout(3000) },
+      60_000,
+    );
     return data.items?.[0] ?? null;
   } catch {
     return null;

@@ -1,4 +1,5 @@
 import type { APIRoute } from 'astro';
+import { cachedFetchJson } from '../lib/pb-cache';
 
 interface PBPost {
   id: string;
@@ -23,16 +24,15 @@ export const GET: APIRoute = async ({ site }) => {
   const siteUrl = (site?.toString() || 'http://localhost:4321').replace(/\/$/, '');
   const pbUrl = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 
-  // Fetch published posts from PocketBase
+  // Fetch published posts from PocketBase（60s 进程缓存，RSS 阅读器轮询不再穿透到 PB）
   let posts: PBPost[] = [];
   try {
-    const res = await fetch(
-      `${pbUrl}/api/collections/posts/records?filter=(status='published')&sort=-published_at&fields=id,title,slug,excerpt,published_at,updated&perPage=50`
+    const data = await cachedFetchJson<{ items?: PBPost[] }>(
+      `${pbUrl}/api/collections/posts/records?filter=(status='published')&sort=-published_at&fields=id,title,slug,excerpt,published_at,updated&perPage=50`,
+      undefined,
+      60_000,
     );
-    if (res.ok) {
-      const data = await res.json();
-      posts = data.items || [];
-    }
+    posts = data.items || [];
   } catch {
     // If PocketBase is unreachable, return feed with no items
   }

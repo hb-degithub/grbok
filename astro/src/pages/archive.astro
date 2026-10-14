@@ -3,6 +3,7 @@ import BaseLayout from "../layouts/BaseLayout.astro";
 import AnimatedContent from '../components/reactbits/AnimatedContent';
 import BlurText from '../components/reactbits/BlurText';
 import ParticleField from '../components/effects/ParticleField';
+import { cachedFetchJson } from '../lib/pb-cache';
 const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || "http://localhost:8090";
 interface ArchivePost {
   id: string;
@@ -16,9 +17,10 @@ interface ArchiveGroup {
 }
 let posts: ArchivePost[] = [];
 try {
-  const url = PB_URL + "/api/collections/posts/records?sort=-published_at" + "&filter=" + encodeURIComponent('status="published"') + "&fields=id,title,slug,published_at";
-  const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
-  if (res.ok) { const data = await res.json(); posts = data.items ?? []; }
+  // perPage=500：缺省 perPage 只返回前 30 条，会漏掉更早的文章
+  const url = PB_URL + "/api/collections/posts/records?sort=-published_at" + "&filter=" + encodeURIComponent('status="published"') + "&fields=id,title,slug,published_at&perPage=500";
+  const data = await cachedFetchJson<{ items?: ArchivePost[] }>(url, { signal: AbortSignal.timeout(3000) }, 60_000);
+  posts = data.items ?? [];
 } catch {}
 const groups: ArchiveGroup[] = [];
 for (const post of posts) {
