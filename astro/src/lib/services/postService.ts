@@ -1,9 +1,27 @@
 import { BaseService } from './baseService';
+import { actionRequestHeaders } from './actionRequest';
 import type { RecordModel } from 'pocketbase';
 import type { Post } from '../../types/pocketbase';
 
 // Post 已经包含 id 字段，不需要再继承 RecordModel
 type PostRecord = Post & RecordModel;
+
+/** 点赞/收藏接口的返回体（服务端 pb_hooks/lib/post_actions_lib.js） */
+export interface PostActionResponse {
+  ok: boolean;
+  likes?: number;
+  alreadyLiked?: boolean;
+  removed?: boolean;
+  bookmarked?: boolean;
+  count?: number;
+  alreadyBookmarked?: boolean;
+  /** 是否收到浏览器指纹头（辅助信号，非授权依据） */
+  fingerprintSeen?: boolean;
+  fingerprintSource?: 'header' | 'absent';
+  /** 实际生效的限流维度：user = 新策略；ip-fallback = 策略行缺失时的降级 */
+  limitSource?: 'user' | 'ip-fallback';
+  anomaly?: boolean;
+}
 
 class PostService extends BaseService<PostRecord> {
   constructor() {
@@ -34,19 +52,47 @@ class PostService extends BaseService<PostRecord> {
   }
 
   /**
-   * 点赞文章（服务端 HMAC 防重复；重复请求返回 alreadyLiked）
+   * 点赞文章（需登录；服务端按用户 id 去重，重复请求返回 alreadyLiked）
    */
-  async likePost(postId: string): Promise<{ likes: number; alreadyLiked?: boolean }> {
+  async likePost(postId: string): Promise<PostActionResponse> {
     const pb = this.getPocketBase();
-    return pb.send(`/api/posts/${postId}/like`, { method: 'POST' });
+    return pb.send(`/api/posts/${postId}/like`, {
+      method: 'POST',
+      headers: actionRequestHeaders(),
+    });
   }
 
   /**
-   * 收藏/取消收藏文章（toggle 语义）
+   * 取消点赞文章（需登录；计数 -1 且不为负）
    */
-  async toggleBookmark(postId: string): Promise<{ bookmarked: boolean; count: number }> {
+  async unlikePost(postId: string): Promise<PostActionResponse> {
     const pb = this.getPocketBase();
-    return pb.send(`/api/posts/${postId}/bookmark`, { method: 'POST' });
+    return pb.send(`/api/posts/${postId}/like`, {
+      method: 'DELETE',
+      headers: actionRequestHeaders(),
+    });
+  }
+
+  /**
+   * 收藏文章（需登录；服务端按用户 id 去重，幂等）
+   */
+  async bookmarkPost(postId: string): Promise<PostActionResponse> {
+    const pb = this.getPocketBase();
+    return pb.send(`/api/posts/${postId}/bookmark`, {
+      method: 'POST',
+      headers: actionRequestHeaders(),
+    });
+  }
+
+  /**
+   * 取消收藏文章（需登录；幂等）
+   */
+  async unbookmarkPost(postId: string): Promise<PostActionResponse> {
+    const pb = this.getPocketBase();
+    return pb.send(`/api/posts/${postId}/bookmark`, {
+      method: 'DELETE',
+      headers: actionRequestHeaders(),
+    });
   }
 }
 
