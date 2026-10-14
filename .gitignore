@@ -55,6 +55,7 @@ temp/
 # 临时调试文件 (仅根目录, 不影响 pb_hooks/*.pb.js 和 src 下的 js)
 /*.js
 /*.bat
+/*.sh
 /temp-img-*
 /tmp-screenshot*
 /pb_login_page.png
@@ -95,6 +96,14 @@ astro/pw-screenshot.cjs
 
 # ZCode session workspace
 .zcode/
+
+# 本地 agent/工具私有状态（不随仓库传递）
+.agent-teams/
+.mimosa/
+.mnemon/
+
+# GUI 测试截图产物（本地证据）
+gui-test-screenshots/
 
 # 历史遗留临时/备份/日志文件
 original-*
