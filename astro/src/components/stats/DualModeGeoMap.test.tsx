@@ -22,7 +22,9 @@ vi.mock('./Globe3D', () => ({
 }));
 
 // Mock ResizeObserver
+const resizeCallbacks: ResizeObserverCallback[] = [];
 class MockResizeObserver {
+  constructor(callback: ResizeObserverCallback) { resizeCallbacks.push(callback); }
   observe = vi.fn();
   unobserve = vi.fn();
   disconnect = vi.fn();
@@ -37,19 +39,27 @@ const mockWorldData = {
   '840': { views: 500, uv: 300, name: 'United States' },
 };
 
-const mockChinaData = {
-  '110000': { views: 300, uv: 200, name: '北京' },
-  '440000': { views: 500, uv: 350, name: '广东' },
-};
-
 describe('DualModeGeoMap', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resizeCallbacks.length = 0;
+  });
+
+  it('does not resize the 2D chart after its container loses its layout during a mode switch', async () => {
+    render(<DualModeGeoMap worldData={mockWorldData} />);
+    fireEvent.click(await screen.findByRole('tab', { name: '2D' }));
+    await waitFor(() => expect(echarts.init).toHaveBeenCalled());
+    const instance = vi.mocked(echarts.init).mock.results.at(-1)!.value;
+    const map = screen.getByRole('img', { name: '国际访客地理分布地图' });
+    Object.defineProperty(map, 'clientWidth', { value: 0, configurable: true });
+    Object.defineProperty(map, 'clientHeight', { value: 0, configurable: true });
+    resizeCallbacks.at(-1)!([], {} as ResizeObserver);
+    expect(instance.resize).not.toHaveBeenCalled();
   });
 
   it('默认 3D 模式下渲染 3D 地球', async () => {
     render(
-      <DualModeGeoMap worldData={mockWorldData} chinaData={mockChinaData} maxViews={1200} />
+      <DualModeGeoMap worldData={mockWorldData} />
     );
 
     // 默认 3D 模式，应显示 3D 加载状态或 3D 组件
@@ -57,37 +67,33 @@ describe('DualModeGeoMap', () => {
       expect(screen.getByRole('tablist')).toBeTruthy();
     });
 
-    // 应有 4 个切换按钮（3D/2D + 世界/中国）
+    // 仅保留 3D/2D 两种世界地图视图
     const tabs = screen.getAllByRole('tab');
-    expect(tabs).toHaveLength(4);
+    expect(tabs).toHaveLength(2);
     expect(tabs[0].textContent).toBe('3D');
     expect(tabs[1].textContent).toBe('2D');
-    expect(tabs[2].textContent).toBe('世界');
-    expect(tabs[3].textContent).toBe('中国');
 
     // 3D 按钮应为激活状态
     expect(tabs[0].getAttribute('aria-selected')).toBe('true');
     expect(tabs[1].getAttribute('aria-selected')).toBe('false');
   });
 
-  it('包含 2D/3D 和世界/中国切换按钮', async () => {
+  it('只提供 2D/3D 切换，不再提供中国省份视图', async () => {
     render(
-      <DualModeGeoMap worldData={mockWorldData} chinaData={mockChinaData} maxViews={1200} />
+      <DualModeGeoMap worldData={mockWorldData} />
     );
 
     await waitFor(() => {
       const tabs = screen.getAllByRole('tab');
-      expect(tabs).toHaveLength(4);
+      expect(tabs).toHaveLength(2);
       expect(tabs[0].textContent).toBe('3D');
       expect(tabs[1].textContent).toBe('2D');
-      expect(tabs[2].textContent).toBe('世界');
-      expect(tabs[3].textContent).toBe('中国');
     });
   });
 
   it('切换到 2D 模式后加载 ECharts 地图', async () => {
     render(
-      <DualModeGeoMap worldData={mockWorldData} chinaData={mockChinaData} maxViews={1200} />
+      <DualModeGeoMap worldData={mockWorldData} />
     );
 
     await waitFor(() => {
@@ -113,7 +119,7 @@ describe('DualModeGeoMap', () => {
     (registerWorldMap as any).mockRejectedValueOnce(new Error('Network error'));
 
     render(
-      <DualModeGeoMap worldData={mockWorldData} chinaData={mockChinaData} maxViews={1200} />
+      <DualModeGeoMap worldData={mockWorldData} />
     );
 
     await waitFor(() => {
@@ -129,28 +135,16 @@ describe('DualModeGeoMap', () => {
     });
   });
 
-  it('2D 中国模式下显示合规声明', async () => {
-    render(
-      <DualModeGeoMap worldData={mockWorldData} chinaData={mockChinaData} maxViews={1200} />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByRole('tablist')).toBeTruthy();
-    });
-
-    // 切换到 2D 模式
-    fireEvent.click(screen.getAllByRole('tab')[1]);
-
-    // 等待 ECharts 初始化
-    await waitFor(() => {
-      expect(echarts.init).toHaveBeenCalled();
-    });
-
-    // 切换到中国地图
-    fireEvent.click(screen.getAllByRole('tab')[3]); // 点击"中国"按钮
-
-    await waitFor(() => {
-      expect(screen.getByText(/南海诸岛/)).toBeTruthy();
-    });
+  it('2D 仅加载世界地图，仍保留中国的国家级访问数据', async () => {
+    const { registerWorldMap, registerChinaMap } = await import('../../lib/echarts-map');
+    render(<DualModeGeoMap worldData={mockWorldData} />);
+    fireEvent.click(await screen.findByRole('tab', { name: '2D' }));
+    await waitFor(() => expect(echarts.init).toHaveBeenCalled());
+    expect(registerWorldMap).toHaveBeenCalled();
+    expect(registerChinaMap).not.toHaveBeenCalled();
+    expect(screen.queryByRole('tab', { name: '中国' })).toBeNull();
+    const option = vi.mocked(echarts.init).mock.results.at(-1)!.value.setOption.mock.calls.at(-1)[0];
+    expect(option.geo.map).toBe('world');
+    expect(option.series[0].data).toContainEqual({ name: 'China', value: 1200, uv: 800, regionId: '156' });
   });
 });

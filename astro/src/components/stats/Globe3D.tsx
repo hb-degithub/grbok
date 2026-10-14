@@ -1,175 +1,124 @@
-import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useId, memo } from 'react';
 import { Globe3DEngine, type GlobeGeoData } from '../../lib/globe-3d';
-
-/**
- * 3D 粒子地球 React 组件
- * 封装 Three.js 渲染生命周期，支持世界/中国模式
- */
+import { viewMaximum } from '../../lib/globe-geo';
+import styles from './Globe3D.module.css';
 
 interface Globe3DProps {
-  /** 国际数据：ISO numeric code → GeoData */
   worldData: Record<string, GlobeGeoData>;
-  /** 中国数据：adcode → GeoData */
-  chinaData: Record<string, GlobeGeoData>;
-  /** 最大浏览量（用于颜色归一化） */
-  maxViews: number;
-  /** 地图模式 */
-  mode: 'world' | 'china';
-  /** WebGL 不可用时回退到 2D 的回调 */
   onFallback?: () => void;
 }
+interface TooltipState { data: GlobeGeoData; x: number; y: number }
 
-interface TooltipState {
-  visible: boolean;
-  name: string;
-  views: number;
-  uv: number;
-  x: number;
-  y: number;
-}
-
-function Globe3D({ worldData, chinaData, maxViews, mode, onFallback }: Globe3DProps) {
+function Globe3D({ worldData, onFallback }: Globe3DProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<Globe3DEngine | null>(null);
+  const fallbackRef = useRef(onFallback);
+  fallbackRef.current = onFallback;
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [tooltip, setTooltip] = useState<TooltipState>({
-    visible: false,
-    name: '',
-    views: 0,
-    uv: 0,
-    x: 0,
-    y: 0,
-  });
+  const [error, setError] = useState(false);
+  const [rotating, setRotating] = useState(false);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const instructionsId = useId();
+  const handleHover = useCallback((data: GlobeGeoData | null, x: number, y: number) => {
+    setTooltip(data ? { data, x, y } : null);
+  }, []);
 
-  // 悬停回调
-  const handleHover = useCallback(
-    (data: { name: string; views: number; uv: number } | null, x: number, y: number) => {
-      if (data) {
-        setTooltip({
-          visible: true,
-          name: data.name,
-          views: data.views,
-          uv: data.uv,
-          x,
-          y,
-        });
-      } else {
-        setTooltip((prev) => ({ ...prev, visible: false }));
-      }
-    },
-    []
-  );
-
-  // 初始化引擎
   useEffect(() => {
     if (!containerRef.current) return;
-
     let cancelled = false;
+    const handleError = () => {
+      if (cancelled) return;
+      if (fallbackRef.current) fallbackRef.current();
+      else { setError(true); setLoading(false); }
+    };
     const engine = new Globe3DEngine({
-      container: containerRef.current,
-      worldData,
-      chinaData,
-      maxViews,
-      mode,
+      container: containerRef.current, worldData,
       onHover: handleHover,
+      onRotationChange: value => { if (!cancelled) setRotating(value); },
+      onError: handleError,
     });
-
     engineRef.current = engine;
-
-    engine
-      .init()
-      .then(() => {
-        if (!cancelled) setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Globe3D init failed:', err);
-        if (!cancelled) {
-          // WebGL 不可用时自动回退到 2D 模式
-          if (err instanceof Error && err.message === 'WebGL not supported') {
-            onFallback?.();
-            return;
-          }
-          setError('3D 地球加载失败');
-          setLoading(false);
-        }
-      });
-
+    engine.init().then(() => { if (!cancelled) setLoading(false); }).catch(() => {
+      if (!cancelled) { engine.destroy(); handleError(); }
+    });
     return () => {
       cancelled = true;
       engine.destroy();
       engineRef.current = null;
     };
-    // 仅在挂载时初始化一次
+    // Engine creation is mount-only; current data is synchronized below after init.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [handleHover]);
 
-  // 数据/模式更新
   useEffect(() => {
-    if (!engineRef.current || loading) return;
-    engineRef.current.updateData(worldData, chinaData, maxViews, mode);
-  }, [worldData, chinaData, maxViews, mode, loading]);
+    if (!loading && !error) engineRef.current?.updateData(worldData);
+  }, [worldData, loading, error]);
 
-  // 错误状态
-  if (error) {
-    return (
-      <div className="flex h-[480px] flex-col items-center justify-center gap-3" role="alert">
-        <span className="text-sm text-zinc-500">{error}</span>
-        <button
-          onClick={() => window.location.reload()}
-          className="rounded-lg bg-teal-600 px-4 py-2 text-sm text-white hover:bg-teal-700"
-        >
-          重新加载
-        </button>
-      </div>
-    );
-  }
-
+  const maximum = viewMaximum(worldData);
+  const hasVisits = Object.values(worldData).some(item => item.views > 0);
   return (
-    <div className="relative">
-      {/* Three.js 容器 — 始终渲染，确保 ref 可用 */}
-      <div
-        ref={containerRef}
-        className="h-[480px] w-full overflow-hidden rounded-lg"
-        role="img"
-        aria-label={mode === 'china' ? '中国访客 3D 地球' : '国际访客 3D 地球'}
-      />
-
-      {/* 加载覆盖层 */}
-      {loading && (
-        <div
-          className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/80 dark:bg-zinc-900/80"
-          role="status"
-          aria-label="3D 地球加载中"
-        >
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
-          <span className="ml-3 text-sm text-zinc-500">3D 地球加载中…</span>
+    <div className={styles.globe}>
+      <div className={styles.stage}>
+        <div className={styles.caption} aria-hidden="true">
+          <span>世界 · 访客足迹</span>
+          <span className={styles.status}><i />{rotating ? '缓慢自转' : '自由探索'}</span>
         </div>
-      )}
-
-      {/* 悬停 Tooltip */}
-      {tooltip.visible && (
         <div
-          className="pointer-events-none absolute z-20 rounded-lg border border-zinc-200 bg-white/95 px-3 py-2 text-sm shadow-lg backdrop-blur-sm dark:border-zinc-700 dark:bg-zinc-900/95"
-          style={{
-            left: `${(tooltip.x + 1) * 50}%`,
-            top: `${(-tooltip.y + 1) * 50}%`,
-            transform: 'translate(-50%, -120%)',
-          }}
-        >
-          <div className="font-semibold text-zinc-900 dark:text-zinc-100">{tooltip.name}</div>
-          <div className="text-xs text-zinc-500 dark:text-zinc-400">
-            浏览量：{tooltip.views} · 独立访客：{tooltip.uv}
+          ref={containerRef}
+          className={styles.canvas}
+          role="img"
+          tabIndex={0}
+          aria-label="国际访客 3D 地球"
+          aria-describedby={instructionsId}
+          aria-busy={loading}
+        />
+        <span id={instructionsId} className="sr-only">拖拽旋转或使用方向键，Home 键复位。悬停或轻触地表查看数据。使用下方按钮控制自转。</span>
+        {loading && !error && (
+          <div className={styles.overlay} role="status" aria-label="3D 地球加载中">
+            <span className={styles.loader} /><span>正在绘制访客足迹…</span>
           </div>
+        )}
+        {error && (
+          <div className={styles.overlay} role="alert">
+            <span>地球暂时无法显示</span>
+            <button type="button" className={styles.control} onClick={() => window.location.reload()}>重新加载</button>
+          </div>
+        )}
+        {tooltip && !loading && (
+          <div
+            role="tooltip"
+            className={styles.tooltip}
+            style={{
+              left: 'clamp(86px, ' + (tooltip.x + 1) * 50 + '%, calc(100% - 86px))',
+              top: 'clamp(98px, ' + (-tooltip.y + 1) * 50 + '%, calc(100% - 12px))',
+            }}
+          >
+            <strong>{tooltip.data.name}</strong>
+            {tooltip.data.views > 0
+              ? <span><b>{tooltip.data.views.toLocaleString()}</b> 次浏览 <em>·</em> {tooltip.data.uv.toLocaleString()} 位访客</span>
+              : <span>暂无访问记录</span>}
+          </div>
+        )}
+        {!hasVisits && !loading && !error && <div className={styles.empty}>暂无访问记录</div>}
+      </div>
+      <div className={styles.toolbar}>
+        <span className={styles.hint}>拖拽探索<span> · 悬停查看</span></span>
+        <div className={styles.controls}>
+          <button type="button" className={styles.control} disabled={loading || error} aria-label={rotating ? '暂停自转' : '开始自转'} onClick={() => engineRef.current?.setAutoRotate(!rotating)}>
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+              {rotating ? <path d="M7 5v10M13 5v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /> : <path d="m7 4 9 6-9 6V4Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />}
+            </svg>{rotating ? '暂停' : '自转'}
+          </button>
+          <button type="button" className={styles.control} disabled={loading || error} onClick={() => engineRef.current?.resetView()} aria-label="复位地球视角">
+            <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 8a6 6 0 1 1 0 5M4 3v5h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>复位
+          </button>
         </div>
-      )}
-
-      {/* 操作提示 */}
-      <div className="mt-2 text-center text-[10px] text-zinc-400">
-        拖拽旋转 · 自动自转
+      </div>
+      <div className={styles.legend} aria-label={'浏览量图例，当前区域最高 ' + maximum + ' 次'}>
+        <span>浏览量</span><span className={styles.scale}><i /><i /><i /><i /><i /></span>
+        <span>少 → 多</span><span className={styles.legendEnd}>{hasVisits ? '最高 ' + maximum.toLocaleString() + ' 次' : '暂无数据'}</span>
       </div>
     </div>
   );
 }
-
 export default memo(Globe3D);
