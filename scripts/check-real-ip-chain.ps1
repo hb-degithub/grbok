@@ -38,7 +38,9 @@ Require ([regex]::Matches($productionCaddyService, '(?m)^\s*-\s*"127\.0\.0\.1:\$
 Require ([regex]::Matches($localCaddyService, '(?m)^\s*-\s*"127\.0\.0\.1:80:80"\s*$').Count -eq 1) 'local Caddy port must be loopback-bound'
 Require ([regex]::Matches($localCaddyService, '(?m)^\s*-\s*"80:80"\s*$').Count -eq 0) 'local Caddy must not publish port 80 on every host interface'
 Require ([regex]::Matches($composeLocal, '(?m)^\s*-\s*"127\.0\.0\.1:80:80"\s*$').Count -eq 1) 'local loopback Caddy port binding must not be duplicated or placed on another service'
-Require ($caddy -match 'client_ip_headers X-Forwarded-For X-Real-IP') 'production client_ip_headers order missing'
+Require ($caddy -match 'client_ip_headers Ali-Real-Client-Ip X-Forwarded-For X-Real-IP') 'production client_ip_headers must prefer the edge-injected Ali-Real-Client-Ip header'
+Require (-not ($caddy -match 'client_ip_headers\s+X-Forwarded-For')) 'production must not trust X-Forwarded-For ahead of the edge-injected header'
+Require ([regex]::Matches($caddy, '(?m)^\s*client_ip_headers\s+').Count -eq 1) 'production must declare exactly one client_ip_headers order'
 Require ($local -match 'client_ip_headers X-Forwarded-For X-Real-IP') 'local client_ip_headers order missing'
 foreach ($config in @(@('production', $caddy), @('local', $local))) {
     Require ([regex]::Matches($config[1], '(?m)^\s*header_up X-Real-IP \{client_ip\}\s*$').Count -ge 1) "$($config[0]) Caddy X-Real-IP client_ip missing"
