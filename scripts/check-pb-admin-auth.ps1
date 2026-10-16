@@ -108,15 +108,16 @@ if (-not (Test-Path -LiteralPath $hookFile -PathType Leaf)) {
     $failures += "Missing hook file: $hookFile"
 } else {
     $hookContent = Get-Content -LiteralPath $hookFile -Raw
+    # fb787f0 (2026-07-24) replaced the passkey step-up routes with TOTP. The
+    # passkey endpoints (/step-up/options, /step-up/verify, /passkeys*) no longer
+    # exist anywhere in the hook tree, so demanding them had been red since then.
     $requiredRoutes = @(
         '/api/blog-admin/step-up/status',
-        '/api/blog-admin/step-up/options',
-        '/api/blog-admin/step-up/verify',
         '/api/blog-admin/step-up/revoke',
-        '/api/blog-admin/passkeys',
-        '/api/blog-admin/passkeys/registration/options',
-        '/api/blog-admin/passkeys/registration/verify',
-        '/api/blog-admin/passkeys/:id/revoke',
+        '/api/blog-admin/totp/setup',
+        '/api/blog-admin/totp/confirm',
+        '/api/blog-admin/totp/verify',
+        '/api/blog-admin/totp/revoke',
         '/api/blog-admin/local-recovery'
     )
     foreach ($route in $requiredRoutes) {

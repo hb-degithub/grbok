@@ -228,8 +228,11 @@ else {
     if ($values['MAIL_GATEWAY_INTERNAL_URL'] -ne 'http://admin-auth:8787') {
         $issues.Add('.env.example must use MAIL_GATEWAY_INTERNAL_URL=http://admin-auth:8787')
     }
-    if ($values['PUBLIC_SITE_URL'] -ne 'https://hlydwz.com') {
-        $issues.Add('.env.example must use PUBLIC_SITE_URL=https://hlydwz.com')
+    # .env.example deliberately uses a documentation placeholder domain since
+    # 13f9485 (".env.example real-domain placeholder-ification", 2026-07-24); the
+    # production domain lives in the compose defaults, asserted further below.
+    if ($values['PUBLIC_SITE_URL'] -ne 'https://blog.example.com') {
+        $issues.Add('.env.example must use PUBLIC_SITE_URL=https://blog.example.com')
     }
     if ($values['SMTP_PASSWORD'] -ne 'your_smtp_password_here') {
         $issues.Add('.env.example must keep SMTP_PASSWORD=your_smtp_password_here')

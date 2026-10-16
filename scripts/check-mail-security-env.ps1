@@ -113,8 +113,13 @@ $pocketBaseEntries = @(
     'ACCOUNT_RETENTION_DELETE_ENABLED=${ACCOUNT_RETENTION_DELETE_ENABLED:-false}'
 )
 $caddyEntries = @{
+    # The caddy service must receive ADMIN_IP with the reserved non-matching
+    # default: an earlier revision used ${ADMIN_IP:-0.0.0.0/0} here, which
+    # publicly exposed the PocketBase admin UI. The exact literal changed in
+    # f53ce9d (2026-07-26) and was made safe again by fad3632 (2026-08-31); this
+    # assertion demanded the pre-f53ce9d bare form and had been red since.
     'docker-compose.yml' = @(
-        'ADMIN_IP=${ADMIN_IP}',
+        'ADMIN_IP=${ADMIN_IP:-192.0.2.1}',
         'OPENRESTY_TRUSTED_PROXY=${OPENRESTY_TRUSTED_PROXY}'
     )
     'docker-compose.local.yml' = @(
