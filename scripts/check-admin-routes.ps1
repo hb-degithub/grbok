@@ -19,8 +19,30 @@
     residual-escape guard and the native-auth path block.
     Both listeners must keep the exact CORS allow-list and the access-log
     scrubbing described below.
+
+    Parsing rules (2026-10-16 hardening, after adversarial verification found the
+    previous revision both missed real breakage and flagged legal configs):
+    - The repo root comes from this script's own location ($PSScriptRoot).
+      The previous revision used CWD-relative paths, so invoking it from another
+      directory silently validated whatever tree happened to be the CWD.
+    - Configs are read with [IO.File]::ReadAllText. On PowerShell 5.1,
+      `Get-Content -Raw` uses the platform default encoding and returns NULL for a
+      BOM-less LF-only file that contains non-ASCII bytes - and these Caddyfiles
+      carry Chinese comments, so an LF-only checkout made every assertion fail.
+    - Comments are BLANKED OUT (never deleted, so byte offsets and brace balance
+      survive) before anything is matched, so a commented-out directive can
+      neither satisfy nor defeat an assertion.
+    - Matcher and handle bodies are extracted by brace matching instead of a
+      "[^}]*" wildcard, so a legal nested block (e.g. `header { ... }` inside a
+      handle) no longer hides the responder.
+    - Path coverage is read from positive `path` directives only, so an emptied
+      path line or a `path` -> `not path` polarity flip is caught rather than
+      silently satisfied by the tokens still being present.
 #>
 $ErrorActionPreference = 'Stop'
+
+# Derive the tree under test from this script (repo root = parent of scripts/).
+$root = Split-Path -Parent $PSScriptRoot
 
 $failures = @()
 $securityHeaders = @(
@@ -32,6 +54,9 @@ $securityHeaders = @(
 $expectedCorsHeaders = @('Content-Type', 'Authorization') + $securityHeaders
 $logSecrets = @('Authorization') + $securityHeaders
 $adminPaths = @('/_', '/_/*', '/api/admins', '/api/admins/*')
+# The local listener additionally gates the admin front-end and the blog-admin
+# API, which the public listener must NOT gate. Order-independent below.
+$localAdminPaths = @('/admin*', '/_/*', '/api/admins/*', '/api/blog-admin/*')
 $residualPaths = @('/api/*', '/_', '/_/*', '/admin', '/admin/*')
 $nativeAuthPaths = @(
     '/api/collections/users/records',
@@ -48,32 +73,128 @@ $nativeAuthPaths = @(
     '/api/collections/_pb_users_auth_/auth-with-otp'
 )
 
+function Read-RepoText([string]$RelativePath) {
+    $full = Join-Path $root $RelativePath
+    if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { return $null }
+    return [System.IO.File]::ReadAllText($full)
+}
+
+# Replace every comment byte with a space, keeping length and line breaks, so
+# that later matching never sees commented-out directives. Quote state is
+# tracked (and reset at each newline, since Caddyfile quotes do not span lines)
+# so a '#' inside a quoted value survives.
+function Get-MaskedCaddy([string]$Text) {
+    if ([string]::IsNullOrEmpty($Text)) { return '' }
+    $chars = $Text.ToCharArray()
+    $inQuote = $false
+    $inComment = $false
+    for ($i = 0; $i -lt $chars.Length; $i++) {
+        $ch = $chars[$i]
+        if ($ch -eq "`n") { $inComment = $false; $inQuote = $false; continue }
+        if ($inComment) { $chars[$i] = ' '; continue }
+        if ($ch -eq '"') { $inQuote = -not $inQuote; continue }
+        if ($ch -eq '#' -and -not $inQuote) { $inComment = $true; $chars[$i] = ' '; continue }
+    }
+    return (-join $chars)
+}
+
+# Body of the block opened at $AfterOpenBrace, found by brace counting that
+# ignores braces inside quoted strings. Returns $null when unbalanced.
+function Get-BraceBody([string]$Text, [int]$AfterOpenBrace) {
+    $depth = 1
+    $inQuote = $false
+    for ($i = $AfterOpenBrace; $i -lt $Text.Length; $i++) {
+        $ch = $Text[$i]
+        if ($ch -eq '"') { $inQuote = -not $inQuote; continue }
+        if ($inQuote) { continue }
+        if ($ch -eq '{') { $depth++ }
+        elseif ($ch -eq '}') {
+            $depth--
+            if ($depth -eq 0) { return $Text.Substring($AfterOpenBrace, $i - $AfterOpenBrace) }
+        }
+    }
+    return $null
+}
+
 # Matcher bodies come in two shapes:
-#   @name { ... }                        (block form, closed by a "}" line)
+#   @name { ... }                        (block form, brace-matched)
 #   @name path \ <continuation lines>    (backslash-continued one-liner)
-# Both are anchored to the start of a line so that a "handle @name {" reference
-# can never be mistaken for the matcher definition itself.
-function Get-MatcherBody([string]$Content, [string]$Name) {
+# Both are anchored to the start of a line, and the caller passes masked text, so
+# neither a "handle @name {" reference nor a commented-out block can be mistaken
+# for the definition.
+function Get-MatcherBody([string]$Masked, [string]$Name) {
     $escaped = [regex]::Escape($Name)
-    $block = [regex]::Match($Content, "(?ms)^[ \t]*@$escaped[ \t]*\{[ \t]*\r?\n(?<body>.*?)^[ \t]*\}")
-    if ($block.Success) { return $block.Groups['body'].Value }
-    $continued = [regex]::Match($Content, "(?m)^[ \t]*@$escaped\b(?<body>(?:.*\\[ \t]*\r?\n)*.*\r?\n)")
+    $block = [regex]::Match($Masked, "(?m)^[ \t]*@$escaped[ \t]*\{")
+    if ($block.Success) {
+        $body = Get-BraceBody $Masked ($block.Index + $block.Length)
+        if ($null -ne $body) { return $body }
+    }
+    $continued = [regex]::Match($Masked, "(?m)^[ \t]*@$escaped\b(?<body>(?:.*\\[ \t]*\r?\n)*.*\r?\n)")
     if ($continued.Success) { return $continued.Groups['body'].Value }
     return $null
 }
 
-function Test-PathToken([string]$Body, [string]$Path) {
-    if ([string]::IsNullOrEmpty($Body)) { return $false }
-    return [bool]($Body -match "(^|\s)$([regex]::Escape($Path))(\s|$)")
+function Get-HandleBodies([string]$Masked, [string]$Name) {
+    $escaped = [regex]::Escape($Name)
+    $bodies = @()
+    foreach ($m in [regex]::Matches($Masked, "(?m)^[ \t]*handle[ \t]+@$escaped[ \t]*\{")) {
+        $body = Get-BraceBody $Masked ($m.Index + $m.Length)
+        if ($null -ne $body) { $bodies += $body }
+    }
+    return $bodies
+}
+
+# Tokens of positive `path ...` directives only. A `not path ...` line
+# contributes nothing, and an emptied path line contributes nothing, so both a
+# polarity flip and a blanked path list fail coverage instead of passing on the
+# tokens merely being present somewhere in the body.
+function Get-PositivePathTokens([string]$Body) {
+    $tokens = @()
+    if ([string]::IsNullOrEmpty($Body)) { return $tokens }
+    $inPositiveContinuation = $false
+    foreach ($line in ($Body -split "\r?\n")) {
+        $t = $line.Trim()
+        if ($t -eq '') { continue }
+        if ($t -match '^not\s+path\b') { $inPositiveContinuation = $false; continue }
+        $pathMatch = [regex]::Match($t, '^path\s+(?<rest>.*)$')
+        if ($pathMatch.Success) {
+            $rest = $pathMatch.Groups['rest'].Value.Trim()
+            if ($rest -eq '\') { $inPositiveContinuation = $true; continue }
+            $rest = $rest.TrimEnd('\').Trim()
+            foreach ($tok in ($rest -split '\s+')) { if ($tok -ne '') { $tokens += $tok } }
+            $inPositiveContinuation = $false
+            continue
+        }
+        if ($inPositiveContinuation) {
+            $tok = $t.TrimEnd('\').Trim()
+            if ($tok -ne '') { $tokens += $tok }
+        }
+    }
+    return $tokens
+}
+
+function Test-PositivePathToken([string]$Body, [string]$Path) {
+    return (@(Get-PositivePathTokens $Body) -contains $Path)
+}
+
+# True when some `handle @Name { ... }` block contains a real
+# `respond "<Message>" <Code>` directive line.
+function Test-HandleRespond([string]$Masked, [string]$Name, [string]$Message, [int]$Code) {
+    $pattern = '(?m)^[ \t]*respond[ \t]+"' + [regex]::Escape($Message) + '"[ \t]+' + $Code + '[ \t]*\r?$'
+    foreach ($body in @(Get-HandleBodies $Masked $Name)) {
+        if ($body -match $pattern) { return $true }
+    }
+    return $false
 }
 
 foreach ($file in @('Caddyfile', 'Caddyfile.local')) {
-    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+    $text = Read-RepoText $file
+    if ($null -eq $text) {
         $failures += "Missing file: $file"
         continue
     }
 
-    $content = Get-Content -LiteralPath $file -Raw
+    $content = Get-MaskedCaddy $text
     $isProduction = ($file -eq 'Caddyfile')
 
     # --- residual percent-escape guard (both listeners) ---
@@ -86,12 +207,12 @@ foreach ($file in @('Caddyfile', 'Caddyfile.local')) {
             $failures += "$file : @residual_escape must match a residual %xx escape"
         }
         foreach ($path in $residualPaths) {
-            if (-not (Test-PathToken $residualBody $path)) {
+            if (-not (Test-PositivePathToken $residualBody $path)) {
                 $failures += "$file : @residual_escape must cover $path"
             }
         }
-        if ($content -notmatch '(?s)handle\s+@residual_escape\s*\{[^}]*respond\s+"Not Found"\s+404') {
-            $failures += "$file : @residual_escape must answer 404"
+        if (-not (Test-HandleRespond $content 'residual_escape' 'Not Found' 404)) {
+            $failures += "$file : @residual_escape must answer 404 from a handle block"
         }
     }
 
@@ -109,7 +230,7 @@ foreach ($file in @('Caddyfile', 'Caddyfile.local')) {
 
         if ($isProduction) {
             foreach ($path in $adminPaths) {
-                if (-not (Test-PathToken $adminBody $path)) {
+                if (-not (Test-PositivePathToken $adminBody $path)) {
                     $failures += "$file : @blocked_admin_access must cover $path"
                 }
             }
@@ -122,31 +243,40 @@ foreach ($file in @('Caddyfile', 'Caddyfile.local')) {
             if ($content -match 'ADMIN_IP') {
                 $failures += "$file : public listener must not reintroduce an ADMIN_IP whitelist"
             }
-            if ($content -notmatch '(?s)handle\s+@blocked_admin_access\s*\{[^}]*respond\s+"Not Found"\s+404') {
-                $failures += "$file : blocked admin paths must answer 404"
+            if (-not (Test-HandleRespond $content 'blocked_admin_access' 'Not Found' 404)) {
+                $failures += "$file : blocked admin paths must answer 404 from a handle block"
             }
         }
         else {
             if ($adminBody -notmatch 'not\s+client_ip\s+\{\$ADMIN_IP\}') {
                 $failures += "$file : local admin matcher must exempt the loopback ADMIN_IP"
             }
-            if ($content -notmatch '(?s)handle\s+@blocked_admin_access\s*\{[^}]*respond\s+"Forbidden"\s+403') {
+            foreach ($path in $localAdminPaths) {
+                if (-not (Test-PositivePathToken $adminBody $path)) {
+                    $failures += "$file : local @blocked_admin_access must cover $path"
+                }
+            }
+            if (-not (Test-HandleRespond $content 'blocked_admin_access' 'Forbidden' 403)) {
                 $failures += "$file : local blocked admin paths must answer 403 from a handle block"
             }
             if ($content -match '(?m)^\s*respond\s+@blocked_admin_access\b') {
                 $failures += "$file : bare 'respond @blocked_admin_access' sorts after every handle block and is silently bypassed"
             }
+
             $nativeBody = Get-MatcherBody $content 'blockedNativeAuth'
             if ($null -eq $nativeBody) {
                 $failures += "$file : missing @blockedNativeAuth matcher"
             }
             else {
+                # Token-anchored, not substring: the matcher lists both "X" and
+                # "X/" forms, and a substring test let a sibling token satisfy a
+                # missing one (e.g. renaming X to X-xyz still passed).
                 foreach ($path in $nativeAuthPaths) {
-                    if ($nativeBody -notmatch [regex]::Escape($path)) {
+                    if (-not (Test-PositivePathToken $nativeBody $path)) {
                         $failures += "$file : @blockedNativeAuth must cover $path"
                     }
                 }
-                if ($content -notmatch '(?s)handle\s+@blockedNativeAuth\s*\{[^}]*respond\s+"Not Found"\s+404') {
+                if (-not (Test-HandleRespond $content 'blockedNativeAuth' 'Not Found' 404)) {
                     $failures += "$file : blocked native auth paths must answer 404 from a handle block"
                 }
                 if ($content -match '(?m)^\s*respond\s+@blockedNativeAuth\b') {
@@ -226,11 +356,11 @@ foreach ($file in @('Caddyfile', 'Caddyfile.local')) {
 
 # --- ingress port boundary: the admin tunnel must stay loopback-bound ---
 $composeFile = 'docker-compose.yml'
-if (-not (Test-Path -LiteralPath $composeFile -PathType Leaf)) {
+$composeContent = Read-RepoText $composeFile
+if ($null -eq $composeContent) {
     $failures += "Missing file: $composeFile"
 }
 else {
-    $composeContent = Get-Content -LiteralPath $composeFile -Raw
     if ([regex]::Matches($composeContent, '(?m)^\s*-\s*"127\.0\.0\.1:\$\{CADDY_HTTP_PORT:-18080\}:80"\s*$').Count -ne 1) {
         $failures += "$composeFile : public Caddy listener must stay loopback-bound"
     }
@@ -254,11 +384,11 @@ $requiredEnv = @(
     'ADMIN_AUTH_SESSION_TTL_SECONDS'
 )
 
-if (-not (Test-Path -LiteralPath $envFile -PathType Leaf)) {
+$envContent = Read-RepoText $envFile
+if ($null -eq $envContent) {
     $failures += "Missing file: $envFile"
 }
 else {
-    $envContent = Get-Content -LiteralPath $envFile -Raw
     foreach ($name in $requiredEnv) {
         if ($envContent -notmatch [regex]::Escape($name)) {
             $failures += "$envFile : missing $name"
