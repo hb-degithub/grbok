@@ -68,7 +68,7 @@ function Require-PlaceholderList {
     return $entries
 }
 
-$envContent = Get-Content -LiteralPath (Join-Path $repoRoot '.env.example') -Raw
+$envContent = [IO.File]::ReadAllText((Join-Path $repoRoot '.env.example'))
 Require-EnvPlaceholder $envContent 'MAIL_ARCHIVE_HMAC_SECRET' 'REPLACE_WITH_'
 Require-EnvPlaceholder $envContent 'MAIL_ARCHIVE_API_ENABLED' '' 'false'
 Require-EnvPlaceholder $envContent 'ACCOUNT_RETENTION_REMINDER_ENABLED' '' 'false'
@@ -150,7 +150,7 @@ $forbiddenContainerPatterns = @(
 )
 
 foreach ($composeName in @('docker-compose.yml', 'docker-compose.local.yml')) {
-    $content = Get-Content -LiteralPath (Join-Path $repoRoot $composeName) -Raw
+    $content = [IO.File]::ReadAllText((Join-Path $repoRoot $composeName))
     $pocketbase = Get-ServiceBlock $content 'pocketbase'
     $adminAuth = Get-ServiceBlock $content 'admin-auth'
     $caddy = Get-ServiceBlock $content 'caddy'
@@ -201,7 +201,7 @@ foreach ($composeName in @('docker-compose.yml', 'docker-compose.local.yml')) {
     }
 }
 
-$gitignoreContent = Get-Content -LiteralPath (Join-Path $repoRoot '.gitignore') -Raw
+$gitignoreContent = [IO.File]::ReadAllText((Join-Path $repoRoot '.gitignore'))
 foreach ($entry in @('mail-archive.env', 'rclone.conf', '*.agekey', 'age-identity*', 'archive-remote.conf')) {
     $entryPattern = "(?m)^$([regex]::Escape($entry))\r?$"
     if ([regex]::Matches($gitignoreContent, $entryPattern).Count -ne 1) {

@@ -34,9 +34,9 @@ foreach ($requiredPath in @($wrapperPath, $pythonPath, $runbookPath)) {
     }
 }
 
-$wrapper = if (Test-Path -LiteralPath $wrapperPath) { Get-Content -LiteralPath $wrapperPath -Raw } else { '' }
-$python = if (Test-Path -LiteralPath $pythonPath) { Get-Content -LiteralPath $pythonPath -Raw } else { '' }
-$runbook = if (Test-Path -LiteralPath $runbookPath) { Get-Content -LiteralPath $runbookPath -Raw } else { '' }
+$wrapper = if (Test-Path -LiteralPath $wrapperPath) { [IO.File]::ReadAllText($wrapperPath) } else { '' }
+$python = if (Test-Path -LiteralPath $pythonPath) { [IO.File]::ReadAllText($pythonPath) } else { '' }
+$runbook = if (Test-Path -LiteralPath $runbookPath) { [IO.File]::ReadAllText($runbookPath) } else { '' }
 
 Require-Match $wrapper '(?m)^set -euo pipefail\s*$' 'wrapper must enable strict shell mode'
 Require-Match $wrapper '(?m)^umask 077\s*$' 'wrapper must set umask 077'

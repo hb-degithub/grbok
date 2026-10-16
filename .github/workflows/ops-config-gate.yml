@@ -1,0 +1,108 @@
+# Ops config gate
+#
+# Gates the 8 PowerShell ops/config "check" scripts that assert the
+# production-critical configuration surface:
+#   - Caddy admin routing + PocketBase admin-UI exposure
+#     (check-admin-routes, check-admin-recovery)
+#   - OpenResty -> Caddy -> PocketBase real-IP chain (check-real-ip-chain)
+#   - SMTP / mail-archive / host-secret boundaries
+#     (check-mail-config, check-mail-archive-config, check-mail-security-env)
+#   - PocketBase admin auth + native auth facade cutover
+#     (check-pb-admin-auth, check-auth-facade-cutover)
+#
+# Why this workflow exists:
+#   scripts/pre-deploy-check.ps1 already aggregates these assertions, but it is
+#   a MANUAL pre-deploy script that no CI job ever ran. Because nothing executed
+#   them, the checks silently rotted for months: assertions drifted away from
+#   the configs they describe and no pipeline went red. This workflow makes the
+#   same 8 assertions a HARD gate on every main-bound PR and push.
+#
+# Hard gate, deliberately:
+#   Every step must exit 0. No step is marked to tolerate failure, no command is
+#   suffixed to force success, and nothing swallows an error. A non-zero exit
+#   from any script fails the job, and the job stops at the first failing check.
+#
+# Runner choice - windows-latest with `shell: powershell` (Windows PowerShell
+#   5.1), not pwsh 7:
+#     * The scripts were written for and verified against Windows PowerShell
+#       5.1, and pwsh 7 is not installed in the environment where they were
+#       developed, so pwsh compatibility could not be tested. Pinning
+#       windows-latest reproduces the verified environment rather than
+#       guessing at pwsh 7 behaviour.
+#     * Encoding is not a hazard here: every check script is pure ASCII (the two
+#       files carrying a UTF-8 BOM are ASCII-only after the BOM), so the
+#       runner's ANSI code page cannot corrupt the script text itself.
+#   Note: on a Linux runner these paths would need pwsh plus attention to the
+#   scripts' $PSScriptRoot / CWD mix, which is why this gate is Windows-hosted.
+#
+# Encoding: locale-independent by construction (hardened 2026-10-16).
+#   Windows PowerShell 5.1 decodes `Get-Content -Raw` with the machine's ANSI
+#   code page. Several of the FILES these checks assert on (docker-compose.yml,
+#   .env.example, .gitignore) carry UTF-8 Chinese comments, so on a DOUBLE-byte
+#   code page (936/GBK, 932, 949) a trailing 0x0A byte could be consumed as the
+#   second byte of a multi-byte character, merging two lines and producing a
+#   false "ADMIN_IP ... found 0" failure on an LF-only checkout. Adversarial
+#   verification reproduced exactly that failure on a 936 host.
+#   Every such read now uses [IO.File]::ReadAllText, which decodes UTF-8
+#   explicitly and ignores the code page, so the gate is safe on any runner
+#   locale. Do NOT reintroduce `Get-Content -Raw` for these config files.
+#
+# Scope: read-only configuration assertions. They start no PocketBase server,
+#   no Docker container and touch no production system.
+#
+# Working directory: each step runs with the repository root as CWD, which is
+#   the environment these scripts were verified in. They resolve most paths via
+#   $PSScriptRoot but a few read repository-relative paths.
+
+name: Ops config gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, codex/*]
+  workflow_dispatch: {}
+
+jobs:
+  ops-config-gate:
+    name: Ops config gate
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Each step below is a hard gate: a non-zero exit fails the job.
+      # The scripts are invoked directly (no wrapper, no error trapping),
+      # so the script's own exit code is the step's exit code.
+
+      - name: Admin recovery structure
+        shell: powershell
+        run: ./scripts/check-admin-recovery.ps1
+
+      - name: Admin route protection
+        shell: powershell
+        run: ./scripts/check-admin-routes.ps1
+
+      - name: Auth facade cutover
+        shell: powershell
+        run: ./scripts/check-auth-facade-cutover.ps1
+
+      - name: Mail archive config
+        shell: powershell
+        run: ./scripts/check-mail-archive-config.ps1
+
+      - name: Mail config boundaries
+        shell: powershell
+        run: ./scripts/check-mail-config.ps1
+
+      - name: Mail security env
+        shell: powershell
+        run: ./scripts/check-mail-security-env.ps1
+
+      - name: PocketBase admin auth
+        shell: powershell
+        run: ./scripts/check-pb-admin-auth.ps1
+
+      - name: Real IP chain
+        shell: powershell
+        run: ./scripts/check-real-ip-chain.ps1

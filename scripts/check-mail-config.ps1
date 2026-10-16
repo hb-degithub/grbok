@@ -113,7 +113,7 @@ foreach ($composeName in @('docker-compose.yml', 'docker-compose.local.yml')) {
         continue
     }
 
-    $text = Get-Content -LiteralPath $composePath -Raw
+    $text = [IO.File]::ReadAllText($composePath)
     $serviceNames = [regex]::Matches($text, '(?m)^  (?<name>[A-Za-z0-9_-]+):\s*$') |
         ForEach-Object { $_.Groups['name'].Value } | Sort-Object -Unique
     $blocks = @{}
