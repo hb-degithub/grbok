@@ -51,8 +51,12 @@ jobs:
         run: cd astro && npm run lint
 
       # 前端类型检查（astro check，覆盖 .astro 与 TS/TSX 文件）
+      # 注意:astro.config.mjs 对生产构建强制要求 PUBLIC_SITE_URL,与 Build 步同参
       - name: Check
         run: cd astro && npm run check
+        env:
+          PUBLIC_SITE_URL: https://blog.example.com
+          PUBLIC_POCKETBASE_URL: http://localhost:8090
 
       # 生产构建（前端静态产物），随后上传制品
       - name: Build
@@ -62,7 +66,7 @@ jobs:
           PUBLIC_POCKETBASE_URL: http://localhost:8090
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: astro-dist
           path: astro/dist/
@@ -70,7 +74,7 @@ jobs:
 
       - name: Upload test results on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: astro/test-results/
@@ -87,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: astro-dist
           path: astro/dist/
@@ -96,7 +100,7 @@ jobs:
         run: cd astro/dist && tar -czf "$RUNNER_TEMP/dist_pkg.tar.gz" client server
 
       - name: Upload package to server
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
@@ -106,7 +110,7 @@ jobs:
           target: /tmp/
 
       - name: Atomic sync & restart on server
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         env:
           PKG: ${{ runner.temp }}/dist_pkg.tar.gz
         with:

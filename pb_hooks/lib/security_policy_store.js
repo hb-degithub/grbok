@@ -33,6 +33,32 @@ var DEFAULTS = {
   comment_reply_notification: { limit: 60, windowSeconds: 60 },
   account_retention_notice: { limit: 10, windowSeconds: 60 },
   outbound_global: { limit: 60, windowSeconds: 60 },
+  // AI 写作助手：按管理员 actorId 计（ai_admin.js 的 subject = actorId）
+  ai_assist: { limit: 10, windowSeconds: 60 },
+  // AI 一键成文：单次生成 token 成本高，配额更紧、窗口更宽
+  ai_article: { limit: 5, windowSeconds: 300 },
+  // 2026-10-14 渗透测试 #5：密码登录限流下沉到持久化策略表
+  // （旧实现把桶键放在 ESA 注入的 ali-real-client-ip 上、且状态只存 globalThis 内存）。
+  // 窗口固定 900s —— 与用户可见文案「登录尝试过于频繁，请15分钟后再试」一致。
+  //   login_ip          按客户端 IP（IPv6 归一为 /64）计，保持原 10 次/15 分钟
+  //   login_email_ip    按 email|ip 组合计，保持原 5 次/15 分钟
+  //                     （故意不用纯 email：否则任意人可用受害者邮箱失败 5 次实施账号锁定 DoS）
+  //   login_email_any   按 email 跨 IP 聚合计，30 次/15 分钟 —— 唯一不可被边缘 IP 轮换绕过的维度
+  login_ip: { limit: 10, windowSeconds: 900 },
+  login_email_ip: { limit: 5, windowSeconds: 900 },
+  login_email_any: { limit: 30, windowSeconds: 900 },
+  // 2026-10-14 渗透测试 #7：读者 OTP 校验 per-IP 限流。
+  // 窗口固定 600s = challenge 有效期（auth_otp.js EXPIRES_SECONDS）；
+  // challenge 级「5 次失败整条作废」仍由 auth_otp_challenges.attempts 持久化承担。
+  otp_verify_ip: { limit: 20, windowSeconds: 600 },
+  // 2026-10-14 渗透测试 #3：点赞/收藏改为「必须登录」后，限流主体从边缘 IP 换成
+  // 已认证用户 id（action_auth_lib.js 的 USER_POLICY_KEYS 以这些键为首选维度，
+  // 键缺失时回退到 *_ip）。键名与阈值必须与
+  // pb_migrations/20261014120000_add_user_action_binding.pb.js 完全一致，
+  // 否则 getRatePolicySet() 的行数/键数校验不通过 → 全站限流 fail-closed 503。
+  post_like_user: { limit: 30, windowSeconds: 60 },
+  post_bookmark_user: { limit: 30, windowSeconds: 60 },
+  comment_like_user: { limit: 60, windowSeconds: 60 },
 };
 
 var BOUNDS = {
@@ -64,6 +90,17 @@ var BOUNDS = {
   comment_reply_notification: { minLimit: 60, maxLimit: 60, minWindow: 60, maxWindow: 60 },
   account_retention_notice: { minLimit: 10, maxLimit: 10, minWindow: 60, maxWindow: 60 },
   outbound_global: { minLimit: 60, maxLimit: 60, minWindow: 60, maxWindow: 60 },
+  ai_assist: { minLimit: 5, maxLimit: 30, minWindow: 60, maxWindow: 300 },
+  ai_article: { minLimit: 2, maxLimit: 20, minWindow: 120, maxWindow: 1800 },
+  // 窗口固定：login_* 必须 900s（文案承诺 15 分钟）；otp_verify_ip 必须 600s（对齐 challenge TTL）
+  login_ip: { minLimit: 5, maxLimit: 30, minWindow: 900, maxWindow: 900 },
+  login_email_ip: { minLimit: 3, maxLimit: 10, minWindow: 900, maxWindow: 900 },
+  login_email_any: { minLimit: 10, maxLimit: 60, minWindow: 900, maxWindow: 900 },
+  otp_verify_ip: { minLimit: 10, maxLimit: 60, minWindow: 600, maxWindow: 600 },
+  // 用户维度互动配额：下限不低于对应 *_ip 维度，上限放宽（单用户正常使用远低于持证滥用的多账号场景）
+  post_like_user: { minLimit: 10, maxLimit: 60, minWindow: 60, maxWindow: 300 },
+  post_bookmark_user: { minLimit: 10, maxLimit: 60, minWindow: 60, maxWindow: 300 },
+  comment_like_user: { minLimit: 20, maxLimit: 120, minWindow: 60, maxWindow: 300 },
 };
 
 function coded(code, message) {

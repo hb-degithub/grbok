@@ -15,7 +15,7 @@ $scriptPath = 'scripts/admin-recovery.ps1'
 if (-not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) {
     $failures += "Missing recovery script: $scriptPath"
 } else {
-    $content = Get-Content -LiteralPath $scriptPath -Raw
+    $content = [IO.File]::ReadAllText($scriptPath)
 
     $requiredPatterns = @(
         'UserEmail',

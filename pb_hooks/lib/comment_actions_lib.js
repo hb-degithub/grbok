@@ -1,12 +1,19 @@
 'use strict';
 
-// 评论点赞、编辑、删除业务逻辑
-// 所有函数自包含，不依赖闭包变量（PB 0.22 JSVM 限制）
+// 评论点赞、编辑、删除业务逻辑（2026-10-14 安全加固版）
+//
+// 点赞部分的安全模型变更（渗透测试 #3）：
+//   1. 必须已认证用户才能点赞（匿名 401）；
+//   2. 去重键绑定**用户 id**，不再使用「ESA 边缘 IP + User-Agent」；
+//   3. 补齐 DELETE /api/comments/:id/like（取消点赞，计数 -1 且不为负）；
+//   4. 持久化限流（用户维度优先，策略键缺失时回退 IP 维度）。
+// 编辑/删除评论仍走「邮箱验证码」身份通道，其 IP 限流保持不变。
+//
+// 所有函数自包含，不依赖闭包变量（PB 0.22 JSVM 限制）。
 
-// 注意：lib 模块作用域内 __hooks 不存在（模块顶层与函数体内 require 绝对
-// 路径都会抛 Invalid module），一律用相对路径 require。
 var rateLimit = require('./security_rate_limit.js');
 var verification = require('./comment_verification.js');
+var actionAuth = require('./action_auth_lib.js');
 
 function detailedError(status, code, retryAfter) {
   var data = {
@@ -68,6 +75,7 @@ function findComment(id) {
   }
 }
 
+// 编辑/删除/验证码仍按 IP 维度限流，保持既有行为不回归。
 function checkRateLimit(ip, policyKey) {
   var decision;
   try {
@@ -86,32 +94,117 @@ function checkRateLimit(ip, policyKey) {
   }
 }
 
+// 用户绑定的去重键：HMAC(scope, userId|commentId)。
+function userBoundHash(scope, userId, commentId) {
+  try {
+    return require('./mail_crypto.js').hashPrivate(scope, userId + '|' + commentId);
+  } catch (_) {
+    throw actionAuth.actionUnavailable();
+  }
+}
+
+function findCommentLike(txDao, commentId, visitorHash, userId) {
+  try {
+    return txDao.findFirstRecordByFilter(
+      'comment_likes',
+      'comment = {:comment} && visitor_hash = {:hash}',
+      { comment: commentId, hash: visitorHash },
+    );
+  } catch (_) {}
+  // 兼容历史记录（加固前的 IP 绑定行没有 user 字段）。
+  try {
+    return txDao.findFirstRecordByFilter(
+      'comment_likes',
+      'comment = {:comment} && user = {:user}',
+      { comment: commentId, user: userId },
+    );
+  } catch (_) {}
+  return null;
+}
+
+function beginAction(e, policyKey) {
+  var user = actionAuth.requireUser(e);
+  var ip = actionAuth.clientIp(e);
+  var fingerprint = actionAuth.clientFingerprint(e);
+  var policy = actionAuth.USER_POLICY_KEYS[policyKey];
+
+  var decision = actionAuth.checkRateLimit({
+    userPolicyKey: policyKey,
+    userSubject: String(user.id),
+    fallbackPolicyKey: policy.fallbackKey,
+    scope: policy.scope,
+    ip: ip,
+  });
+  if (!decision.allowed) {
+    throw actionAuth.actionRateLimited(
+      policy.scope.toUpperCase() + '_RATE_LIMITED',
+      decision.retryAfterSeconds,
+    );
+  }
+
+  var anomalyKey = actionAuth.fingerprintAnomalyKey(String(user.id), policyKey);
+  var anomalyLimited = false;
+  if (anomalyKey) {
+    var extra;
+    try {
+      extra = actionAuth.checkRateLimit({
+        userPolicyKey: '',
+        userSubject: '',
+        fallbackPolicyKey: anomalyKey,
+        scope: policy.scope + '_fingerprint',
+        ip: ip,
+      });
+    } catch (_) {
+      extra = { allowed: true };
+    }
+    if (extra && extra.allowed === false) {
+      actionAuth.auditAction('action_fingerprint_anomaly_blocked', {
+        actor: String(user.id),
+        targetCollection: 'users',
+        targetId: String(user.id),
+        summary: 'policy=' + policyKey + ' fingerprintPresent=' + String(fingerprint.present),
+      });
+      throw actionAuth.actionRateLimited(
+        policy.scope.toUpperCase() + '_FINGERPRINT_RATE_LIMITED',
+        Number(extra.retryAfterSeconds) || 1,
+      );
+    }
+    anomalyLimited = true;
+  }
+  actionAuth.noteFingerprint(String(user.id), fingerprint.value);
+
+  return {
+    userId: String(user.id),
+    ip: ip,
+    fingerprintPresent: Boolean(fingerprint.present),
+    fingerprintSource: fingerprint.present ? 'header' : 'absent',
+    limitSource: decision.degraded ? 'ip-fallback' : 'user',
+    anomaly: anomalyLimited,
+  };
+}
+
+function auditSafely(action, ctx, commentId, summary) {
+  actionAuth.auditAction(action, {
+    actor: ctx.userId,
+    targetCollection: 'comments',
+    targetId: String(commentId),
+    summary: String(summary || '').slice(0, 500),
+  });
+}
+
 /**
- * 点赞评论
+ * 点赞评论（幂等：重复点赞不重复计数）
  */
 function likeComment(e) {
   var commentId = pathParam(e, 'id');
   if (!commentId) throw new BadRequestError('Comment ID is required');
 
-  var ip = getClientIP(e);
-  checkRateLimit(ip, 'comment_like_ip');
-
-  // 用服务端 HMAC 生成稳定访客指纹，防止同一访客重复点赞；
-  // 原始 IP/User-Agent 不落库，commentId 纳入指纹避免跨评论关联。
-  var userAgent = '';
-  try { userAgent = String(e.request().header.get('User-Agent') || ''); } catch (_) {}
-  var visitorHash;
-  try {
-    visitorHash = require('./mail_crypto.js').hashPrivate(
-      'comment-like',
-      ip + '|' + userAgent + '|' + commentId,
-    );
-  } catch (_) {
-    throw detailedError(503, 'COMMENT_ACTION_UNAVAILABLE');
-  }
+  var ctx = beginAction(e, 'comment_like_user');
+  var visitorHash = userBoundHash('comment-like', ctx.userId, commentId);
 
   var result;
   var alreadyLiked = false;
+  var authorUserId = '';
   $app.dao().runInTransaction(function (txDao) {
     var comment = txDao.findRecordById('comments', commentId);
     if (!comment) throw new NotFoundError('Comment not found');
@@ -119,15 +212,7 @@ function likeComment(e) {
     if (comment.get('deleted')) throw new BadRequestError('Comment has been deleted');
 
     var currentLikes = comment.getInt('likes') || 0;
-    var existing = null;
-    try {
-      existing = txDao.findFirstRecordByFilter(
-        'comment_likes',
-        'comment = {:comment} && visitor_hash = {:hash}',
-        { comment: commentId, hash: visitorHash },
-      );
-    } catch (_) {}
-
+    var existing = findCommentLike(txDao, commentId, visitorHash, ctx.userId);
     if (existing) {
       alreadyLiked = true;
       result = currentLikes;
@@ -138,18 +223,14 @@ function likeComment(e) {
     likeRecord.set('comment', commentId);
     likeRecord.set('visitor_hash', visitorHash);
     try {
+      likeRecord.set('user', ctx.userId);
+    } catch (_) {}
+    try {
       txDao.saveRecord(likeRecord);
     } catch (_) {
       // 唯一索引处理并发重复请求：第二个事务仅在确有记录时按已点赞返回；
       // 其他数据库错误 fail closed，避免静默丢失真实故障。
-      var racedLike = null;
-      try {
-        racedLike = txDao.findFirstRecordByFilter(
-          'comment_likes',
-          'comment = {:comment} && visitor_hash = {:hash}',
-          { comment: commentId, hash: visitorHash },
-        );
-      } catch (_) {}
+      var racedLike = findCommentLike(txDao, commentId, visitorHash, ctx.userId);
       if (!racedLike) throw detailedError(503, 'COMMENT_ACTION_UNAVAILABLE');
       alreadyLiked = true;
       result = currentLikes;
@@ -161,7 +242,7 @@ function likeComment(e) {
     result = currentLikes + 1;
 
     // 获赞统计与经验（仅注册用户作者）；统计失败不阻断点赞主流程
-    var authorUserId = String(comment.get('author_user') || '').trim();
+    authorUserId = String(comment.get('author_user') || '').trim();
     if (authorUserId) {
       try {
         require('./user_level_lib.js').addLikeReceived(txDao, authorUserId, 1);
@@ -171,8 +252,78 @@ function likeComment(e) {
     }
   });
 
-  var response = { ok: true, likes: result };
+  auditSafely(alreadyLiked ? 'comment_like_duplicate' : 'comment_like', ctx, commentId,
+    'likes=' + String(result) + ' source=' + ctx.limitSource);
+
+  var response = {
+    ok: true,
+    likes: result,
+    fingerprintSeen: ctx.fingerprintPresent,
+    fingerprintSource: ctx.fingerprintSource,
+    limitSource: ctx.limitSource,
+  };
   if (alreadyLiked) response.alreadyLiked = true;
+  if (ctx.anomaly) response.anomaly = true;
+  return e.json(200, response);
+}
+
+/**
+ * 取消点赞评论（计数 -1，且绝不为负）
+ */
+function unlikeComment(e) {
+  var commentId = pathParam(e, 'id');
+  if (!commentId) throw new BadRequestError('Comment ID is required');
+
+  var ctx = beginAction(e, 'comment_like_user');
+  var visitorHash = userBoundHash('comment-like', ctx.userId, commentId);
+
+  var result;
+  var removed = false;
+  $app.dao().runInTransaction(function (txDao) {
+    var comment = txDao.findRecordById('comments', commentId);
+    if (!comment) throw new NotFoundError('Comment not found');
+
+    var currentLikes = comment.getInt('likes') || 0;
+    var existing = findCommentLike(txDao, commentId, visitorHash, ctx.userId);
+    if (!existing) {
+      result = currentLikes;
+      return;
+    }
+
+
+    txDao.deleteRecord(existing);
+    removed = true;
+    var next = currentLikes - 1;
+    if (next < 0) next = 0;
+    if (next !== currentLikes) {
+      comment.set('likes', next);
+      txDao.saveRecord(comment);
+    }
+    result = next;
+
+    // 作者获赞统计同步回退（尽力而为）
+    var authorUserId = String(comment.get('author_user') || '').trim();
+    if (authorUserId) {
+      try {
+        require('./user_level_lib.js').addLikeReceived(txDao, authorUserId, -1);
+      } catch (likeErr) {
+        console.error('[user-level] operation=like-received-rollback result=INTERNAL_ERROR detail=' + String(likeErr && likeErr.message || likeErr).slice(0, 200));
+      }
+    }
+  });
+
+  auditSafely(removed ? 'comment_unlike' : 'comment_unlike_noop', ctx, commentId,
+    'likes=' + String(result) + ' source=' + ctx.limitSource);
+
+  var response = {
+    ok: true,
+    likes: result,
+    removed: removed,
+    fingerprintSeen: ctx.fingerprintPresent,
+    fingerprintSource: ctx.fingerprintSource,
+    limitSource: ctx.limitSource,
+  };
+  if (ctx.anomaly) response.anomaly = true;
   return e.json(200, response);
 }
 
@@ -286,6 +437,7 @@ function sendVerification(e) {
 
 module.exports = {
   likeComment: likeComment,
+  unlikeComment: unlikeComment,
   editComment: editComment,
   deleteComment: deleteComment,
   sendVerification: sendVerification,

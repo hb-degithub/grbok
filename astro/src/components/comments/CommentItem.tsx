@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, type Variants } from 'framer-motion';
 import type { NestedComment, CommentFormData } from '../../types/pocketbase';
 import ReplyForm from './ReplyForm';
 import { cn } from '../../lib/utils';
 import { sanitizeText } from '../../lib/security';
 import { commentService } from '../../lib/services/commentService';
+import { isAuthRequiredError, isRateLimitedError } from '../../lib/services/actionRequest';
+import { getPocketBase } from '../../lib/pocketbase';
 import LevelBadge from '../ui/LevelBadge';
 
 interface CommentItemProps {
@@ -69,6 +71,8 @@ export default function CommentItem({
   const [likes, setLikes] = useState(comment.likes || 0);
   const [isLiked, setIsLiked] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
+  const [likeError, setLikeError] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [isReporting, setIsReporting] = useState(false);
@@ -136,16 +140,42 @@ export default function CommentItem({
 
   const canReply = depth < maxDepth;
 
-  /** 点赞 */
+  // SSR 安全：仅在浏览器端水合后读取登录态（点赞必须登录，见 2026-10-14 加固）
+  useEffect(() => {
+    try {
+      const pb = getPocketBase();
+      setIsAuthenticated(Boolean(pb?.authStore?.isValid && pb.authStore.record));
+    } catch {
+      setIsAuthenticated(false);
+    }
+  }, []);
+
+  /** 点赞 / 取消点赞（需登录；计数为服务端权威值） */
   const handleLike = async () => {
-    if (isLiked || isLiking || isDeleted) return;
+    if (isLiking || isDeleted) return;
+    if (!isAuthenticated) {
+      setLikeError('请先登录后再点赞');
+      return;
+    }
+    const nextLiked = !isLiked;
     setIsLiking(true);
     try {
-      const result = await commentService.likeComment(comment.id);
-      setLikes(result.likes);
-      setIsLiked(true);
+      const result = nextLiked
+        ? await commentService.likeComment(comment.id)
+        : await commentService.unlikeComment(comment.id);
+      if (typeof result?.likes === 'number') setLikes(result.likes);
+      setIsLiked(nextLiked);
+      setLikeError('');
     } catch (err) {
-      console.error('点赞失败:', err);
+      if (isAuthRequiredError(err)) {
+        setIsAuthenticated(false);
+        setLikeError('请先登录后再点赞');
+      } else if (isRateLimitedError(err)) {
+        setLikeError('操作过于频繁，请稍后再试');
+      } else {
+        console.error('点赞失败:', err);
+        setLikeError('点赞失败，请稍后再试');
+      }
     } finally {
       setIsLiking(false);
     }
@@ -292,6 +322,14 @@ export default function CommentItem({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <p className="break-words font-medium text-zinc-900 dark:text-white">{comment.author_name}</p>
+                {comment.is_ai && (
+                  <span
+                    className="inline-flex shrink-0 items-center rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent"
+                    title="该回复由 AI 生成"
+                  >
+                    AI
+                  </span>
+                )}
                 {comment.author_level && <LevelBadge level={comment.author_level} size="sm" />}
               </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
@@ -312,23 +350,32 @@ export default function CommentItem({
 
           {/* 操作栏 */}
           <div className="flex items-center gap-4">
-            {/* 点赞 */}
+            {/* 点赞（需登录；服务端按用户 id 去重） */}
             <button
+              type="button"
               onClick={handleLike}
-              disabled={isLiked || isLiking}
+              disabled={isLiking}
               className={cn(
                 'focus-ring inline-flex items-center gap-1.5 rounded-md text-sm transition-colors',
                 isLiked
                   ? 'text-teal-600 dark:text-teal-400'
                   : 'text-zinc-500 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-500'
               )}
-              aria-label={isLiked ? '已点赞' : '点赞'}
+              aria-label={isLiked ? '取消点赞' : '点赞'}
+              aria-pressed={isLiked}
+              title={!isAuthenticated ? '请先登录后再点赞' : undefined}
             >
               <svg className="h-4 w-4" fill={isLiked ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
               {likes > 0 && <span>{likes}</span>}
             </button>
+
+            {likeError && (
+              <span role="alert" className="text-xs text-red-600 dark:text-red-400">
+                {likeError}
+              </span>
+            )}
 
             {/* 回复 */}
             {canReply && (

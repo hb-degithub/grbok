@@ -1,13 +1,21 @@
 (function () {
 /// <reference path="../pb_data/types.d.ts" />
 
-// 评论点赞、编辑、删除端点
+// 评论点赞、编辑、删除端点（2026-10-14 安全加固：点赞需登录）
+//
+//   POST   /api/comments/:id/like  — 点赞（需登录，幂等）
+//   DELETE /api/comments/:id/like  — 取消点赞（需登录，计数 -1 且不为负）
+//
 // 注意：PB 0.22 JSVM 的 routerAdd 回调按源码字符串在请求级 runtime
 // 里重新 eval，访问不到本 IIFE 的闭包变量，因此 handler 必须自包含。
 
 routerAdd('POST', '/api/comments/:id/like', function (e) {
   return require(__hooks + '/lib/comment_actions_lib.js').likeComment(e);
 }, $apis.bodyLimit(4096));
+
+routerAdd('DELETE', '/api/comments/:id/like', function (e) {
+  return require(__hooks + '/lib/comment_actions_lib.js').unlikeComment(e);
+});
 
 routerAdd('POST', '/api/comments/:id/edit', function (e) {
   return require(__hooks + '/lib/comment_actions_lib.js').editComment(e);

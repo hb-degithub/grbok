@@ -681,7 +681,11 @@ export default function GridScan({
     let canceled = false;
     const load = async () => {
       try {
-        const faceapi = await import('face-api.js');
+        // face-api.js 已从依赖中移除（enableWebcam 恒为 false，此分支不会执行）；
+        // 变量化 specifier + @vite-ignore 避免打包器静态解析不存在的包，
+        // 运行时失败由外层 catch 兜底降级。
+        const faceApiSpecifier = 'face-api.js';
+        const faceapi = await import(/* @vite-ignore */ faceApiSpecifier);
         faceApiRef.current = faceapi;
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri(modelsPath),

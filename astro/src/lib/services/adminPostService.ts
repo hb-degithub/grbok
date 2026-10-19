@@ -17,6 +17,8 @@ export interface Post {
   seo_title?: string;
   seo_description?: string;
   seo_keywords?: string;
+  /** 该文章由 AI 一键成文创建（后台列表显示 AI 徽标） */
+  is_ai?: boolean;
   created: string;
   updated: string;
 }

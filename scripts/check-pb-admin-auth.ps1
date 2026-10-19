@@ -13,7 +13,7 @@ $migration = Get-ChildItem -Path 'pb_migrations' -Filter '*_create_admin_auth_ha
 if (-not $migration) {
     $failures += 'Missing migration pb_migrations/*_create_admin_auth_hardening.pb.js'
 } else {
-    $content = Get-Content -LiteralPath $migration.FullName -Raw
+    $content = [IO.File]::ReadAllText($migration.FullName)
 
     $requiredCollections = @('admin_passkeys', 'webauthn_challenges', 'admin_verified_sessions', 'admin_recovery_codes')
     foreach ($name in $requiredCollections) {
@@ -34,7 +34,7 @@ $stepUpMigration = Get-Item -LiteralPath 'pb_migrations/20260716100000_create_ad
 if (-not $stepUpMigration) {
     $failures += 'Missing migration pb_migrations/20260716100000_create_admin_step_up_security.pb.js'
 } else {
-    $stepUpContent = Get-Content -LiteralPath $stepUpMigration.FullName -Raw
+    $stepUpContent = [IO.File]::ReadAllText($stepUpMigration.FullName)
 
     $requiredCollections = @('admin_step_up_sessions', 'admin_passkey_state', 'admin_security_audits')
     foreach ($name in $requiredCollections) {
@@ -88,7 +88,7 @@ $cutoverMigration = Get-Item -LiteralPath 'pb_migrations/20260716100500_harden_a
 if (-not $cutoverMigration) {
     $failures += 'Missing migration pb_migrations/20260716100500_harden_admin_recovery_cutover.pb.js'
 } else {
-    $cutoverContent = Get-Content -LiteralPath $cutoverMigration.FullName -Raw
+    $cutoverContent = [IO.File]::ReadAllText($cutoverMigration.FullName)
     foreach ($field in @('recovery_nonce_hmac', 'recovery_expires_at')) {
         if ($cutoverContent -notmatch [regex]::Escape($field)) {
             $failures += "Recovery cutover migration missing field $field"
@@ -107,16 +107,17 @@ $hookFile = 'pb_hooks/admin_security.pb.js'
 if (-not (Test-Path -LiteralPath $hookFile -PathType Leaf)) {
     $failures += "Missing hook file: $hookFile"
 } else {
-    $hookContent = Get-Content -LiteralPath $hookFile -Raw
+    $hookContent = [IO.File]::ReadAllText($hookFile)
+    # fb787f0 (2026-07-24) replaced the passkey step-up routes with TOTP. The
+    # passkey endpoints (/step-up/options, /step-up/verify, /passkeys*) no longer
+    # exist anywhere in the hook tree, so demanding them had been red since then.
     $requiredRoutes = @(
         '/api/blog-admin/step-up/status',
-        '/api/blog-admin/step-up/options',
-        '/api/blog-admin/step-up/verify',
         '/api/blog-admin/step-up/revoke',
-        '/api/blog-admin/passkeys',
-        '/api/blog-admin/passkeys/registration/options',
-        '/api/blog-admin/passkeys/registration/verify',
-        '/api/blog-admin/passkeys/:id/revoke',
+        '/api/blog-admin/totp/setup',
+        '/api/blog-admin/totp/confirm',
+        '/api/blog-admin/totp/verify',
+        '/api/blog-admin/totp/revoke',
         '/api/blog-admin/local-recovery'
     )
     foreach ($route in $requiredRoutes) {

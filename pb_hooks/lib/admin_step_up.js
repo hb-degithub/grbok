@@ -95,6 +95,24 @@ function hash(secret, namespace, value) {
   return $security.hs256(namespace + ':' + String(value), secret);
 }
 
+// step-up 会话的 IP 绑定键:IPv4 绑 /24、IPv6 绑 /64。
+// 精确 IP 绑定在移动网络/多出口 NAT 下会因出口 IP 漂移反复失效
+// (2026-09-18 实测:用户 90 秒内漂移 3 个同段 IP 导致 2FA 反复"验证失败"),
+// 网段绑定在同一会话劫持防护意义不变的前提下消除误伤。
+function ipBindKey(ip) {
+  var v = String(ip || '').trim();
+  if (!v) return '';
+  if (v.indexOf(':') === -1) {
+    var parts = v.split('.');
+    return parts.length === 4 ? 'v4:' + parts[0] + '.' + parts[1] + '.' + parts[2] + '.0/24' : '';
+  }
+  try {
+    return 'v6:' + require('./security_rate_limit.js').ipv6Prefix64(v);
+  } catch (_) {
+    return '';
+  }
+}
+
 function equal(left, right) {
   if (typeof left !== 'string' || typeof right !== 'string') return false;
   return $security.equal(left, right);
@@ -148,7 +166,7 @@ function requireAdminStepUp(ctx, options) {
     if (!equal(record.getString('secret_hmac'), hash(hashSecret, 'step-up-secret', rawSecret))) forbidden();
     if (!equal(record.getString('client_session_hmac'), hash(hashSecret, 'step-up-client-session', clientSession))) forbidden();
     if (!equal(record.getString('fingerprint_hash'), hash(hashSecret, 'step-up-fingerprint', fingerprint))) forbidden();
-    if (!equal(record.getString('ip_hash'), hash(hashSecret, 'step-up-ip', ip))) forbidden();
+    if (!equal(record.getString('ip_hash'), hash(hashSecret, 'step-up-ip', ipBindKey(ip)))) forbidden();
     if (!equal(record.getString('user_agent_hash'), hash(hashSecret, 'step-up-ua', userAgent))) forbidden();
 
     return {
@@ -321,4 +339,5 @@ module.exports = {
   requireAdminStepUp: requireAdminStepUp,
   requireProtectedWrite: requireProtectedWrite,
   auditManagedWrite: auditManagedWrite,
+  ipBindKey: ipBindKey,
 };

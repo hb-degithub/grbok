@@ -27,7 +27,10 @@ onRecordBeforeCreateRequest((e) => {
       } else {
         record = $app.dao().findFirstRecordByFilter('settings', 'key = {:key}', { key: key });
       }
-      const value = record.get('value');
+      // PB 0.22 JSVM：json 字段经 record.get() 返回字节数组（true 变成 [116,114,117,101]），
+      // 永远 !== true/'true'。必须 getString 取 JSON 文本再解析（与 ai_config.readBannedWords 同款）。
+      // 兼容两种存储形态：json 布尔 true（'true'）与字符串 true（'"true"'）。
+      const value = JSON.parse(record.getString('value'));
       return value === true || value === 'true';
     } catch (_) {
       return fallback;
@@ -68,6 +71,9 @@ onRecordBeforeCreateRequest((e) => {
   const parentId = String(record.get('parent_id') || '').trim();
   const authorName = stripTags(record.get('author_name'));
   const authorEmail = String(record.get('author_email') || '').trim();
+  // #8（2026-10-14）：最终落库的邮箱。冒名评论（邮箱属于他人账号）会被剥离为空，
+  // 因此不能用 const 的 authorEmail 直接落库（见下方 impersonationAttempt 分支）。
+  let effectiveAuthorEmail = authorEmail;
   const content = stripTags(record.get('content'));
 
   if (!boolSetting('enable_comments', true)) throw new BadRequestError('Comments are disabled.');
@@ -82,6 +88,20 @@ onRecordBeforeCreateRequest((e) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(authorEmail)) throw new BadRequestError('Invalid email format.');
   }
   if (hasSpamPattern(content)) throw new BadRequestError('Comment contains suspicious content.');
+
+  // 违禁词本地拦截（独立开关，AI 未配置也生效；命中不透露具体词）
+  // 词表经 ai_config.commentPolicy 读取（内部用 getString+JSON.parse 规避
+  // PB 0.22 JSVM json 字段 record.get() 返回字节数组的坑）。
+  const aiPolicy = require(__hooks + '/lib/ai_config.js').commentPolicy($app.dao());
+  if (aiPolicy.bannedWordsEnabled && aiPolicy.bannedWords.length) {
+    const lowerContent = content.toLowerCase();
+    for (let wi = 0; wi < aiPolicy.bannedWords.length; wi++) {
+      const word = String(aiPolicy.bannedWords[wi] || '').toLowerCase();
+      if (word && lowerContent.indexOf(word) !== -1) {
+        throw new BadRequestError('评论包含不适宜发布的内容，请修改后重试');
+      }
+    }
+  }
 
   // H4/H5: anti-impersonation + side-channel elimination.
   // If author_email belongs to a registered user, the requester MUST be
@@ -121,6 +141,21 @@ onRecordBeforeCreateRequest((e) => {
       // Anonymous or wrong-user comment using a registered email. Silently
       // force into pending; response stays identical to the anonymous path.
       impersonationAttempt = true;
+
+      // 2026-10-14 渗透测试 #8：该邮箱属于**他人**账号，剥离作者邮箱，
+      // 避免以他人身份落库/展示（此前的实现会原样保存并仅置 pending）。
+      // 响应仍与匿名路径同构（评审队列 pending），不额外泄露邮箱是否已注册。
+      try {
+        $app.logger().warn(
+          '[validate-comment] stripped author_email owned by another account',
+          'postId', String(postId || ''),
+          'ownerUserId', String(ownerUser.id || ''),
+          'attemptedEmail', String(authorEmail || '')
+        );
+      } catch (_) {}
+      effectiveAuthorEmail = '';
+      record.set('author_email', '');
+      record.set('author_user', '');
     } else if (!ownerUser.verified()) {
       // Authenticated owner but email not verified — keep the verification
       // gate. No side-channel: the requester is the account owner and
@@ -206,8 +241,12 @@ onRecordBeforeCreateRequest((e) => {
   }
 
   record.set('author_name', authorName);
-  record.set('author_email', authorEmail);
+  record.set('author_email', effectiveAuthorEmail);
   record.set('content', content);
+
+  // AI 管线字段只能由服务端 worker 写入，客户端提交一律清零
+  record.set('is_ai', false); record.set('ai_moderated', false); record.set('ai_replied', false);
+  record.set('ai_verdict', ''); record.set('ai_reason', '');
   
   // 等级权限：Lv3+ 用户评论免审核
   var authorLevel = 1;
@@ -222,7 +261,9 @@ onRecordBeforeCreateRequest((e) => {
   // disabled — they must pass admin review. Legitimate comments respect the
   // moderation setting as before.
   // Lv3+ 用户评论免审核（除非 moderation 强制开启）
-  const baseStatus = boolSetting('comment_moderation', true) && authorLevel < 3 ? 'pending' : 'approved';
+  // AI 审核档位开启时，非信任用户评论一律先 pending，交给 AI worker 判定
+  const aiNeedsReview = aiPolicy.commentMode !== 'off' && authorLevel < 3;
+  const baseStatus = (boolSetting('comment_moderation', true) || aiNeedsReview) && authorLevel < 3 ? 'pending' : 'approved';
   record.set('status', impersonationAttempt ? 'pending' : baseStatus);
   record.set('ip_address', ip || '');
 

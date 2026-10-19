@@ -96,6 +96,20 @@
 | GET | `/api/blog-admin/security/registration-mode` | 读取注册模式 |
 | PUT | `/api/blog-admin/security/registration-mode` | 更新注册模式 |
 
+### 3.5 AI 助手
+
+以下接口由 `pb_hooks/ai_admin.pb.js`（薄壳）+ `pb_hooks/lib/ai_admin.js` 实现，全部要求可信管理 IP（`ADMIN_IP` 白名单，未配置时不启用）+ step-up。
+
+| 方法 | 路径 | 访问要求 | 用途 | 限流 |
+|---|---|---|---|---|
+| GET | `/api/blog-admin/ai/settings` | super_admin | 读取 AI 配置（脱敏，绝不含 api_key 明文） | 无 |
+| PUT | `/api/blog-admin/ai/settings` | super_admin | 保存 AI 配置（api_key 加密存储，留空保留原值） | 无 |
+| POST | `/api/blog-admin/ai/test` | super_admin | 连通性测试（200 + ok/error 结构回传） | `ai_assist` |
+| POST | `/api/blog-admin/ai/article` | author/admin/super_admin | 一键成文（主题→HTML 全文，按 `article_publish_mode` 落库） | `ai_article`（5次/300s） |
+| POST | `/api/blog-admin/ai/assist` | author/admin/super_admin | 写作辅助（meta 元信息 / polish 润色 / continue 续写） | `ai_assist`（10次/60s） |
+
+配套：`pb_hooks/ai_comment_worker.pb.js` 每分钟 cron 驱动评论审核/回复管线（`pb_hooks/lib/ai_comment_worker.js`）；违禁词拦截在 `pb_hooks/validate_comment.pb.js` 提交路径内联执行。限流策略默认值见 `pb_hooks/lib/security_policy_store.js`（`ai_assist`/`ai_article`）。
+
 ## 4. PocketBase 原生 REST
 
 ### 4.1 标准路径模式

@@ -4,7 +4,7 @@ import CountUp from '../reactbits/CountUp';
 import { fadeUp, staggerContainer } from '../../lib/motion';
 import { useStats } from '../../hooks/domains/useStats';
 import DualModeGeoMap from './DualModeGeoMap';
-import { ALPHA2_TO_NUMERIC, ALPHA2_TO_ZH_NAME, PROVINCE_TO_ADCODE } from '../../lib/geoConstants';
+import { ALPHA2_TO_NUMERIC, ALPHA2_TO_ZH_NAME } from '../../lib/geoConstants';
 import type { StatsData } from '../../lib/services/statsService';
 
 interface StatsDashboardProps {
@@ -31,11 +31,10 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
 
   // 地理数据处理 - 使用可选链避免空值错误
   const geoCountries = data?.geo?.countries || [];
-  const geoRegions = data?.geo?.regions || [];
 
   // 以下计算在 data 存在时才会执行，使用 useMemo 缓存结果
   // 注意：useMemo 必须在所有条件 return 之前调用，违反 Hooks 规则会导致崩溃
-  const { worldMapData, chinaMapData, maxGeoViews } = useMemo(() => {
+  const { worldMapData, maxGeoViews } = useMemo(() => {
     const maxViews = Math.max(...geoCountries.map((c) => c.views), 1);
 
     // 国际地图数据
@@ -57,27 +56,8 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
       }
     }
 
-    // 中国地图数据（按省份聚合）
-    const chinaData: Record<string, { views: number; uv: number; name: string }> = {};
-    const provinceMap: Record<string, { views: number; uv: number }> = {};
-    
-    // 从 regions 数据聚合中国各省份
-    for (const r of geoRegions) {
-      if (r.country === 'CN' && r.region) {
-        const prov = r.region;
-        if (!provinceMap[prov]) provinceMap[prov] = { views: 0, uv: 0 };
-        provinceMap[prov].views += r.views;
-        provinceMap[prov].uv += r.uniqueVisitors;
-      }
-    }
-    
-    for (const [prov, provData] of Object.entries(provinceMap)) {
-      const adcode = PROVINCE_TO_ADCODE[prov];
-      if (adcode) chinaData[adcode] = { views: provData.views, uv: provData.uv, name: prov };
-    }
-
-    return { worldMapData: worldData, chinaMapData: chinaData, maxGeoViews: maxViews };
-  }, [geoCountries, geoRegions]);
+    return { worldMapData: worldData, maxGeoViews: maxViews };
+  }, [geoCountries]);
 
   if (error) {
     return (
@@ -187,35 +167,43 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
 
       {/* 访客地理分布 - 所有变体都显示 */}
       {geoCountries.length > 0 && (
-        <motion.div variants={fadeUp} className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <h3 className="mb-4 text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">访客地理分布</h3>
-          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+        <motion.div variants={fadeUp} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+          <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold tracking-tight text-zinc-950 dark:text-zinc-50">访客地理分布</h3>
+              <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">每一次到访，都在这里留下足迹。</p>
+            </div>
+            <span className="text-xs text-zinc-500 dark:text-zinc-400"><b className="mr-1 font-mono text-base font-medium text-teal-700 dark:text-teal-300">{Object.keys(worldMapData).length}</b> 个国家 / 地区</span>
+          </div>
+          <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_220px]">
             {/* 地图 */}
             <DualModeGeoMap
               worldData={worldMapData}
-              chinaData={chinaMapData}
-              maxViews={maxGeoViews}
             />
             {/* 排名 */}
-            <div className="space-y-3">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">国家/地区 TOP 10</h4>
-              <div className="space-y-2">
+            <div className="min-w-0 border-t border-zinc-100 pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-2 dark:border-zinc-800">
+              <div className="mb-5 flex items-baseline justify-between gap-2">
+                <h4 className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">到访最多的地方</h4>
+                <span className="font-mono text-[9px] tracking-wider text-zinc-400">TOP 10</span>
+              </div>
+              <div className="space-y-5">
                 {geoCountries.slice(0, 10).map((c, i) => (
                   <div key={`${c.country}-${i}`} className="flex items-center gap-3">
                     <span className="w-5 shrink-0 text-right font-mono text-xs text-zinc-400">{i + 1}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{c.country}</span>
-                        <span className="ml-2 shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
-                          {c.views} 次 / {c.uniqueVisitors} 人
+                        <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{ALPHA2_TO_ZH_NAME[c.country] || c.country}</span>
+                        <span className="ml-2 shrink-0 font-mono text-xs text-zinc-600 dark:text-zinc-300">
+                          {c.views.toLocaleString()} <span className="font-sans text-[10px] text-zinc-400">次</span>
                         </span>
                       </div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                      <div className="mt-2 h-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
                         <div
-                          className="h-full rounded-full bg-teal-500 transition-all"
+                          className="h-full rounded-full bg-teal-600 dark:bg-teal-400"
                           style={{ width: `${(c.views / maxGeoViews) * 100}%` }}
                         />
                       </div>
+                      <div className="mt-1.5 text-[10px] text-zinc-400 dark:text-zinc-500">{c.uniqueVisitors.toLocaleString()} 位独立访客</div>
                     </div>
                   </div>
                 ))}

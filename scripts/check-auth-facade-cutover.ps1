@@ -31,7 +31,20 @@ foreach($path in @('/api/collections/users/confirm-password-reset','/api/collect
 Require ($configs.Contains('/api/blog-auth/register')) 'registration facade route missing'
 Require ($configs.Contains('/api/blog-auth/password-reset/request')) 'mail facade route missing'
 $registerUi=Read 'astro\src\components\auth\RegisterForm.tsx'; $welcomeUi=Read 'astro\src\components\effects\WelcomeOverlay.tsx'
-Require (-not (($registerUi+$welcomeUi) -match '\u6ce8\u518c\u6210\u529f|\u6ce8\u518c\u5e76\u767b\u5f55|\u90ae\u7bb1\u53ef\u80fd\u5df2\u88ab\u6ce8\u518c')) 'registration UI still implies account creation or login'
+Require (-not (($registerUi+$welcomeUi) -match '\u6ce8\u518c\u5e76\u767b\u5f55|\u90ae\u7bb1\u53ef\u80fd\u5df2\u88ab\u6ce8\u518c')) 'registration UI still implies account creation or login'
+# '\u6ce8\u518c\u6210\u529f\uFF01' may only appear on the no-email branch of the
+# WelcomeOverlay ternary. The facade sets verified = !email
+# (pb_hooks/lib/registration_facade.js:97), so a registration without an email
+# really is created and immediately usable; with an email the success message
+# stays neutral so a duplicate mailbox is indistinguishable. 8d943dc (2026-08-08)
+# made the email optional and legitimately reintroduced the literal that
+# 7f17762 (2026-07-16) had banned outright.
+$successLines=[regex]::Matches($welcomeUi,'(?m)^.*\u6ce8\u518c\u6210\u529f\uFF01.*$')
+Require ($successLines.Count -ge 1) 'WelcomeOverlay no-email success wording missing'
+foreach($successLine in $successLines){
+    Require ($successLine.Value -match '\u63d0\u4ea4\u540e\u8bf7\u9a8c\u8bc1\u90ae\u7bb1') 'registration success wording must remain the no-email branch of the neutral-message ternary'
+}
+Require ($registerUi -notmatch '\u6ce8\u518c\u6210\u529f') 'RegisterForm must not claim registration success'
 Require (($registerUi -match '\u63d0\u4ea4\u6ce8\u518c') -and ($registerUi -match '\u8bf7\u9a8c\u8bc1\u90ae\u7bb1')) 'RegisterForm pending-verification wording missing'
 Require ($welcomeUi -match '\u63d0\u4ea4\u540e\u8bf7\u9a8c\u8bc1\u90ae\u7bb1\uff0c\u9a8c\u8bc1\u5b8c\u6210\u540e\u53ef\u8bc4\u8bba') 'WelcomeOverlay verification-before-comment wording missing'
 Write-Host 'PASS native registration/account-mail cutover preserves token confirmation routes'

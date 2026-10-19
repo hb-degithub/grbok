@@ -68,10 +68,28 @@ function classifyUA(ua) {
   return 'desktop';
 }
 
+// 路径长度上限（与旧实现一致，显式命名）。
+const MAX_PATH_LENGTH = 200;
+
+// 允许的路径字符集白名单（2026-10-14 渗透测试 #9 修复；旧实现在 :71-76 只做
+// 长度/前缀/`..`/反斜杠校验，<b>hi</b>、\x00、任意文本都能写进公开 topPages）。
+//   * RFC 3986 unreserved（A-Za-z0-9 - . _ ~）与 sub-delims/:/@（!$&'()*+,;=:@）
+//   * 路径分隔符 /、百分号编码引导符 %（另由 PATH_BAD_ESCAPE_PATTERN 要求后接两位十六进制）
+//   * 查询/片段分隔符 ? #（location.pathname 不含它们，extractPostSlug 也会剥离，放行无害）
+//   * CJK 汉字 / 日文假名 / 韩文音节的"原字符"：浏览器 location.pathname 通常已把非 ASCII
+//     百分号编码为 %XX，但直接放行这些码位不会引入 HTML 注入面（< > " ' 反引号 与全部
+//     控制字符都不在集合内），却能避免误伤 /tags/中文 这类路由。
+// 明确拒绝：空白（含 \t \n \u3000）、\x00-\x1f、\x7f、< > " ` \ { } | ^ 等。
+const PATH_ALLOWED_PATTERN = /^[A-Za-z0-9\-._~!$&'()*+,;=:@\/%?#\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af]+$/;
+// 每个 % 必须是合法百分号编码引导：浏览器只会产出 %XX，裸 % 或 %zz 一律拒绝。
+const PATH_BAD_ESCAPE_PATTERN = /%(?![0-9A-Fa-f]{2})/;
+
 function isValidPath(path) {
-  if (typeof path !== 'string' || path.length === 0 || path.length > 200) return false;
+  if (typeof path !== 'string' || path.length === 0 || path.length > MAX_PATH_LENGTH) return false;
   if (path[0] !== '/' || path.startsWith('//')) return false;
   if (path.includes('..') || path.includes('\\')) return false;
+  if (!PATH_ALLOWED_PATTERN.test(path)) return false;
+  if (PATH_BAD_ESCAPE_PATTERN.test(path)) return false;
   return true;
 }
 
@@ -281,6 +299,20 @@ function blogStats(e) {
   }
 
   const range = e.queryParam('range') === '7d' ? '7d' : '30d';
+  const wantGeo = e.queryParam('geo') === '1';
+  const adminRequest = isAdminRequest(e);
+  const wantDetail = e.queryParam('detail') === '1' && adminRequest;
+
+  // 聚合结果 60s 进程缓存：page_views 的 COUNT DISTINCT 全表扫描随数据量增长，
+  // /stats 页与首页 StatusMini 重复查询直接命中内存。detail 结果含管理视角数据，
+  // 与公开结果分键存放，缓存 key 携带 admin 标记防串。
+  const cacheKey = range + '|' + (wantGeo ? 'g1' : 'g0') + '|' + (wantDetail ? 'd1' : 'd0') + (adminRequest ? '|a1' : '|a0');
+  const queryCache = globalThis.statsQueryResultCache || (globalThis.statsQueryResultCache = {});
+  const cached = queryCache[cacheKey];
+  if (cached && cached.expiry > Date.now()) {
+    return e.json(200, cached.data);
+  }
+
   const from = rangeStart(range);
   const todayFrom = new Date(new Date().setHours(0, 0, 0, 0))
     .toISOString().replace('T', ' ').slice(0, 19);
@@ -322,7 +354,7 @@ function blogStats(e) {
       })),
     };
 
-    if (e.queryParam('detail') === '1' && isAdminRequest(e)) {
+    if (wantDetail) {
       const uaRaw = queryRows(
         'SELECT ua_category, COUNT(*) AS c FROM page_views WHERE event = {:ev} AND created >= {:from} GROUP BY ua_category ORDER BY c DESC',
         { ev: 'pageview', from: from }, { ua_category: '', c: 0 });
@@ -335,7 +367,7 @@ function blogStats(e) {
     }
 
     // 访客地理聚合（geo=1 时对所有用户开放；仅返回聚合数字与国家/省份名称，不返回 visitor_hash 与单条记录）
-    if (e.queryParam('geo') === '1') {
+    if (wantGeo) {
       const countryRaw = queryRows(
         "SELECT country, COUNT(*) AS c, COUNT(DISTINCT visitor_hash) AS uv FROM page_views WHERE event = {:ev} AND created >= {:from} AND country != '' GROUP BY country ORDER BY c DESC",
         { ev: 'pageview', from: from }, { country: '', c: 0, uv: 0 });
@@ -358,6 +390,7 @@ function blogStats(e) {
       };
     }
 
+    queryCache[cacheKey] = { expiry: Date.now() + 60 * 1000, data: response };
     return e.json(200, response);
   } catch (_) {
     console.error('[stats][STATS_QUERY_FAILED]');
@@ -410,4 +443,7 @@ module.exports = {
   blogStats: blogStats,
   friendLinkStats: friendLinkStats,
   retentionCleanup: retentionCleanup,
+  // 供测试夹具直接穷举字符集白名单（tests/security-rate/login_otp_rate_fixture.pb.js）
+  isValidPath: isValidPath,
+  MAX_PATH_LENGTH: MAX_PATH_LENGTH,
 };

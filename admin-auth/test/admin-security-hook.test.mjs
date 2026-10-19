@@ -55,7 +55,8 @@ async function loadAdminStepUpModule() {
     secret_hmac: `hash:step-up-secret:${rawSecret}:${hashSecret.length}`,
     client_session_hmac: `hash:step-up-client-session:client-session:${hashSecret.length}`,
     fingerprint_hash: `hash:step-up-fingerprint:fingerprint:${hashSecret.length}`,
-    ip_hash: `hash:step-up-ip:203.0.113.8:${hashSecret.length}`,
+    // 2026-09-18 起 step-up IP 绑定按 /24 网段(出口 IP 漂移兼容),夹具同步
+    ip_hash: `hash:step-up-ip:v4:203.0.113.0/24:${hashSecret.length}`,
     user_agent_hash: `hash:step-up-ua:test-agent:${hashSecret.length}`,
   };
   const record = { getString(name) { return values[name] || ''; } };

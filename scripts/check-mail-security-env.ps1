@@ -68,7 +68,7 @@ function Require-PlaceholderList {
     return $entries
 }
 
-$envContent = Get-Content -LiteralPath (Join-Path $repoRoot '.env.example') -Raw
+$envContent = [IO.File]::ReadAllText((Join-Path $repoRoot '.env.example'))
 Require-EnvPlaceholder $envContent 'MAIL_ARCHIVE_HMAC_SECRET' 'REPLACE_WITH_'
 Require-EnvPlaceholder $envContent 'MAIL_ARCHIVE_API_ENABLED' '' 'false'
 Require-EnvPlaceholder $envContent 'ACCOUNT_RETENTION_REMINDER_ENABLED' '' 'false'
@@ -113,8 +113,13 @@ $pocketBaseEntries = @(
     'ACCOUNT_RETENTION_DELETE_ENABLED=${ACCOUNT_RETENTION_DELETE_ENABLED:-false}'
 )
 $caddyEntries = @{
+    # The caddy service must receive ADMIN_IP with the reserved non-matching
+    # default: an earlier revision used ${ADMIN_IP:-0.0.0.0/0} here, which
+    # publicly exposed the PocketBase admin UI. The exact literal changed in
+    # f53ce9d (2026-07-26) and was made safe again by fad3632 (2026-08-31); this
+    # assertion demanded the pre-f53ce9d bare form and had been red since.
     'docker-compose.yml' = @(
-        'ADMIN_IP=${ADMIN_IP}',
+        'ADMIN_IP=${ADMIN_IP:-192.0.2.1}',
         'OPENRESTY_TRUSTED_PROXY=${OPENRESTY_TRUSTED_PROXY}'
     )
     'docker-compose.local.yml' = @(
@@ -145,7 +150,7 @@ $forbiddenContainerPatterns = @(
 )
 
 foreach ($composeName in @('docker-compose.yml', 'docker-compose.local.yml')) {
-    $content = Get-Content -LiteralPath (Join-Path $repoRoot $composeName) -Raw
+    $content = [IO.File]::ReadAllText((Join-Path $repoRoot $composeName))
     $pocketbase = Get-ServiceBlock $content 'pocketbase'
     $adminAuth = Get-ServiceBlock $content 'admin-auth'
     $caddy = Get-ServiceBlock $content 'caddy'
@@ -196,7 +201,7 @@ foreach ($composeName in @('docker-compose.yml', 'docker-compose.local.yml')) {
     }
 }
 
-$gitignoreContent = Get-Content -LiteralPath (Join-Path $repoRoot '.gitignore') -Raw
+$gitignoreContent = [IO.File]::ReadAllText((Join-Path $repoRoot '.gitignore'))
 foreach ($entry in @('mail-archive.env', 'rclone.conf', '*.agekey', 'age-identity*', 'archive-remote.conf')) {
     $entryPattern = "(?m)^$([regex]::Escape($entry))\r?$"
     if ([regex]::Matches($gitignoreContent, $entryPattern).Count -ne 1) {

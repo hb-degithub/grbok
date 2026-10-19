@@ -43,7 +43,10 @@ DISK_PCT=$(df -P / | awk 'NR==2{gsub(/%/,"",$5); print $5}')
 # load1
 LOAD1=$(awk '{print $1}' /proc/loadavg)
 
+# CPU 核数(规格展示用)
+CPU_CORES=$(grep -c ^processor /proc/cpuinfo)
+
 curl -s -o /dev/null -m 5 -X POST "$INGEST_URL" \
   -H 'Content-Type: application/json' \
   -H "X-Internal-Secret: $SECRET" \
-  -d "{\"cpuPct\":$CPU_PCT,\"memPct\":$MEM_PCT,\"memUsedMb\":$MEM_USED,\"memTotalMb\":$MEM_TOTAL,\"rxKbps\":$RX_KBPS,\"txKbps\":$TX_KBPS,\"diskPct\":$DISK_PCT,\"load1\":$LOAD1}"
+  -d "{\"cpuPct\":$CPU_PCT,\"memPct\":$MEM_PCT,\"memUsedMb\":$MEM_USED,\"memTotalMb\":$MEM_TOTAL,\"rxKbps\":$RX_KBPS,\"txKbps\":$TX_KBPS,\"diskPct\":$DISK_PCT,\"load1\":$LOAD1,\"cpuCores\":$CPU_CORES}"

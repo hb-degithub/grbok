@@ -25,12 +25,12 @@ test('both logout hooks await server revoke instead of directly clearing auth', 
   assert.doesNotMatch(publicStatus, /const logout[\s\S]*authStore\.clear\(\)/);
 });
 
-test('recovery code is route-scoped and cleared on terminal status or registration result', async () => {
+test('recovery code is route-scoped and cleared on terminal status or bind result', async () => {
   const headers = await source('../src/lib/admin-step-up.ts');
-  const passkeys = await source('../src/lib/admin-passkey.ts');
+  const totp = await source('../src/lib/admin-totp.ts');
   assert.match(headers, /isAdminRecoveryHeaderPath\(requestUrl\.pathname\)/);
   assert.doesNotMatch(headers, /if \(recoveryCode\) headers\.set\('X-Admin-Recovery-Code'/);
-  assert.match(passkeys, /shouldClearRecoveryCodeAfterStatus\(result\.status\)/);
-  assert.match(passkeys, /shouldClearRecoveryCodeAfterRequestError\(error\)/);
-  assert.match(passkeys, /if \(result\.verified\) clearAdminRecoveryCode\(\)/);
+  // TOTP 时代(Passkey 已下线):状态为终态时清恢复码;绑定成功落 step-up 后清恢复码
+  assert.match(totp, /shouldClearRecoveryCodeAfterStatus\(result\.status\)/);
+  assert.match(totp, /saveAdminStepUp\(result\.credential, result\.expiresAt\);\s*\n?\s*clearAdminRecoveryCode\(\)/);
 });

@@ -32,4 +32,18 @@
   routerAdd('POST', '/api/internal/monitor/host', function (e) {
     return require(__hooks + '/lib/monitor_lib.js').saveHostMetrics(e);
   }, $apis.bodyLimit(4096));
+
+
+  // 防护统计:雷池采集器写入(内网+密钥)/ 公开聚合(脱敏)/ 后台明细
+  routerAdd('POST', '/api/internal/monitor/protection', function (e) {
+    return require(__hooks + '/lib/protection' + '_lib.js').saveSnapshot(e);
+  }, $apis.bodyLimit(4096));
+
+  routerAdd('GET', '/api/public/protection', function (e) {
+    return require(__hooks + '/lib/protection' + '_lib.js').getPublicProtection(e);
+  }, $apis.bodyLimit(1024));
+
+  routerAdd('GET', '/api/blog-admin/monitor/protection', function (e) {
+    return require(__hooks + '/lib/protection' + '_lib.js').getAdminProtection(e);
+  }, $apis.bodyLimit(4096));
 })();

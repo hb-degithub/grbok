@@ -3,9 +3,28 @@
 // 安全防护状态查询业务逻辑
 // 所有函数自包含，不依赖闭包变量（PB 0.22 JSVM 限制）
 
+// PB 0.22 的 routerAdd 自定义路由不会填充 e.auth（恒为 null），
+// 但鉴权中间件会把记录写进请求上下文；必须走 requestInfo/authRecord 回退链
+// （2026-09-19 生产实测：裸读 e.auth 导致安全状态/监控接口全员 401/403）。
+function resolveAuth(e) {
+  try {
+    if (e.auth && e.auth.id) return e.auth;
+  } catch (_) {}
+  try {
+    var info = $apis.requestInfo(e);
+    if (info && info.auth && info.auth.id) return info.auth;
+    if (info && info.authRecord && info.authRecord.id) return info.authRecord;
+  } catch (_) {}
+  try {
+    var record = e.get('authRecord') || e.get('auth');
+    if (record && record.id) return record;
+  } catch (_) {}
+  return null;
+}
+
 function getSecurityStatus(e) {
   // 检查管理员权限
-  var auth = e.auth;
+  var auth = resolveAuth(e);
   if (!auth || !auth.id) {
     return e.json(401, { code: 'UNAUTHORIZED' });
   }
@@ -85,7 +104,7 @@ function getSecurityStatus(e) {
 
 function getSecurityEvents(e) {
   // 检查管理员权限
-  var auth = e.auth;
+  var auth = resolveAuth(e);
   if (!auth || !auth.id) {
     return e.json(401, { code: 'UNAUTHORIZED' });
   }

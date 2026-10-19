@@ -22,12 +22,34 @@
         -X-Powered-By
     }
 
+    # 路径解码层数不一致兜底（与生产 Caddyfile 对齐，2026-10-14 渗透测试）：
+    # Caddy 的 path 匹配器只看"解一层百分号编码"后的路径，PocketBase 会对路由参数
+    # 再解一层——/api/collections/%2575sers/records 在 Caddy 看来不等于 users/records，
+    # 于是穿过下方 @blockedNativeAuth 与 @blocked_admin_access（本地实测 200 穿透）。
+    # 判据：解一层后若仍残留 %xx，一律 404；与编码层数无关。规则收窄到
+    # /api/*、/_*、/admin*，普通页面路径不受影响。
+    @residual_escape {
+        path /api/* /_ /_/* /admin /admin/*
+        path_regexp (?i)%[0-9a-f]{2}
+    }
+    handle @residual_escape {
+        respond "Not Found" 404
+    }
+
+    # 本地 :80 只绑定 127.0.0.1（见 docker-compose.local.yml），保留 ADMIN_IP
+    # 回环豁免以便开发者访问 /_/；公网监听（生产 Caddyfile）已改为无条件 404，
+    # 因为 client_ip 头可伪造、remote_ip 恒为 docker 网关，唯一不可伪造判据是入口端口。
     @blocked_admin_access {
         path /admin* /_/* /api/admins/* /api/blog-admin/*
         not path /_astro/* /pagefind/*
         not client_ip {$ADMIN_IP}
     }
-    respond @blocked_admin_access "Forbidden" 403
+    # 必须用 handle 包裹：裸 respond 在 Caddy 2.8 的指令排序中位于所有 handle 之后，
+    # 会被下方 handle /api/* 与 handle @pb_admin 抢先代理到 PB，拦截静默失效
+    # （生产 Caddyfile:212-214 记录同一踩坑；本地 2026-10-16 实验台实测确认）。
+    handle @blocked_admin_access {
+        respond "Forbidden" 403
+    }
 
     @bad_paths {
         path /.env* /.git* /.svn* /wp-* /xmlrpc* /vendor* /node_modules* /.htaccess* /backup* /sql* /config* /phpmyadmin* /mysql* /shell* /cmd* /eval* /input* /index.php* /info.php*
@@ -62,7 +84,10 @@
         /api/collections/_pb_users_auth_/request-verification/ \
         /api/collections/_pb_users_auth_/request-email-change \
         /api/collections/_pb_users_auth_/request-email-change/
-    respond @blockedNativeAuth "Not Found" 404
+    # 同上：必须 handle 包裹，否则这串精确路径拦不住 handle /api/* 的代理。
+    handle @blockedNativeAuth {
+        respond "Not Found" 404
+    }
 
     @pb_admin {
         path /_/*
@@ -78,6 +103,10 @@
 
     @static {
         path /_astro/* /pagefind/* *.js *.css *.png *.jpg *.jpeg *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot
+        # 后缀通配（*.jpg 等）会盖过 handle /api/files/* 的路径特异性，
+        # 导致 PB 文件 URL（/api/files/media_assets/...）被 file_server 拦截返回 404。
+        # 生产 Caddyfile:176-181 早有该排除，本地此前缺失（2026-10-16 实验台实测 404）。
+        not path /api/*
     }
     handle @static {
         header Cache-Control "public, max-age=3600"

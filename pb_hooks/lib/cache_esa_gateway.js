@@ -91,13 +91,19 @@ function unwrap(response) {
   throw gatewayError('ESA_UPSTREAM_ERROR', false);
 }
 
+// credentials 可为 null:admin-auth 会回退到 ECS RAM 角色 STS 凭据
+function packCredentials(credentials) {
+  if (!credentials) return null;
+  return {
+    accessKeyId: credentials.accessKeyId,
+    accessKeySecret: credentials.accessKeySecret,
+    siteId: credentials.siteId,
+  };
+}
+
 function purge(credentials, type, urls) {
   var body = unwrap(signedRequest(PURGE_PATH, {
-    credentials: {
-      accessKeyId: credentials.accessKeyId,
-      accessKeySecret: credentials.accessKeySecret,
-      siteId: credentials.siteId,
-    },
+    credentials: packCredentials(credentials),
     type: type,
     urls: urls,
   }));
@@ -107,11 +113,7 @@ function purge(credentials, type, urls) {
 
 function describeTasks(credentials, taskId) {
   var body = unwrap(signedRequest(TASKS_PATH, {
-    credentials: {
-      accessKeyId: credentials.accessKeyId,
-      accessKeySecret: credentials.accessKeySecret,
-      siteId: credentials.siteId,
-    },
+    credentials: packCredentials(credentials),
     taskId: taskId,
   }));
   return Array.isArray(body.tasks) ? body.tasks : [];

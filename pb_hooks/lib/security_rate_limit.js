@@ -255,6 +255,35 @@ function consume(txDao, input) {
   return { allowed: true, limitedBy: null, retryAfterSeconds: 0 };
 }
 
+// 删除指定 (policyKey, subject) 的限流桶。用于登录成功后的"清零"语义
+// （旧实现是在成功回调里 delete globalThis 内存桶）。
+// 与 consume 同构：必须传入同一个事务 dao；策略表降级时抛 RateLimitUnavailableError。
+function resetBuckets(txDao, input) {
+  if (!txDao || !input || !Array.isArray(input.entries) || !input.entries.length || input.entries.length > 8) {
+    throw invalid();
+  }
+  var policySet = policyStore.getRatePolicySet(txDao);
+  if (policySet.degraded) throw unavailable();
+  var seen = {};
+  var cleared = 0;
+  for (var i = 0; i < input.entries.length; i++) {
+    var key = String(input.entries[i] && input.entries[i].policyKey || '');
+    var subject = input.entries[i] && input.entries[i].subject;
+    if (seen[key]) throw invalid('duplicate policy entry');
+    seen[key] = true;
+    if (!policySet.policies[key] || typeof subject !== 'string' || !subject) throw invalid();
+    var record = findBucket(txDao, key, subjectHash(key, subject));
+    if (!record) continue;
+    try {
+      txDao.deleteRecord(record);
+    } catch (_) {
+      throw unavailable();
+    }
+    cleared++;
+  }
+  return { cleared: cleared };
+}
+
 function cleanupExpired(dao, nowMs) {
   if (!dao || !Number.isSafeInteger(nowMs) || nowMs < 0) throw invalid('invalid cleanup input');
   var total = 0;
@@ -275,6 +304,7 @@ function cleanupExpired(dao, nowMs) {
 module.exports = {
   RateLimitUnavailableError: RateLimitUnavailableError,
   consume: consume,
+  resetBuckets: resetBuckets,
   normalizeEmail: normalizeEmail,
   normalizeIp: normalizeIp,
   ipv6Prefix64: ipv6Prefix64,

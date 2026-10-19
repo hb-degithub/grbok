@@ -3,6 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import ScrollReveal from '../components/ui/ScrollReveal';
 import GlowCard from '../components/ui/GlowCard';
 import ParticleField from '../components/effects/ParticleField';
+import { cachedFetchJson } from '../lib/pb-cache';
 
 const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
 
@@ -15,9 +16,11 @@ interface Tag {
 
 async function fetchTags(): Promise<Tag[]> {
   try {
-    const res = await fetch(`${PB_URL}/api/collections/tags/records?sort=-created`, { signal: AbortSignal.timeout(3000) });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const data = await res.json();
+    const data = await cachedFetchJson<{ items?: Tag[] }>(
+      `${PB_URL}/api/collections/tags/records?sort=-created&perPage=200`,
+      { signal: AbortSignal.timeout(3000) },
+      60_000,
+    );
     return data.items ?? [];
   } catch {
     return [];
@@ -43,9 +46,11 @@ interface TagPost {
 async function fetchTagPostMap(): Promise<Map<string, { posts: TagPost[]; total: number }>> {
   const map = new Map<string, { posts: TagPost[]; total: number }>();
   try {
-    const res = await fetch(`${PB_URL}/api/collections/post_tags/records?perPage=500&expand=post_id&fields=tag_id,expand.post_id.title,expand.post_id.slug,expand.post_id.published_at,expand.post_id.status`, { signal: AbortSignal.timeout(3000) });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const data = await res.json();
+    const data = await cachedFetchJson<{ items?: PostTagRecord[] }>(
+      `${PB_URL}/api/collections/post_tags/records?perPage=500&expand=post_id&fields=tag_id,expand.post_id.title,expand.post_id.slug,expand.post_id.published_at,expand.post_id.status`,
+      { signal: AbortSignal.timeout(3000) },
+      60_000,
+    );
     const records: PostTagRecord[] = data.items ?? [];
     for (const record of records) {
       const post = record.expand?.post_id;

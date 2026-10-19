@@ -2,6 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ScrollReveal from '../components/ui/ScrollReveal';
 import StatusPanel from '../components/status/StatusPanel';
+import ProtectionPanel from '../components/status/ProtectionPanel';
 ---
 
 <BaseLayout title="运行状态" description="站点服务可用性、API 状态与你的访问延迟实时监测">
@@ -19,5 +20,8 @@ import StatusPanel from '../components/status/StatusPanel';
       </ScrollReveal>
     </div>
     <StatusPanel client:load />
+    <div class="mt-10" id="protection">
+      <ProtectionPanel client:load />
+    </div>
   </section>
 </BaseLayout>

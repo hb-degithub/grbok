@@ -1,8 +1,9 @@
 import { BaseService } from './baseService';
+import { actionRequestHeaders } from './actionRequest';
 import type { RecordModel } from 'pocketbase';
 import type { PublicComment, NestedComment, CommentFormData, CommentRealtimeEvent } from '../../types/pocketbase';
 
-const PUBLIC_COMMENT_FIELDS = 'id,post_id,author_name,content,parent_id,status,created,updated,likes,edited,edited_at,deleted,author_level';
+const PUBLIC_COMMENT_FIELDS = 'id,post_id,author_name,content,parent_id,status,created,updated,likes,edited,edited_at,deleted,author_level,is_ai';
 
 interface CommentRecord extends RecordModel {
   post_id: string;
@@ -101,11 +102,25 @@ class CommentService extends BaseService<CommentRecord> {
   }
 
   /**
-   * 点赞评论
+   * 点赞评论（需登录；服务端按用户 id 去重）
    */
   async likeComment(commentId: string): Promise<{ likes: number; alreadyLiked?: boolean }> {
     const pb = this.getPocketBase();
-    return pb.send(`/api/comments/${commentId}/like`, { method: 'POST' });
+    return pb.send(`/api/comments/${commentId}/like`, {
+      method: 'POST',
+      headers: actionRequestHeaders(),
+    });
+  }
+
+  /**
+   * 取消点赞评论（需登录；计数 -1 且不为负）
+   */
+  async unlikeComment(commentId: string): Promise<{ likes: number; removed?: boolean }> {
+    const pb = this.getPocketBase();
+    return pb.send(`/api/comments/${commentId}/like`, {
+      method: 'DELETE',
+      headers: actionRequestHeaders(),
+    });
   }
 
   /**
