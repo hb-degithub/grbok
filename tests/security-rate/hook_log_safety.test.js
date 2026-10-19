@@ -5,11 +5,19 @@ var fs = require('fs');
 var path = require('path');
 
 var repoRoot = path.resolve(__dirname, '..', '..');
+
+// 每个 hook 允许的稳定日志码清单。一个文件可以登记多条(每条对应一个 operation),
+// 但源码里出现的每条 console.error 都必须命中其中之一——新增日志而未登记同样会
+// 让本测试失败,这是日志契约的强制点。
 var expectedLogs = {
-  'pb_hooks/account_mail.pb.js': '[account-mail] operation=registration-auto-send result=INTERNAL_ERROR',
-  'pb_hooks/mail_outbox.pb.js': '[mail-outbox] operation=worker result=INTERNAL_ERROR',
-  'pb_hooks/security_rate_cleanup.pb.js': '[security-rate] operation=cleanup result=INTERNAL_ERROR',
-  'pb_hooks/send_email_comment.pb.js': '[comment-mail] operation=enqueue result=INTERNAL_ERROR',
+  'pb_hooks/account_mail.pb.js': ['[account-mail] operation=registration-auto-send result=INTERNAL_ERROR'],
+  'pb_hooks/mail_outbox.pb.js': ['[mail-outbox] operation=worker result=INTERNAL_ERROR'],
+  'pb_hooks/security_rate_cleanup.pb.js': ['[security-rate] operation=cleanup result=INTERNAL_ERROR'],
+  'pb_hooks/send_email_comment.pb.js': [
+    '[comment-mail] operation=enqueue result=INTERNAL_ERROR',
+    // 2026-09-20 AI 回复管线(c3b70c6)新增:审核通过 AI 回复后给被回复者补发通知的入队失败
+    '[comment-mail] operation=enqueue-ai-reply result=INTERNAL_ERROR',
+  ],
 };
 
 // 2026-09-18 起允许的稳定后缀:截断到 200 字符的 error.message(不含 stack/对象),
@@ -17,14 +25,18 @@ var expectedLogs = {
 var ALLOWED_DETAIL_SUFFIX = " + String(err && err.message || err).slice(0, 200));";
 
 Object.keys(expectedLogs).forEach(function (relativePath) {
+  var expected = expectedLogs[relativePath];
   var source = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
-  assert(source.indexOf(expectedLogs[relativePath]) !== -1, relativePath + ' must log its stable error code');
+  var allowedCalls = [];
+  expected.forEach(function (code) {
+    assert(source.indexOf(code) !== -1, relativePath + ' must log its stable error code: ' + code);
+    allowedCalls.push("console.error('" + code + "');");
+    allowedCalls.push("console.error('" + code + " detail='" + ALLOWED_DETAIL_SUFFIX);
+  });
   var logCalls = source.match(/console\.error\s*\([^;\n]*\);/g) || [];
-  var plainCall = "console.error('" + expectedLogs[relativePath] + "');";
-  var detailCall = "console.error('" + expectedLogs[relativePath] + " detail='" + ALLOWED_DETAIL_SUFFIX;
   logCalls.forEach(function (call) {
     assert(
-      call === plainCall || call === detailCall,
+      allowedCalls.indexOf(call) !== -1,
       relativePath + ' must emit only stable literal log records (got: ' + call.slice(0, 120) + ')',
     );
   });
