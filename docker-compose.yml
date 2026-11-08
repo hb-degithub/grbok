@@ -134,6 +134,11 @@ services:
       - ADMIN_AUTH_INTERNAL_SECRET=${ADMIN_AUTH_INTERNAL_SECRET}
       - ADMIN_AUTH_HASH_SECRET=${ADMIN_AUTH_HASH_SECRET}
       - ADMIN_IP=${ADMIN_IP}
+      # 2026-11-08 Task 3：可信反代来源（逗号分隔 IP/CIDR）。只有 TCP peer 命中该列表时，
+      # pb_hooks/lib/client_ip.js 才采信 Caddy 写入的 Ali-Real-Client-Ip；否则一律用
+      # socket 对端地址。生产必须填 Caddy 所在容器网 CIDR（如 172.18.0.0/16），
+      # 留空 = 所有客户端共用 Caddy 容器 IP 一个 per-IP 限流桶（安全但粗粒度）。
+      - PB_TRUSTED_PROXY_IPS=${PB_TRUSTED_PROXY_IPS:-}
       - MAIL_INTERNAL_SECRET=${MAIL_INTERNAL_SECRET}
       - MAIL_HASH_SECRET=${MAIL_HASH_SECRET}
       - MAIL_ARCHIVE_HMAC_SECRET=${MAIL_ARCHIVE_HMAC_SECRET}

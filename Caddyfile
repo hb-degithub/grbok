@@ -5,6 +5,12 @@
         # 放在 X-Forwarded-For 之前可免疫 XFF 伪造；无该头的链路（SSH 隧道/本地直连）
         # 自动回退 XFF → RemoteAddr。注意 Caddy 仅在 immediate peer 属于 trusted_proxies
         # 时才采信这些头，雷池/OpenResty 回源地址必须在 $OPENRESTY_TRUSTED_PROXY 内。
+        #
+        # 2026-11-08 Task 3：Caddy 到 PocketBase 的所有反向代理都写 header_up
+        # Ali-Real-Client-Ip {client_ip}；PB 侧只在 TCP peer 命中 PB_TRUSTED_PROXY_IPS
+        # 时才采信该头（见 pb_hooks/lib/client_ip.js）。生产必须在 .env 显式设置
+        # PB_TRUSTED_PROXY_IPS 为 Caddy 容器网 CIDR（如 172.18.0.0/16），否则 PB 只看到
+        # Caddy 的容器 IP：安全但所有客户端共用一个 per-IP 限流桶。
         client_ip_headers Ali-Real-Client-Ip X-Forwarded-For X-Real-IP
     }
 }
@@ -26,6 +32,9 @@ http://img.hlydwz.com {
     handle /api/files/* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
         reverse_proxy pocketbase:8090 {
+            # 2026-11-08 Task 3：只有该头与 PB 侧 PB_TRUSTED_PROXY_IPS 同时配置才生效；
+            # 客户端自带同名头在可信 peer 之外一律被 PB 忽略。
+            header_up Ali-Real-Client-Ip {client_ip}
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
@@ -63,6 +72,9 @@ http://img.hlydwz.com {
         header Cache-Control "no-store"
         header X-Robots-Tag "noindex, nofollow, noarchive"
         reverse_proxy pocketbase:8090 {
+            # 2026-11-08 Task 3：只有该头与 PB 侧 PB_TRUSTED_PROXY_IPS 同时配置才生效；
+            # 客户端自带同名头在可信 peer 之外一律被 PB 忽略。
+            header_up Ali-Real-Client-Ip {client_ip}
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
@@ -225,6 +237,9 @@ http://img.hlydwz.com {
         header X-Robots-Tag "noindex, nofollow, noarchive"
         header Cache-Control "no-store"
         reverse_proxy pocketbase:8090 {
+            # 2026-11-08 Task 3：只有该头与 PB 侧 PB_TRUSTED_PROXY_IPS 同时配置才生效；
+            # 客户端自带同名头在可信 peer 之外一律被 PB 忽略。
+            header_up Ali-Real-Client-Ip {client_ip}
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
@@ -237,6 +252,9 @@ http://img.hlydwz.com {
     handle /api/files/* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
         reverse_proxy pocketbase:8090 {
+            # 2026-11-08 Task 3：只有该头与 PB 侧 PB_TRUSTED_PROXY_IPS 同时配置才生效；
+            # 客户端自带同名头在可信 peer 之外一律被 PB 忽略。
+            header_up Ali-Real-Client-Ip {client_ip}
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
@@ -259,6 +277,9 @@ http://img.hlydwz.com {
         }
 
         reverse_proxy pocketbase:8090 {
+            # 2026-11-08 Task 3：只有该头与 PB 侧 PB_TRUSTED_PROXY_IPS 同时配置才生效；
+            # 客户端自带同名头在可信 peer 之外一律被 PB 忽略。
+            header_up Ali-Real-Client-Ip {client_ip}
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
@@ -280,6 +301,9 @@ http://img.hlydwz.com {
         # 管理界面响应必须禁止一切缓存
         header Cache-Control "no-store"
         reverse_proxy pocketbase:8090 {
+            # 2026-11-08 Task 3：只有该头与 PB 侧 PB_TRUSTED_PROXY_IPS 同时配置才生效；
+            # 客户端自带同名头在可信 peer 之外一律被 PB 忽略。
+            header_up Ali-Real-Client-Ip {client_ip}
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
