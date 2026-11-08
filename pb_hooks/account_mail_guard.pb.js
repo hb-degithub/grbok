@@ -105,9 +105,16 @@
       e.httpContext.noContent(204);
       return;
     } catch (err) {
-      // 失败开放（保留原始 4xx）：宁可少一层纵深防御，也不阻断真实改邮箱流程。
-      try { console.error('[account-mail-guard] operation=email-change-enumeration result=INTERNAL_ERROR err=' + String(err)); } catch (_) {}
-      return;
+      // 目标端点的守卫异常不能恢复原始含邮箱的 4xx；统一失败响应。
+      try { console.error('[account-mail-guard] operation=email-change-enumeration result=INTERNAL_ERROR'); } catch (_) {}
+      try {
+        var routePath = String(e.httpContext.path() || '');
+        if (routePath.indexOf('confirm-email-change') !== -1) {
+          e.httpContext.json(400, { code: 400, message: '邮箱确认失败，请重新发起邮箱变更', data: {} });
+        } else if (routePath.indexOf('request-email-change') !== -1) {
+          e.httpContext.noContent(204);
+        }
+      } catch (_) {}
     }
   });
 })();

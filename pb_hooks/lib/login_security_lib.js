@@ -107,8 +107,10 @@ function getClientIP(e) {
 // 认证事件在 PB 0.22 已提供解析后的 identity；requestInfo 仅作回退，且不会重读 body。
 function getIdentity(e) {
   let value = '';
+  // 若运行时提供已识别账号，可用邮箱归一；否则使用事件已解析的 identity。
+  // 不把用户名/邮箱别名合并宣称为已验证能力。
   try {
-    if (e && e.identity !== undefined && e.identity !== null) value = String(e.identity);
+    if (!value && e && e.identity !== undefined && e.identity !== null) value = String(e.identity);
   } catch (_) {
     value = '';
   }
@@ -117,7 +119,7 @@ function getIdentity(e) {
       const ctx = (e && e.httpContext) ? e.httpContext : e;
       if (ctx && typeof $apis !== 'undefined' && $apis && typeof $apis.requestInfo === 'function') {
         const info = $apis.requestInfo(ctx);
-        const body = info && info.body;
+        const body = info && info.data;
         if (body && body.identity !== undefined && body.identity !== null) value = String(body.identity);
       }
     } catch (_) {
