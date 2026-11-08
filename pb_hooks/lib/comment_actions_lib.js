@@ -14,6 +14,7 @@
 var rateLimit = require('./security_rate_limit.js');
 var verification = require('./comment_verification.js');
 var actionAuth = require('./action_auth_lib.js');
+var requestBody = require('./request_body.js');
 
 function detailedError(status, code, retryAfter) {
   var data = {
@@ -53,18 +54,12 @@ function pathParam(e, name) {
   return '';
 }
 
-// 读取 JSON 请求体。e.requestInfo() 在 PB 0.22.21 JSVM 路由事件上不存在，
-// 与 stats_lib.js readBody 同款：readerToString + JSON.parse，失败回退 {}。
+// 读取请求体。统一走 request_body 模块（$apis.requestInfo(context).data，
+// 已解析数据），不再用 readerToString 二次消费 request().body —— 后者会与
+// 路由 $apis.bodyLimit(...) 的 limitedReader 叠加，在错误重试场景放大成
+// Go fatal stack overflow。解析失败/缺失时返回 {}，由调用方给出明确 4xx。
 function readBody(e) {
-  try {
-    var raw = readerToString(e.request().body, 4097);
-    if (!raw) return {};
-    var parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return {};
-    return parsed;
-  } catch (_) {
-    return {};
-  }
+  return requestBody.readRequestBody(e);
 }
 
 function findComment(id) {

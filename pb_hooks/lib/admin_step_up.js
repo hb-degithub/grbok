@@ -186,11 +186,13 @@ function requireAdminStepUp(ctx, options) {
 function requireProtectedWrite(e, operation) {
   var collection = '';
   try {
-    collection = e.record && e.record.collection ? e.record.collection().name : '';
+    collection = e.record && e.record.collection ? String(e.record.collection().name || '') : '';
   } catch (_) {
-    // e.record.collection() 在创建时可能失败，直接返回不拦截
-    return;
+    // 集合读取失败时无法判断是否属于受保护集合。fail-open 会让"读不到集合"
+    // 变成绕过 step-up 的通道，因此这里必须 fail closed（一律拒绝）。
+    collection = '';
   }
+  if (!collection) forbidden();
   if (PROTECTED_COLLECTIONS.indexOf(collection) === -1) return;
 
   var actor = currentActor(e);
