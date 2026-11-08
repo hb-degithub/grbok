@@ -101,7 +101,7 @@ function resolve(dao) {
   var apiKey = resolveKey(record);
   if (!baseUrl || !model || !apiKey) return null;
   return {
-    baseUrl: baseUrl.replace(/\/+$/, ''),
+    baseUrl: validateBaseUrl(baseUrl),
     apiKey: apiKey,
     model: model,
     timeoutSeconds: normalizeTimeout(record.get('timeout_seconds')),
@@ -169,15 +169,41 @@ function invalid(message) {
   throw new ApiError(400, 'INVALID_AI_CONFIG: ' + message);
 }
 
-// base_url 必须是 http(s) URL。与 SMTP host 校验不同：这里允许 IP 字面量与
-// 内网地址 —— 自建 new-api / one-api 网关常部署在局域网或同机 Docker 网络。
-// SSRF 风险由路由层门槛兜底（可信管理 IP + step-up + super_admin），且该端点
-// 只接收管理端构造的固定 prompt，不转发用户输入的 URL。
+// base_url 只允许 AI_ALLOWED_ORIGINS 中显式配置的精确 origin。
+// 自建 new-api / one-api 网关须显式加入白名单；空配置默认拒绝。
+// 该校验不代替受信上游的重定向/DNS 管理与容器出口网络控制。
 function validateBaseUrl(raw) {
-  var url = String(raw || '').trim();
-  if (!url) return '';
-  if (url.length > 500 || !/^https?:\/\/[^\s]+$/i.test(url)) invalid('base_url');
-  return url.replace(/\/+$/, '');
+  var value = String(raw || '').trim();
+  if (!value || value.length > 500 || !/^https?:\/\/[^\s]+$/i.test(value)) invalid('base_url');
+  var match = /^https?:\/\/([^\/?#\s]+)(?:\/)?$/i.exec(value);
+  if (!match || match[1].indexOf('@') !== -1) invalid('base_url');
+  var authority = match[1];
+  var host = '';
+  var port = '';
+  if (authority.charAt(0) === '[') {
+    var end = authority.indexOf(']');
+    if (end < 0) invalid('base_url');
+    host = authority.slice(0, end + 1).toLowerCase();
+    port = authority.slice(end + 1);
+    if (port && !/^:[0-9]+$/.test(port)) invalid('base_url');
+  } else {
+    var colon = authority.lastIndexOf(':');
+    if (colon !== -1) {
+      host = authority.slice(0, colon).toLowerCase();
+      port = authority.slice(colon);
+      if (!/^:[0-9]+$/.test(port)) invalid('base_url');
+    } else host = authority.toLowerCase();
+  }
+  if (!host || !/^[a-z0-9._-]+$|^\[[0-9a-f:]+\]$/.test(host)) invalid('base_url');
+  if (port && (Number(port.slice(1)) < 1 || Number(port.slice(1)) > 65535)) invalid('base_url');
+  var configured = envValue('AI_ALLOWED_ORIGINS').split(',');
+  for (var i = 0; i < configured.length; i++) {
+    var allowed = configured[i].trim().toLowerCase().replace(/\/$/, '');
+    if (allowed && /^https?:\/\/[^\/?#\s]+$/.test(allowed) && allowed === value.toLowerCase().replace(/\/$/, '')) {
+      return allowed;
+    }
+  }
+  invalid('base_url');
 }
 
 // input: { enabled, base_url, api_key, model, timeout_seconds, article_publish_mode,
@@ -253,6 +279,7 @@ function save(dao, input, userId) {
 }
 
 module.exports = {
+  validateBaseUrl: validateBaseUrl,
   resolve: resolve,
   commentPolicy: commentPolicy,
   readPublic: readPublic,

@@ -150,6 +150,8 @@ services:
       - MAIL_ACCOUNT_ENABLED=${MAIL_ACCOUNT_ENABLED:-false}
       - MAIL_OTP_ENABLED=${MAIL_OTP_ENABLED:-false}
       - PUBLIC_SITE_URL=${PUBLIC_SITE_URL:-https://hlydwz.com}
+      # AI 上游须配置精确 origin 白名单（逗号分隔）；空值默认拒绝。
+      - AI_ALLOWED_ORIGINS=${AI_ALLOWED_ORIGINS:-}
     networks:
       - blog_network
     security_opt:

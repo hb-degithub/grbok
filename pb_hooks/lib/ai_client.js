@@ -36,6 +36,8 @@ function effectiveConfig(config) {
 // 返回 { content: string, usage: object|null }
 function chat(opts) {
   var cfg = effectiveConfig(opts && opts.config);
+  // 即使调用方传入缓存配置，也在每次出站请求前重新执行 origin 白名单校验。
+  cfg.baseUrl = aiConfig.validateBaseUrl(cfg.baseUrl);
   var messages = [];
   if (opts.system) messages.push({ role: 'system', content: String(opts.system) });
   messages.push({ role: 'user', content: String(opts.user || '') });
