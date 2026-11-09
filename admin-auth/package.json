@@ -9,7 +9,7 @@
     "mail:cli": "node src/mail/cli.mjs"
   },
   "dependencies": {
-    "maxmind": "^5.0.7",
+    "maxmind": "^5.0.8",
     "nodemailer": "^10.1.1"
   },
   "engines": {
