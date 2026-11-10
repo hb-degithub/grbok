@@ -247,6 +247,13 @@ onRecordBeforeCreateRequest((e) => {
   // AI 管线字段只能由服务端 worker 写入，客户端提交一律清零
   record.set('is_ai', false); record.set('ai_moderated', false); record.set('ai_replied', false);
   record.set('ai_verdict', ''); record.set('ai_reason', '');
+
+  // 服务端管理字段：点赞数、编辑/删除标记只能由点赞与验证码编辑/删除流程写入，
+  // 客户端在创建时提交的值一律丢弃。
+  record.set('likes', 0);
+  record.set('edited', false);
+  record.set('edited_at', '');
+  record.set('deleted', false);
   
   // 等级权限：Lv3+ 用户评论免审核
   var authorLevel = 1;
@@ -286,6 +293,20 @@ onRecordBeforeUpdateRequest((e) => {
   const persisted = $app.dao().findRecordById('comments', e.record.id);
   const originalAuthorUser = String(persisted.get('author_user') || '');
   e.record.set('author_user', originalAuthorUser);
+  // 服务端管理字段：点赞计数、编辑/删除标记、编辑时间与真实客户端 IP
+  // 只能由点赞 / 验证码编辑 / 验证码删除 / 审核流程在服务端写入，
+  // 客户端（含管理端请求体）提交的值一律恢复为库中已持久化的值。
+  e.record.set('likes', persisted.getInt('likes') || 0);
+  e.record.set('edited', persisted.getBool('edited'));
+  e.record.set('edited_at', persisted.getString('edited_at') || '');
+  e.record.set('deleted', persisted.getBool('deleted'));
+  e.record.set('ip_address', persisted.getString('ip_address') || '');
+  // AI 管线字段同样只由服务端 worker（DAO 写入，不经过请求钩子）维护。
+  e.record.set('is_ai', persisted.getBool('is_ai'));
+  e.record.set('ai_moderated', persisted.getBool('ai_moderated'));
+  e.record.set('ai_replied', persisted.getBool('ai_replied'));
+  e.record.set('ai_verdict', persisted.getString('ai_verdict') || '');
+  e.record.set('ai_reason', persisted.getString('ai_reason') || '');
   if (typeof e.next === 'function') e.next();
 }, 'comments');
 })();

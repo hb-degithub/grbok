@@ -55,6 +55,10 @@ onRecordBeforeCreateRequest((e) => {
   // 服务端写入真实客户端 IP（客户端不应也不能提供自己的 IP）
   record.set('reporter_ip', String(ip || 'unknown').slice(0, 45));
 
+  // 审核状态属于管理端字段：创建阶段强制 pending，客户端提交的
+  // dismissed/reviewed/actioned 一律丢弃（createRule 对匿名开放）。
+  record.set('status', 'pending');
+
   // 验证举报理由非空
   if (!String(record.get('reason') || '').trim()) {
     throw new BadRequestError('请填写举报理由');

@@ -41,6 +41,8 @@ const ENV = {
   MAIL_GATEWAY_INTERNAL_URL: `http://127.0.0.1:${PORT}`,
   BLOG_AUTH_LOOPBACK_BASE: `http://127.0.0.1:${PORT}`,
   PUBLIC_SITE_URL: 'http://localhost:4321',
+  // 旧驱动直连本机 PB，显式声明回环为可信代理，保持既有 IP 场景语义。
+  PB_TRUSTED_PROXY_IPS: '127.0.0.1,::1',
 };
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

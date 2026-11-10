@@ -5,6 +5,12 @@
         # 放在 X-Forwarded-For 之前可免疫 XFF 伪造；无该头的链路（SSH 隧道/本地直连）
         # 自动回退 XFF → RemoteAddr。注意 Caddy 仅在 immediate peer 属于 trusted_proxies
         # 时才采信这些头，雷池/OpenResty 回源地址必须在 $OPENRESTY_TRUSTED_PROXY 内。
+        #
+        # 2026-11-08 Task 3：Caddy 到 PocketBase 的所有反向代理都写 header_up
+        # Ali-Real-Client-Ip {client_ip}；PB 侧只在 TCP peer 命中 PB_TRUSTED_PROXY_IPS
+        # 时才采信该头（见 pb_hooks/lib/client_ip.js）。生产必须在 .env 显式设置
+        # PB_TRUSTED_PROXY_IPS 为 Caddy 容器网 CIDR（如 172.18.0.0/16），否则 PB 只看到
+        # Caddy 的容器 IP：安全但所有客户端共用一个 per-IP 限流桶。
         client_ip_headers Ali-Real-Client-Ip X-Forwarded-For X-Real-IP
     }
 }
@@ -26,6 +32,9 @@ http://img.hlydwz.com {
     handle /api/files/* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
         reverse_proxy pocketbase:8090 {
+            # 2026-11-08 Task 3：只有该头与 PB 侧 PB_TRUSTED_PROXY_IPS 同时配置才生效；
+            # 客户端自带同名头在可信 peer 之外一律被 PB 忽略。
+            header_up Ali-Real-Client-Ip {client_ip}
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
@@ -63,6 +72,9 @@ http://img.hlydwz.com {
         header Cache-Control "no-store"
         header X-Robots-Tag "noindex, nofollow, noarchive"
         reverse_proxy pocketbase:8090 {
+            # 2026-11-08 Task 3：只有该头与 PB 侧 PB_TRUSTED_PROXY_IPS 同时配置才生效；
+            # 客户端自带同名头在可信 peer 之外一律被 PB 忽略。
+            header_up Ali-Real-Client-Ip {client_ip}
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
@@ -73,9 +85,36 @@ http://img.hlydwz.com {
 :80 {
     encode zstd gzip
     root * /srv
-    # 请求体大小限制（防止大文件上传攻击）
-    request_body {
-        max_size 10MB
+    # SafeLine 自建反代没有文档化的全量 body 检测开关；以下为应用侧边界。
+    # 小型公开写接口保持在 64KB；上传允许 10MB 文件 + multipart 开销。
+    # 这些限制不证明 WAF 已修复，也不能替代源站安全组。
+    @small_api path /api/collections/comments/* /api/comments/* /api/blog-auth/* /api/collections/guestbook_messages/* /api/collections/comment_likes/* /api/collections/reactions/* /api/posts/* /api/track-view
+    request_body @small_api {
+        max_size 64KB
+    }
+    @upload_api path /api/collections/media_assets/* /api/collections/gallery_items/*
+    request_body @upload_api {
+        max_size 12MB
+    }
+    @editor_api path /api/collections/posts/* /api/collections/post_versions/* /api/blog-admin/*
+    request_body @editor_api {
+        max_size 4MB
+    }
+    @other_api {
+        path /api/*
+        not path /api/collections/comments/* /api/comments/* /api/blog-auth/* /api/collections/guestbook_messages/* /api/collections/comment_likes/* /api/collections/reactions/* /api/posts/* /api/track-view /api/collections/media_assets/* /api/collections/gallery_items/* /api/collections/posts/* /api/collections/post_versions/* /api/blog-admin/*
+    }
+    request_body @other_api {
+        max_size 1MB
+    }
+
+    # 不向前端 API 接受压缩请求体，避免 WAF 解码边界差异。
+    @encoded_api {
+        path /api/*
+        header_regexp Content-Encoding (?i)(gzip|deflate|br|zstd)
+    }
+    handle @encoded_api {
+        respond "Unsupported Media Type" 415
     }
 
     # HTTP 方法限制：静态资源/页面只需 GET，但 PocketBase REST 写操作必须放行
@@ -225,6 +264,9 @@ http://img.hlydwz.com {
         header X-Robots-Tag "noindex, nofollow, noarchive"
         header Cache-Control "no-store"
         reverse_proxy pocketbase:8090 {
+            # 2026-11-08 Task 3：只有该头与 PB 侧 PB_TRUSTED_PROXY_IPS 同时配置才生效；
+            # 客户端自带同名头在可信 peer 之外一律被 PB 忽略。
+            header_up Ali-Real-Client-Ip {client_ip}
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
@@ -236,7 +278,13 @@ http://img.hlydwz.com {
     # ESA 边缘缓存。文件 URL 含随机文件名、内容不可变；删除文件后旧 URL 即 404。
     handle /api/files/* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
+        # 直接打开用户文件时禁止活动内容执行，缓解媒体尾部注入。
+        header Content-Security-Policy "default-src 'none'; sandbox"
+        header X-Content-Type-Options "nosniff"
         reverse_proxy pocketbase:8090 {
+            # 2026-11-08 Task 3：只有该头与 PB 侧 PB_TRUSTED_PROXY_IPS 同时配置才生效；
+            # 客户端自带同名头在可信 peer 之外一律被 PB 忽略。
+            header_up Ali-Real-Client-Ip {client_ip}
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
@@ -259,6 +307,9 @@ http://img.hlydwz.com {
         }
 
         reverse_proxy pocketbase:8090 {
+            # 2026-11-08 Task 3：只有该头与 PB 侧 PB_TRUSTED_PROXY_IPS 同时配置才生效；
+            # 客户端自带同名头在可信 peer 之外一律被 PB 忽略。
+            header_up Ali-Real-Client-Ip {client_ip}
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
@@ -280,6 +331,9 @@ http://img.hlydwz.com {
         # 管理界面响应必须禁止一切缓存
         header Cache-Control "no-store"
         reverse_proxy pocketbase:8090 {
+            # 2026-11-08 Task 3：只有该头与 PB 侧 PB_TRUSTED_PROXY_IPS 同时配置才生效；
+            # 客户端自带同名头在可信 peer 之外一律被 PB 忽略。
+            header_up Ali-Real-Client-Ip {client_ip}
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
             header_up X-Forwarded-Proto {scheme}
