@@ -32,7 +32,8 @@ services:
       pocketbase:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/index.html"]
+      # SSR 构建只生成静态资产，首页经 SSR 代理；以 PB 健康端点验证代理链。
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
