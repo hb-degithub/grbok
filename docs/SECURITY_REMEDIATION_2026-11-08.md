@@ -2,7 +2,15 @@
 
 ## 证据边界
 
-仅修改本地隔离工作区，未连接或部署生产服务器。真实 PocketBase 0.22.48 测试使用临时数据库、虚构账号和回环端口，不发送真实邮件。
+真实 PocketBase 0.22.48 测试使用临时数据库、虚构账号与回环端口，不发送真实邮件。
+
+### 生产部署记录（2026-11-10）
+
+已合并并部署应用修复，生产备份位于 `/opt/hlydwz-blog/backups/pre-security-20261110-192709`。已设置 `PB_TRUSTED_PROXY_IPS=10.255.2.2/32`；按用户要求未配置 AI 白名单，未改变 AI/访问量业务逻辑。SSR 已绑定 `10.255.0.1:4321`，SafeLine 管理端口已绑定 `127.0.0.1:9443`。Caddy 健康检查改为 `/api/health`。
+
+生产验证：首页、标签页、PB health 均 200；关系枚举和非法邮箱确认均 400；评论动作返回受控 4xx 且 PB 无 fatal。
+
+**未完成：源站 80 仍可直连返回 200。** ESA 源站防护读取返回空，启用被当前 RAM 子账号拒绝（`esa:UpdateOriginProtection` 无权限）；因此尚未修改安全组，不能宣称 ESA 直连已封堵。SafeLine/OpenResty 的来源头清洗仍需按实际链路验证。
 
 ```bash
 node scripts/test-pentest-remediation-local.mjs --suite baseline
