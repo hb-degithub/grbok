@@ -28,9 +28,21 @@ jobs:
       - name: Install dependencies
         run: cd astro && npm ci --include=dev
 
-      # 前端单元测试：vitest 为构建前置硬门禁，失败即整体失败
+      # 前端单元测试：vitest 为构建前置硬门禁，失败即整体失败。
+      # 失败时把日志转成注解（annotations），便于在无 Actions 日志权限时定位。
       - name: Run unit tests
-        run: cd astro && npx vitest run
+        run: |
+          set +e
+          cd astro
+          echo "node=$(node -v) npm=$(npm -v)"
+          npx vitest run 2>&1 | tee "$RUNNER_TEMP/vitest.log"
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            tail -n 60 "$RUNNER_TEMP/vitest.log" \
+              | sed -e 's/%/%25/g' -e 's/\r/%0D/g' \
+              | while IFS= read -r line; do echo "::error title=vitest-failure::${line}"; done
+          fi
+          exit "$status"
 
       # admin-auth 后端服务测试：npm ci 安装后运行 node --test（mailpit 集成用例在无 MAILPIT_INTEGRATION 时自动跳过）
       - name: Admin-auth tests
