@@ -14,7 +14,13 @@
 
 同一时段还把 SafeLine `backend_1` 的 `Ali-Real-Client-Ip` 覆盖为 `$remote_addr`（= ESA 节点 IP），会让所有访客共用同一限流桶；已恢复为原始透传配置（备份 `safeline-backend_1.conf`），Caddy 日志确认重新记录真实客户端 IP。
 
-**正确做法（尚未执行，需控制台或授权）**：源站 ACL 必须是「只放行 ESA 回源地址」的白名单，不能全量封 80。步骤：① 在 ESA 控制台开启「源站防护」取得回源 IPv4/IPv6 清单（或给 RAM 子账号 `esa:UpdateOriginProtection` 权限后用 `GetOriginProtection` 读取）；② 用安全组或 `iptables` 白名单放行该清单，其余仍可 DROP；③ 验证 ESA 链路与直连两条路径。在名单为空时严禁启用任何 80 端口全量 DROP。
+**源站 ACL 决定：维持现状（2026-11-13 决策）。** 源站 80 直连暂不做限制。原因：ESA 回源节点 IP 会漂移，静态白名单需要持续同步，漏更新即全站回源失败；当前 RAM 子账号又缺少 `esa:UpdateOriginProtection` 与 ECS 安全组权限。
+
+**硬性约束：禁止再对宿主机 80 端口做全量 DROP。** SafeLine 以 host 网络监听 `0.0.0.0:80`，任何「一封了之」都会同时切断 ESA 回源（已发生一次，见上方事故）。若将来要重新收紧，只能走不依赖固定 IP 的方案：
+- ESA 回源令牌：ESA 转换规则注入静态头，Caddy 校验，未携带即拒绝（与回源 IP 无关）；
+- 或云防火墙引用 ESA 地址簿自动同步（需相应权限）。
+
+在这类方案落地前，源站直连绕过 ESA 的风险仍然存在，属于已知残余风险，不应在报告里写成「已封堵」。
 
 ```bash
 node scripts/test-pentest-remediation-local.mjs --suite baseline
