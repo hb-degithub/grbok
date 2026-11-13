@@ -10,7 +10,11 @@
 
 生产验证：首页、标签页、PB health、SafeLine 管理健康均 200；关系枚举和非法邮箱确认均 400；评论动作返回受控 4xx 且 PB 无 fatal。
 
-**源站直连已封堵。** 因当前 RAM 子账号无 ECS 安全组/ESA 源站防护写权限，采用宿主机 systemd 防火墙 `blog-origin-guard`：INPUT 的 TCP 80 直接拒绝，已启用并持久化；外部直连实测超时，ESA 公网链路仍 200。回滚：`systemctl disable --now blog-origin-guard`，其 ExecStop 会移除规则。SafeLine `backend_1` 已覆盖 `Ali-Real-Client-Ip`/X-Real-IP/XFF 为 socket 来源，避免把客户端伪造头继续转发。
+**源站直连封堵：已回滚（事故记录 2026-11-13）。** 最初用宿主机 systemd 防火墙 `blog-origin-guard` 对 INPUT 的 TCP 80 全量 DROP，实测外部直连超时，但 **同时把 ESA 回源也拦掉了**：SafeLine 以 host 网络监听 `0.0.0.0:80`，ESA 回源同样命中该 DROP。约 7.5 小时内该链丢弃 6.1 万个包，公网 `/api/health` 返回 522，动态接口（含 `/api/public/status`）不可用，页面仅靠 ESA 缓存显示。已 `systemctl disable --now blog-origin-guard` 并删除 unit 与脚本，回源恢复。
+
+同一时段还把 SafeLine `backend_1` 的 `Ali-Real-Client-Ip` 覆盖为 `$remote_addr`（= ESA 节点 IP），会让所有访客共用同一限流桶；已恢复为原始透传配置（备份 `safeline-backend_1.conf`），Caddy 日志确认重新记录真实客户端 IP。
+
+**正确做法（尚未执行，需控制台或授权）**：源站 ACL 必须是「只放行 ESA 回源地址」的白名单，不能全量封 80。步骤：① 在 ESA 控制台开启「源站防护」取得回源 IPv4/IPv6 清单（或给 RAM 子账号 `esa:UpdateOriginProtection` 权限后用 `GetOriginProtection` 读取）；② 用安全组或 `iptables` 白名单放行该清单，其余仍可 DROP；③ 验证 ESA 链路与直连两条路径。在名单为空时严禁启用任何 80 端口全量 DROP。
 
 ```bash
 node scripts/test-pentest-remediation-local.mjs --suite baseline
