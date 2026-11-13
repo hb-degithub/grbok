@@ -24,9 +24,9 @@ jobs:
             astro/package-lock.json
             admin-auth/package-lock.json
 
-      # 安装 astro 前端依赖（npm ci 严格按锁文件安装）
+      # 安装 astro 前端依赖（测试工具属于 devDependencies，必须显式包含）
       - name: Install dependencies
-        run: cd astro && npm ci
+        run: cd astro && npm ci --include=dev
 
       # 前端单元测试：vitest 为构建前置硬门禁，失败即整体失败
       - name: Run unit tests
