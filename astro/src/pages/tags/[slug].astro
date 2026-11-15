@@ -3,11 +3,13 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostList from '../../components/posts/PostList';
 import ScrollReveal from '../../components/ui/ScrollReveal';
 import { cachedFetchJson } from '../../lib/pb-cache';
+import { pbBaseUrl } from '../../lib/pb-base-url';
 
 // SSR模式：禁用预渲染，每次请求时动态生成
 export const prerender = false;
 
-const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
+// SSR 取数走服务端回环地址，浏览器侧仍用公网域名（见 pb-base-url.ts）
+const PB_URL = pbBaseUrl();
 
 const { slug } = Astro.params;
 

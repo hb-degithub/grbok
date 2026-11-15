@@ -125,11 +125,22 @@ http://img.hlydwz.com {
     }
 
     # User-Agent 过滤（拦截已知恶意爬虫/扫描器）
+    # 注意：header 匹配器一行只吃「一个字段 + 一个值」。原来写成
+    # `header User-Agent *sqlmap* *nikto* ...`（10 个通配值）时，caddy 2.8.4 会把它解析成
+    # 多个「字段/值」对（adapt 实测 {"User-Agent":["*sqlmap*"],"*nmap*":["*masscan*"],...}），
+    # 这些字段条件之间是 AND，而 *nmap* 之类通配字段名几乎不可能同时命中，
+    # 实测 curl -A sqlmap 仍 200 放行——整条 UA 过滤等于失效。
+    # 故改用 header_regexp（大小写不敏感，语义等价于原来的子串通配，且是 OR）。
     @bad_ua {
-        header User-Agent *sqlmap* *nikto* *nmap* *masscan* *acunetix* *nessus* *openvas* *w3af* *burp* *metasploit*
+        header_regexp User-Agent "(?i)sqlmap|nikto|nmap|masscan|acunetix|nessus|openvas|w3af|burp|metasploit"
     }
+    # 注意：此处不能用 `redir /blocked?reason=... 302`。redir 支持「首个 token 是路径匹配器」
+    # 的简写，在 handle 内会被解析成嵌套路由：match.path=["/blocked?reason=malicious-ua"]
+    # + headers.Location=["302"]（caddy 2.8.4 adapt 实测），query 不属于 path，
+    # 该匹配器永不命中，@bad_ua 等于失效。改为显式写响应头 + respond 302。
     handle @bad_ua {
-        redir /blocked?reason=malicious-ua 302
+        header Location "/blocked?reason=malicious-ua"
+        respond "" 302
     }
 
     # /admin 前端页面：已移除 IP 白名单（2026-09-07）。
@@ -201,8 +212,10 @@ http://img.hlydwz.com {
         path /.env* /.git* /.svn* /wp-* /xmlrpc* /vendor* /composer* /node_modules* /.htaccess* /.idea* /backup* /dump* /sql* /db* /config* /phpmyadmin* /mysql* /administrator* /shell* /cmd* /eval* /input* /server-status* /index.php* /info.php*
         not path /_astro/* /api/*
     }
+    # 同 @bad_ua：不要用 redir（首 token 会被当成嵌套路径匹配器且 query 永不命中）。
     handle @bad_paths {
-        redir /blocked?reason=bad-path 302
+        header Location "/blocked?reason=bad-path"
+        respond "" 302
     }
 
     # Service worker must never be cached long-term: browsers revalidate it on every

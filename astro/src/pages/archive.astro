@@ -4,7 +4,9 @@ import AnimatedContent from '../components/reactbits/AnimatedContent';
 import BlurText from '../components/reactbits/BlurText';
 import ParticleField from '../components/effects/ParticleField';
 import { cachedFetchJson } from '../lib/pb-cache';
-const PB_URL = import.meta.env.PUBLIC_POCKETBASE_URL || "http://localhost:8090";
+import { pbBaseUrl } from '../lib/pb-base-url';
+// SSR 取数走服务端回环地址，浏览器侧仍用公网域名（见 pb-base-url.ts）
+const PB_URL = pbBaseUrl();
 interface ArchivePost {
   id: string;
   title: string;

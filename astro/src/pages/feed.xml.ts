@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { cachedFetchJson } from '../lib/pb-cache';
+import { pbBaseUrl } from '../lib/pb-base-url';
 
 interface PBPost {
   id: string;
@@ -22,7 +23,8 @@ function escapeXml(str: string): string {
 
 export const GET: APIRoute = async ({ site }) => {
   const siteUrl = (site?.toString() || 'http://localhost:4321').replace(/\/$/, '');
-  const pbUrl = import.meta.env.PUBLIC_POCKETBASE_URL || 'http://localhost:8090';
+  // SSR 取数走服务端回环地址，浏览器侧仍用公网域名（见 pb-base-url.ts）
+  const pbUrl = pbBaseUrl();
 
   // Fetch published posts from PocketBase（60s 进程缓存，RSS 阅读器轮询不再穿透到 PB）
   let posts: PBPost[] = [];
