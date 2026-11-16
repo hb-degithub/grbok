@@ -90,3 +90,33 @@ Caddy 按路由设置公开小接口 64KB、普通 API 1MB、文章/管理接口
 - 外部直连源站应被安全组拒绝；9443/8090/4321 不应公开响应。
 - PB/SSR/Caddy 日志无 Go fatal、重复写入或新限流误判。
 - 应用用对应 Git revert 并重启 PB；Caddy 恢复旧文件后 `docker compose up -d --force-recreate caddy`；安全组回滚保留受控管理通道。
+
+## 2026-11-16 生产事故修复：SSR 取数被自家 WAF 拦截
+
+**现象**：首页无文章、`/posts/<slug>` 对已发布文章渲染「文章不存在」（HTTP 200 软 404），但 API 直连正常。
+
+**根因**：构建产物把 `PUBLIC_POCKETBASE_URL` 内联成 `https://hlydwz.com`，SSR 服务端也用这个公网域名取数，请求绕回 ESA → SafeLine，被 WAF 返回 **403 挑战页**，JSON 解析失败 → 返回空数据。实测：服务器上 `node fetch https://hlydwz.com/api/collections/posts/records?...` 得到 403 + safeline 挑战页。
+
+**修复**：新增 `astro/src/lib/pb-base-url.ts` 的 `pbBaseUrl()`：浏览器仍用内联公网地址，服务端优先读**运行时** `PB_SERVER_URL`。6 个 SSR 数据入口（`index/tags/posts/[slug]/archive/tags/[slug]/feed.xml`）改用该函数。
+
+**部署要求（必须）**：`blog-astro-ssr.service` 增加
+```
+Environment=PB_SERVER_URL=http://127.0.0.1:18080
+```
+指向 Caddy loopback（PB 未发布宿主端口，不能写 127.0.0.1:8090——那是 1Panel）。缺失时回退公网地址，仍会被 WAF 403。
+
+## 本次部署踩到的三个坑（务必遵守）
+
+1. **单文件 bind mount 的 inode 陷阱**：`install`/`mv` 会替换 Caddyfile 的 inode，容器内仍是旧文件。必须原地写入：`cat new > /opt/hlydwz-blog/current/Caddyfile`（保持 inode），再用 `ls -i` 前后一致确认。
+2. **`caddy reload` 在本环境静默不生效**：reload 打印 "adapted config to JSON" 但运行配置未更新（`/config/caddy/autosave.json` 时间不变、admin API 中查不到新串）。**正确做法：改完 Caddyfile 后 `docker compose up -d --no-deps --force-recreate caddy`**，并用 `docker exec blog-caddy grep -c <新关键字> /etc/caddy/Caddyfile` + 实际请求验证。
+3. **ESA 会忽略源站 `no-cache` 缓存 HTML/RSS**：实测文章页 `Age` 达 64490s、`feed.xml` 达 2137817s（约 24 天）。部署后必须主动刷新，`Content` 是 JSON **对象**：
+   ```bash
+   aliyun esa PurgeCaches --SiteId <id> --Type file \
+     --Content '{"Files":["https://hlydwz.com/posts/<slug>","https://hlydwz.com/feed.xml"]}'
+   ```
+   全站刷新用 `--Type purgeall --Content '{"PurgeAll":true}'`（注意：不带 Content 对象会报 InvalidParameters）。
+
+## 本次同时收紧的两处规则及其影响
+
+- `reactions` 五条规则置 `null`（新迁移 `20261115202000_harden_reactions_rules.pb.js`）：匿名 `GET /api/collections/reactions/records` 已从 200 变为 **403**。**连带影响**：`/admin/insights` 面板通过浏览器 SDK 用普通用户 token 读 reactions（`astro/src/lib/services/insightsService.ts`），规则收紧后会取数失败、面板显示空。若需保留，应改为服务端聚合端点（只返回计数，不暴露 `fingerprint`/`user_id`）。
+- `@bad_ua` 匹配器原本写成一行 10 个通配值，Caddy 会解析成多个 **AND** 的字段条件（含 `*nmap*` 之类通配字段名），实际永不命中；`redir /blocked?reason=... 302` 也被解析成「路径匹配器 + Location:302」而失效。已改为 `header_regexp User-Agent "(?i)sqlmap|nikto|..."` + `header Location`/`respond 302`，实测 `sqlmap` UA 与 `/.env` 均返回 302，正常 UA 200。
