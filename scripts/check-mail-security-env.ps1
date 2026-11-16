@@ -80,7 +80,10 @@ if ($ageRecipients.Count -ne $ageFingerprints.Count) {
 }
 Require-EnvPlaceholder $envContent 'MAIL_ARCHIVE_RCLONE_REMOTE' '' 'archive-remote'
 Require-EnvPlaceholder $envContent 'MAIL_ARCHIVE_RCLONE_PREFIX' '' 'personal-blog/mail-audit'
-Require-EnvPlaceholder $envContent 'OPENRESTY_TRUSTED_PROXY' '' 'REPLACE_WITH_EXACT_OPENRESTY_SOURCE_CIDR'
+# 2026-11-16 更正：此处原先要求 REPLACE_WITH_EXACT_OPENRESTY_SOURCE_CIDR 这个「占位符」，
+# 但它不是合法 IP/CIDR，而 compose 会把该值直接注入 Caddy 的 trusted_proxies，
+# 照抄 .env.example 就会让 `caddy validate` 失败、容器起不来。改为要求一个合法的保留示例值。
+Require-EnvPlaceholder $envContent 'OPENRESTY_TRUSTED_PROXY' '' '10.255.2.1'
 
 foreach ($legacyName in @('MAIL_ARCHIVE_AGE_RECIPIENT', 'MAIL_ARCHIVE_AGE_RECIPIENT_FINGERPRINT')) {
     if ($envContent -match "(?m)^$([regex]::Escape($legacyName))=") {
