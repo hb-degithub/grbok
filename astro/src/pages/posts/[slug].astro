@@ -32,6 +32,7 @@ interface Post {
   expand?: {
     author?: {
       name: string;
+      avatar?: string;
     };
   };
 }
@@ -51,6 +52,25 @@ async function fetchPost(postSlug: string): Promise<Post | null> {
 }
 
 const post = await fetchPost(slug ?? '');
+
+// 2026-11-16：users 的 viewRule 只允许本人/管理员读，匿名 expand=author 恒为空
+// （实测 items[0].expand === null），文章页因此一直不显示作者。这里在 expand 缺失时
+// 回退到只返回 name/avatar 的公开接口，避免为了展示作者而放开整张 users 表。
+if (post && !post.expand?.author && typeof (post as { author?: string }).author === 'string' && (post as { author?: string }).author) {
+  try {
+    const authorId = encodeURIComponent(String((post as { author?: string }).author).replace(/["\\]/g, ''));
+    const author = await cachedFetchJson<{ name?: string; avatar?: string }>(
+      `${PB_URL}/api/public/authors/${authorId}`,
+      { signal: AbortSignal.timeout(3000) },
+      60_000,
+    );
+    if (author && author.name) {
+      post.expand = { author: { name: author.name, avatar: author.avatar || '' } };
+    }
+  } catch {
+    // 作者信息只是装饰，取不到不影响正文
+  }
+}
 
 const formattedDate = post?.published_at
   ? new Date(post.published_at).toLocaleDateString('zh-CN', {

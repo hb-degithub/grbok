@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchAdminVerificationStatus } from '../lib/admin-totp';
+import { getPocketBase } from '../lib/pocketbase';
 import type { AdminStepUpStatus } from '../lib/admin-totp';
 
 export interface AdminVerificationState {
@@ -21,6 +22,17 @@ export function useAdminVerification(): AdminVerificationState {
   const refresh = useCallback(() => {
     setIsChecking(true);
     setIsError(false);
+    // 2026-11-16：未登录（或 token 已失效）时不要打 step-up 状态接口。
+    // 管理页在跳转 /login 之前会先挂载一次，此前每次匿名访问都会连发 3 次 401
+    // （该接口内部有两次重试），既污染控制台也给边缘 WAF 增加可疑流量。
+    const pb = getPocketBase();
+    if (!pb.authStore.isValid) {
+      setIsVerified(false);
+      setExpiresAt(null);
+      setStatus('expired');
+      setIsChecking(false);
+      return;
+    }
     fetchAdminVerificationStatus()
       .then((result) => {
         setIsVerified(result.verified);
