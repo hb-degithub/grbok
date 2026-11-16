@@ -116,6 +116,12 @@ Environment=PB_SERVER_URL=http://127.0.0.1:18080
    ```
    全站刷新用 `--Type purgeall --Content '{"PurgeAll":true}'`（注意：不带 Content 对象会报 InvalidParameters）。
 
+## 部署时必须同步的三类文件（2026-11-16 实测踩坑）
+
+1. **pb_hooks + pb_migrations 必须同批**：`security_policy_store.js` 里的策略键与 `security_rate_policies` 表行数强校验（`getRatePolicySet` 要求 rows === DEFAULTS 键数）。只上代码不上迁移（或反之）会让整组限流 fail-closed → 评论/登录/注册/管理写入全部 503。本次同批上线了 `view_ip` 与 `comment_verification` 两个键。
+2. **admin-auth 源码不在 pb_hooks 里**：只同步 `pb_hooks`/`pb_migrations` 不会更新邮件网关。改了 `admin-auth/src/mail/*`（例如新增 `comment_verification` 类别）后，必须把该目录同步到服务器并 `docker compose build admin-auth && docker compose up -d --no-deps --force-recreate admin-auth`，否则 outbox 行会落 `failed / PAYLOAD_INVALID`。
+3. **PB 迁移在容器重启时应用**：`docker restart blog-pocketbase` 后要立即确认 `/api/health` 200 且限流策略组未降级（插入策略行的迁移失败会导致全站 503）。
+
 ## 本次同时收紧的两处规则及其影响
 
 - `reactions` 五条规则置 `null`（新迁移 `20261115202000_harden_reactions_rules.pb.js`）：匿名 `GET /api/collections/reactions/records` 已从 200 变为 **403**。**连带影响**：`/admin/insights` 面板通过浏览器 SDK 用普通用户 token 读 reactions（`astro/src/lib/services/insightsService.ts`），规则收紧后会取数失败、面板显示空。若需保留，应改为服务端聚合端点（只返回计数，不暴露 `fingerprint`/`user_id`）。
