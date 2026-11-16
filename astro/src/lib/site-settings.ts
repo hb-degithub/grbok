@@ -73,9 +73,12 @@ export function mergeSettingRecords(records: SettingRecord[]): SiteSettings {
 
 export async function loadSiteSettings(): Promise<SiteSettings> {
   const pb = getPocketBase();
-  const filter = PUBLIC_SETTING_KEYS.map((key) => pb.filter('key = {:key}', { key })).join(' || ');
+  // 2026-11-16：不再下发 "key = ... || key = ..." 的长 OR filter。
+  // settings 集合的 listRule 已经把匿名可读范围限定为 PUBLIC_SETTING_KEYS（含 feature_flags），
+  // 该 filter 完全冗余；而 SafeLine 会把带引号与 || 的 filter 判成注入并返回挑战页（浏览器 403），
+  // 导致每一页的站点设置加载失败（评论开关等全部回退默认值）。
+  // 这里改为不带 filter 的整表读取，服务端规则保证只返回允许的键。
   const records = await pb.collection('settings').getFullList<SettingRecord>({
-    filter,
     fields: 'key,value',
   });
 

@@ -387,8 +387,11 @@ http://img.hlydwz.com {
             file_server
         }
         handle {
-            # SSR HTML 禁缓存(同上,防止 HTML 与 hash chunk 版本错配)
-            header Cache-Control "no-cache, must-revalidate"
+            # SSR HTML 禁缓存(同上,防止 HTML 与 hash chunk 版本错配)。
+            # 2026-11-16：ESA 实测忽略 no-cache 并把 SafeLine 挑战页缓存了 23 天，
+            # 这里升级为 no-store（对遵循源站头的缓存层更明确）；ESA 侧仍需在控制台
+            # 关掉 HTML 缓存，或依赖 scripts/edge-challenge-watch.sh 的自动刷新。
+            header Cache-Control "no-store"
             reverse_proxy 10.255.0.1:4321 {
                 header_up X-Real-IP {client_ip}
                 header_up X-Forwarded-For {client_ip}

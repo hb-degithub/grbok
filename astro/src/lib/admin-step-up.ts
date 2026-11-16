@@ -104,11 +104,17 @@ export function installAdminStepUpHeaders(pb: PocketBase): void {
     }
 
     const headers = new Headers(next.headers as HeadersInit | undefined);
-    headers.set('X-Admin-Session', getAdminClientSession());
-    headers.set('X-Browser-Fingerprint', await getBrowserFingerprint());
-    headers.set('X-Auth-Client-Time', new Date().toISOString());
-    headers.set('X-Requested-With', 'XMLHttpRequest');
+    // 2026-11-16：管理头只随「管理上下文或已存在 step-up 凭证」的请求发出。
+    // 之前对匿名公开 GET 也附带 X-Admin-Session / 指纹 / X-Requested-With，
+    // 一是把后台会话标识铺到所有公开请求上，二是这类组合更容易被边缘 WAF 判定为可疑流量。
     const stored = readAdminStepUp();
+    const isAdminApi = requestUrl.pathname.indexOf('/api/blog-admin') === 0;
+    if (isAdminApi || stored) {
+      headers.set('X-Admin-Session', getAdminClientSession());
+      headers.set('X-Browser-Fingerprint', await getBrowserFingerprint());
+      headers.set('X-Auth-Client-Time', new Date().toISOString());
+      headers.set('X-Requested-With', 'XMLHttpRequest');
+    }
     if (stored) headers.set('X-Admin-Step-Up', stored.credential);
     const recoveryCode = sessionStorage.getItem(RECOVERY_CODE_KEY);
     if (recoveryCode && isAdminRecoveryHeaderPath(requestUrl.pathname)) {
