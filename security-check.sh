@@ -43,19 +43,33 @@ else
         ok "PB_ENCRYPTION_KEY is configured and non-default"
     fi
 
+    # 2026-11-16 更正：Caddyfile 已不再使用 {$ADMIN_IP}（公网 :80 对 /_ 与 /api/admins 一律 404），
+    # ADMIN_IP 现在只被 pb_hooks 的 /api/blog-admin/* 端点（mail/ai/cache）读取；这些端点未配置时
+    # 不启用 IP 检查（仍要求 super_admin + 有效 step-up）。因此这里降级为提示，避免预检恒红。
     ADMIN_IP=$(grep -E "^ADMIN_IP=" .env | cut -d= -f2- || true)
-    if [ "$ADMIN_IP" = "0.0.0.0" ] || [ -z "$ADMIN_IP" ]; then
-        bad "ADMIN_IP must be a concrete trusted IP in production."
+    if [ "$ADMIN_IP" = "0.0.0.0" ]; then
+        bad "ADMIN_IP must never be 0.0.0.0; set a concrete admin IP or leave it empty."
+    elif [ -z "$ADMIN_IP" ]; then
+        note "ADMIN_IP is empty: /api/blog-admin/* (mail/ai/cache) has no IP allowlist, only super_admin + step-up."
     else
-        ok "ADMIN_IP is restricted"
+        ok "ADMIN_IP is restricted (applies to /api/blog-admin/*)"
     fi
 
-    DOMAIN=$(grep -E "^DOMAIN=" .env | cut -d= -f2- || true)
-    if [ "$DOMAIN" = "blog.example.com" ] || [ -z "$DOMAIN" ]; then
-        bad "DOMAIN is missing or still uses blog.example.com."
-    else
-        ok "DOMAIN is configured"
+    # 2026-11-16 更正：部署以 PUBLIC_SITE_URL 为准（compose / astro.config.mjs / SMTP 链接都读它），
+    # 旧的 DOMAIN 变量已无人消费；保留 DOMAIN 仅作向后兼容的回退。
+    SITE_URL=$(grep -E "^PUBLIC_SITE_URL=" .env | cut -d= -f2- || true)
+    DOMAIN_LEGACY=$(grep -E "^DOMAIN=" .env | cut -d= -f2- || true)
+    if [ -z "$SITE_URL" ]; then
+        SITE_URL="$DOMAIN_LEGACY"
     fi
+    case "$SITE_URL" in
+        ""|*blog.example.com*|*localhost*)
+            bad "PUBLIC_SITE_URL is missing or still points at a placeholder/localhost."
+            ;;
+        *)
+            ok "PUBLIC_SITE_URL is configured ($SITE_URL)"
+            ;;
+    esac
 
     SMTP_USER=$(grep -E "^ALIYUN_SMTP_USER=" .env | cut -d= -f2- || true)
     if [ -z "$SMTP_USER" ] || [ "$SMTP_USER" = "smtp_xxx@xxx.example.com" ]; then
@@ -81,10 +95,12 @@ for caddyfile in Caddyfile Caddyfile.local; do
     fi
 done
 
-if grep -Fq 'handle /api/admins/*' Caddyfile && grep -Fq 'PocketBase admin API is restricted' Caddyfile; then
-    ok "Caddy restricts PocketBase admin API by ADMIN_IP"
+# 2026-11-16 更正：公网监听上 /_ 与 /api/admins 走无条件 404（@blocked_admin_access），
+# 不再依赖 ADMIN_IP 判据；真正的管理入口是 loopback 的 :8080（宿主 127.0.0.1:18081 隧道）。
+if grep -Fq '@blocked_admin_access' Caddyfile && grep -Fq 'respond "Not Found" 404' Caddyfile; then
+    ok "Caddy blocks /_ and /api/admins on the public listener (unconditional 404)"
 else
-    bad "Caddyfile must restrict /api/admins/* before the generic /api/* proxy."
+    bad "Caddyfile must keep the @blocked_admin_access 404 block so PB admin never reaches the public port."
 fi
 
 if grep -Fq 'X-Robots-Tag "noindex, nofollow, noarchive"' Caddyfile; then
@@ -93,10 +109,12 @@ else
     bad "Caddyfile should send noindex headers for /admin* and /login*."
 fi
 
-if grep -Fq 'handle /admin*' Caddyfile && grep -Fq 'Forbidden: admin pages are restricted' Caddyfile; then
-    ok "Caddy restricts static admin pages by ADMIN_IP"
+# 2026-11-16 更正：/admin* 自 2026-09-07 起取消 IP 白名单（管理员无固定公网 IP），
+# 改为 SSR 页面 + AdminGuard（服务端 token 校验 + 邮箱验证 + step-up）守护。
+if grep -Fq 'handle /admin*' Caddyfile; then
+    ok "Caddy routes /admin* to the SSR app (guarded by AdminGuard, no IP allowlist by design)"
 else
-    bad "Caddyfile must restrict /admin* static pages by ADMIN_IP."
+    bad "Caddyfile should route /admin* to the SSR app."
 fi
 
 if grep -Fq 'Strict-Transport-Security' Caddyfile; then

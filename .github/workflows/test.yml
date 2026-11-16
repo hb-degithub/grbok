@@ -28,6 +28,11 @@ jobs:
       - name: Install dependencies
         run: cd astro && npm ci --include=dev
 
+      # astro/test/ 下的认证生命周期与契约测试不在 vitest include 范围（只匹配 src/**），
+      # 必须单独用 node --test 跑，否则这些行为断言永远不执行。
+      - name: Admin auth lifecycle tests
+        run: cd astro && npm run test:admin-auth
+
       # 前端单元测试：vitest 为构建前置硬门禁，失败即整体失败。
       # 失败时把日志转成注解（annotations），便于在无 Actions 日志权限时定位。
       - name: Run unit tests
@@ -55,6 +60,9 @@ jobs:
       - name: Validate pb fixtures
         run: |
           set -euo pipefail
+          # 生产 hooks 与迁移同样必须过语法门禁：PB 启动时单个 hook 语法错误会被跳过，
+          # 只查 tests/ 会让这种错误静默上线。
+          find pb_hooks pb_migrations -name '*.js' -print0 | xargs -0 -n1 node --check
           find tests -name '*.pb.js' -print0 | xargs -0 -n1 node --check
           node --test tests/security-rate/hook_log_safety.test.js tests/mail-local/account_retention_integration_contract.js
 
@@ -92,6 +100,29 @@ jobs:
           path: astro/test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  # 真实 PocketBase 0.22.48 安全回归：脚本会自行下载官方二进制到 tmp/ 并起隔离实例。
+  # 这些用例覆盖登录限流/可信代理、关系遍历守卫、邮箱枚举、评论字段固定等 P0 修复，
+  # 之前只存在于「人工记得跑一次」，CI 全绿并不代表这些路径没退化。
+  security-regression:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [baseline, relation, mail, login, comments, fields]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run PocketBase security suite (${{ matrix.suite }})
+        run: node scripts/test-pentest-remediation-local.mjs --suite ${{ matrix.suite }}
+        env:
+          MAIL_GATEWAY_ENABLED: "false"
+          MAIL_ACCOUNT_ENABLED: "false"
+          MAIL_OTP_ENABLED: "false"
 
   # CD:仅在 main 分支推送且 CI 全绿时触发;需仓库配置 vars.DEPLOY_ENABLED=true
   # 与 secrets.SSH_HOST/SSH_USER/SSH_PRIVATE_KEY(可选 SSH_PORT)后才会真正执行,
