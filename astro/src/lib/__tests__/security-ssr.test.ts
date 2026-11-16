@@ -55,6 +55,23 @@ describe('sanitizeHtml in SSR (node environment, no window)', () => {
     expect(out).toContain('alt="示例"');
   });
 
+  it('keeps headings and table structure (2026-11-16 regression)', () => {
+    // 修复前 h2 不在白名单，会被丢掉并变成纯文本，目录提取（只认 h2/h3）永远为空；
+    // 表格相关标签缺失同样会让正文表格塌成一行文字。
+    const out = sanitizeHtml('<h2>二级标题</h2><h3>三级标题</h3><table><thead><tr><th>列</th></tr></thead><tbody><tr><td>值</td></tr></tbody></table><p>行内 <span>span</span></p>');
+    expect(out).toContain('<h2>二级标题</h2>');
+    expect(out).toContain('<h3>三级标题</h3>');
+    expect(out).toContain('<table>');
+    expect(out).toContain('<td>值</td>');
+    expect(out).toContain('<span>span</span>');
+  });
+
+  it('still strips scripts hidden inside table cells', () => {
+    const out = sanitizeHtml('<table><tr><td><script>alert(1)</script>值</td></tr></table>');
+    expect(out).toContain('值');
+    expect(out).not.toContain('<script');
+  });
+
   it('keeps relative and anchor URLs', () => {
     const out = sanitizeHtml('<a href="/posts/x">站内</a><a href="#section">锚点</a>');
     expect(out).toContain('href="/posts/x"');
