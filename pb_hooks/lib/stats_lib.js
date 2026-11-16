@@ -179,43 +179,110 @@ function extractPostSlug(path) {
   return slug;
 }
 
-// 浏览量计数：path 指向 /posts/<slug> 时将对应 posts.views +1。
-// 文章不存在/查询失败一律静默跳过（绝不能让浏览上报因此失败）；
-// views 可能为 null（历史数据），兜底为 0 再 +1；
-// slug 可能是 URL 编码形式（浏览器 location.pathname 对非 ASCII 会编码），先试原样再试解码。
-function incrementPostViews(path) {
-  var slug = extractPostSlug(path);
-  if (!slug) return;
+// 2026-11-16 渗透测试 #24：只有「存在且已发布」的文章才允许计数。
+// 旧实现按 slug 查 posts（不看 status），匿名请求可以把草稿/归档甚至已删除
+// 文章的历史 slug 刷出浏览量。slug 可能是 URL 编码形式（浏览器 location.pathname
+// 对非 ASCII 会编码），先试原样再试解码；两者都查不到或不是 published 一律返回 null。
+function findPublishedPostBySlug(slug) {
+  if (!slug) return null;
   var dao = $app.dao();
-  var post = null;
+  var candidates = [slug];
+  var decoded = null;
   try {
-    post = dao.findFirstRecordByFilter('posts', 'slug = {:slug}', { slug: slug });
+    decoded = decodeURIComponent(slug);
   } catch (_) {
-    try {
-      post = dao.findFirstRecordByFilter('posts', 'slug = {:slug}', { slug: decodeURIComponent(slug) });
-    } catch (_) {
-      post = null;
-    }
+    decoded = null;
   }
-  if (!post) return;
-  var current = Number(post.get('views'));
-  if (!isFinite(current) || current < 0) current = 0;
-  post.set('views', current + 1);
-  dao.saveRecord(post);
+  if (decoded && decoded !== slug) candidates.push(decoded);
+  for (var i = 0; i < candidates.length; i++) {
+    try {
+      var post = dao.findFirstRecordByFilter(
+        'posts',
+        'slug = {:slug} && status = "published"',
+        { slug: candidates[i] },
+      );
+      if (post) return post;
+    } catch (_) {}
+  }
+  return null;
+}
+
+// 同一 visitor 的每日去重：visitor_hash 本身按日轮换（见 visitorHash），
+// 因此「同一 visitor_hash + 同一 path 已有 pageview」等价于当天已计过一次。
+// 查询失败时按"已计数"处理：宁可少计一次，也不重复放大浏览量。
+function hasExistingPageView(dao, visitorHashValue, path) {
+  try {
+    var rows = dao.findRecordsByFilter(
+      'page_views',
+      'visitor_hash = {:hash} && path = {:path} && event = "pageview"',
+      '',
+      1,
+      0,
+      { hash: visitorHashValue, path: path },
+    );
+    return rows.length > 0;
+  } catch (_) {
+    return true;
+  }
+}
+
+// 持久化限流（security_rate_policies 的 view_ip 策略键）。
+// 模块缺失只可能出现在只复制部分 lib 的精简夹具环境；此时回退到旧内存桶，
+// 保持既有测试契约。模块存在但策略降级/写失败时 fail-closed（503）。
+function checkPersistentViewRate(ip) {
+  var securityRate;
+  try {
+    securityRate = require('./security_rate_limit.js');
+  } catch (_) {
+    return { available: false };
+  }
+  var subject = ip;
+  try {
+    subject = securityRate.normalizeIp(ip);
+  } catch (_) {
+    subject = ip;
+  }
+  var decision = null;
+  try {
+    $app.dao().runInTransaction(function (txDao) {
+      decision = securityRate.consume(txDao, {
+        nowMs: Date.now(),
+        entries: [{ policyKey: 'view_ip', subject: subject }],
+      });
+    });
+  } catch (_) {
+    return { available: true, failed: true };
+  }
+  if (!decision || typeof decision.allowed !== 'boolean') return { available: true, failed: true };
+  return {
+    available: true,
+    allowed: decision.allowed,
+    retryAfterSeconds: decision.retryAfterSeconds || 1,
+  };
 }
 
 function trackView(e) {
   const ip = getClientIP(e);
   if (!ip) return trackingUnavailable(e);
 
-  let rateSubject;
-  try {
-    rateSubject = mailCrypto.hashPrivate('stats-rate-ip', ip);
-  } catch (_) {
-    return trackingUnavailable(e);
-  }
-  if (isRateLimited('tv:' + rateSubject, RATE_LIMIT_PER_MIN)) {
-    return e.json(429, { ok: false, error: 'RATE_LIMITED' });
+  // 2026-11-16 渗透测试 #24：匿名上报纳入持久化限流（view_ip 策略键）。
+  const persistentRate = checkPersistentViewRate(ip);
+  if (persistentRate.available) {
+    if (persistentRate.failed) return trackingUnavailable(e);
+    if (!persistentRate.allowed) {
+      return e.json(429, { ok: false, error: 'RATE_LIMITED' });
+    }
+  } else {
+    // 精简夹具环境没有 security_rate_limit.js：保留旧内存桶兜底。
+    let rateSubject;
+    try {
+      rateSubject = mailCrypto.hashPrivate('stats-rate-ip', ip);
+    } catch (_) {
+      return trackingUnavailable(e);
+    }
+    if (isRateLimited('tv:' + rateSubject, RATE_LIMIT_PER_MIN)) {
+      return e.json(429, { ok: false, error: 'RATE_LIMITED' });
+    }
   }
 
   const body = readBody(e);
@@ -247,37 +314,62 @@ function trackView(e) {
     return trackingUnavailable(e);
   }
 
-  try {
-    const collection = $app.dao().findCollectionByNameOrId('page_views');
-    const record = new Record(collection);
-    record.set('path', path);
-    record.set('referrer', referrer);
-    record.set('ua_category', category);
-    record.set('visitor_hash', visitorHashValue);
-    record.set('event', event);
-    if (event === 'link_click') record.set('target', target);
-    // 访客地理（仅 pageview 解析，link_click 复用意义不大且省一次内网调用）
-    if (event === 'pageview') {
-      try {
-        const geo = require('./stats_geo.js').resolve(e, ip);
-        if (geo && geo.country) {
-          record.set('country', geo.country);
-          record.set('region_code', geo.region_code || '');
-          record.set('city', geo.city || '');
-        }
-      } catch (_) {}
+  // 文章路径必须解析到「存在且已发布」的文章；否则按前端兼容的成功响应返回，
+  // 不写 page_views、不递增 posts.views（draft/archived/不存在的 slug 均不可计数）。
+  // 非 /posts/<slug> 路径仍作为普通页面浏览记录（/api/blog-stats 与既有统计夹具依赖）。
+  let post = null;
+  if (event === 'pageview') {
+    const slug = extractPostSlug(path);
+    if (slug) {
+      post = findPublishedPostBySlug(slug);
+      if (!post) return e.json(202, { ok: true });
     }
-    $app.dao().saveRecord(record);
+  }
+
+  // 访客地理（仅 pageview 解析，link_click 复用意义不大且省一次内网调用）。
+  // 在事务外解析，避免内网调用占用写事务。
+  let geo = null;
+  if (event === 'pageview') {
+    try {
+      geo = require('./stats_geo.js').resolve(e, ip);
+    } catch (_) {
+      geo = null;
+    }
+  }
+
+  try {
+    $app.dao().runInTransaction(function (txDao) {
+      // 同一 visitor 当天对同一 path 只计一次浏览量；page_views 全量行仍保留，
+      // 供 /api/blog-stats 的 totalViews/topPages 使用（限流已约束写入速率）。
+      var alreadyCounted = false;
+      if (post) alreadyCounted = hasExistingPageView(txDao, visitorHashValue, path);
+
+      const collection = txDao.findCollectionByNameOrId('page_views');
+      const record = new Record(collection);
+      record.set('path', path);
+      record.set('referrer', referrer);
+      record.set('ua_category', category);
+      record.set('visitor_hash', visitorHashValue);
+      record.set('event', event);
+      if (event === 'link_click') record.set('target', target);
+      if (geo && geo.country) {
+        record.set('country', geo.country);
+        record.set('region_code', geo.region_code || '');
+        record.set('city', geo.city || '');
+      }
+      txDao.saveRecord(record);
+
+      if (post && !alreadyCounted) {
+        var stored = txDao.findRecordById('posts', post.id);
+        var current = Number(stored.get('views'));
+        if (!isFinite(current) || current < 0) current = 0;
+        stored.set('views', current + 1);
+        txDao.saveRecord(stored);
+      }
+    });
   } catch (_) {
     console.error('[stats][STATS_TRACK_SAVE_FAILED]');
     return trackingUnavailable(e);
-  }
-
-  // page_views 落库成功后才递增文章浏览量；失败静默（不影响已成功的上报响应）。
-  if (event === 'pageview') {
-    try {
-      incrementPostViews(path);
-    } catch (_) {}
   }
 
   return e.json(202, { ok: true });

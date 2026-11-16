@@ -7,6 +7,10 @@ var DEFAULTS = {
   // 验证邮件 category 级全局配额（mail_outbox.enqueue 按 category 名消耗）；
   // 按邮箱/IP 维度由 registration_facade 的 account_mail_* 三轴承担
   account_verification: { limit: 60, windowSeconds: 60 },
+  // 评论编辑/删除验证码邮件的类别级配额（mail_outbox.enqueue 按 category 名消耗）。
+  // 键名/阈值必须与 pb_migrations/20261116153000_add_comment_verification_rate_policy.pb.js
+  // 一致，且迁移必须与本次代码同批上线：getRatePolicySet 要求行数 === DEFAULTS 键数。
+  comment_verification: { limit: 60, windowSeconds: 60 },
   registration_ip: { limit: 3, windowSeconds: 3600 },
   registration_ipv6_64: { limit: 10, windowSeconds: 3600 },
   registration_global: { limit: 20, windowSeconds: 60 },
@@ -59,6 +63,11 @@ var DEFAULTS = {
   post_like_user: { limit: 30, windowSeconds: 60 },
   post_bookmark_user: { limit: 30, windowSeconds: 60 },
   comment_like_user: { limit: 60, windowSeconds: 60 },
+  // 2026-11-16 渗透测试 #24：匿名 /api/track-view 的持久化限流（按客户端 IP）。
+  // 键名/阈值必须与 pb_migrations/20261116150000_add_view_rate_policy.pb.js 一致，
+  // 且迁移必须与本次代码同批上线：getRatePolicySet 要求行数 === DEFAULTS 键数，
+  // 缺行会让整组限流 fail-closed 降级。
+  view_ip: { limit: 60, windowSeconds: 60 },
 };
 
 var BOUNDS = {
@@ -66,6 +75,7 @@ var BOUNDS = {
   account_mail_ip: { minLimit: 2, maxLimit: 20, minWindow: 300, maxWindow: 3600 },
   account_mail_global: { minLimit: 10, maxLimit: 120, minWindow: 60, maxWindow: 900 },
   account_verification: { minLimit: 60, maxLimit: 60, minWindow: 60, maxWindow: 60 },
+  comment_verification: { minLimit: 60, maxLimit: 60, minWindow: 60, maxWindow: 60 },
   registration_ip: { minLimit: 1, maxLimit: 10, minWindow: 3600, maxWindow: 3600 },
   registration_ipv6_64: { minLimit: 2, maxLimit: 30, minWindow: 3600, maxWindow: 3600 },
   registration_global: { minLimit: 5, maxLimit: 60, minWindow: 60, maxWindow: 60 },
@@ -101,6 +111,7 @@ var BOUNDS = {
   post_like_user: { minLimit: 10, maxLimit: 60, minWindow: 60, maxWindow: 300 },
   post_bookmark_user: { minLimit: 10, maxLimit: 60, minWindow: 60, maxWindow: 300 },
   comment_like_user: { minLimit: 20, maxLimit: 120, minWindow: 60, maxWindow: 300 },
+  view_ip: { minLimit: 10, maxLimit: 120, minWindow: 60, maxWindow: 300 },
 };
 
 function coded(code, message) {

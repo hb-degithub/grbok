@@ -109,7 +109,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [baseline, relation, mail, login, comments, fields]
+        suite: [baseline, relation, mail, login, comments, fields, abuse]
     steps:
       - uses: actions/checkout@v4
 

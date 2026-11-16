@@ -17,12 +17,14 @@ function string(value, max, name) {
 }
 function variables(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) invalid('invalid variables');
-  // 变量白名单按模板分组：评论通知、保留通知、邮箱验证、评论回复通知。
+  // 变量白名单按模板分组：评论通知、保留通知、邮箱验证、评论回复通知、
+  // 评论操作验证码（code：6 位数字，渲染前在 render() 里再严格校验）。
   var allowed = {
     postTitle: true, commenter: true, content: true, postUrl: true,
     displayName: true, cleanupDate: true, siteUrl: true,
     actionUrl: true, expiresMinutes: true,
     parentCommenter: true, parentContent: true,
+    code: true,
   };
   // 长字段单独放宽上限：content（评论正文）、actionUrl（含 token 的验证链接）。
   var longFields = { content: 2000, actionUrl: 1000 };
@@ -48,7 +50,7 @@ function enqueue(txDao, input) {
   var existing = findDedupe(txDao, dedupeKey);
   if (existing) return { queued: false, outboxId: existing.id };
   var category = string(input.category, 64, 'category');
-  if (category !== 'comment_notification' && category !== 'account_retention_notice' && category !== 'account_verification' && category !== 'comment_reply_notification') invalid('invalid category');
+  if (category !== 'comment_notification' && category !== 'account_retention_notice' && category !== 'account_verification' && category !== 'comment_reply_notification' && category !== 'comment_verification') invalid('invalid category');
   var policyKey = category;
   var limit = rateLimit.consume(txDao, { nowMs: Date.now(), entries: [
     { policyKey: policyKey, subject: 'v1' }, { policyKey: 'outbound_global', subject: 'v1' },
@@ -58,7 +60,8 @@ function enqueue(txDao, input) {
   if ((category === 'comment_notification' && templateKey !== 'comment_new') ||
       (category === 'account_retention_notice' && templateKey !== 'account_retention_notice') ||
       (category === 'account_verification' && templateKey !== 'account_verification') ||
-      (category === 'comment_reply_notification' && templateKey !== 'comment_reply')) invalid('invalid template');
+      (category === 'comment_reply_notification' && templateKey !== 'comment_reply') ||
+      (category === 'comment_verification' && templateKey !== 'comment_verification')) invalid('invalid template');
   var record = new Record(txDao.findCollectionByNameOrId('mail_outbox'));
   record.set('dedupe_key', dedupeKey);
   record.set('event_id', $security.randomStringWithAlphabet(22, ALPHABET));
@@ -154,6 +157,16 @@ function render(record) {
     message.text += '\n' + loginUrl;
     return message;
   }
+  if (record.getString('template_key') === 'comment_verification') {
+    // 评论编辑/删除验证码：走共享模板引擎（mail_templates 的
+    // comment_verification 模板，由 20261116154000 迁移种下）。
+    // variables 只有一个 code，渲染前强制 6 位数字校验 —— 避免把任意文本
+    // 当成验证码发出去；验证码本身不写日志（只记 category/result）。
+    var code = string(vars.code, 64, 'code');
+    if (!/^[0-9]{6}$/.test(code)) invalid('invalid code');
+    var codeRendered = templates.render('comment_verification', { code: code });
+    return { subject: codeRendered.subject, html: codeRendered.html, text: codeRendered.text };
+  }
   if (record.getString('template_key') === 'comment_reply') {
     var subject = '评论回复: ' + string(vars.postTitle, 160, 'postTitle');
     var html = '<h2>你的评论收到回复</h2><p><strong>文章:</strong> ' + templates.escapeHtml(vars.postTitle) +
@@ -212,10 +225,12 @@ function processBatch(nowMs, limit) {
         var logCategory = cat === 'comment_notification' ? 'comment_new'
           : cat === 'comment_reply_notification' ? 'comment_reply'
           : cat === 'account_verification' ? 'account_verification'
+          : cat === 'comment_verification' ? 'comment_verification'
           : 'account_retention_notice';
         var logSource = cat === 'comment_notification' ? 'comment'
           : cat === 'comment_reply_notification' ? 'comment'
           : cat === 'account_verification' ? 'registration'
+          : cat === 'comment_verification' ? 'comment'
           : 'retention';
         logs.delivery({ event_id: $security.randomStringWithAlphabet(22, ALPHABET), category: logCategory, source_kind: logSource, result: result, duration_ms: 0, attempt: record.getInt('attempt'), error_class: errorClass });
       } catch (_) {}

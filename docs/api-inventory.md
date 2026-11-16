@@ -224,7 +224,7 @@ POST /api/blog-internal/mail-archive/retention-confirm
 
 本地隔离环境全量验证（2026-08-22，PocketBase 0.22.21 隔离实例 + Mailpit 1.30.0，未触生产）：
 
-- `scripts/test-api-surface-local.ps1 -Offline`：65/65。公开健康/搜索/统计/track-view、评论四动作负路径、OTP/注册/密码重置统一响应、全部 `/api/blog-admin/*` 匿名门禁 401/403、未知管理路由 404、9 条 `/api/blog-internal/mail-archive/*` 未签名 401（ARCHIVE_AUTH_REJECTED）、原生 REST 规则抽查（posts/comments/public_comments/comment_likes/tags/settings/users）。
+- `scripts/test-api-surface-local.ps1 -Offline`：65/65。公开健康/搜索/统计/track-view、评论四动作负路径、OTP/注册/密码重置统一响应、全部 `/api/blog-admin/*` 匿名门禁统一 401（含未知管理路由，不再有 403/404 可枚举差异）、9 条 `/api/blog-internal/mail-archive/*` 未签名 401（ARCHIVE_AUTH_REJECTED）、原生 REST 规则抽查（posts/comments/public_comments/comment_likes/tags/settings/users）。
 - `scripts/test-security-rate-local.ps1 -All -Offline`：8/8（policy、rate 含并发与重启持久化、account_mail、registration、outbox、admin_policy）。
 - `scripts/test-stats-friend-local.ps1 -Offline`：PASS（track-view 哈希身份、可信 IP、referrer 白名单、friend-link-stats、Top10）。
 - `scripts/test-gallery-local.ps1 -Offline`：PASS（gallery REST + step-up 边界 + 审计）。

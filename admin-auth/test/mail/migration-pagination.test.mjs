@@ -51,7 +51,7 @@ it('paginates the delivery-log migration to EOF and emits only archive-compatibl
   assert.ok(calls.length >= 3, `expected multiple pages, got ${calls.length}`);
   assert.ok(calls.every((call) => call.limit <= 500), 'migration requested an unbounded page');
   assert.equal(new Set(rows.map((row) => row.values.event_id)).size, rows.length);
-  const allowedCategories = new Set(['account_verification','account_password_reset','account_email_change','reader_otp','comment_new','comment_approved','comment_reply','admin_test','ops_alert','account_retention_notice']);
+  const allowedCategories = new Set(['account_verification','account_password_reset','account_email_change','reader_otp','comment_new','comment_approved','comment_reply','admin_test','ops_alert','account_retention_notice','comment_verification']);
   const allowedSources = new Set(['account','reader','comment','admin','operations','retention','registration']);
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];

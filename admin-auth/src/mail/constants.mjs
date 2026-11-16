@@ -7,6 +7,8 @@ export const MAIL_CATEGORIES = Object.freeze([
   'comment_approved',
   'comment_reply',
   'comment_notification',
+  // 评论编辑/删除的一次性验证码（PB 侧 comment_verification.js 入队时使用该类目）
+  'comment_verification',
   'account_retention_notice',
   'admin_test',
   'ops_alert',

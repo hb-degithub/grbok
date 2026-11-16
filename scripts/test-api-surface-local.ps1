@@ -229,11 +229,10 @@ try {
     Expect-Status (Invoke-Probe 'register missing fields' POST '/api/blog-auth/register' @{}) 400
     Expect-Status (Invoke-Probe 'password reset uniform accepted' POST '/api/blog-auth/password-reset/request' @{ email = 'surface-probe@example.com' }) 202
 
-    # ---- Admin-gated routes: anonymous must get 401/403, never 404/500 ----
-    # security_policy_admin.pb.js and cache_admin.pb.js keep their helpers in
-    # pb_hooks/lib (security_policy_route_helpers.js / cache_admin_helpers.js)
-    # because the PB 0.22 JSVM request runtime cannot resolve .pb.js IIFE
-    # closures; anonymous probes must still hit the 401/403 gate.
+    # ---- Admin-gated routes: anonymous must get 401 before step-up, never 403/404/500 ----
+    # 2026-11-16 #23: admin_prefix_guard.pb.js 在 step-up 之前统一 401，并且
+    # 未注册的 /api/blog-admin/* 也返回同一 401，匿名枚举不再有状态码区分度；
+    # 已认证但无 step-up 的请求仍由原 handler 返回 403（本脚本只测匿名路径）。
     $adminGets = @(
         '/api/blog-admin/step-up/status', '/api/blog-admin/security/status', '/api/blog-admin/security/events',
         '/api/blog-admin/esa/config', '/api/blog-admin/esa/tasks',
@@ -242,22 +241,22 @@ try {
         '/api/blog-admin/security/rate-policy', '/api/blog-admin/security/registration-mode',
         '/api/blog-admin/email-verification-status'
     )
-    foreach ($path in $adminGets) { Expect-StatusIn (Invoke-Probe "anon admin gate GET $path" GET $path) @(401, 403) }
+    foreach ($path in $adminGets) { Expect-Status (Invoke-Probe "anon admin gate GET $path" GET $path) 401 }
 
     $adminPosts = @(
         '/api/blog-admin/step-up/revoke', '/api/blog-admin/totp/setup', '/api/blog-admin/totp/confirm',
         '/api/blog-admin/totp/verify', '/api/blog-admin/totp/revoke', '/api/blog-admin/local-recovery',
         '/api/blog-admin/esa/purge', '/api/blog-admin/mail/verify', '/api/blog-admin/mail/test'
     )
-    foreach ($path in $adminPosts) { Expect-StatusIn (Invoke-Probe "anon admin gate POST $path" POST $path @{}) @(401, 403) }
+    foreach ($path in $adminPosts) { Expect-Status (Invoke-Probe "anon admin gate POST $path" POST $path @{}) 401 }
 
     $adminPuts = @(
         '/api/blog-admin/esa/config', '/api/blog-admin/mail/smtp', '/api/blog-admin/mail/templates',
         '/api/blog-admin/security/rate-policy', '/api/blog-admin/security/registration-mode'
     )
-    foreach ($path in $adminPuts) { Expect-StatusIn (Invoke-Probe "anon admin gate PUT $path" PUT $path @{}) @(401, 403) }
+    foreach ($path in $adminPuts) { Expect-Status (Invoke-Probe "anon admin gate PUT $path" PUT $path @{}) 401 }
 
-    Expect-Status (Invoke-Probe 'unknown admin route is 404' GET '/api/blog-admin/definitely-missing') 404
+    Expect-Status (Invoke-Probe 'unknown admin route is 401 (indistinguishable)' GET '/api/blog-admin/definitely-missing') 401
 
     # ---- HMAC-signed internal mail-archive routes: unsigned must be rejected ----
     $archiveRoutes = @('status', 'prepare', 'export', 'seal', 'uploaded', 'commit', 'restore-descriptor', 'retention-due', 'retention-confirm')

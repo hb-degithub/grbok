@@ -7,6 +7,8 @@ var CATEGORIES = {
   account_verification: true, account_password_reset: true, account_email_change: true,
   reader_otp: true, comment_new: true, comment_approved: true, comment_reply: true,
   admin_test: true, ops_alert: true, account_retention_notice: true,
+  // 评论编辑/删除验证码邮件（mail_outbox 的 comment_verification 类别）
+  comment_verification: true,
 };
 var SOURCE_KINDS = { account: true, reader: true, comment: true, admin: true, operations: true, retention: true, registration: true };
 var RESULTS = { sent: true, failed: true };
