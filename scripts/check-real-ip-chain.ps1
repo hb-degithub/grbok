@@ -29,7 +29,10 @@ Require ([regex]::Matches($caddy, '(?m)^\s*trusted_proxies\s+static\s+\{\$OPENRE
 Require ([regex]::Matches($caddy, '(?m)^\s*trusted_proxies\s+static\s+').Count -eq 1) 'production must define exactly one trusted proxy source'
 Require ([regex]::Matches($local, '(?m)^\s*trusted_proxies\s+static\s+127\.0\.0\.1/32\s+172\.16\.0\.0/12\s*$').Count -eq 1) 'local trusted proxy sources must stay explicit and local-only'
 Require (-not $local.Contains('OPENRESTY_TRUSTED_PROXY')) 'local Caddy must not depend on the production proxy source'
-Require ([regex]::Matches($envExample, '(?m)^OPENRESTY_TRUSTED_PROXY=REPLACE_WITH_EXACT_OPENRESTY_SOURCE_CIDR\r?$').Count -eq 1) '.env.example must use a non-operational exact OpenResty source placeholder'
+# 2026-11-16 更正：原断言要求 REPLACE_WITH_EXACT_OPENRESTY_SOURCE_CIDR 这个占位符，
+# 但它不是合法 IP/CIDR；compose 会把它直接注入 Caddy 的 trusted_proxies，
+# 照抄示例即 `caddy validate` 失败、blog-caddy 起不来。改为要求一个合法但非本机的示例值。
+Require ([regex]::Matches($envExample, '(?m)^OPENRESTY_TRUSTED_PROXY=10\.255\.2\.1\r?$').Count -eq 1) '.env.example must declare a syntactically valid sample trusted-proxy source'
 Require ([regex]::Matches($productionCaddyService, '(?m)^\s*-\s*OPENRESTY_TRUSTED_PROXY=\$\{OPENRESTY_TRUSTED_PROXY\}\s*$').Count -eq 1) 'production Compose caddy must inject OPENRESTY_TRUSTED_PROXY exactly once'
 Require ([regex]::Matches($compose, '(?m)^\s*-\s*OPENRESTY_TRUSTED_PROXY=').Count -eq 1) 'production Compose must inject OPENRESTY_TRUSTED_PROXY nowhere except caddy'
 Require ([regex]::Matches($localCaddyService, '(?m)^\s*-\s*OPENRESTY_TRUSTED_PROXY=').Count -eq 0) 'local Compose caddy must not inject the production proxy source'
