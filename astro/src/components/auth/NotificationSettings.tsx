@@ -42,43 +42,43 @@ export default function NotificationSettings({ onSave }: NotificationSettingsPro
   }
 
   return (
-    <div className="rounded-lg border border-border bg-bg-soft p-4">
-      <h3 className="mb-4 text-sm font-medium text-text">邮件通知设置</h3>
+    <div className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4">
+      <h3 className="mb-4 text-sm font-medium text-[var(--sf-ink)]">邮件通知设置</h3>
       
       <div className="space-y-3">
         <label className="flex items-center justify-between">
-          <span className="text-sm text-text-muted">有人回复我的评论时通知我</span>
+          <span className="text-sm text-[var(--sf-ink-3)]">有人回复我的评论时通知我</span>
           <input
             type="checkbox"
             checked={prefs.notify_comment_reply}
             onChange={(e) => setPrefs({ ...prefs, notify_comment_reply: e.target.checked })}
-            className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+            className="h-4 w-4 rounded-[2px] border-[var(--sf-line-control)] text-[var(--sf-accent)] focus:ring-[var(--sf-accent)]"
           />
         </label>
         
         <label className="flex items-center justify-between">
-          <span className="text-sm text-text-muted">我的文章收到新评论时通知我</span>
+          <span className="text-sm text-[var(--sf-ink-3)]">我的文章收到新评论时通知我</span>
           <input
             type="checkbox"
             checked={prefs.notify_post_comment}
             onChange={(e) => setPrefs({ ...prefs, notify_post_comment: e.target.checked })}
-            className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+            className="h-4 w-4 rounded-[2px] border-[var(--sf-line-control)] text-[var(--sf-accent)] focus:ring-[var(--sf-accent)]"
           />
         </label>
       </div>
 
       {error && (
-        <p className="mt-3 text-sm text-red-500">{error}</p>
+        <p className="mt-3 text-sm text-[var(--sf-danger)]">{error}</p>
       )}
       
       {saved && (
-        <p className="mt-3 text-sm text-green-500">已保存</p>
+        <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">已保存</p>
       )}
 
       <button
         onClick={handleSave}
         disabled={loading}
-        className="mt-4 rounded-md bg-accent px-4 py-2 text-sm text-white hover:bg-accent-hover disabled:opacity-50"
+        className="mt-4 rounded-[3px] bg-[var(--sf-accent)] px-4 py-2 text-sm text-[var(--sf-on-accent)] hover:bg-[var(--sf-accent-ink)] disabled:opacity-50"
       >
         {loading ? '保存中...' : '保存设置'}
       </button>

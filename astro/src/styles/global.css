@@ -568,30 +568,6 @@ img:not([src]), img[src=''], img[src*='loading'] {
 }
 
 /* ===========================
-   旧 Tailwind 颜色工具类兼容桥（临时，勿扩散）
-   ------------------------------------------------------------
-   /account/notifications 的 NotificationSettings.tsx 仍在用旧工具类名取色
-   （该组件不在本次「只允许改 global.css」的改动范围内）。旧调色板定义
-   删除后，这些类名不会再被 Tailwind 生成，为避免「白字打在透明背景上」这类
-   可读性回退，在这里把它们就地映射到 --sf-* 令牌：
-   不新增任何令牌，只用现有 --sf-*，文件内也不再保留任何旧调色板定义。
-   待 NotificationSettings.tsx 迁移到 var(--sf-*) 后，整块删除即可。
-   =========================== */
-
-.bg-accent { background-color: var(--sf-accent); }
-/* 该组件把按钮前景写死成 text-white：浅色主题下配深青底没问题（6.06:1），
-   暗色主题的浅青底（#3fa8b2）配白字只有 2.82:1。这里按设计系统语义把
-   强调色底上的前景改成 --sf-on-accent（暗色为近石墨 #16191d，6.26:1）。 */
-.dark .bg-accent { color: var(--sf-on-accent); }
-.hover\:bg-accent-hover:hover { background-color: var(--sf-accent-ink); }
-.bg-bg-soft { background-color: var(--sf-surface); }
-.border-border { border-color: var(--sf-line); }
-.text-accent { color: var(--sf-accent); }
-.text-text { color: var(--sf-ink); }
-.text-text-muted { color: var(--sf-ink-3); }
-.focus\:ring-accent:focus { --tw-ring-color: var(--sf-accent); }
-
-/* ===========================
    Print styles
    =========================== */
 
