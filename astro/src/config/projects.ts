@@ -29,26 +29,10 @@ export const projects: Project[] = [
     name: '胡巴的博客',
     tagline: '自建全栈个人博客系统',
     description:
-      'Astro 6.4 纯静态生成前端 + PocketBase 0.22 后端的全栈博客：RBAC 管理员体系、TOTP 身份验证器、评论系统、Pagefind 全文搜索、访问统计、Docker Compose 一体化部署。',
-    tech: ['Astro 6.4', 'React 19', 'Tailwind CSS 4', 'PocketBase 0.22', 'admin-auth', 'Caddy 2.8', 'Docker Compose'],
+      'Astro 7 SSR 服务端渲染 + React 19 岛屿 + PocketBase 0.22 后端的全栈博客：RBAC 管理员体系、TOTP 身份验证器、评论系统、Pagefind 全文搜索、访问统计、Docker Compose 一体化部署。',
+    tech: ['Astro 7 SSR', 'React 19', 'Tailwind CSS 4', 'PocketBase 0.22', 'admin-auth', 'Caddy 2.8', 'Docker Compose'],
     status: 'active',
     links: { demo: 'https://hlydwz.com', article: '/posts' },
     featured: true,
-  },
-  {
-    name: '示例项目 Alpha',
-    tagline: '示例项目，请编辑 src/config/projects.ts',
-    description: '这是一个占位项目。把这里换成你的项目：名称、标语、描述、技术栈和链接。',
-    tech: ['示例', '占位'],
-    status: 'wip',
-    links: {},
-  },
-  {
-    name: '示例项目 Beta',
-    tagline: '示例项目，请编辑 src/config/projects.ts',
-    description: '再一个占位项目。featured: true 可以让项目显示在顶部大卡片区。',
-    tech: ['示例'],
-    status: 'archived',
-    links: {},
   },
 ];
