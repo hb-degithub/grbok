@@ -4,6 +4,7 @@ import PostList from '../components/posts/PostList';
 import HomeAuthQuickEntry from '../components/auth/HomeAuthQuickEntry';
 import HomeSideNav from '../components/sidebar/HomeSideNav';
 import StatusMini from '../components/sidebar/StatusMini';
+import RequestPath from '../components/layout/RequestPath';
 import HotArticles from '../components/sidebar/HotArticles';
 import RecentComments from '../components/sidebar/RecentComments';
 import FriendLinks from '../components/sidebar/FriendLinks';
@@ -33,29 +34,6 @@ const [postsCount, tagsCount] = await Promise.all([
   fetchCount('posts', 'status = "published"'),
   fetchCount('tags'),
 ]);
-
-/**
- * 站点结构拓扑：节点全部是本页可点到的站内真实路由，没有任何占位数据。
- * 计数只复用上面同一次 SSR 计数结果（postsCount / tagsCount）；
- * fetchCount 抓取失败时返回 0，此时不渲染计数——宁可不写，也不把「取不到」显示成 0。
- * 数组顺序即结构顺序：第 1 项是根（首页），其余是它的直接子级（一级栏目）。
- */
-interface SiteNodeLink {
-  href: string;
-  name: string;
-  path: string;
-  detail: string | null;
-  current: boolean;
-}
-
-const siteNodes: SiteNodeLink[] = [
-  { href: '/', name: '首页', path: '/', detail: null, current: true },
-  { href: '/posts', name: '文章', path: '/posts', detail: postsCount > 0 ? `${postsCount} 篇` : null, current: false },
-  { href: '/tags', name: '标签', path: '/tags', detail: tagsCount > 0 ? `${tagsCount} 个` : null, current: false },
-  { href: '/archive', name: '归档', path: '/archive', detail: null, current: false },
-  { href: '/about', name: '关于', path: '/about', detail: null, current: false },
-  { href: '/login', name: '登录', path: '/login', detail: null, current: false },
-];
 ---
 
 <BaseLayout title="首页" description={SITE_CONFIG.description} mainClass="pt-0 sm:pt-0 sm:pb-0">
@@ -97,58 +75,15 @@ const siteNodes: SiteNodeLink[] = [
         </p>
       </div>
 
-      <!-- 右侧站点结构拓扑：节点是站内真实路由，计数复用本页 SSR 数据，连线是真实层级 -->
+      <!-- 右侧真实请求链路：公网访客 → ESA 边缘 → 雷池 SafeLine → Caddy → Astro SSR / PocketBase。
+           面板（含骨架、overall 状态、分叉）由 RequestPath 客户端岛渲染，指标全部来自
+           /api/public/status、/api/public/protection、/api/public/ping 三个既有公开接口；
+           Caddy 一跳没有独立逐跳探测，面板固定显示「未采集」，不写死毫秒数。 -->
       <figure class="sf-figure relative mx-auto w-full max-w-[23rem]">
-        <div class="sf-instrument relative w-full border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5 sm:p-6">
-          <span class="sf-corner sf-corner-tl" aria-hidden="true"></span>
-          <span class="sf-corner sf-corner-tr" aria-hidden="true"></span>
-          <span class="sf-corner sf-corner-bl" aria-hidden="true"></span>
-          <span class="sf-corner sf-corner-br" aria-hidden="true"></span>
-          <div class="mb-4 flex items-baseline justify-between gap-3 border-b border-[var(--sf-line-soft)] pb-2">
-            <span class="sf-instrument-label font-mono text-[0.625rem] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">SITEMAP / 01</span>
-            <span class="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">{siteNodes.length} NODES</span>
-          </div>
-          <div class="sf-sitemap">
-            {/* 连线只负责画层级关系（root → 一级栏目），语义由下面的 <ol>/<a> 提供；
-                连线坐标与节点百分比一一对应，改坐标时两边要同步。 */}
-            <svg class="sf-sitemap__wires" viewBox="0 0 360 360" fill="none" aria-hidden="true" focusable="false">
-              <path
-                d="M104 180H128M128 48V312M128 48H152M128 114H152M128 180H152M128 246H152M128 312H152"
-                stroke="var(--sf-line-strong)"
-                stroke-width="1"
-                vector-effect="non-scaling-stroke"></path>
-            </svg>
-            <ol class="sf-sitemap__list" role="list">
-              {siteNodes.map((node) => (
-                <li class:list={['sf-sitemap__item', node.current && 'sf-sitemap__item--current']}>
-                  <a
-                    href={node.href}
-                    class="sf-sitemap__link"
-                    aria-current={node.current ? 'page' : undefined}
-                  >
-                    <span class="sf-sitemap__name">{node.name}</span>
-                    <span class="sf-sitemap__meta">
-                      <span class="sf-sitemap__path">{node.path}</span>
-                      {node.detail && (
-                        <>
-                          <span class="sf-sitemap__sep" aria-hidden="true">·</span>
-                          <span class="sf-sitemap__count">{node.detail}</span>
-                        </>
-                      )}
-                      {node.current && (
-                        <>
-                          <span class="sf-sitemap__sep" aria-hidden="true">·</span>
-                          <span class="sf-sitemap__flag">当前页</span>
-                        </>
-                      )}
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </div>
-        <figcaption class="mt-3 text-center font-mono text-[0.625rem] text-[var(--sf-ink-3)]">站点结构 · 真实入口 · 首页为根，其余为一级栏目</figcaption>
+        <RequestPath client:visible />
+        <figcaption class="mt-3 text-center font-mono text-[0.625rem] leading-relaxed text-[var(--sf-ink-3)]">
+          真实请求链路 · 公网 / ESA → 雷池 → Caddy 分叉到页面与接口 ·「未采集」= 这一跳没有独立测量，不显示估算值
+        </figcaption>
       </figure>
     </div>
   </section>
@@ -278,192 +213,10 @@ const siteNodes: SiteNodeLink[] = [
     color: var(--sf-ink-3);
   }
 
-  /* 站点结构面板；结构线由内联 SVG 画在底层，节点文字是 HTML 叠加在上层，
-     因此文字不随图形缩放、不会发虚。 */
-  .sf-instrument {
-    position: relative;
-  }
-
-  /* 四个角标：边框简写显式带 var(--sf-line-strong)。
-     若只写 `border-top: 1px solid`，简写会把 color 重置为 currentColor，
-     暗色主题下线条会变成近白（.sf-corner 上的 border-color 被覆盖）。 */
-  .sf-corner {
-    position: absolute;
-    width: 12px;
-    height: 12px;
-    border-color: var(--sf-line-strong);
-  }
-
-  .sf-corner-tl { top: -1px; left: -1px; border-top: 1px solid var(--sf-line-strong); border-left: 1px solid var(--sf-line-strong); }
-  .sf-corner-tr { top: -1px; right: -1px; border-top: 1px solid var(--sf-line-strong); border-right: 1px solid var(--sf-line-strong); }
-  .sf-corner-bl { bottom: -1px; left: -1px; border-bottom: 1px solid var(--sf-line-strong); border-left: 1px solid var(--sf-line-strong); }
-  .sf-corner-br { bottom: -1px; right: -1px; border-bottom: 1px solid var(--sf-line-strong); border-right: 1px solid var(--sf-line-strong); }
-
-  /* 站点结构拓扑
-     - 小屏（<640px）：纵向列表 + 左侧竖线（每条 li 的 border-left 拼成一条主干），
-       短横线是「同属根节点一级栏目」的层级提示。
-     - 桌面（≥640px）：同一个 <ol> 按 360×360 坐标系绝对定位到方形舞台，
-       连线由上方 <svg> 画在底层；两者百分比与 SVG 坐标一一对应。 */
-  .sf-sitemap__wires {
-    display: none;
-  }
-
-  .sf-sitemap__list {
-    display: flex;
-    flex-direction: column;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .sf-sitemap__item {
-    position: relative;
-    padding: 4px 0 4px 1.125rem;
-    border-left: 1px solid var(--sf-line-strong);
-  }
-
-  .sf-sitemap__item::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 0;
-    width: 0.6875rem;
-    height: 1px;
-    background: var(--sf-line-strong);
-  }
-
-  /* 可点区域在移动端保持 ≥44px（min-height: 48px） */
-  .sf-sitemap__link {
-    display: flex;
-    min-height: 48px;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--sf-line);
-    border-radius: 3px;
-    background: var(--sf-surface);
-    color: var(--sf-ink);
-    text-decoration: none;
-    transition: border-color 0.15s ease;
-  }
-
-  /* 当前页用强调色描边区分（另有 aria-current="page" 与「当前页」文字，不只靠颜色） */
-  .sf-sitemap__item--current .sf-sitemap__link {
-    border-color: var(--sf-accent);
-  }
-
-  .sf-sitemap__link:hover {
-    border-color: var(--sf-accent);
-  }
-
-  .sf-sitemap__link:focus-visible {
-    border-color: var(--sf-accent);
-    outline: 2px solid var(--sf-accent);
-    outline-offset: 2px;
-  }
-
-  .sf-sitemap__name {
-    font-size: 0.875rem;
-    font-weight: 500;
-    letter-spacing: 0.02em;
-    white-space: nowrap;
-  }
-
-  .sf-sitemap__meta {
-    display: inline-flex;
-    min-width: 0;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 0.3em;
-    font-family: 'Geist Mono', monospace;
-    font-size: 0.6875rem;
-    letter-spacing: 0.04em;
-    color: var(--sf-ink-3);
-  }
-
-  .sf-sitemap__sep {
-    color: var(--sf-line-strong);
-  }
-
-  .sf-sitemap__count {
-    font-variant-numeric: tabular-nums;
-    color: var(--sf-ink-2);
-  }
-
-  .sf-sitemap__flag {
-    color: var(--sf-accent);
-    letter-spacing: 0.12em;
-  }
-
-  @media (min-width: 640px) {
-    .sf-sitemap {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 1 / 1;
-    }
-
-    .sf-sitemap__wires {
-      display: block;
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-
-    .sf-sitemap__list {
-      position: absolute;
-      inset: 0;
-    }
-
-    .sf-sitemap__item {
-      position: absolute;
-      margin: 0;
-      padding: 0;
-      border-left: 0;
-    }
-
-    .sf-sitemap__item::before {
-      display: none;
-    }
-
-    /* 根节点：首页（当前页），左侧垂直居中；右边缘正好接上 SVG 的连接线 */
-    .sf-sitemap__item:nth-child(1) {
-      top: 41.6667%;
-      left: 0;
-      width: 28.8889%;
-      height: 16.6667%;
-    }
-
-    /* 一级栏目：右侧竖排，共用一列宽度与行高 */
-    .sf-sitemap__item:nth-child(n + 2) {
-      left: 42.2222%;
-      width: 57.7778%;
-      height: 14.4444%;
-    }
-
-    .sf-sitemap__item:nth-child(2) { top: 6.1111%; }
-    .sf-sitemap__item:nth-child(3) { top: 24.4444%; }
-    .sf-sitemap__item:nth-child(4) { top: 42.7778%; }
-    .sf-sitemap__item:nth-child(5) { top: 61.1111%; }
-    .sf-sitemap__item:nth-child(6) { top: 79.4444%; }
-
-    .sf-sitemap__link {
-      height: 100%;
-      min-height: 0;
-      flex-direction: column;
-      align-items: flex-start;
-      justify-content: center;
-      gap: 1px;
-      padding: 0.25rem 0.625rem;
-    }
-
-    .sf-sitemap__meta {
-      font-size: 0.625rem;
-      letter-spacing: 0.03em;
-    }
-  }
+  /* 说明：Hero 右侧的「真实请求链路」面板由 React 岛 RequestPath 渲染。
+     Astro 的 scoped 样式只作用于本文件的元素，不会命中子组件渲染的 DOM，
+     因此该面板的细线/骨架/分叉全部用 Tailwind 令牌类写在组件内部，
+     这里只保留页面自身的骨架与下方区块样式。 */
 
   /* 面板 */
   .sf-panel {
