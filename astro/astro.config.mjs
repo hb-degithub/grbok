@@ -57,6 +57,10 @@ export default defineConfig({
   vite: {
     plugins: [tailwindcss(), buildStampPlugin()],
     build: {
+      // 字体永远不要内联成 base64：@font-face 里的 data URI 会随主 CSS 一起成为
+      // render-blocking 负载（实测内联字体占主 CSS 的 16%），而独立文件既能被浏览器
+      // 按 unicode-range 按需拉取，也能长期缓存。
+      assetsInlineLimit: (filePath) => (/[.](woff2?|ttf|otf)$/i.test(filePath) ? false : undefined),
       // Split heavy vendor libraries into separate chunks so pages that don't use
       // them (every page except login/home) don't pay the download cost.
       // three+postprocessing (~700KB) only load on /login; ogl/gsap only on home.

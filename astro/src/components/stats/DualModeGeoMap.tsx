@@ -77,7 +77,9 @@ function withAlpha(value: string, alpha: number): string {
 }
 
 function DualModeGeoMap({ worldData }: DualModeGeoMapProps) {
-  const [renderMode, setRenderMode] = useState<RenderMode>('3d');
+  // 默认用 2D：3D 球体要额外拉 three-vendor（≈192KB）并产生主线程长任务，
+  // 而 2D 已经能表达同样的地理分布。用户仍可一键切到 3D，功能不减。
+  const [renderMode, setRenderMode] = useState<RenderMode>('2d');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);

@@ -57,7 +57,7 @@ describe('DualModeGeoMap', () => {
     expect(instance.resize).not.toHaveBeenCalled();
   });
 
-  it('默认 3D 模式下渲染 3D 地球', async () => {
+  it('默认 2D 模式（避免默认加载 three），可切换 3D', async () => {
     render(
       <DualModeGeoMap worldData={mockWorldData} />
     );
@@ -73,9 +73,16 @@ describe('DualModeGeoMap', () => {
     expect(tabs[0].textContent).toBe('3D');
     expect(tabs[1].textContent).toBe('2D');
 
-    // 3D 按钮应为激活状态
-    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
-    expect(tabs[1].getAttribute('aria-selected')).toBe('false');
+    // 默认应为 2D 激活（3D 需要额外加载 three，不作为首屏默认）
+    expect(tabs[0].getAttribute('aria-selected')).toBe('false');
+    expect(tabs[1].getAttribute('aria-selected')).toBe('true');
+
+    // 仍可切到 3D
+    fireEvent.click(tabs[0]);
+    await waitFor(() => {
+      expect(screen.getAllByRole('tab')[0].getAttribute('aria-selected')).toBe('true');
+      expect(screen.getAllByRole('tab')[1].getAttribute('aria-selected')).toBe('false');
+    });
   });
 
   it('只提供 2D/3D 切换，不再提供中国省份视图', async () => {
@@ -100,8 +107,9 @@ describe('DualModeGeoMap', () => {
       expect(screen.getByRole('tablist')).toBeTruthy();
     });
 
-    // 切换到 2D 模式
-    fireEvent.click(screen.getAllByRole('tab')[1]); // 点击 2D 按钮
+    // 先切到 3D，再切回 2D（默认已是 2D，重复点击不会重新加载）
+    fireEvent.click(screen.getAllByRole('tab')[0]);
+    fireEvent.click(screen.getAllByRole('tab')[1]);
 
     // 2D 模式下应显示加载状态
     await waitFor(() => {
@@ -122,13 +130,7 @@ describe('DualModeGeoMap', () => {
       <DualModeGeoMap worldData={mockWorldData} />
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole('tablist')).toBeTruthy();
-    });
-
-    // 切换到 2D 模式
-    fireEvent.click(screen.getAllByRole('tab')[1]);
-
+    // 默认即 2D，地图注册失败会直接进入错误态（错误态替换掉切换器）
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeTruthy();
       expect(screen.getByText('重新加载')).toBeTruthy();
