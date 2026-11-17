@@ -61,8 +61,9 @@
 }
 
 /* ===========================
-   Design System - Batch 1
-   Zinc-Slate cold tech + teal accent
+   布局与视口令牌
+   （旧 Zinc/Teal 调色板已整体移除，颜色一律走上方 --sf-*
+   —— 这些只是排版/视口尺寸变量，与配色无关）
    =========================== */
 
 :root {
@@ -142,26 +143,7 @@ button, a, input, select, textarea {
     padding-top: 0.75rem;
     padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
   }
-  .mobile-auth-shell .card {
-    border-radius: 0.75rem;
-    padding: 1rem;
-  }
 }
-
-/* Hairline borders */
-.hairline-b { position: relative; }
-.hairline-b::after {
-  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
-  background: var(--color-border); transform: scaleY(0.5); transform-origin: bottom;
-}
-.dark .hairline-b::after { background: var(--color-dark-border); }
-
-.hairline-t { position: relative; }
-.hairline-t::before {
-  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px;
-  background: var(--color-border); transform: scaleY(0.5); transform-origin: top;
-}
-.dark .hairline-t::before { background: var(--color-dark-border); }
 
 /* Safe-area utilities */
 .safe-pt { padding-top: env(safe-area-inset-top); }
@@ -173,43 +155,12 @@ button, a, input, select, textarea {
 }
 
 /* ===========================
-   Theme tokens - Zinc + Teal
+   Theme scales - typography / radius / shadow / motion
+   （颜色命名空间已清空：旧调色板令牌 37 个全部移除，
+   颜色只保留上方 --sf-*，避免两套调色板并存）
    =========================== */
 
 @theme {
-  /* Light palette - zinc cool grays */
-  --color-bg-primary: #ffffff;
-  --color-bg-secondary: #f4f4f5;
-  --color-bg-tertiary: #e4e4e7;
-  --color-text-primary: #09090b;
-  --color-text-secondary: #52525b;
-  --color-text-tertiary: #a1a1aa;
-  --color-accent: #14b8a6;
-  --color-accent-light: #5eead4;
-  --color-accent-hover: #0d9488;
-  --color-border: #e4e4e7;
-  --color-border-hover: #d4d4d8;
-  --color-surface: #ffffff;
-
-  /* Glow - tinted teal */
-  --color-glow: rgba(20, 184, 166, 0.06);
-  --color-glow-accent: rgba(20, 184, 166, 0.12);
-
-  /* Dark palette - off-black zinc */
-  --color-dark-bg-primary: #0a0a0b;
-  --color-dark-bg-secondary: #18181b;
-  --color-dark-bg-tertiary: #27272a;
-  --color-dark-text-primary: #fafafa;
-  --color-dark-text-secondary: #a1a1aa;
-  --color-dark-text-tertiary: #71717a;
-  --color-dark-accent: #2dd4bf;
-  --color-dark-accent-light: #99f6e4;
-  --color-dark-accent-hover: #5eead4;
-  --color-dark-border: #27272a;
-  --color-dark-border-hover: #3f3f46;
-  --color-dark-surface: #18181b;
-  --color-dark-glow: rgba(45, 212, 191, 0.06);
-
   /* Typography */
   --font-sans: 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
   --font-mono: 'Geist Mono', 'Fira Code', ui-monospace, monospace;
@@ -234,18 +185,6 @@ button, a, input, select, textarea {
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.09), 0 4px 6px -4px rgb(0 0 0 / 0.05);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.11), 0 8px 10px -6px rgb(0 0 0 / 0.06);
-
-  /* Admin aliases */
-  --color-bg: #ffffff;
-  --color-bg-soft: #f4f4f5;
-  --color-text: #09090b;
-  --color-text-secondary: #52525b;
-  --color-text-muted: #a1a1aa;
-  --color-muted: #a1a1aa;
-  --color-border: #e4e4e7;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
 
   /* Motion */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -290,7 +229,7 @@ body {
    链接默认色只声明「继承」，颜色与 hover 交给组件自己（工具类）决定。
    注意层（layer）：Tailwind v4 把工具类放在 @layer utilities，而未分层
    （unlayered）规则在层叠中高于任何 @layer。旧版本这里的未分层
-   a/a:hover/.dark a 写死 --color-accent(#14b8a6)，会永久盖掉组件上的
+   a/a:hover/.dark a 写死 teal 强调色，会永久盖掉组件上的
    text-[var(--sf-on-accent)] 等工具类（生产实测主按钮 rgb(20,184,166)
    on rgb(11,109,118)）。因此这些默认规则放进 @layer base，让组件的
    text-[…] / hover:text-[…] 重新生效；transition 与 text-decoration 规则保持不变。
@@ -343,6 +282,8 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
 
 /* ===========================
    Prose - article content
+   全部走 --sf-* 令牌：深浅主题由 :root / .dark 的令牌值自动切换，
+   因此不再需要逐条 .dark 覆盖。
    =========================== */
 
 @media (max-width: 639px) {
@@ -364,7 +305,6 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
     display: block; max-width: 100%; overflow-x: auto;
     -webkit-overflow-scrolling: touch; white-space: nowrap;
   }
-  .card { border-radius: var(--radius-lg); }
 }
 
 .prose {
@@ -372,23 +312,17 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
   margin: 0 auto;
   font-size: 1.0625rem;
   line-height: var(--leading-loose);
-  color: var(--color-text-primary);
+  color: var(--sf-ink);
 }
-
-.dark .prose { color: var(--color-dark-text-primary); }
 
 .prose h1, .prose h2, .prose h3, .prose h4 {
   font-family: var(--font-display);
   font-weight: 700;
   line-height: var(--leading-tight);
   letter-spacing: -0.025em;
-  color: var(--color-text-primary);
+  color: var(--sf-ink);
   margin-top: 2.5em;
   margin-bottom: 0.75em;
-}
-
-.dark .prose h1, .dark .prose h2, .dark .prose h3, .dark .prose h4 {
-  color: var(--color-dark-text-primary);
 }
 
 .prose h1 { font-size: 2.25rem; }
@@ -396,21 +330,18 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
 .prose h3 { font-size: 1.375rem; }
 .prose h4 { font-size: 1.125rem; }
 
-.prose p { margin-bottom: 1.5em; color: var(--color-text-secondary); }
-.dark .prose p { color: var(--color-dark-text-secondary); }
+.prose p { margin-bottom: 1.5em; color: var(--sf-ink-2); }
 
-.prose strong { font-weight: 600; color: var(--color-text-primary); }
-.dark .prose strong { color: var(--color-dark-text-primary); }
+.prose strong { font-weight: 600; color: var(--sf-ink); }
 
 .prose ul, .prose ol {
-  margin-bottom: 1.5em; padding-left: 1.5em; color: var(--color-text-secondary);
+  margin-bottom: 1.5em; padding-left: 1.5em; color: var(--sf-ink-2);
 }
-.dark .prose ul, .dark .prose ol { color: var(--color-dark-text-secondary); }
 
 .prose ul { list-style-type: disc; }
 .prose ol { list-style-type: decimal; }
 .prose li { margin-bottom: 0.5em; }
-.prose li::marker { color: var(--color-text-tertiary); }
+.prose li::marker { color: var(--sf-ink-3); }
 
 .prose a {
   text-decoration: underline !important;
@@ -422,19 +353,13 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
 
 /* Blockquote */
 .prose blockquote {
-  border-left: 3px solid var(--color-accent);
+  border-left: 3px solid var(--sf-accent);
   padding: 0.875em 1.25em;
   margin: 1.5em 0;
-  background-color: var(--color-bg-secondary);
+  background-color: var(--sf-line-soft);
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
   font-style: normal;
-  color: var(--color-text-secondary);
-}
-
-.dark .prose blockquote {
-  border-left-color: var(--color-dark-accent);
-  background-color: var(--color-dark-bg-secondary);
-  color: var(--color-dark-text-secondary);
+  color: var(--sf-ink-2);
 }
 
 /* Inline code */
@@ -444,16 +369,16 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
   font-weight: 500;
   border-radius: var(--radius-sm);
   padding: 0.15em 0.4em;
-  background-color: var(--color-bg-secondary);
-  color: var(--color-accent);
+  background-color: var(--sf-line-soft);
+  color: var(--sf-accent-ink);
 }
 
-.dark .prose code {
-  background-color: var(--color-dark-bg-secondary);
-  color: var(--color-dark-accent);
-}
-
-/* Code blocks - Catppuccin-inspired dark */
+/* Code blocks
+   刻意保持「常暗」代码块：底色与文字色不跟随主题切换。
+   原因：Astro 默认用 Shiki（github-dark）给围栏代码块输出行内背景色与 token 颜色，
+   这里若改成浅色底，会出现「浅色容器 + 深色主题 token 颜色」的错配；
+   常暗底在浅色与暗色主题下都是深底浅字，可读性最好。
+   本条规则不含任何旧调色板令牌，故不在收口范围内。 */
 .prose pre {
   position: relative;
   background-color: #1e1e2e;
@@ -481,98 +406,20 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
 }
 
 .prose th, .prose td {
-  padding: 0.75em 1em; border-bottom: 1px solid var(--color-border); text-align: left;
+  padding: 0.75em 1em; border-bottom: 1px solid var(--sf-line); text-align: left;
 }
-
-.dark .prose th, .dark .prose td { border-bottom-color: var(--color-dark-border); }
 
 .prose th {
-  font-weight: 600; color: var(--color-text-primary); background-color: var(--color-bg-secondary);
-}
-
-.dark .prose th {
-  color: var(--color-dark-text-primary); background-color: var(--color-dark-bg-secondary);
+  font-weight: 600; color: var(--sf-ink); background-color: var(--sf-line-soft);
 }
 
 .prose hr {
-  border: none; height: 1px; background: var(--color-border); margin: 3em 0;
+  border: none; height: 1px; background: var(--sf-line); margin: 3em 0;
 }
-
-.dark .prose hr { background: var(--color-dark-border); }
 
 .prose img {
   max-width: 100%; height: auto; border-radius: var(--radius-xl);
   margin: 2em 0; box-shadow: var(--shadow-lg);
-}
-
-/* ===========================
-   Buttons - teal primary
-   =========================== */
-
-.btn,
-.btn-primary,
-.btn-ghost {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
-  padding: 0.625rem 1.25rem; font-size: 0.875rem; font-weight: 500;
-  border-radius: var(--radius-md); transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer; border: 1px solid transparent; outline: none;
-}
-
-.btn:focus-visible,
-.btn-primary:focus-visible,
-.btn-ghost:focus-visible {
-  outline: 2px solid var(--color-accent); outline-offset: 2px;
-}
-
-.btn-primary {
-  background-color: var(--color-accent); color: white;
-  box-shadow: 0 1px 2px rgb(20 184 166 / 0.2);
-}
-
-.btn-primary:hover {
-  background-color: var(--color-accent-hover);
-  box-shadow: 0 4px 12px rgb(20 184 166 / 0.25);
-  transform: translateY(-1px);
-}
-
-.btn-primary:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 2px rgb(20 184 166 / 0.2);
-}
-
-.btn-ghost {
-  background-color: transparent; color: var(--color-text-secondary);
-  border-color: var(--color-border);
-}
-
-.btn-ghost:hover {
-  background-color: var(--color-bg-secondary); color: var(--color-text-primary);
-  border-color: var(--color-border-hover);
-}
-
-/* Inputs */
-.input {
-  width: 100%; padding: 0.625rem 1rem; font-size: 0.875rem;
-  background-color: white; border: 1px solid var(--color-border);
-  border-radius: var(--radius-md); transition: all 0.2s ease;
-  outline: none; color: var(--color-text-primary);
-}
-
-.input:focus {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgb(20 184 166 / 0.1);
-}
-
-.input::placeholder { color: var(--color-text-tertiary); }
-
-.dark .input {
-  background-color: var(--color-dark-bg-secondary); border-color: var(--color-dark-border);
-  color: var(--color-dark-text-primary);
-}
-
-.dark .input:focus {
-  border-color: var(--color-dark-accent);
-  box-shadow: 0 0 0 3px rgb(45 212 191 / 0.1);
 }
 
 /* ===========================
@@ -585,15 +432,10 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
 }
 
 .skeleton {
-  background: linear-gradient(90deg, var(--color-bg-secondary) 25%, var(--color-bg-tertiary) 37%, var(--color-bg-secondary) 63%);
+  background: linear-gradient(90deg, var(--sf-line-soft) 25%, var(--sf-line) 37%, var(--sf-line-soft) 63%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: var(--radius-md);
-}
-
-.dark .skeleton {
-  background: linear-gradient(90deg, var(--color-dark-bg-secondary) 25%, var(--color-dark-bg-tertiary) 37%, var(--color-dark-bg-secondary) 63%);
-  background-size: 200% 100%;
 }
 
 /* ===========================
@@ -615,117 +457,16 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background-color: var(--color-border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background-color: var(--color-text-tertiary); }
-.dark ::-webkit-scrollbar-thumb { background-color: var(--color-dark-border); }
+::-webkit-scrollbar-thumb { background-color: var(--sf-line); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--sf-ink-3); }
 
 /* ===========================
    Selection
    =========================== */
 
-::selection { background-color: rgb(20 184 166 / 0.15); color: var(--color-text-primary); }
-.dark ::selection { background-color: rgb(45 212 191 / 0.25); color: var(--color-dark-text-primary); }
-
-/* ===========================
-   Transition utility
-   =========================== */
-
-.transition-base { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-
-/* ===========================
-   Card - solid surfaces
-   =========================== */
-
-.card {
-  background-color: white;
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
-}
-
-.card:hover {
-  border-color: var(--color-border-hover);
-  box-shadow: 0 2px 12px rgba(9, 9, 11, 0.06);
-}
-
-.dark .card {
-  background-color: var(--color-dark-bg-secondary);
-  border-color: var(--color-dark-border);
-}
-
-.dark .card:hover {
-  border-color: var(--color-dark-border-hover);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
-}
-
-/* ===========================
-   Glass surfaces
-   =========================== */
-
-.glass {
-  background-color: rgb(255 255 255 / 0.72);
-  backdrop-filter: blur(12px) saturate(1.4);
-  -webkit-backdrop-filter: blur(12px) saturate(1.4);
-  border: 1px solid rgb(228 228 231 / 0.6);
-  box-shadow:
-    0 4px 24px -1px rgb(0 0 0 / 0.08),
-    inset 0 1px 0 rgb(255 255 255 / 0.6);
-}
-
-.dark .glass {
-  background-color: rgb(24 24 27 / 0.72);
-  border-color: rgb(63 63 70 / 0.5);
-  box-shadow:
-    0 4px 24px -1px rgb(0 0 0 / 0.3),
-    inset 0 1px 0 rgb(255 255 255 / 0.06);
-}
-
-.glass-strong {
-  background-color: rgb(255 255 255 / 0.85);
-  backdrop-filter: blur(20px) saturate(1.6);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  border: 1px solid rgb(228 228 231 / 0.8);
-  box-shadow:
-    0 8px 40px -4px rgb(0 0 0 / 0.12),
-    0 2px 8px -2px rgb(0 0 0 / 0.06),
-    inset 0 1px 0 rgb(255 255 255 / 0.7);
-}
-
-.dark .glass-strong {
-  background-color: rgb(24 24 27 / 0.88);
-  border-color: rgb(63 63 70 / 0.6);
-  box-shadow:
-    0 8px 40px -4px rgb(0 0 0 / 0.45),
-    0 2px 8px -2px rgb(0 0 0 / 0.2),
-    inset 0 1px 0 rgb(255 255 255 / 0.08);
-}
-
-/* Glass overlay — modal backdrop dimmer */
-.glass-overlay {
-  background-color: rgb(9 9 11 / 0.4);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-.dark .glass-overlay {
-  background-color: rgb(0 0 0 / 0.6);
-}
-
-/* Side panel card - reusable surface for homepage sidebar blocks */
-.side-panel-card {
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border);
-  background-color: var(--color-surface);
-  padding: 1.25rem;
-  box-shadow: 0 8px 24px -4px rgb(9 9 11 / 0.04);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-}
-
-.dark .side-panel-card {
-  border-color: var(--color-dark-border);
-  background-color: var(--color-dark-bg-secondary);
-}
+/* 选中态用唯一强调色 + 强调色专用前景令牌（--sf-on-accent 已按主题反向），
+   深浅主题下都是「深青底白字 / 浅青底石墨字」，对比度均达正文标准。 */
+::selection { background-color: var(--sf-accent); color: var(--sf-on-accent); }
 
 /* ===========================
    Entry animations
@@ -744,17 +485,6 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
 .animate-enter { animation: enter 0.45s var(--ease-out-expo) forwards; }
 .animate-enter-subtle { animation: enter-subtle 0.3s var(--ease-out-expo) forwards; }
 
-/* Accent dot */
-.accent-dot {
-  display: inline-block; width: 0.375rem; height: 0.375rem;
-  border-radius: 9999px; background-color: var(--color-accent);
-}
-.dark .accent-dot { background-color: var(--color-dark-accent); }
-
-/* Card lift */
-.card-lift { transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
-.card-lift:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
-
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -764,7 +494,6 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
     scroll-behavior: auto !important;
   }
   .animate-enter, .animate-enter-subtle, .animate-fade-in-up { opacity: 1; transform: none; }
-  .card-lift:hover { transform: none; }
   html, body { transition: none !important; }
 }
 
@@ -821,35 +550,46 @@ html { -webkit-text-size-adjust: 100%; }
   .admin-shell input[type="button"], .admin-shell input[type="submit"] {
     min-height: 2.5rem;
   }
-  .admin-shell .card { border-radius: var(--radius-md); }
 }
 
 /* Image loading placeholder */
 img:not([src]), img[src=''], img[src*='loading'] {
-  background: linear-gradient(110deg, var(--color-bg-secondary) 30%, var(--color-bg-tertiary) 50%, var(--color-bg-secondary) 70%);
+  background: linear-gradient(110deg, var(--sf-line-soft) 30%, var(--sf-line) 50%, var(--sf-line-soft) 70%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   min-height: 2rem;
 }
 
-.dark img:not([src]), .dark img[src=''], .dark img[src*='loading'] {
-  background: linear-gradient(110deg, var(--color-dark-bg-secondary) 30%, var(--color-dark-bg-tertiary) 50%, var(--color-dark-bg-secondary) 70%);
-}
-
-/* Button micro-interactions */
-.btn-primary, .btn-ghost { transition: all 0.18s ease; }
-.btn-primary:active, .btn-ghost:active { transform: scale(0.97); }
-
-/* Focus ring - teal */
+/* Focus ring - 强调色（深浅主题由 --sf-accent 自动切换） */
 *:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--sf-accent);
   outline-offset: 2px;
   border-radius: 0.25rem;
 }
 
-.dark *:focus-visible {
-  outline-color: var(--color-dark-accent);
-}
+/* ===========================
+   旧 Tailwind 颜色工具类兼容桥（临时，勿扩散）
+   ------------------------------------------------------------
+   /account/notifications 的 NotificationSettings.tsx 仍在用旧工具类名取色
+   （该组件不在本次「只允许改 global.css」的改动范围内）。旧调色板定义
+   删除后，这些类名不会再被 Tailwind 生成，为避免「白字打在透明背景上」这类
+   可读性回退，在这里把它们就地映射到 --sf-* 令牌：
+   不新增任何令牌，只用现有 --sf-*，文件内也不再保留任何旧调色板定义。
+   待 NotificationSettings.tsx 迁移到 var(--sf-*) 后，整块删除即可。
+   =========================== */
+
+.bg-accent { background-color: var(--sf-accent); }
+/* 该组件把按钮前景写死成 text-white：浅色主题下配深青底没问题（6.06:1），
+   暗色主题的浅青底（#3fa8b2）配白字只有 2.82:1。这里按设计系统语义把
+   强调色底上的前景改成 --sf-on-accent（暗色为近石墨 #16191d，6.26:1）。 */
+.dark .bg-accent { color: var(--sf-on-accent); }
+.hover\:bg-accent-hover:hover { background-color: var(--sf-accent-ink); }
+.bg-bg-soft { background-color: var(--sf-surface); }
+.border-border { border-color: var(--sf-line); }
+.text-accent { color: var(--sf-accent); }
+.text-text { color: var(--sf-ink); }
+.text-text-muted { color: var(--sf-ink-3); }
+.focus\:ring-accent:focus { --tw-ring-color: var(--sf-accent); }
 
 /* ===========================
    Print styles
@@ -857,12 +597,12 @@ img:not([src]), img[src=''], img[src*='loading'] {
 
 @media print {
   header, footer, nav, .fixed, aside,
-  .admin-sidebar, .admin-topbar, .btn-primary, .btn-ghost,
+  .admin-sidebar, .admin-topbar,
   [class*="search"], [class*="modal"], [class*="toast"],
   [class*="progress"], [class*="backdrop"],
   .sticky, [class*="footer"], [class*="header"],
   iframe, .video-bg, .cursor-glow, .particle,
-  .side-panel, .widget, .comments-section { display: none !important; }
+  .widget, .comments-section { display: none !important; }
 
   body { background: white !important; color: #09090b !important; }
   .prose { max-width: none !important; margin: 0 auto !important; }
