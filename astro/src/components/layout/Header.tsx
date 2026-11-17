@@ -213,7 +213,7 @@ export default function Header() {
         const initial = getUserInitial(user);
         items.push({
           icon: (
-            <div className="flex items-center justify-center rounded-full bg-zinc-700 text-xs font-bold text-white dark:bg-zinc-200 dark:text-zinc-900" style={{ width: 22, height: 22 }}>
+            <div className="flex items-center justify-center rounded-full bg-[var(--sf-accent)] text-xs font-bold text-[var(--sf-on-accent)]" style={{ width: 22, height: 22 }}>
               {initial}
             </div>
           ),
@@ -240,7 +240,7 @@ export default function Header() {
       <button
         type="button"
         onClick={() => setSideNavOpen(true)}
-        className="focus-ring fixed left-3 top-3 z-50 inline-flex h-11 w-11 items-center justify-center rounded-lg border border-zinc-200 bg-white/80 text-zinc-600 shadow-sm backdrop-blur-xl transition-colors hover:bg-zinc-100 hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-white sm:hidden"
+        className="focus-ring fixed left-3 top-3 z-50 inline-flex h-11 w-11 items-center justify-center rounded-[4px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] sm:hidden"
         aria-label="打开导航菜单"
         aria-controls="mobile-side-nav"
         aria-expanded={sideNavOpen}
@@ -275,7 +275,7 @@ export default function Header() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
               transition={{ duration: 0.2 }}
-              className="pointer-events-auto fixed top-20 left-1/2 -translate-x-1/2 w-[min(14rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-zinc-200 bg-white p-1.5 shadow-xl shadow-zinc-900/10 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/95"
+              className="pointer-events-auto fixed top-20 left-1/2 -translate-x-1/2 w-[min(14rem,calc(100vw-2rem))] overflow-hidden rounded-[4px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-1.5"
               role="menu"
             >
               {themeOptions.map((item) => (
@@ -284,10 +284,10 @@ export default function Header() {
                   type="button"
                   onClick={() => setMode(item.mode)}
                   className={cn(
-                    'flex min-h-[44px] sm:min-h-[40px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left leading-snug transition-colors',
+                    'flex min-h-[44px] sm:min-h-[40px] w-full items-center gap-3 rounded-[4px] px-3 py-2 text-left leading-snug transition-colors',
                     themeMode === item.mode
-                      ? 'bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-white'
-                      : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-white'
+                      ? 'bg-[var(--sf-line-soft)] text-[var(--sf-ink)]'
+                      : 'text-[var(--sf-ink-2)] hover:bg-[var(--sf-line-soft)] hover:text-[var(--sf-ink)]'
                   )}
                   role="menuitemradio"
                   aria-checked={themeMode === item.mode}
@@ -297,7 +297,7 @@ export default function Header() {
                   </svg>
                   <span className="min-w-0 break-words">
                     <span className="block text-sm font-semibold leading-5">{item.label}</span>
-                    <span className="block text-xs leading-4 text-zinc-400 dark:text-zinc-500">{item.description}</span>
+                    <span className="block text-xs leading-4 text-[var(--sf-ink-2)]">{item.description}</span>
                   </span>
                 </button>
               ))}
@@ -314,7 +314,7 @@ export default function Header() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
               transition={{ duration: 0.2 }}
-              className="pointer-events-auto fixed top-20 left-1/2 -translate-x-1/2 w-[min(14rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-zinc-200 bg-white p-1.5 shadow-xl shadow-zinc-900/10 backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900/95"
+              className="pointer-events-auto fixed top-20 left-1/2 -translate-x-1/2 w-[min(14rem,calc(100vw-2rem))] overflow-hidden rounded-[4px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-1.5"
               role="menu"
             >
               {MORE_LINKS.map((item) => (
@@ -323,10 +323,10 @@ export default function Header() {
                   href={item.href}
                   onClick={() => setMoreMenuOpen(false)}
                   className={cn(
-                    'flex min-h-[44px] sm:min-h-[40px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left leading-snug transition-colors',
+                    'flex min-h-[44px] sm:min-h-[40px] w-full items-center gap-3 rounded-[4px] px-3 py-2 text-left leading-snug transition-colors',
                     isActive(item.href)
-                      ? 'bg-zinc-100 text-zinc-950 dark:bg-zinc-800 dark:text-white'
-                      : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800/70 dark:hover:text-white'
+                      ? 'bg-[var(--sf-line-soft)] text-[var(--sf-ink)]'
+                      : 'text-[var(--sf-ink-2)] hover:bg-[var(--sf-line-soft)] hover:text-[var(--sf-ink)]'
                   )}
                   role="menuitem"
                 >
@@ -335,7 +335,7 @@ export default function Header() {
                   </svg>
                   <span className="min-w-0 break-words">
                     <span className="block text-sm font-semibold leading-5">{item.label}</span>
-                    <span className="block text-xs leading-4 text-zinc-400 dark:text-zinc-500">{item.description}</span>
+                    <span className="block text-xs leading-4 text-[var(--sf-ink-2)]">{item.description}</span>
                   </span>
                 </a>
               ))}

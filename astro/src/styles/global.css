@@ -3,6 +3,61 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ===========================
+   科幻简约设计令牌
+   =========================== */
+
+:root {
+  --sf-canvas: #f1f3f5;
+  --sf-surface: #ffffff;
+  --sf-ink: #16191d;
+  --sf-ink-2: #454f59;
+  --sf-ink-3: #5f6a75;
+  --sf-line: #d3d9df;
+  --sf-line-strong: #b3bcc5;
+  --sf-line-soft: #e3e7eb;
+  --sf-line-control: #7f8b97;
+  --sf-accent: #0b6d76;
+  --sf-accent-ink: #085159;
+  /* 强调色背景上的文字色：浅色主题白字，暗色主题改用近石墨深字（浅青底上更好读）。 */
+  --sf-on-accent: #fff;
+  /* 语义红：危险/破坏性操作与安全拦截计数的前景/描边色。 */
+  --sf-danger: #b91c1c;
+  /* 键盘焦点环：强调色的半透明版本。单独定义成令牌，避免在 .focus-ring 里
+     使用 color-mix() —— 不支持该函数的老浏览器会整条丢弃 box-shadow，
+     导致键盘焦点完全不可见。 */
+  --sf-focus-ring: rgb(11 109 118 / 0.32);
+  --sf-pad: max(clamp(1.25rem, 4vw, 3.5rem), env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+}
+
+.dark {
+  --sf-canvas: #0e1114;
+  --sf-surface: #161a1e;
+  --sf-ink: #e8ecf0;
+  --sf-ink-2: #a8b4bd;
+  --sf-ink-3: #7a8791;
+  --sf-line: #2a3239;
+  --sf-line-strong: #3f4b55;
+  --sf-line-soft: #1e252c;
+  --sf-line-control: #5a6a77;
+  --sf-accent: #3fa8b2;
+  --sf-accent-ink: #6bc4cc;
+  --sf-on-accent: #16191d;
+  /* 暗色主题的语义红更亮以保证对比度。 */
+  --sf-danger: #f87171;
+  --sf-focus-ring: rgb(63 168 178 / 0.4);
+}
+
+/* 共享区块包装：首页热门/评论等子组件复用（子组件内部继续使用 --sf-* 令牌）。
+   只定义区块本身，不对业务组件做宽泛 reset。 */
+.sf-block {
+  min-width: 0;
+  border: 1px solid var(--sf-line);
+  border-radius: 4px;
+  background-color: var(--sf-surface);
+  padding: 1.25rem;
+}
+
+/* ===========================
    Design System - Batch 1
    Zinc-Slate cold tech + teal accent
    =========================== */
@@ -217,43 +272,70 @@ html.dark { color-scheme: dark; }
 body {
   font-family: var(--font-sans);
   line-height: var(--leading-relaxed);
-  background-color: var(--color-bg-primary);
-  color: var(--color-text-primary);
+  /* 全站画布与文字统一走科幻令牌，深浅主题由 .dark 令牌整体切换。 */
+  background-color: var(--sf-canvas);
+  color: var(--sf-ink);
   letter-spacing: 0;
 }
 
 .dark body {
-  background-color: var(--color-dark-bg-primary);
-  color: var(--color-dark-text-primary);
+  background-color: var(--sf-canvas);
+  color: var(--sf-ink);
 }
 
-/* Links */
-a {
-  color: var(--color-accent);
-  text-decoration: none !important;
-  transition: color 0.15s ease;
-}
+/* Links
+   链接默认色只声明「继承」，颜色与 hover 交给组件自己（工具类）决定。
+   注意层（layer）：Tailwind v4 把工具类放在 @layer utilities，而未分层
+   （unlayered）规则在层叠中高于任何 @layer。旧版本这里的未分层
+   a/a:hover/.dark a 写死 --color-accent(#14b8a6)，会永久盖掉组件上的
+   text-[var(--sf-on-accent)] 等工具类（生产实测主按钮 rgb(20,184,166)
+   on rgb(11,109,118)）。因此这些默认规则放进 @layer base，让组件的
+   text-[…] / hover:text-[…] 重新生效；transition 与 text-decoration 规则保持不变。
+   注意：text-decoration 这里**不能**加 !important —— important 声明的层叠方向是反向的
+   （层内 important 高于未分层 important），加了会反过来压掉未分层的
+   `.prose a{text-decoration:underline!important}`，导致正文内链看不出是链接。 */
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+    transition: color 0.15s ease;
+  }
 
-a:hover {
-  text-decoration: none !important;
-  color: var(--color-accent-hover);
-}
+  a:hover {
+    text-decoration: none;
+    color: inherit;
+  }
 
-.dark a { color: var(--color-dark-accent); }
-.dark a:hover {
-  text-decoration: none !important;
-  color: var(--color-dark-accent-light);
-}
+  .dark a {
+    color: inherit;
+  }
 
-a:focus { text-decoration: none !important; }
+  .dark a:hover {
+    text-decoration: none;
+    color: inherit;
+  }
+
+  a:focus {
+    text-decoration: none;
+  }
+}
 
 /* Header navigation reset */
 header ul, header li { list-style: none; margin: 0; padding: 0; }
 
-/* Focus ring - teal tinted */
+/* Focus ring - 统一走强调色令牌（浅色深青 / 暗色浅青），不再写死 teal */
 .focus-ring { outline: none; }
 .focus-ring:focus-visible {
-  box-shadow: 0 0 0 3px rgb(20 184 166 / 0.32);
+  box-shadow: 0 0 0 3px var(--sf-focus-ring);
+}
+
+/* 高对比度模式（Windows 强制颜色）会丢弃 box-shadow，上面的 outline:none 会让焦点完全不可见。
+   这里改画系统色轮廓，保证键盘焦点始终存在。 */
+@media (forced-colors: active) {
+  .focus-ring:focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
 }
 
 /* ===========================
@@ -777,8 +859,7 @@ img:not([src]), img[src=''], img[src*='loading'] {
   [class*="progress"], [class*="backdrop"],
   .sticky, [class*="footer"], [class*="header"],
   iframe, .video-bg, .cursor-glow, .particle,
-  .side-panel, .widget, .comments-section,
-  .font-mono { display: none !important; }
+  .side-panel, .widget, .comments-section { display: none !important; }
 
   body { background: white !important; color: #09090b !important; }
   .prose { max-width: none !important; margin: 0 auto !important; }

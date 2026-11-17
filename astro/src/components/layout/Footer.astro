@@ -4,17 +4,17 @@ import FooterFriendLinks from '../links/FooterFriendLinks';
 const currentYear = new Date().getFullYear();
 ---
 
-<footer class="relative z-10 mt-24 border-t border-zinc-200/70 bg-white dark:border-zinc-800/80 dark:bg-zinc-950">
-  <div class="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-12">
+<footer class="relative z-10 mt-16 sm:mt-20 border-t border-[var(--sf-line)] bg-[var(--sf-canvas)]">
+  <div class="mx-auto max-w-[1180px] px-[var(--sf-pad)] py-10 sm:py-12">
     <div class="flex flex-col items-center gap-6 sm:flex-row sm:items-start sm:justify-between">
       <!-- 站点信息 -->
       <div class="flex flex-col items-center gap-2 text-center sm:items-start sm:text-left">
         <div class="flex items-center gap-2">
-          <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-900">B</span>
-          <span class="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{SITE_CONFIG.name}</span>
+          <span class="flex h-8 w-8 items-center justify-center rounded-[4px] border border-[var(--sf-line-strong)] text-sm font-bold text-[var(--sf-ink)]">B</span>
+          <span class="text-sm font-semibold text-[var(--sf-ink)]">{SITE_CONFIG.name}</span>
         </div>
-        <p class="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs">{SITE_CONFIG.description}</p>
-        <p class="text-xs text-zinc-400 dark:text-zinc-500">&copy; {currentYear} {SITE_CONFIG.author}. All rights reserved.</p>
+        <p class="text-xs text-[var(--sf-ink-2)] max-w-xs">{SITE_CONFIG.description}</p>
+        <p class="text-xs text-[var(--sf-ink-3)]">&copy; {currentYear} {SITE_CONFIG.author}. All rights reserved.</p>
       </div>
 
       <!-- 社交链接 -->
@@ -24,7 +24,7 @@ const currentYear = new Date().getFullYear();
             href={link.url}
             target="_blank"
             rel="noopener noreferrer"
-            class="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-lg border border-zinc-200 text-zinc-500 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:text-zinc-200"
+            class="flex h-11 w-11 sm:h-9 sm:w-9 items-center justify-center rounded-[4px] border border-[var(--sf-line)] text-[var(--sf-ink-3)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent)]"
             aria-label={link.name}
           >
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -40,9 +40,9 @@ const currentYear = new Date().getFullYear();
     <FooterFriendLinks client:visible />
 
     <!-- 备案链接 -->
-    <div class="mt-8 flex flex-col items-center gap-3 border-t border-zinc-200/70 pt-6 dark:border-zinc-800/70 sm:flex-row sm:justify-center sm:gap-6">
+    <div class="mt-8 flex flex-col items-center gap-3 border-t border-[var(--sf-line-soft)] pt-6 sm:flex-row sm:justify-center sm:gap-6">
       <a href="/status" class="beian-link">
-        <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
+        <span class="inline-block h-2 w-2 rounded-full bg-[var(--sf-accent)]"></span>
         <span>运行状态</span>
       </a>
       {SITE_CONFIG.icp.url && (
@@ -64,7 +64,7 @@ const currentYear = new Date().getFullYear();
       )}
     </div>
 
-    <p class="mt-4 text-center text-[10px] text-zinc-400 dark:text-zinc-600">Powered by Astro 6.4, PocketBase 0.22 &amp; admin-auth</p>
+    <p class="mt-4 text-center font-mono text-[10px] text-[var(--sf-ink-3)]">Powered by Astro 7, PocketBase 0.22 &amp; admin-auth</p>
   </div>
 </footer>
 
@@ -73,7 +73,7 @@ const currentYear = new Date().getFullYear();
     display: inline-flex;
     align-items: center;
     gap: 0.375rem;
-    color: rgb(120 113 108);
+    color: var(--sf-ink-3);
     text-decoration: none !important;
     line-height: 1.5;
     max-width: 100%;
@@ -81,18 +81,10 @@ const currentYear = new Date().getFullYear();
     transition: color 150ms ease;
   }
   .beian-link:hover, .beian-link:focus-visible {
-    color: rgb(28 25 23);
+    color: var(--sf-accent-ink);
     text-decoration: none !important;
-  }
-  :global(.dark) .beian-link, :global(.dark) .beian-link:visited {
-    color: rgb(168 162 158);
-  }
-  :global(.dark) .beian-link:hover, :global(.dark) .beian-link:focus-visible {
-    color: rgb(245 245 244);
   }
   @media (max-width: 420px) {
     .beian-link { width: min(100%, 19rem); white-space: normal; justify-content: center; text-align: center; }
   }
 </style>
-
-
