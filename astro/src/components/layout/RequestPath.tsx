@@ -12,6 +12,12 @@ import { cn } from '../../lib/utils';
  *
  * 硬约束：Caddy 这一跳**没有独立的逐跳探测**，因此固定显示「未采集」，
  * 生产代码里不写死任何毫秒字面量——所有数字只能来自上面三个接口或浏览器实测。
+ *
+ * 布局：自上而下的流向图（不是「左侧主干 + 节点挂右树状表」）。
+ *   01 → 02 → 03 之间是居中的 1px 竖直连线（11px + 细小下箭头）；
+ *   Caddy 底边中点向下 7px 后横向分叉，再向下 8px 落到 04 / 05 顶边中点。
+ *   ≥380px 时 04 / 05 两列并排；<380px 退回单列，并用左侧短括号线保留分叉语义。
+ *   连线全部是 aria-hidden 的装饰层，节点内容仍是真实文本。
  */
 
 type SourcePhase = 'loading' | 'ready' | 'failed';
@@ -63,6 +69,19 @@ function SkeletonBar({ width }: { width: string }) {
   );
 }
 
+/**
+ * 相邻节点之间的居中竖直连线：1px `--sf-line-strong` 主线（7px）+ 一个细小的向下箭头（4px），
+ * 合计 11px，与节点水平居中对齐。整段是纯装饰。
+ */
+function VerticalLink() {
+  return (
+    <span aria-hidden="true" className="relative mx-auto block h-[11px] w-px shrink-0">
+      <span className="absolute left-1/2 top-0 h-[7px] w-px -translate-x-1/2 bg-[var(--sf-line-strong)]" />
+      <span className="absolute left-1/2 top-[7px] h-1 w-1 -translate-x-1/2 rotate-45 border-b border-r border-[var(--sf-line-strong)]" />
+    </span>
+  );
+}
+
 interface HopNote {
   label: string;
   /** string = 真实数值；null = 还在加载（骨架）；undefined = 该行只有静态说明。 */
@@ -78,10 +97,8 @@ interface HopView {
   prefix?: string;
   value: string | null;
   notes: HopNote[];
-  /** Caddy 之后分叉出来的终点：缩进 + 更长的短横线。 */
+  /** Caddy 之后分叉出来的终点（04 / 05），由同一个分叉段连接。 */
   branch: boolean;
-  /** 链路末端：竖线在节点中线收口。 */
-  tail: boolean;
 }
 
 export default function RequestPath() {
@@ -188,7 +205,6 @@ export default function RequestPath() {
       value: pingLoading ? null : ping != null ? `${ping} ms` : UNKNOWN,
       notes: [{ label: '端到端实测' }],
       branch: false,
-      tail: false,
     },
     {
       key: 'safeline',
@@ -207,7 +223,6 @@ export default function RequestPath() {
         },
       ],
       branch: false,
-      tail: false,
     },
     {
       key: 'caddy',
@@ -222,7 +237,6 @@ export default function RequestPath() {
         ? [{ label: '24h 平均响应' }]
         : [{ label: '无逐跳探测', value: UNKNOWN }],
       branch: false,
-      tail: false,
     },
     {
       key: 'astro',
@@ -242,7 +256,6 @@ export default function RequestPath() {
         },
       ],
       branch: true,
-      tail: false,
     },
     {
       key: 'pocketbase',
@@ -263,7 +276,6 @@ export default function RequestPath() {
         },
       ],
       branch: true,
-      tail: true,
     },
   ];
 
@@ -293,76 +305,178 @@ export default function RequestPath() {
         </span>
       </div>
 
-      <ol role="list" aria-label="真实请求链路" aria-busy={loading} className="m-0 list-none p-0">
-        {hops.map((hop, i) => (
-          <li
-            key={hop.key}
-            className={cn('relative', hop.branch ? 'pl-10' : 'pl-6', hop.tail ? 'pb-0' : 'pb-1.5')}
-          >
-            {/* 链路装饰层：竖线走主干，短横线接到节点；分叉段用强调色区分。全部 aria-hidden。 */}
-            <span
-              aria-hidden="true"
-              className={cn(
-                'pointer-events-none absolute left-2.5 w-px bg-[var(--sf-line-strong)]',
-                i === 0 ? 'bottom-0 top-1/2' : hop.tail ? 'top-0 bottom-1/2' : 'inset-y-0',
-              )}
-            />
-            <span
-              aria-hidden="true"
-              className={cn(
-                'pointer-events-none absolute left-2.5 top-1/2 h-px -translate-y-1/2',
-                hop.branch ? 'w-[1.875rem] bg-[var(--sf-accent)]' : 'w-3.5 bg-[var(--sf-line-strong)]',
-              )}
-            />
+      {/* 拓扑本体：一行一个节点自上而下流动；04 / 05 是同一行的两列（≥380px）。
+          gap-y 必须为 0——竖直间距全部由节点内部的连线块提供，否则会与连线断开。 */}
+      <ol
+        role="list"
+        aria-label="真实请求链路"
+        aria-busy={loading}
+        className="m-0 grid list-none grid-cols-1 gap-x-2 gap-y-0 p-0 min-[380px]:grid-cols-2"
+      >
+        {hops.map((hop, i) => {
+          const afterCaddy = hop.branch;
+          const connector = i === 0 ? 'none' : afterCaddy ? (hops[i - 1]?.branch ? 'fork-right' : 'fork-left') : 'line';
 
-            <div className="grid min-h-[46px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[3px] border border-[var(--sf-line)] px-2.5 py-2">
-              <div className="min-w-0">
-                <p className="flex min-w-0 items-baseline gap-1.5">
-                  <span className="font-mono text-[0.625rem] leading-none tabular-nums text-[var(--sf-ink-3)]">
-                    {hop.index}
-                  </span>
-                  <span className="truncate text-[0.8125rem] font-medium leading-tight text-[var(--sf-ink)]">
-                    {hop.name}
-                  </span>
-                </p>
-                <p className="mt-1 truncate font-mono text-[0.625rem] leading-none tracking-[0.04em] text-[var(--sf-ink-3)]">
-                  {hop.detail}
-                </p>
-              </div>
+          return (
+            <li
+              key={hop.key}
+              className={cn(
+                'relative flex min-w-0 flex-col',
+                afterCaddy ? 'col-span-1 pt-2' : 'col-span-full',
+              )}
+            >
+              {connector === 'line' && <VerticalLink />}
 
-              <div className="min-w-0 text-right">
-                <p className="flex min-h-[1rem] items-center justify-end gap-1 font-mono text-[0.75rem] font-medium leading-none tabular-nums text-[var(--sf-ink)]">
-                  {hop.prefix && (
-                    <span className="whitespace-nowrap font-normal text-[var(--sf-ink-3)]">{hop.prefix}</span>
-                  )}
-                  {hop.value === null ? (
-                    <>
-                      <SkeletonBar width="3.5rem" />
-                      <span className="sr-only">指标读取中</span>
-                    </>
-                  ) : (
-                    <span className="whitespace-nowrap">{hop.value}</span>
-                  )}
-                </p>
-                {hop.notes.map((note) => (
-                  <p
-                    key={note.label}
-                    className="mt-1 flex items-baseline justify-end gap-1 font-mono text-[0.625rem] leading-none tracking-[0.02em] text-[var(--sf-ink-3)]"
-                  >
-                    <span className="whitespace-nowrap">{note.label}</span>
-                    {note.value === undefined ? null : note.value === null ? (
-                      <SkeletonBar width="2.5rem" />
-                    ) : (
-                      <span className="whitespace-nowrap font-medium tabular-nums text-[var(--sf-ink-2)]">
-                        {note.value}
-                      </span>
-                    )}
+              {connector === 'fork-left' && (
+                <>
+                  {/* ≥380px：分叉横线的左半段（本列中点 → 两列之间的间隙中心）。 */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-1/2 -right-1 top-0 hidden h-px bg-[var(--sf-accent)] min-[380px]:block"
+                  />
+                  {/* 落线：从分叉横线向下 8px 到本节点顶边中点。 */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-1/2 top-0 hidden h-2 w-px -translate-x-1/2 bg-[var(--sf-accent)] min-[380px]:block"
+                  />
+                  {/* <380px：单列时退化成左侧短括号线（Caddy 短干 → 折到左边 → 依次钩住 04 / 05）。 */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-2 right-1/2 top-0 h-px bg-[var(--sf-accent)] min-[380px]:hidden"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute bottom-0 left-2 top-0 w-px bg-[var(--sf-accent)] min-[380px]:hidden"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-2 top-2 h-px w-2 bg-[var(--sf-accent)] min-[380px]:hidden"
+                  />
+                </>
+              )}
+
+              {connector === 'fork-right' && (
+                <>
+                  {/* ≥380px：分叉横线的右半段（间隙中心 → 本列中点）。 */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -left-1 right-1/2 top-0 hidden h-px bg-[var(--sf-accent)] min-[380px]:block"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-1/2 top-0 hidden h-2 w-px -translate-x-1/2 bg-[var(--sf-accent)] min-[380px]:block"
+                  />
+                  {/* <380px：括号线在 05 顶边中点收口。 */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-2 top-0 h-2 w-px bg-[var(--sf-accent)] min-[380px]:hidden"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-2 top-2 h-px w-2 bg-[var(--sf-accent)] min-[380px]:hidden"
+                  />
+                </>
+              )}
+
+              {afterCaddy ? (
+                /* 分叉终点：半宽卡片改成「序号 + 名称 + 指标」上下排，detail 在半宽时隐藏。 */
+                <div className="ml-4 flex min-h-[44px] flex-1 flex-col justify-center gap-1 rounded-[3px] border border-[var(--sf-line)] px-2 py-2 min-[380px]:ml-0">
+                  <p className="flex min-w-0 items-baseline gap-1.5">
+                    <span className="font-mono text-[0.625rem] leading-none tabular-nums text-[var(--sf-ink-3)]">
+                      {hop.index}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium leading-tight text-[var(--sf-ink)]">
+                      {hop.name}
+                    </span>
+                    <span className="flex shrink-0 items-baseline gap-1 font-mono text-[0.75rem] font-medium leading-none tabular-nums text-[var(--sf-ink)]">
+                      {hop.value === null ? (
+                        <>
+                          <SkeletonBar width="2.5rem" />
+                          <span className="sr-only">指标读取中</span>
+                        </>
+                      ) : (
+                        <span className="whitespace-nowrap">{hop.value}</span>
+                      )}
+                    </span>
                   </p>
-                ))}
-              </div>
-            </div>
-          </li>
-        ))}
+                  <p className="truncate font-mono text-[0.625rem] leading-none tracking-[0.04em] text-[var(--sf-ink-3)] min-[380px]:hidden">
+                    {hop.detail}
+                  </p>
+                  <div className="flex flex-col gap-1">
+                    {hop.notes.map((note) => (
+                      <p
+                        key={note.label}
+                        className="flex items-baseline gap-1.5 font-mono text-[0.625rem] leading-none tracking-[0.02em] text-[var(--sf-ink-3)]"
+                      >
+                        <span className="whitespace-nowrap">{note.label}</span>
+                        {note.value === undefined ? null : note.value === null ? (
+                          <SkeletonBar width="2rem" />
+                        ) : (
+                          <span className="whitespace-nowrap font-medium tabular-nums text-[var(--sf-ink-2)]">
+                            {note.value}
+                          </span>
+                        )}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                /* 主干节点：整行宽度，保持原来的「左名称 / 右指标」两列。 */
+                <div className="grid min-h-[44px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[3px] border border-[var(--sf-line)] px-2.5 py-2">
+                  <div className="min-w-0">
+                    <p className="flex min-w-0 items-baseline gap-1.5">
+                      <span className="font-mono text-[0.625rem] leading-none tabular-nums text-[var(--sf-ink-3)]">
+                        {hop.index}
+                      </span>
+                      <span className="truncate text-[0.8125rem] font-medium leading-tight text-[var(--sf-ink)]">
+                        {hop.name}
+                      </span>
+                    </p>
+                    <p className="mt-1 truncate font-mono text-[0.625rem] leading-none tracking-[0.04em] text-[var(--sf-ink-3)]">
+                      {hop.detail}
+                    </p>
+                  </div>
+
+                  <div className="min-w-0 text-right">
+                    <p className="flex min-h-[1rem] items-center justify-end gap-1 font-mono text-[0.75rem] font-medium leading-none tabular-nums text-[var(--sf-ink)]">
+                      {hop.prefix && (
+                        <span className="whitespace-nowrap font-normal text-[var(--sf-ink-3)]">{hop.prefix}</span>
+                      )}
+                      {hop.value === null ? (
+                        <>
+                          <SkeletonBar width="3.5rem" />
+                          <span className="sr-only">指标读取中</span>
+                        </>
+                      ) : (
+                        <span className="whitespace-nowrap">{hop.value}</span>
+                      )}
+                    </p>
+                    {hop.notes.map((note) => (
+                      <p
+                        key={note.label}
+                        className="mt-1 flex items-baseline justify-end gap-1 font-mono text-[0.625rem] leading-none tracking-[0.02em] text-[var(--sf-ink-3)]"
+                      >
+                        <span className="whitespace-nowrap">{note.label}</span>
+                        {note.value === undefined ? null : note.value === null ? (
+                          <SkeletonBar width="2.5rem" />
+                        ) : (
+                          <span className="whitespace-nowrap font-medium tabular-nums text-[var(--sf-ink-2)]">
+                            {note.value}
+                          </span>
+                        )}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Caddy 底边中点 → 分叉横线之间的短干（7px，强调色 1px）。 */}
+              {hop.key === 'caddy' && (
+                <span aria-hidden="true" className="mx-auto block h-[7px] w-px shrink-0 bg-[var(--sf-accent)]" />
+              )}
+            </li>
+          );
+        })}
       </ol>
     </div>
   );
