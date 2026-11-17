@@ -4,27 +4,28 @@ import Starfield from '../../components/effects/Starfield';
 ---
 
 <BaseLayout title="示例文章" description="一篇用于展示博客排版和视觉效果的示例文章" noindex>
-  <section class="relative -mx-6 -mt-12 min-h-screen overflow-hidden px-6 pt-24">
+  <section class="relative">
     <Starfield client:visible />
 
-    <div class="pointer-events-none absolute left-[15%] top-[20%] h-64 w-64 rounded-full bg-zinc-200/50 blur-[100px] animate-float" aria-hidden="true"></div>
-    <div class="pointer-events-none absolute bottom-[25%] right-[15%] h-80 w-80 rounded-full bg-zinc-200/50 blur-[120px] animate-float" style="animation-delay: -4s" aria-hidden="true"></div>
-
-    <article class="prose relative z-10 mx-auto">
-      <header class="card not-prose mb-10 rounded-3xl p-8 sm:p-10">
-        <div class="mb-4 flex items-center gap-2 text-xs">
-          <span class="rounded-full bg-zinc-100 px-2.5 py-0.5 font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">示例</span>
-          <span class="text-zinc-400 dark:text-zinc-500" aria-hidden="true">/</span>
-          <time class="text-zinc-500 dark:text-zinc-400" datetime="2024-01-15">2024年1月15日</time>
-          <span class="text-zinc-400 dark:text-zinc-500" aria-hidden="true">/</span>
-          <span class="text-zinc-500 dark:text-zinc-400">5 分钟阅读</span>
+    <article class="relative z-10 mx-auto w-full max-w-3xl px-[var(--sf-pad)] py-16">
+      <header class="mb-10 border-b border-[var(--sf-line)] pb-6">
+        <p class="mb-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
+          <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
+          Demo / 01
+        </p>
+        <div class="mb-4 flex flex-wrap items-center gap-2 text-xs">
+          <span class="rounded-[3px] border border-[var(--sf-line)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--sf-ink-2)]">示例</span>
+          <span class="text-[var(--sf-line-control)]" aria-hidden="true">/</span>
+          <time class="font-mono text-[11px] tabular-nums tracking-[0.06em] text-[var(--sf-ink-3)]" datetime="2024-01-15">2024年1月15日</time>
+          <span class="text-[var(--sf-line-control)]" aria-hidden="true">/</span>
+          <span class="font-mono text-[11px] tracking-[0.06em] text-[var(--sf-ink-3)]">5 分钟阅读</span>
         </div>
-        <h1 class="font-display text-3xl font-black uppercase tracking-wide text-zinc-900 dark:text-zinc-100 sm:text-4xl">
+        <h1 class="text-3xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-4xl">
           博客示例文章
         </h1>
       </header>
 
-      <div class="mb-12">
+      <div class="prose demo-body mb-12 text-[var(--sf-ink-2)]">
         <p>这是一篇用于展示博客排版、动效背景和内容样式的示例文章。你可以用它检查标题、段落、列表和装饰层在不同主题下的表现。</p>
         <ul>
           <li>响应式文章排版</li>
@@ -39,12 +40,19 @@ import Starfield from '../../components/effects/Starfield';
 </BaseLayout>
 
 <style>
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-14px); }
+  /* 正文色统一跟随设计令牌（global.css 的 .prose 排版与间距保持不变）。
+     Astro 作用域选择器包在 :where() 里（零特异性），再叠一层 article
+     把特异性提到 (0,2,2)，稳定压过 global.css 的 .prose p / .dark .prose p。 */
+  article .demo-body.prose {
+    color: var(--sf-ink-2);
   }
-  .animate-float { animation: float 7s ease-in-out infinite; }
-  @media (prefers-reduced-motion: reduce) {
-    .animate-float { animation: none; }
+
+  article .demo-body.prose p,
+  article .demo-body.prose li {
+    color: var(--sf-ink-2);
+  }
+
+  article .demo-body.prose li::marker {
+    color: var(--sf-line-control);
   }
 </style>

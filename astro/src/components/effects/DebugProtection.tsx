@@ -67,7 +67,7 @@ export default function DebugProtection() {
           initial={{ opacity: 0, y: 12, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 8, scale: 0.98 }}
-          className="fixed bottom-5 left-1/2 z-[9999] -translate-x-1/2 rounded-md border border-zinc-700/15 bg-zinc-950 px-4 py-2.5 text-sm font-medium text-white shadow-xl shadow-zinc-950/20"
+          className="fixed bottom-5 left-0 right-0 z-[9999] mx-auto w-fit max-w-[92vw] rounded-[2px] border border-[var(--sf-line-strong)] bg-[var(--sf-surface)] px-4 py-2.5 font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink)]"
           role="status"
           aria-live="polite"
         >

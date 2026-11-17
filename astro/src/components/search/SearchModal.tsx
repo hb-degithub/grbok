@@ -30,7 +30,7 @@ function SearchSkeleton() {
   return (
     <div className="flex flex-col gap-1 px-2 py-1" aria-hidden="true">
       {[0, 1, 2].map((i) => (
-        <div key={i} className="flex flex-col gap-2 rounded-xl px-3 py-3 sm:px-4" style={{ opacity: 1 - i * 0.25 }}>
+        <div key={i} className="flex flex-col gap-2 rounded-[3px] border border-[var(--sf-line-soft)] px-3 py-3 sm:px-4" style={{ opacity: 1 - i * 0.25 }}>
           <div className="skeleton h-4 w-2/5" />
           <div className="skeleton h-3 w-full" />
           <div className="skeleton h-3 w-3/4" />
@@ -43,18 +43,18 @@ function SearchSkeleton() {
 function EmptyState({ icon, title, hint }: { icon: React.ReactNode; title: string; hint?: string }) {
   return (
     <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-100 text-zinc-400 dark:bg-zinc-800/80 dark:text-zinc-500">
+      <div className="flex h-12 w-12 items-center justify-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] text-[var(--sf-ink-3)]">
         {icon}
       </div>
-      <p className="text-sm font-medium text-zinc-600 dark:text-zinc-300">{title}</p>
-      {hint && <p className="max-w-xs text-xs leading-relaxed text-zinc-400 dark:text-zinc-500">{hint}</p>}
+      <p className="break-words text-sm font-medium leading-snug text-[var(--sf-ink)]">{title}</p>
+      {hint && <p className="max-w-xs break-words text-xs leading-relaxed text-[var(--sf-ink-3)]">{hint}</p>}
     </div>
   );
 }
 
 function Kbd({ children }: { children: React.ReactNode }) {
   return (
-    <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded-md border border-zinc-200 bg-zinc-50 px-1.5 font-mono text-[10px] font-medium text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+    <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] px-1.5 font-mono text-[10px] font-medium text-[var(--sf-ink-3)]">
       {children}
     </kbd>
   );
@@ -209,7 +209,7 @@ export default function SearchModal() {
           exit={{ opacity: 0 }}
         >
           <motion.div
-            className="absolute inset-0 bg-zinc-950/45 backdrop-blur-[6px]"
+            className="absolute inset-0 bg-black/45"
             onClick={() => setIsOpen(false)}
             aria-hidden="true"
             initial={{ opacity: 0 }}
@@ -225,12 +225,12 @@ export default function SearchModal() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: -12 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="glass-strong relative z-10 flex h-[var(--vvh,100dvh)] max-h-[100dvh] w-full max-w-full flex-col overflow-hidden rounded-none sm:h-auto sm:max-h-[min(80dvh,42rem)] sm:max-w-2xl sm:rounded-2xl"
+            className="relative z-10 flex h-[var(--vvh,100dvh)] max-h-[100dvh] w-full max-w-full flex-col overflow-hidden rounded-none border border-[var(--sf-line)] bg-[var(--sf-surface)] sm:h-auto sm:max-h-[min(80dvh,42rem)] sm:max-w-2xl sm:rounded-[3px]"
             onClick={(event) => event.stopPropagation()}
           >
-            {/* 输入区 */}
-            <div className="flex min-h-[60px] shrink-0 items-center gap-1 border-b border-zinc-200/70 px-4 py-2 pt-[max(env(safe-area-inset-top),0.5rem)] dark:border-zinc-700/60 sm:pt-2">
-              <svg className="h-[18px] w-[18px] shrink-0 text-zinc-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+            {/* 输入区：实底表面 + 细线，输入框与 Input.tsx 使用同一组令牌 */}
+            <div className="flex min-h-[60px] shrink-0 items-center gap-2 border-b border-[var(--sf-line)] bg-[var(--sf-canvas)] px-3 py-2 pt-[max(env(safe-area-inset-top),0.5rem)] sm:pt-2">
+              <svg className="h-[18px] w-[18px] shrink-0 text-[var(--sf-ink-3)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -246,16 +246,16 @@ export default function SearchModal() {
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={handleInputKeyDown}
                 placeholder="搜索文章…"
-                className="min-w-0 flex-1 bg-transparent px-3 py-3 text-[16px] leading-snug text-zinc-900 placeholder-zinc-400 outline-none dark:text-zinc-100 dark:placeholder-zinc-500 sm:text-[15px]"
+                className="min-h-[40px] min-w-0 flex-1 rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-[16px] leading-snug text-[var(--sf-ink)] placeholder:text-[var(--sf-ink-3)] outline-none transition-colors duration-200 focus-visible:border-[var(--sf-accent)] focus-visible:ring-2 focus-visible:ring-[var(--sf-accent)] focus-visible:ring-offset-0 sm:text-sm"
               />
               {isLoading && (
-                <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-zinc-200 border-t-teal-500 dark:border-zinc-700 dark:border-t-teal-400" aria-hidden="true" />
+                <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[var(--sf-line-strong)] border-t-[var(--sf-accent)]" aria-hidden="true" />
               )}
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
                 aria-label="关闭搜索"
-                className="focus-ring ml-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-white/5 dark:hover:text-zinc-300 sm:h-7 sm:w-auto sm:px-2"
+                className="focus-ring ml-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[3px] text-[var(--sf-ink-3)] transition-colors hover:bg-[var(--sf-line-soft)] hover:text-[var(--sf-ink)] sm:h-7 sm:w-auto sm:px-2"
               >
                 <Kbd><span className="hidden sm:inline">esc</span></Kbd>
                 <svg className="h-5 w-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
@@ -326,10 +326,10 @@ export default function SearchModal() {
                     onMouseEnter={() => setSelectedIndex(index)}
                     onClick={() => setIsOpen(false)}
                     className={cn(
-                      'focus-ring group flex min-h-11 flex-col gap-1 rounded-xl px-3 py-3 transition-colors duration-150 sm:px-4',
+                      'focus-ring group flex min-h-11 flex-col gap-1 rounded-[3px] border px-3 py-3 transition-colors duration-150 sm:px-4',
                       index === selectedIndex
-                        ? 'bg-teal-500/[0.08] dark:bg-teal-400/[0.1]'
-                        : 'hover:bg-zinc-100/80 dark:hover:bg-white/[0.04]'
+                        ? 'border-[var(--sf-accent)] bg-[var(--sf-canvas)]'
+                        : 'border-transparent hover:border-[var(--sf-line)] hover:bg-[var(--sf-line-soft)]'
                     )}
                   >
                     <span className="flex items-baseline justify-between gap-3">
@@ -337,18 +337,18 @@ export default function SearchModal() {
                         className={cn(
                           'break-words text-[15px] font-medium leading-snug transition-colors',
                           index === selectedIndex
-                            ? 'text-teal-700 dark:text-teal-300'
-                            : 'text-zinc-900 dark:text-zinc-100'
+                            ? 'text-[var(--sf-accent-ink)]'
+                            : 'text-[var(--sf-ink)]'
                         )}
                       >
                         {result.title || '无标题'}
                       </span>
-                      <span className="shrink-0 font-mono text-[11px] leading-snug text-zinc-400 dark:text-zinc-500">
+                      <span className="shrink-0 font-mono text-[11px] leading-snug text-[var(--sf-ink-3)]">
                         {urlToBreadcrumb(result.url)}
                       </span>
                     </span>
                     <span
-                      className="line-clamp-2 break-words text-[13px] leading-relaxed text-zinc-500 [overflow-wrap:anywhere] dark:text-zinc-400 [&_mark]:rounded-sm [&_mark]:bg-teal-500/15 [&_mark]:px-0.5 [&_mark]:text-teal-700 dark:[&_mark]:bg-teal-400/20 dark:[&_mark]:text-teal-300"
+                      className="line-clamp-2 break-words text-[13px] leading-relaxed text-[var(--sf-ink-2)] [overflow-wrap:anywhere] [&_mark]:rounded-[2px] [&_mark]:bg-[var(--sf-line-soft)] [&_mark]:px-0.5 [&_mark]:text-[var(--sf-accent-ink)]"
                       dangerouslySetInnerHTML={{ __html: sanitizeHtml(result.excerpt || '') }}
                     />
                   </a>
@@ -356,7 +356,7 @@ export default function SearchModal() {
             </div>
 
             {/* 底部快捷键栏 */}
-            <div className="hidden shrink-0 items-center justify-between border-t border-zinc-200/70 px-4 py-2.5 text-xs text-zinc-400 dark:border-zinc-700/60 dark:text-zinc-500 sm:flex">
+            <div className="hidden shrink-0 items-center justify-between border-t border-[var(--sf-line)] px-4 py-2.5 text-xs text-[var(--sf-ink-3)] sm:flex">
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1.5">
                   <Kbd>↑</Kbd>
@@ -373,7 +373,7 @@ export default function SearchModal() {
                 </span>
               </div>
               {results.length > 0 && (
-                <span className="tabular-nums">{results.length} 条结果</span>
+                <span className="tabular-nums text-[var(--sf-ink-2)]">{results.length} 条结果</span>
               )}
             </div>
           </motion.div>

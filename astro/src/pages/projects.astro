@@ -1,109 +1,193 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import ParticleField from '../components/effects/ParticleField';
-import ScrollReveal from '../components/ui/ScrollReveal';
-import GlowCard from '../components/ui/GlowCard';
 import { projects, type Project } from '../config/projects';
 
 const featured = projects.filter((p) => p.featured);
 const regular = projects.filter((p) => !p.featured);
 
+/** 状态徽标只走共享令牌：单一强调色 + 冷灰细线区分语义，不再引入第二套调色板。 */
 const statusMeta: Record<Project['status'], { label: string; className: string }> = {
-  active: { label: '运营中', className: 'bg-teal-500/10 text-teal-600 dark:text-teal-400' },
-  wip: { label: '开发中', className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400' },
-  archived: { label: '已归档', className: 'bg-zinc-500/10 text-zinc-500 dark:text-zinc-400' },
+  active: { label: '运营中', className: 'border-[var(--sf-accent)] text-[var(--sf-accent-ink)]' },
+  wip: { label: '开发中', className: 'border-[var(--sf-line-strong)] text-[var(--sf-ink-2)]' },
+  archived: { label: '已归档', className: 'border-[var(--sf-line)] text-[var(--sf-ink-3)]' },
 };
+
+/** 两位序号：精选/常规两组的索引都统一等宽对齐。 */
+function formatOrdinal(index: number): string {
+  return String(index + 1).padStart(2, '0');
+}
 ---
 
 <BaseLayout title="项目" description="我做过的和正在做的项目">
-  <div class="pointer-events-none fixed inset-0 z-0 hidden lg:block" aria-hidden="true">
-    <ParticleField client:visible count={36} speed={0.25} />
-  </div>
-  <section class="relative z-10 mx-auto w-full max-w-5xl px-5 py-16 sm:px-8 lg:px-10">
-    <div class="mb-10">
-      <ScrollReveal client:visible>
-        <div class="mb-4 flex items-center gap-3">
-          <span class="h-px w-8 bg-zinc-400 dark:bg-zinc-500"></span>
-          <span class="font-mono text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Projects</span>
-        </div>
-        <h1 class="text-4xl font-black tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-5xl">项目</h1>
-        <p class="mt-3 max-w-xl text-zinc-500 dark:text-zinc-400">我做过的和正在做的东西。</p>
-      </ScrollReveal>
-    </div>
+  <section class="mx-auto w-full max-w-5xl px-5 py-16 sm:px-8 lg:px-10">
+    <header class="mb-10 border-b border-[var(--sf-line)] pb-6">
+      <p class="mb-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
+        <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
+        Projects / 01
+      </p>
+      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <h1 class="text-4xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-5xl">项目</h1>
+        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">
+          共 {projects.length} 个项目
+        </p>
+      </div>
+      <p class="mt-3 max-w-xl text-[var(--sf-ink-2)]">我做过的和正在做的东西。</p>
+    </header>
 
     {projects.length === 0 ? (
-      <div class="rounded-xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-        还没有项目，去 src/config/projects.ts 添加第一个吧。
+      <div class="border-y border-[var(--sf-line)] px-1 py-16 text-center">
+        <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">Empty / 0</p>
+        <p class="mt-3 text-[var(--sf-ink-2)]">还没有项目，去 src/config/projects.ts 添加第一个吧。</p>
       </div>
     ) : (
       <>
         {featured.length > 0 && (
-          <div class="mb-8 grid gap-5">
-            {featured.map((project) => (
-              <ScrollReveal client:visible>
-                <GlowCard className="card rounded-xl p-6 sm:p-8" glowColor="rgba(20, 184, 166, 0.08)" client:visible>
-                  <div class="flex flex-wrap items-center gap-3">
-                    <h2 class="text-2xl font-black tracking-tight text-zinc-950 dark:text-zinc-50">{project.name}</h2>
-                    <span class={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusMeta[project.status].className}`}>
+          <div class="mb-12">
+            <div class="flex items-baseline justify-between gap-4 border-b border-[var(--sf-line)] pb-2">
+              <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">
+                Featured / 精选
+              </p>
+              <span class="font-mono text-[11px] tabular-nums tracking-[0.1em] text-[var(--sf-ink-3)]">
+                {featured.length} 个
+              </span>
+            </div>
+
+            <div class="mt-4 grid gap-4">
+              {featured.map((project, index) => (
+                <article class="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5 sm:p-6">
+                  <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <span class="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-3)]">
+                      Featured / F{formatOrdinal(index)}
+                    </span>
+                    <span
+                      class={`inline-flex shrink-0 items-center rounded-[3px] border px-2 py-0.5 text-[11px] tracking-[0.08em] ${statusMeta[project.status].className}`}
+                    >
                       {statusMeta[project.status].label}
                     </span>
                   </div>
-                  <p class="mt-2 text-sm font-semibold text-zinc-600 dark:text-zinc-300">{project.tagline}</p>
-                  <p class="mt-3 text-sm leading-7 text-zinc-500 dark:text-zinc-400">{project.description}</p>
-                  <div class="mt-4 flex flex-wrap gap-2">
+
+                  <h2 class="mt-3 text-2xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-3xl">
+                    {project.name}
+                  </h2>
+                  <p class="mt-2 text-sm font-medium text-[var(--sf-ink-2)]">{project.tagline}</p>
+                  <p class="mt-3 text-sm leading-7 text-[var(--sf-ink-3)]">{project.description}</p>
+
+                  <ul class="mt-4 flex list-none flex-wrap gap-1.5 p-0" aria-label={`${project.name} 技术栈`}>
                     {project.tech.map((t) => (
-                      <span class="rounded-full bg-zinc-100 px-3 py-1 font-mono text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{t}</span>
+                      <li class="rounded-[3px] border border-[var(--sf-line-soft)] px-2 py-0.5 font-mono text-[11px] tracking-[0.06em] text-[var(--sf-ink-3)]">
+                        {t}
+                      </li>
                     ))}
-                  </div>
-                  <div class="mt-5 flex flex-wrap gap-3">
+                  </ul>
+
+                  <div class="mt-5 flex flex-wrap gap-2.5">
                     {project.links.demo && (
-                      <a href={project.links.demo} target="_blank" rel="noopener noreferrer" class="btn-primary inline-flex items-center gap-1.5 no-underline">在线访问</a>
+                      <a
+                        href={project.links.demo}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex min-h-[44px] items-center gap-1.5 rounded-[3px] border border-[var(--sf-accent)] px-4 font-mono text-xs uppercase tracking-[0.14em] text-[var(--sf-accent-ink)] no-underline transition-colors duration-200 hover:bg-[var(--sf-accent)] hover:text-[var(--sf-canvas)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
+                      >
+                        在线访问
+                      </a>
                     )}
                     {project.links.github && (
-                      <a href={project.links.github} target="_blank" rel="noopener noreferrer" class="btn-ghost inline-flex items-center gap-1.5 no-underline">GitHub</a>
+                      <a
+                        href={project.links.github}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex min-h-[44px] items-center gap-1.5 rounded-[3px] border border-[var(--sf-line-control)] px-4 font-mono text-xs uppercase tracking-[0.14em] text-[var(--sf-ink-2)] no-underline transition-colors duration-200 hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
+                      >
+                        GitHub
+                      </a>
                     )}
                     {project.links.article && (
-                      <a href={project.links.article} class="btn-ghost inline-flex items-center gap-1.5 no-underline">相关文章</a>
+                      <a
+                        href={project.links.article}
+                        class="inline-flex min-h-[44px] items-center gap-1.5 rounded-[3px] border border-[var(--sf-line-control)] px-4 font-mono text-xs uppercase tracking-[0.14em] text-[var(--sf-ink-2)] no-underline transition-colors duration-200 hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
+                      >
+                        相关文章
+                      </a>
                     )}
                   </div>
-                </GlowCard>
-              </ScrollReveal>
-            ))}
+                </article>
+              ))}
+            </div>
           </div>
         )}
 
         {regular.length > 0 && (
-          <div class="grid gap-5 sm:grid-cols-2">
-            {regular.map((project, index) => (
-              <ScrollReveal delay={index * 0.08} client:visible>
-                <GlowCard className="card h-full rounded-xl p-5" glowColor="rgba(20, 184, 166, 0.08)" client:visible>
-                  <div class="flex flex-wrap items-center gap-2.5">
-                    <h3 class="text-lg font-bold tracking-tight text-zinc-950 dark:text-zinc-50">{project.name}</h3>
-                    <span class={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${statusMeta[project.status].className}`}>
+          <div>
+            <div class="flex items-baseline justify-between gap-4 border-b border-[var(--sf-line)] pb-2">
+              <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">
+                Index / 全部项目
+              </p>
+              <span class="font-mono text-[11px] tabular-nums tracking-[0.1em] text-[var(--sf-ink-3)]">
+                {regular.length} 个
+              </span>
+            </div>
+
+            <div class="mt-4 grid gap-4 sm:grid-cols-2">
+              {regular.map((project, index) => (
+                <article class="group flex h-full flex-col rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5 transition-colors duration-200 hover:border-[var(--sf-line-strong)]">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-3)]">
+                      R{formatOrdinal(index)}
+                    </span>
+                    <span
+                      class={`inline-flex shrink-0 items-center rounded-[3px] border px-2 py-0.5 text-[11px] tracking-[0.08em] ${statusMeta[project.status].className}`}
+                    >
                       {statusMeta[project.status].label}
                     </span>
                   </div>
-                  <p class="mt-1.5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">{project.tagline}</p>
-                  <p class="mt-2 text-sm leading-6 text-zinc-500 dark:text-zinc-400">{project.description}</p>
-                  <div class="mt-3 flex flex-wrap gap-1.5">
+
+                  <h3 class="mt-2.5 text-lg font-bold tracking-tight text-[var(--sf-ink)]">
+                    {project.name}
+                  </h3>
+                  <p class="mt-1.5 text-xs font-medium text-[var(--sf-ink-2)]">{project.tagline}</p>
+                  <p class="mt-2 text-sm leading-6 text-[var(--sf-ink-3)]">{project.description}</p>
+
+                  <ul class="mt-3 flex list-none flex-wrap gap-1.5 p-0" aria-label={`${project.name} 技术栈`}>
                     {project.tech.map((t) => (
-                      <span class="rounded-full bg-zinc-100 px-2.5 py-0.5 font-mono text-[11px] text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">{t}</span>
+                      <li class="rounded-[3px] border border-[var(--sf-line-soft)] px-2 py-0.5 font-mono text-[11px] tracking-[0.06em] text-[var(--sf-ink-3)]">
+                        {t}
+                      </li>
                     ))}
-                  </div>
-                  <div class="mt-4 flex flex-wrap gap-2.5">
+                  </ul>
+
+                  <div class="mt-auto flex flex-wrap gap-x-4 gap-y-1 pt-4">
                     {project.links.demo && (
-                      <a href={project.links.demo} target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-teal-600 no-underline hover:underline dark:text-teal-400">在线访问 →</a>
+                      <a
+                        href={project.links.demo}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex min-h-[44px] items-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-accent-ink)] no-underline transition-colors duration-200 hover:text-[var(--sf-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
+                      >
+                        在线访问 →
+                      </a>
                     )}
                     {project.links.github && (
-                      <a href={project.links.github} target="_blank" rel="noopener noreferrer" class="text-sm font-semibold text-teal-600 no-underline hover:underline dark:text-teal-400">GitHub →</a>
+                      <a
+                        href={project.links.github}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex min-h-[44px] items-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-accent-ink)] no-underline transition-colors duration-200 hover:text-[var(--sf-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
+                      >
+                        GitHub →
+                      </a>
                     )}
                     {project.links.article && (
-                      <a href={project.links.article} class="text-sm font-semibold text-teal-600 no-underline hover:underline dark:text-teal-400">相关文章 →</a>
+                      <a
+                        href={project.links.article}
+                        class="inline-flex min-h-[44px] items-center font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-accent-ink)] no-underline transition-colors duration-200 hover:text-[var(--sf-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
+                      >
+                        相关文章 →
+                      </a>
                     )}
                   </div>
-                </GlowCard>
-              </ScrollReveal>
-            ))}
+                </article>
+              ))}
+            </div>
           </div>
         )}
       </>

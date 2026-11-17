@@ -1,7 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PostList from '../../components/posts/PostList';
-import ScrollReveal from '../../components/ui/ScrollReveal';
 import { cachedFetchJson } from '../../lib/pb-cache';
 import { pbBaseUrl } from '../../lib/pb-base-url';
 
@@ -37,34 +36,39 @@ const tag = await fetchTag(slug ?? '');
 ---
 
 <BaseLayout title={tag ? `标签: ${tag.name}` : '标签'} description={tag?.description || '按标签筛选文章'}>
-  <div class="mb-12">
-    <ScrollReveal client:visible>
-      <div class="flex items-center gap-3 mb-4">
-        <span class="h-px w-8 bg-zinc-400 dark:bg-zinc-500"></span>
-        <span class="font-mono text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Tag</span>
+  <section class="mx-auto w-full max-w-5xl px-5 py-16 sm:px-8 lg:px-10">
+    <header class="mb-10 border-b border-[var(--sf-line)] pb-6">
+      <p class="mb-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
+        <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
+        Taxonomy / Tag
+      </p>
+      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <h1 class="text-4xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-5xl">
+          {tag ? tag.name : '标签'}
+        </h1>
+        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">标签归档</p>
       </div>
-      <h1 class="font-display text-4xl font-black uppercase tracking-wide text-zinc-900 dark:text-zinc-100">
-        {tag ? tag.name : '标签'}
-      </h1>
       {tag?.description && (
-        <p class="mt-3 text-zinc-500 dark:text-zinc-400 max-w-xl">
+        <p class="mt-3 max-w-xl text-[var(--sf-ink-2)]">
           {tag.description}
         </p>
       )}
-    </ScrollReveal>
-  </div>
+    </header>
 
-  {tag ? (
-    <PostList client:visible perPage={12} tagSlug={slug} />
-  ) : (
-    <div class="card flex flex-col items-center justify-center py-20 text-center rounded-lg">
-      <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
-        <svg class="h-8 w-8 text-zinc-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-        </svg>
+    {tag ? (
+      <PostList client:visible perPage={12} tagSlug={slug} />
+    ) : (
+      <div class="border-y border-[var(--sf-line)] px-1 py-16 text-center">
+        <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">Empty / 0</p>
+        <p class="mt-3 text-[var(--sf-ink-2)]">暂无标签</p>
+        <p class="mt-2 text-sm text-[var(--sf-ink-3)]">标签不存在</p>
+        <a
+          href="/tags"
+          class="mt-5 inline-flex min-h-[44px] items-center rounded-[3px] border border-[var(--sf-line-control)] px-4 font-mono text-xs uppercase tracking-[0.14em] text-[var(--sf-ink-2)] no-underline transition-colors duration-200 hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
+        >
+          返回标签列表
+        </a>
       </div>
-      <p class="text-zinc-500 dark:text-zinc-400">标签不存在</p>
-      <a href="/tags" class="btn-ghost mt-4">返回标签列表</a>
-    </div>
-  )}
+    )}
+  </section>
 </BaseLayout>

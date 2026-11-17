@@ -26,6 +26,8 @@
      使用 color-mix() —— 不支持该函数的老浏览器会整条丢弃 box-shadow，
      导致键盘焦点完全不可见。 */
   --sf-focus-ring: rgb(11 109 118 / 0.32);
+  /* 弹层遮罩：浅色主题用石墨半透明，暗色主题用更深的黑，避免暗色下变成浅纱幕。 */
+  --sf-scrim: rgb(22 25 29 / 0.55);
   --sf-pad: max(clamp(1.25rem, 4vw, 3.5rem), env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
 }
 
@@ -45,6 +47,7 @@
   /* 暗色主题的语义红更亮以保证对比度。 */
   --sf-danger: #f87171;
   --sf-focus-ring: rgb(63 168 178 / 0.4);
+  --sf-scrim: rgb(0 0 0 / 0.72);
 }
 
 /* 共享区块包装：首页热门/评论等子组件复用（子组件内部继续使用 --sf-* 令牌）。

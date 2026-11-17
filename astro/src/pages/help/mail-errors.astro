@@ -15,15 +15,27 @@ const errors = [
 ---
 
 <BaseLayout title="邮件与注册错误代码">
-  <main class="mx-auto max-w-3xl px-6 py-20">
-    <p class="text-sm font-medium text-indigo-600">帮助中心</p>
-    <h1 class="mt-3 text-4xl font-semibold tracking-tight text-zinc-950 dark:text-white">邮件与注册错误代码</h1>
-    <p class="mt-5 text-zinc-600 dark:text-zinc-300">这些代码只说明可采取的安全操作，不会确认账户是否存在，也不会披露服务商或当前配额信息。</p>
-    <div class="mt-12 divide-y divide-zinc-200 border-y border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-      {errors.map(([code, action]) => (
-        <section id={code} class="scroll-mt-24 py-7">
-          <h2 class="font-mono text-lg font-semibold text-zinc-950 dark:text-white">{code}</h2>
-          <p class="mt-2 text-zinc-600 dark:text-zinc-300">{action}</p>
+  <main class="mx-auto max-w-3xl px-[var(--sf-pad)] py-16 sm:py-20">
+    <header class="mb-10 border-b border-[var(--sf-line)] pb-6">
+      <p class="mb-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
+        <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
+        Help / 帮助中心
+      </p>
+      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <h1 class="text-4xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-5xl">邮件与注册错误代码</h1>
+        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">共 {errors.length} 个代码</p>
+      </div>
+      <p class="mt-4 max-w-xl text-[var(--sf-ink-2)]">这些代码只说明可采取的安全操作，不会确认账户是否存在，也不会披露服务商或当前配额信息。</p>
+    </header>
+
+    <div class="border-y border-[var(--sf-line)]">
+      {errors.map(([code, action], index) => (
+        <section id={code} class="scroll-mt-24 border-b border-[var(--sf-line-soft)] py-6 last:border-b-0">
+          <p class="mb-1.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">
+            Code / {String(index + 1).padStart(2, '0')}
+          </p>
+          <h2 class="font-mono text-base font-semibold tracking-[0.02em] text-[var(--sf-ink)] [overflow-wrap:anywhere]">{code}</h2>
+          <p class="mt-1.5 text-sm leading-7 text-[var(--sf-ink-2)]">{action}</p>
         </section>
       ))}
     </div>

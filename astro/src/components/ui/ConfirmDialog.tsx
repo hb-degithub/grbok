@@ -77,7 +77,7 @@ export default function ConfirmDialog({ open, title, message, confirmLabel, canc
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-950/40 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4"
           onClick={onCancel}
           onKeyDown={handleKeyDown}
         >
@@ -91,13 +91,28 @@ export default function ConfirmDialog({ open, title, message, confirmLabel, canc
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             onClick={e => e.stopPropagation()}
-            className="w-full max-w-sm rounded-xl border border-border bg-white p-5 shadow-2xl"
+            className="w-full max-w-sm rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5"
           >
-            <h3 id="confirm-dialog-title" className="text-sm font-black text-text">{title}</h3>
-            <p id="confirm-dialog-desc" className="mt-2 text-sm leading-6 text-text-secondary">{message}</p>
+            <h3 id="confirm-dialog-title" className="break-words text-sm font-semibold leading-snug text-[var(--sf-ink)]">{title}</h3>
+            <p id="confirm-dialog-desc" className="mt-2 break-words text-sm leading-6 text-[var(--sf-ink-2)]">{message}</p>
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={onCancel} className="min-h-10 rounded-md border border-border bg-white px-4 text-xs text-text-secondary hover:bg-bg-soft">{cancelLabel || '取消'}</button>
-              <button onClick={onConfirm} className={"min-h-10 rounded-md px-4 text-xs text-white " + (danger ? "bg-danger hover:bg-danger/90" : "bg-accent hover:bg-accent/90")}>{confirmLabel || '确认'}</button>
+              <button
+                onClick={onCancel}
+                className="min-h-10 rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-4 text-xs text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
+              >
+                {cancelLabel || '取消'}
+              </button>
+              <button
+                onClick={onConfirm}
+                className={
+                  'min-h-10 rounded-[3px] px-4 text-xs font-medium text-[var(--sf-on-accent)] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] ' +
+                  (danger
+                    ? 'bg-[var(--sf-danger)] hover:opacity-90'
+                    : 'bg-[var(--sf-accent)] hover:bg-[var(--sf-accent-ink)]')
+                }
+              >
+                {confirmLabel || '确认'}
+              </button>
             </div>
           </motion.div>
         </motion.div>

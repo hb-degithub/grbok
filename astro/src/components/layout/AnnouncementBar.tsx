@@ -3,11 +3,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLatestAnnouncements } from '../../hooks/domains/useAnnouncements';
 import { cn } from '../../lib/utils';
 
+/**
+ * 公告类型配色
+ *
+ * 基底统一为表面色 + 1px 细线，类型差异只体现在细线/文字上：
+ * info 用唯一强调色细线，warning 保留 amber 语义，important 用 --sf-danger 语义红，
+ * normal 使用冷灰细线。不再使用 sky/rose/zinc 旧调色板与半透明底。
+ */
 const typeStyles: Record<string, string> = {
-  info: 'bg-sky-50 text-sky-800 border-sky-200 dark:bg-sky-950/40 dark:text-sky-200 dark:border-sky-900',
-  warning: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-900',
-  important: 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-900',
-  normal: 'bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-900/60 dark:text-zinc-300 dark:border-zinc-800',
+  info: 'border-[var(--sf-accent)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)]',
+  warning: 'border-amber-500 bg-amber-50 text-amber-900 dark:border-amber-600 dark:bg-amber-950/40 dark:text-amber-100',
+  important: 'border-[var(--sf-danger)] bg-[var(--sf-surface)] text-[var(--sf-danger)]',
+  normal: 'border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)]',
 };
 
 export default function AnnouncementBar() {
@@ -36,7 +43,7 @@ export default function AnnouncementBar() {
             <button
               type="button"
               onClick={() => setClosed(prev => new Set([...prev, a.id]))}
-              className="focus-ring shrink-0 rounded p-2 sm:p-1 opacity-70 transition-opacity hover:opacity-100"
+              className="focus-ring shrink-0 rounded-[2px] p-2 opacity-70 transition-opacity hover:opacity-100 sm:p-1"
               aria-label="关闭公告"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

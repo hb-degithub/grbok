@@ -3,14 +3,25 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import ScrollReveal from '../components/ui/ScrollReveal';
 ---
 <BaseLayout title='离线模式' description='网络连接已断开'>
-  <ScrollReveal client:visible>
-  <div class='flex min-h-[60vh] flex-col items-center justify-center text-center px-5'>
-    <div class='mb-4 flex h-16 w-16 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800'>
-      <svg class='h-8 w-8 text-zinc-400' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 000 12.728M12 8v4l2 2'/></svg>
+  <ScrollReveal client:visible className='w-full'>
+  <section class='mx-auto flex min-h-[60vh] w-full max-w-3xl items-center px-[var(--sf-pad)] py-16'>
+    <div class='w-full border-y border-[var(--sf-line)] py-16 text-center'>
+      <p class='mb-6 flex items-center justify-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--sf-ink-3)]'>
+        <span class='h-px w-8 bg-[var(--sf-line-strong)]' aria-hidden='true'></span>
+        Offline / 离线
+      </p>
+      <div class='mx-auto mb-6 flex h-12 w-12 items-center justify-center border border-[var(--sf-line-strong)] bg-[var(--sf-surface)]'>
+        <svg class='h-5 w-5 text-[var(--sf-ink-3)]' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M18.364 5.636a9 9 0 010 12.728M5.636 5.636a9 9 0 000 12.728M12 8v4l2 2'/></svg>
+      </div>
+      <h1 class='text-3xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-4xl'>离线模式</h1>
+      <p class='mx-auto mt-3 max-w-md text-sm leading-relaxed text-[var(--sf-ink-2)]'>网络连接已断开，请检查网络后重试。</p>
+      <a
+        href='/'
+        class='mt-8 inline-flex min-h-11 items-center justify-center gap-2 rounded-[3px] border border-[var(--sf-accent)] px-5 font-mono text-xs uppercase tracking-[0.14em] text-[var(--sf-accent-ink)] no-underline transition-colors duration-200 hover:bg-[var(--sf-accent)] hover:text-[var(--sf-canvas)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]'
+      >
+        返回首页
+      </a>
     </div>
-    <h1 class='text-3xl font-black text-zinc-950 dark:text-zinc-50'>离线模式</h1>
-    <p class='mt-2 text-zinc-500 dark:text-zinc-400'>网络连接已断开，请检查网络后重试。</p>
-    <a href='/' class='btn-primary mt-6'>返回首页</a>
-  </div>
+  </section>
   </ScrollReveal>
 </BaseLayout>

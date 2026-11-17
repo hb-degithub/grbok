@@ -227,7 +227,7 @@ export default function WelcomeOverlay() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
           onClick={handleBackdropClick}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-950/60 px-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--sf-scrim)] px-4"
           role="dialog"
           aria-modal="true"
           aria-label="欢迎引导"
@@ -253,15 +253,15 @@ export default function WelcomeOverlay() {
               {/* Step 1: Welcome with SplitText */}
               <Step>
                 <div className="flex flex-col items-center py-4 text-center">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 dark:bg-teal-900/30">
-                    <svg className="h-7 w-7 text-teal-600 dark:text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">
+                    <svg className="h-7 w-7 text-[var(--sf-accent-ink)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
                     </svg>
                   </div>
-                  <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <h2 className="text-xl font-semibold tracking-tight text-[var(--sf-ink)]">
                     <SplitText text="欢迎来到胡巴的博客" />
                   </h2>
-                  <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+                  <p className="mt-2 text-sm leading-relaxed text-[var(--sf-ink-2)]">
                     一个关于技术、思考与生活的个人空间。<br />
                     在这里记录所学所想，也期待与你交流。
                   </p>
@@ -271,7 +271,7 @@ export default function WelcomeOverlay() {
               {/* Step 2: Features with SpotlightCard */}
               <Step>
                 <div className="py-4">
-                  <h2 className="mb-4 text-center text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <h2 className="mb-4 text-center text-xl font-semibold tracking-tight text-[var(--sf-ink)]">
                     <SplitText text="探索功能" delay={0.1} />
                   </h2>
                   <div className="space-y-3">
@@ -282,14 +282,14 @@ export default function WelcomeOverlay() {
                     ].map((item) => (
                       <SpotlightCard key={item.title} className="px-3 py-2.5" spotlightSize={spotlightSize}>
                         <div className="flex items-start gap-3">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 dark:bg-teal-900/30">
-                            <svg className="h-4 w-4 text-teal-600 dark:text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">
+                            <svg className="h-4 w-4 text-[var(--sf-accent-ink)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
                             </svg>
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{item.title}</p>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400">{item.desc}</p>
+                            <p className="text-sm font-semibold text-[var(--sf-ink)]">{item.title}</p>
+                            <p className="text-xs text-[var(--sf-ink-2)]">{item.desc}</p>
                           </div>
                         </div>
                       </SpotlightCard>
@@ -301,10 +301,10 @@ export default function WelcomeOverlay() {
               {/* Step 3: Community with social links */}
               <Step>
                 <div className="py-4">
-                  <h2 className="mb-4 text-center text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <h2 className="mb-4 text-center text-xl font-semibold tracking-tight text-[var(--sf-ink)]">
                     <SplitText text="加入社区" delay={0.1} />
                   </h2>
-                  <p className="mb-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
+                  <p className="mb-4 text-center text-sm text-[var(--sf-ink-2)]">
                     关注我的动态，在评论区与我交流
                   </p>
                   <div className="flex justify-center gap-3">
@@ -312,7 +312,7 @@ export default function WelcomeOverlay() {
                       href="https://github.com"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 no-underline transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      className="focus-ring flex items-center gap-2 rounded-[2px] border border-[var(--sf-line-control)] px-4 py-2.5 font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-2)] no-underline transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
                     >
                       <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" /></svg>
                       GitHub
@@ -321,7 +321,7 @@ export default function WelcomeOverlay() {
                       href="https://space.bilibili.com/691237475"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 no-underline transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                      className="focus-ring flex items-center gap-2 rounded-[2px] border border-[var(--sf-line-control)] px-4 py-2.5 font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-2)] no-underline transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
                     >
                       <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.813 4.653h.354c.729 0 1.333.6 1.333 1.333v9.6c0 .734-.604 1.334-1.333 1.334h-.354a1.334 1.334 0 01-1.334-1.334v-9.6c0-.733.605-1.333 1.334-1.333zm-10.48 0h.354c.733 0 1.333.6 1.333 1.333v9.6c0 .734-.6 1.334-1.333 1.334h-.354A1.334 1.334 0 016 15.586v-9.6c0-.733.6-1.333 1.333-1.333zm5.667-2.626h-.354c-.734 0-1.334.6-1.334 1.333v.44H8.187a2.667 2.667 0 00-2.667 2.667v9.6a2.667 2.667 0 002.667 2.666h7.626a2.667 2.667 0 002.667-2.666v-9.6a2.667 2.667 0 00-2.667-2.667h-3.12v-.44c0-.733-.6-1.333-1.334-1.333h-.18z" /></svg>
                       Bilibili
@@ -334,10 +334,10 @@ export default function WelcomeOverlay() {
               {!isLoggedIn && (
                 <Step>
                   <div className="py-4">
-                    <h2 className="mb-3 text-center text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                    <h2 className="mb-3 text-center text-xl font-semibold tracking-tight text-[var(--sf-ink)]">
                       <SplitText text="创建账户" delay={0.1} />
                     </h2>
-                    <p className="mb-4 text-center text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className="mb-4 text-center text-xs text-[var(--sf-ink-2)]">
                       注册后即可发表评论，参与社区互动
                     </p>
 
@@ -347,16 +347,16 @@ export default function WelcomeOverlay() {
                         animate={{ opacity: 1, scale: 1 }}
                         className="flex flex-col items-center py-4 text-center"
                       >
-                        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 dark:bg-teal-900/30">
-                          <svg className="h-6 w-6 text-teal-600 dark:text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-[2px] border border-emerald-600 text-emerald-600 dark:border-emerald-500 dark:text-emerald-400">
+                          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
                         </div>
-                        <p className="text-sm font-medium text-teal-700 dark:text-teal-300">{registeredEmail ? '提交后请验证邮箱，验证完成后可评论' : '注册成功！'}</p>
+                        <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">{registeredEmail ? '提交后请验证邮箱，验证完成后可评论' : '注册成功！'}</p>
                         <button
                           type="button"
                           onClick={() => stepperRef.current?.next()}
-                          className="mt-3 rounded-full bg-teal-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal-600"
+                          className="focus-ring mt-3 rounded-[2px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
                         >
                           继续
                         </button>
@@ -364,65 +364,65 @@ export default function WelcomeOverlay() {
                     ) : (
                       <div className="space-y-3">
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">昵称</label>
+                          <label className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">昵称</label>
                           <input
                             type="text"
                             value={regName}
                             onChange={(e) => { setRegName(e.target.value); if (regStatus === 'error') { setRegStatus('idle'); setRegError(''); } }}
                             placeholder="你的昵称"
-                            className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus-visible:border-teal-400 focus-visible:ring-1 focus-visible:ring-teal-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                            className="w-full rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-sm text-[var(--sf-ink)] outline-none transition-colors placeholder:text-[var(--sf-ink-3)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-1 focus-visible:ring-[var(--sf-accent)]"
                             autoComplete="name"
                           />
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">邮箱（可选）</label>
+                          <label className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">邮箱（可选）</label>
                           <input
                             type="email"
                             value={regEmail}
                             onChange={(e) => { setRegEmail(e.target.value); if (regStatus === 'error') { setRegStatus('idle'); setRegError(''); } }}
                             placeholder="your@email.com"
-                            className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus-visible:border-teal-400 focus-visible:ring-1 focus-visible:ring-teal-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                            className="w-full rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-sm text-[var(--sf-ink)] outline-none transition-colors placeholder:text-[var(--sf-ink-3)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-1 focus-visible:ring-[var(--sf-accent)]"
                             autoComplete="email"
                           />
                         </div>
 
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">密码</label>
+                          <label className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">密码</label>
                           <input
                             type="password"
                             value={regPassword}
                             onChange={(e) => { setRegPassword(e.target.value); if (regStatus === 'error') { setRegStatus('idle'); setRegError(''); } }}
                             placeholder="至少 8 个字符"
-                            className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition-colors placeholder:text-zinc-400 focus-visible:border-teal-400 focus-visible:ring-1 focus-visible:ring-teal-400 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                            className="w-full rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-sm text-[var(--sf-ink)] outline-none transition-colors placeholder:text-[var(--sf-ink-3)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-1 focus-visible:ring-[var(--sf-accent)]"
                             autoComplete="new-password"
                           />
                         </div>
 
                         {regStatus === 'error' && regError && (
-                          <p className="text-xs text-red-500 dark:text-red-400">{regError}</p>
+                          <p className="border-l-2 border-[var(--sf-danger)] pl-2 font-mono text-[11px] tracking-[0.06em] text-[var(--sf-danger)]">{regError}</p>
                         )}
 
                         <button
                           type="button"
                           onClick={handleRegister}
                           disabled={regStatus === 'loading'}
-                          className="w-full rounded-full bg-teal-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-teal-600 disabled:opacity-50 dark:bg-teal-600 dark:hover:bg-teal-500"
+                          className="focus-ring w-full rounded-[2px] bg-[var(--sf-accent)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-on-accent)] transition-colors hover:bg-[var(--sf-accent-ink)] disabled:opacity-50"
                         >
                           {regStatus === 'loading' ? '提交中...' : '提交注册'}
                         </button>
 
-                        <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
-                          已有账户？<a href="/login" onClick={dismiss} className="text-teal-600 hover:underline dark:text-teal-400">登录</a>
+                        <p className="text-center font-mono text-[11px] tracking-[0.06em] text-[var(--sf-ink-3)]">
+                          已有账户？<a href="/login" onClick={dismiss} className="text-[var(--sf-accent-ink)] no-underline hover:underline">登录</a>
                           <span className="mx-1.5">·</span>
-                          <button type="button" onClick={() => setShowSkipConfirm(true)} className="text-teal-600 hover:underline dark:text-teal-400">跳过注册</button>
+                          <button type="button" onClick={() => setShowSkipConfirm(true)} className="text-[var(--sf-accent-ink)] no-underline hover:underline">跳过注册</button>
                         </p>
 
                         {showSkipConfirm && (
                           <motion.div
                             initial={{ opacity: 0, y: 4 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20"
+                            className="mt-3 rounded-[3px] border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950/40"
                           >
                             <p className="mb-2 text-xs text-amber-800 dark:text-amber-200">
                               未注册/登录将无法发表评论和参与互动，确定跳过吗？
@@ -431,14 +431,14 @@ export default function WelcomeOverlay() {
                               <button
                                 type="button"
                                 onClick={() => setShowSkipConfirm(false)}
-                                className="rounded-md px-3 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                                className="focus-ring rounded-[2px] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors hover:bg-[var(--sf-line-soft)] hover:text-[var(--sf-ink)]"
                               >
                                 返回注册
                               </button>
                               <button
                                 type="button"
                                 onClick={dismiss}
-                                className="rounded-md bg-amber-500 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500"
+                                className="focus-ring rounded-[2px] border border-amber-600 bg-amber-500 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-amber-950 transition-colors hover:bg-amber-400"
                               >
                                 确定跳过
                               </button>
@@ -455,26 +455,26 @@ export default function WelcomeOverlay() {
               {!isLoggedIn && regStatus === 'success' && registeredEmail && (
                 <Step>
                   <div className="py-4">
-                    <h2 className="mb-3 text-center text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                    <h2 className="mb-3 text-center text-xl font-semibold tracking-tight text-[var(--sf-ink)]">
                       <SplitText text="验证邮箱" delay={0.1} />
                     </h2>
                     <div className="flex flex-col items-center text-center">
                       <motion.div
-                        className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 dark:bg-teal-900/30"
+                        className="mb-4 flex h-14 w-14 items-center justify-center rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)]"
                         animate={{ scale: [1, 1.05, 1] }}
                         transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                       >
-                        <svg className="h-7 w-7 text-teal-600 dark:text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="h-7 w-7 text-[var(--sf-accent-ink)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                         </svg>
                       </motion.div>
-                      <p className="mb-1 text-sm text-zinc-600 dark:text-zinc-300">
+                      <p className="mb-1 text-sm text-[var(--sf-ink-2)]">
                         验证邮件已发送至
                       </p>
-                      <p className="mb-3 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      <p className="mb-3 text-sm font-medium text-[var(--sf-ink)]">
                         {registeredEmail || regEmail.trim() || '你的邮箱'}
                       </p>
-                      <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
+                      <p className="mb-4 text-xs text-[var(--sf-ink-2)]">
                         请检查收件箱（含垃圾邮件），点击验证链接。<br />
                         验证后即可发表评论。
                       </p>
@@ -482,11 +482,11 @@ export default function WelcomeOverlay() {
                         type="button"
                         onClick={handleResendVerification}
                         disabled={resendStatus === 'loading' || resendStatus === 'sent'}
-                        className="rounded-lg border border-zinc-200 bg-white px-4 py-1.5 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                        className="focus-ring rounded-[2px] border border-[var(--sf-line-control)] px-4 py-1.5 font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50"
                       >
                         {resendStatus === 'loading' ? '发送中...' : resendStatus === 'sent' ? '已重新发送 ✓' : '重新发送验证邮件'}
                       </button>
-                      <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
+                      <p className="mt-3 text-xs text-[var(--sf-ink-3)]">
                         也可以稍后再验证，不影响浏览
                       </p>
                     </div>
@@ -497,15 +497,15 @@ export default function WelcomeOverlay() {
               {/* Step 6 (or Step 4 for logged-in): Ready to explore */}
               <Step>
                 <div className="flex flex-col items-center py-4 text-center">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 dark:bg-teal-900/30">
-                    <svg className="h-7 w-7 text-teal-600 dark:text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">
+                    <svg className="h-7 w-7 text-[var(--sf-accent-ink)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
                     </svg>
                   </div>
-                  <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
+                  <h2 className="text-xl font-semibold tracking-tight text-[var(--sf-ink)]">
                     <SplitText text="准备就绪" delay={0.1} />
                   </h2>
-                  <p className="mt-2 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+                  <p className="mt-2 text-sm leading-relaxed text-[var(--sf-ink-2)]">
                     点击下方按钮完成引导，开始探索博客内容。
                   </p>
                 </div>

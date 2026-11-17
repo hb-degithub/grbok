@@ -8,12 +8,24 @@ interface LevelBadgeProps {
   className?: string;
 }
 
+/**
+ * 等级徽标。
+ *
+ * 分级数据（名称 / 图标 / 档位）保持原样，只把「配色」从 zinc/blue/purple/red 调色板
+ * 换成共享令牌：细线描边 + 实底表面 + 单一强调色，深浅主题由 `.dark` 覆写令牌自动切换。
+ * 可辨识性不靠彩色填充，而靠「描边强度 → 强调色 → 警告 → 危险」的语义梯度叠加原有 emoji 图标：
+ *   1 注册用户 冷灰细线 / 弱化文字
+ *   2 活跃用户 控制线 / 常规文字
+ *   3 资深用户 唯一强调色
+ *   4 VIP 会员 警告 amber（语义色保留，优先于统一色板）
+ *   5 荣誉会员 语义红 --sf-danger
+ */
 const LEVEL_CONFIG: Record<number, { name: string; icon: string; color: string; bgColor: string }> = {
-  1: { name: '注册用户', icon: '⚪', color: 'text-zinc-600 dark:text-zinc-400', bgColor: 'bg-zinc-100 dark:bg-zinc-800' },
-  2: { name: '活跃用户', icon: '🔵', color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-50 dark:bg-blue-900/20' },
-  3: { name: '资深用户', icon: '🟣', color: 'text-purple-600 dark:text-purple-400', bgColor: 'bg-purple-50 dark:bg-purple-900/20' },
-  4: { name: 'VIP会员', icon: '🟡', color: 'text-amber-600 dark:text-amber-400', bgColor: 'bg-amber-50 dark:bg-amber-900/20' },
-  5: { name: '荣誉会员', icon: '🔴', color: 'text-red-600 dark:text-red-400', bgColor: 'bg-red-50 dark:bg-red-900/20' },
+  1: { name: '注册用户', icon: '⚪', color: 'text-[var(--sf-ink-3)]', bgColor: 'border-[var(--sf-line)] bg-[var(--sf-surface)]' },
+  2: { name: '活跃用户', icon: '🔵', color: 'text-[var(--sf-ink-2)]', bgColor: 'border-[var(--sf-line-control)] bg-[var(--sf-surface)]' },
+  3: { name: '资深用户', icon: '🟣', color: 'text-[var(--sf-accent-ink)]', bgColor: 'border-[var(--sf-accent)] bg-[var(--sf-surface)]' },
+  4: { name: 'VIP会员', icon: '🟡', color: 'text-amber-700 dark:text-amber-400', bgColor: 'border-amber-500 bg-[var(--sf-surface)] dark:border-amber-400' },
+  5: { name: '荣誉会员', icon: '🔴', color: 'text-[var(--sf-danger)]', bgColor: 'border-[var(--sf-danger)] bg-[var(--sf-surface)]' },
 };
 
 const SIZE_CONFIG = {
@@ -29,7 +41,7 @@ export default function LevelBadge({ level, size = 'md', showName = false, class
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full font-medium',
+        'inline-flex max-w-full items-center gap-1 rounded-[2px] border font-medium leading-snug',
         config.bgColor,
         config.color,
         sizeConfig.padding,
@@ -38,7 +50,7 @@ export default function LevelBadge({ level, size = 'md', showName = false, class
       title={config.name}
     >
       <span className={sizeConfig.icon}>{config.icon}</span>
-      {showName && <span className={sizeConfig.text}>{config.name}</span>}
+      {showName && <span className={cn('min-w-0 break-words', sizeConfig.text)}>{config.name}</span>}
     </span>
   );
 }

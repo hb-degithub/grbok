@@ -8,51 +8,37 @@ import Starfield from '../components/effects/Starfield';
   <div class="pointer-events-none fixed inset-0 z-0 hidden dark:block" aria-hidden="true">
     <Starfield client:visible />
   </div>
-  <div class="relative z-10 flex flex-col items-center justify-center min-h-[60vh] text-center">
-    <ScrollReveal client:visible>
-      <div class="float-404 mb-8">
-        <h1 class="font-display text-9xl font-black text-teal-500 dark:text-teal-400 animate-glow">
+  <section class="relative z-10 mx-auto flex min-h-[60vh] w-full max-w-3xl items-center px-[var(--sf-pad)] py-16">
+    <ScrollReveal client:visible className="w-full">
+      <div class="border-y border-[var(--sf-line)] py-16 text-center">
+        <p class="mb-6 flex items-center justify-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--sf-ink-3)]">
+          <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
+          Error / 404
+        </p>
+
+        <h1
+          class="font-mono text-[clamp(4rem,16vw,7rem)] font-bold leading-[0.9] tracking-[-0.05em] tabular-nums text-[var(--sf-ink)]"
+        >
           404
         </h1>
-        <p class="mt-4 font-display text-2xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100">
-          页面未找到
-        </p>
-        <p class="mt-2 text-zinc-500 dark:text-zinc-400">
-          抱歉，您访问的页面不存在
-        </p>
-      </div>
+        <p class="mt-6 text-xl font-semibold tracking-tight text-[var(--sf-ink)]">页面未找到</p>
+        <p class="mt-2 text-sm text-[var(--sf-ink-2)]">抱歉，您访问的页面不存在</p>
 
-      <div class="flex gap-4">
-        <a href="/" class="btn-primary">
-          返回首页
-        </a>
-        <a href="/posts" class="btn-ghost">
-          浏览文章
-        </a>
+        <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <a
+            href="/"
+            class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[3px] border border-[var(--sf-accent)] px-5 font-mono text-xs uppercase tracking-[0.14em] text-[var(--sf-accent-ink)] no-underline transition-colors duration-200 hover:bg-[var(--sf-accent)] hover:text-[var(--sf-canvas)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] sm:w-auto"
+          >
+            返回首页
+          </a>
+          <a
+            href="/posts"
+            class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[3px] border border-[var(--sf-line-control)] px-5 font-mono text-xs uppercase tracking-[0.14em] text-[var(--sf-ink-2)] no-underline transition-colors duration-200 hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] sm:w-auto"
+          >
+            浏览文章
+          </a>
+        </div>
       </div>
     </ScrollReveal>
-  </div>
-
-  <style>
-    @keyframes glow {
-      0%, 100% { text-shadow: 0 0 8px rgba(20, 184, 166, 0.3); }
-      50% { text-shadow: 0 0 20px rgba(20, 184, 166, 0.6), 0 0 40px rgba(20, 184, 166, 0.2); }
-    }
-    .animate-glow {
-      animation: glow 3s ease-in-out infinite;
-    }
-    @keyframes float-y {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-12px); }
-    }
-    .float-404 {
-      animation: float-y 5s ease-in-out infinite;
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .animate-glow,
-      .float-404 {
-        animation: none;
-      }
-    }
-  </style>
+  </section>
 </BaseLayout>
