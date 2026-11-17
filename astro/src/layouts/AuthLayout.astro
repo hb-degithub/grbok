@@ -13,8 +13,8 @@ const { title, description, noindex } = Astro.props;
 <BaseLayout title={title} description={description} noindex={noindex}>
   <div class="flex min-h-[60vh] items-center justify-center">
     <div class="w-full max-w-md">
-      <div class="rounded-lg border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h1 class="mb-6 text-center text-2xl font-bold">{title}</h1>
+      <div class="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-8">
+        <h1 class="mb-6 text-center text-2xl font-bold text-[var(--sf-ink)]">{title}</h1>
         <slot />
       </div>
     </div>

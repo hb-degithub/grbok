@@ -61,7 +61,7 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
 
   if (error) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+      <div className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-10 text-center text-sm text-[var(--sf-ink-2)]">
         统计数据暂时不可用，请稍后再试。
       </div>
     );
@@ -72,13 +72,13 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="skeleton h-24 rounded-xl" />
+          <div key={i} className="skeleton h-24 rounded-[3px]" />
         ))}
       </div>
     );
   }
 
-  const cards = [
+  const readouts = [
     { label: '总访问量', value: data.totalViews },
     { label: '今日访问', value: data.todayViews },
     { label: '独立访客（30天）', value: data.uniqueVisitors },
@@ -88,27 +88,28 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
 
   return (
     <motion.div variants={staggerContainer(0.08)} initial="hidden" animate="visible" className="space-y-6">
-      {/* 数字卡片 */}
+      {/* 数字读数 */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map((card) => (
+        {readouts.map((readout) => (
           <motion.div
-            key={card.label}
+            key={readout.label}
             variants={fadeUp}
-            className="rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] dark:border-zinc-800 dark:bg-zinc-900"
+            className="relative overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5 transition-colors hover:border-[var(--sf-line-strong)]"
           >
-            <div className="text-3xl font-black text-zinc-950 dark:text-zinc-50">
-              <CountUp to={card.value} duration={1.2} />
+            <span className="absolute left-0 top-0 h-px w-10 bg-[var(--sf-accent)]" aria-hidden="true" />
+            <div className="font-mono text-3xl font-bold leading-none tracking-tight text-[var(--sf-ink)] tabular-nums">
+              <CountUp to={readout.value} duration={1.2} />
             </div>
-            <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{card.label}</div>
+            <div className="mt-2 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">{readout.label}</div>
           </motion.div>
         ))}
       </div>
 
       {/* 30 天趋势（自绘 SVG 柱状图） */}
-      <motion.div variants={fadeUp} className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-        <h3 className="mb-4 text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">近 30 天访问趋势</h3>
+      <motion.div variants={fadeUp} className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5">
+        <h3 className="mb-4 text-sm font-semibold tracking-tight text-[var(--sf-ink)]">近 30 天访问趋势</h3>
         {data.daily.length === 0 ? (
-          <p className="py-8 text-center text-sm text-zinc-400">暂无数据</p>
+          <p className="py-8 text-center text-sm text-[var(--sf-ink-3)]">暂无数据</p>
         ) : (
           <svg viewBox={`0 0 ${data.daily.length * 12} 120`} className="h-28 w-full" role="img" aria-label="近30天每日访问量柱状图">
             {data.daily.map((d, i) => {
@@ -123,7 +124,7 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
                   rx={2}
                   tabIndex={0}
                   aria-label={`${d.date}：${d.views} 次访问`}
-                  className="fill-teal-500/70 transition-colors hover:fill-teal-500 focus:fill-teal-500 focus:outline-none dark:fill-teal-400/70 dark:hover:fill-teal-400 dark:focus:fill-teal-400"
+                  className="fill-[var(--sf-accent)] opacity-70 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none"
                 >
                   <title>{`${d.date}：${d.views} 次访问`}</title>
                 </rect>
@@ -135,30 +136,30 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* 热门页面 */}
-        <motion.div variants={fadeUp} className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <h3 className="mb-4 text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">热门页面 Top 10</h3>
-          <ol className="space-y-2 text-sm">
-            {data.topPages.length === 0 && <li className="text-zinc-400">暂无数据</li>}
+        <motion.div variants={fadeUp} className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5">
+          <h3 className="mb-4 text-sm font-semibold tracking-tight text-[var(--sf-ink)]">热门页面 Top 10</h3>
+          <ol className="divide-y divide-[var(--sf-line-soft)] text-sm">
+            {data.topPages.length === 0 && <li className="text-[var(--sf-ink-3)]">暂无数据</li>}
             {data.topPages.map((p, i) => (
-              <li key={p.path} className="flex items-center gap-3">
-                <span className="w-5 shrink-0 text-right font-mono text-xs text-zinc-400">{i + 1}</span>
-                <a href={safeHref(p.path)} className="min-w-0 flex-1 truncate text-zinc-700 no-underline hover:text-teal-600 dark:text-zinc-300 dark:hover:text-teal-400">{p.path}</a>
-                <span className="shrink-0 font-mono text-xs text-zinc-500 dark:text-zinc-400">{p.views}</span>
+              <li key={p.path} className="flex items-baseline gap-3 py-2">
+                <span className="w-5 shrink-0 text-right font-mono text-[11px] text-[var(--sf-ink-3)] tabular-nums">{i + 1}</span>
+                <a href={safeHref(p.path)} className="min-w-0 flex-1 truncate text-[var(--sf-ink-2)] no-underline transition-colors hover:text-[var(--sf-accent-ink)]">{p.path}</a>
+                <span className="shrink-0 font-mono text-[11px] text-[var(--sf-ink-3)] tabular-nums">{p.views}</span>
               </li>
             ))}
           </ol>
         </motion.div>
 
         {/* 来源 */}
-        <motion.div variants={fadeUp} className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <h3 className="mb-4 text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">访问来源 Top 10</h3>
-          <ol className="space-y-2 text-sm">
-            {data.topReferrers.length === 0 && <li className="text-zinc-400">暂无数据</li>}
+        <motion.div variants={fadeUp} className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5">
+          <h3 className="mb-4 text-sm font-semibold tracking-tight text-[var(--sf-ink)]">访问来源 Top 10</h3>
+          <ol className="divide-y divide-[var(--sf-line-soft)] text-sm">
+            {data.topReferrers.length === 0 && <li className="text-[var(--sf-ink-3)]">暂无数据</li>}
             {data.topReferrers.map((r, i) => (
-              <li key={r.referrer} className="flex items-center gap-3">
-                <span className="w-5 shrink-0 text-right font-mono text-xs text-zinc-400">{i + 1}</span>
-                <span className="min-w-0 flex-1 truncate text-zinc-700 dark:text-zinc-300">{r.referrer}</span>
-                <span className="shrink-0 font-mono text-xs text-zinc-500 dark:text-zinc-400">{r.views}</span>
+              <li key={r.referrer} className="flex items-baseline gap-3 py-2">
+                <span className="w-5 shrink-0 text-right font-mono text-[11px] text-[var(--sf-ink-3)] tabular-nums">{i + 1}</span>
+                <span className="min-w-0 flex-1 truncate text-[var(--sf-ink-2)]">{r.referrer}</span>
+                <span className="shrink-0 font-mono text-[11px] text-[var(--sf-ink-3)] tabular-nums">{r.views}</span>
               </li>
             ))}
           </ol>
@@ -167,13 +168,13 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
 
       {/* 访客地理分布 - 所有变体都显示 */}
       {geoCountries.length > 0 && (
-        <motion.div variants={fadeUp} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
+        <motion.div variants={fadeUp} className="overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4 sm:p-6">
           <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h3 className="text-base font-bold tracking-tight text-zinc-950 dark:text-zinc-50">访客地理分布</h3>
-              <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">每一次到访，都在这里留下足迹。</p>
+              <h3 className="text-base font-semibold tracking-tight text-[var(--sf-ink)]">访客地理分布</h3>
+              <p className="mt-1.5 text-xs text-[var(--sf-ink-2)]">每一次到访，都在这里留下足迹。</p>
             </div>
-            <span className="text-xs text-zinc-500 dark:text-zinc-400"><b className="mr-1 font-mono text-base font-medium text-teal-700 dark:text-teal-300">{Object.keys(worldMapData).length}</b> 个国家 / 地区</span>
+            <span className="text-xs text-[var(--sf-ink-3)]"><b className="mr-1 font-mono text-base font-medium text-[var(--sf-accent)] tabular-nums">{Object.keys(worldMapData).length}</b> 个国家 / 地区</span>
           </div>
           <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_220px]">
             {/* 地图 */}
@@ -181,29 +182,31 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
               worldData={worldMapData}
             />
             {/* 排名 */}
-            <div className="min-w-0 border-t border-zinc-100 pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-2 dark:border-zinc-800">
+            <div className="min-w-0 border-t border-[var(--sf-line-soft)] pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-2">
               <div className="mb-5 flex items-baseline justify-between gap-2">
-                <h4 className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">到访最多的地方</h4>
-                <span className="font-mono text-[9px] tracking-wider text-zinc-400">TOP 10</span>
+                <h4 className="text-xs font-semibold text-[var(--sf-ink-2)]">到访最多的地方</h4>
+                <span className="font-mono text-[9px] tracking-wider text-[var(--sf-ink-3)]">TOP 10</span>
               </div>
               <div className="space-y-5">
                 {geoCountries.slice(0, 10).map((c, i) => (
                   <div key={`${c.country}-${i}`} className="flex items-center gap-3">
-                    <span className="w-5 shrink-0 text-right font-mono text-xs text-zinc-400">{i + 1}</span>
+                    <span className="w-5 shrink-0 text-right font-mono text-[11px] text-[var(--sf-ink-3)] tabular-nums">{i + 1}</span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{ALPHA2_TO_ZH_NAME[c.country] || c.country}</span>
-                        <span className="ml-2 shrink-0 font-mono text-xs text-zinc-600 dark:text-zinc-300">
-                          {c.views.toLocaleString()} <span className="font-sans text-[10px] text-zinc-400">次</span>
+                        <span className="truncate text-sm font-medium text-[var(--sf-ink)]">{ALPHA2_TO_ZH_NAME[c.country] || c.country}</span>
+                        <span className="ml-2 shrink-0 font-mono text-[11px] text-[var(--sf-ink-2)] tabular-nums">
+                          {c.views.toLocaleString()} <span className="font-sans text-[10px] text-[var(--sf-ink-3)]">次</span>
                         </span>
                       </div>
-                      <div className="mt-2 h-1 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
+                      <div className="mt-2 h-1 overflow-hidden bg-[var(--sf-line-soft)]">
                         <div
-                          className="h-full rounded-full bg-teal-600 dark:bg-teal-400"
+                          className="h-full bg-[var(--sf-accent)]"
                           style={{ width: `${(c.views / maxGeoViews) * 100}%` }}
                         />
                       </div>
-                      <div className="mt-1.5 text-[10px] text-zinc-400 dark:text-zinc-500">{c.uniqueVisitors.toLocaleString()} 位独立访客</div>
+                      <div className="mt-1.5 text-[10px] text-[var(--sf-ink-3)]">
+                        <span className="font-mono tabular-nums">{c.uniqueVisitors.toLocaleString()}</span> 位独立访客
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -215,12 +218,13 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
 
       {/* admin 变体：UA 分类分布 */}
       {variant === 'admin' && data.detail && (
-        <motion.div variants={fadeUp} className="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <h3 className="mb-4 text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">设备分布（30 天）</h3>
-          <div className="flex flex-wrap gap-3">
+        <motion.div variants={fadeUp} className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5">
+          <h3 className="mb-4 text-sm font-semibold tracking-tight text-[var(--sf-ink)]">设备分布（30 天）</h3>
+          <div className="flex flex-wrap gap-2">
             {data.detail.uaCategories.map((c) => (
-              <span key={c.category} className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                {CATEGORY_LABELS[c.category] || c.category} · {c.views}
+              <span key={c.category} className="inline-flex items-center rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] px-2.5 py-1 text-[11px] text-[var(--sf-ink-2)]">
+                {CATEGORY_LABELS[c.category] || c.category}{' '}
+                <span className="font-mono text-[var(--sf-ink-3)] tabular-nums">· {c.views}</span>
               </span>
             ))}
           </div>

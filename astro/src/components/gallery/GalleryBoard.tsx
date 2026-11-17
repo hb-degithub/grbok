@@ -7,7 +7,16 @@ import { EASE_OUT_EXPO } from '../../lib/motion';
 
 const ALL = '__all__';
 
-/** 相册面板：分组筛选（layoutId pill）+ 瀑布流 + 灯箱 */
+/** 细线面板：加载失败 / 空态 / 单专辑空态共用，保持三态视觉一致 */
+function StatePanel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-10 text-center text-sm text-[var(--sf-ink-3)]">
+      {children}
+    </div>
+  );
+}
+
+/** 相册面板：分组筛选（layoutId 滑片）+ 瀑布流 + 灯箱 */
 export default function GalleryBoard() {
   const { items, loading, error, setFilter, getPhotoUrl } = useGallery();
   const [album, setAlbum] = useState<string>(ALL);
@@ -46,29 +55,21 @@ export default function GalleryBoard() {
   }, [album]);
 
   if (error) {
-    return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-        相册加载失败，请稍后再试。
-      </div>
-    );
+    return <StatePanel>相册加载失败，请稍后再试。</StatePanel>;
   }
 
   if (loading && items.length === 0) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {[0, 1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="skeleton h-48 rounded-xl" />
+          <div key={i} className="skeleton h-48 rounded-[3px]" />
         ))}
       </div>
     );
   }
 
   if (items.length === 0) {
-    return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-        相册还是空的，等博主上传第一批照片。
-      </div>
-    );
+    return <StatePanel>相册还是空的，等博主上传第一批照片。</StatePanel>;
   }
 
   const fullUrls = filtered.map((i) => getPhotoUrl(i));
@@ -76,7 +77,7 @@ export default function GalleryBoard() {
   return (
     <MotionConfig reducedMotion="user">
     <div>
-      {/* 分组筛选条 */}
+      {/* 分组筛选条：细线方角标签，选中态用唯一强调色实底 */}
       {albums.length > 0 && (
         <div className="mb-6 flex flex-wrap gap-2" role="tablist" aria-label="按专辑筛选">
           {[ALL, ...albums].map((name) => {
@@ -90,31 +91,31 @@ export default function GalleryBoard() {
                 role="tab"
                 aria-selected={active}
                 onClick={() => setAlbum(name)}
-                className={`relative rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
-                  active ? 'text-white dark:text-zinc-950' : 'bg-zinc-100 text-zinc-600 hover:text-zinc-950 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:text-zinc-50'
+                className={`focus-ring relative inline-flex min-h-11 items-center rounded-[3px] border px-4 py-2 text-sm font-medium transition-colors ${
+                  active
+                    ? 'border-[var(--sf-accent)] text-[var(--sf-on-accent)]'
+                    : 'border-[var(--sf-line-control)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]'
                 }`}
               >
                 {active && (
                   <motion.span
                     layoutId="gallery-album-pill"
                     transition={{ duration: 0.3, ease: EASE_OUT_EXPO }}
-                    className="absolute inset-0 rounded-full bg-zinc-900 dark:bg-zinc-100"
+                    className="absolute inset-0 rounded-[3px] bg-[var(--sf-accent)]"
                     aria-hidden="true"
                   />
                 )}
                 <span className="relative z-10">{label}</span>
-                <span className={`relative z-10 ml-1.5 font-mono text-xs ${active ? 'text-teal-400 dark:text-teal-600' : 'text-zinc-400'}`}>{count}</span>
+                <span className={`relative z-10 ml-1.5 font-mono text-xs ${active ? 'text-[var(--sf-on-accent)] opacity-80' : 'text-[var(--sf-ink-3)]'}`}>{count}</span>
               </button>
             );
           })}
         </div>
       )}
 
-      {/* 瀑布流 */}
+      {/* 瀑布流：列数沿用 Masonry 的 1 / 2 / 3 断点，图片容器只有细线描边与方角 */}
       {filtered.length === 0 ? (
-        <div className="rounded-xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-          这个专辑还没有照片。
-        </div>
+        <StatePanel>这个专辑还没有照片。</StatePanel>
       ) : (
         <Masonry columns={{ mobile: 1, tablet: 2, desktop: 3 }} gap={16}>
           {filtered.map((item, i) => (
@@ -122,14 +123,18 @@ export default function GalleryBoard() {
               key={item.id}
               type="button"
               onClick={() => setLightboxIndex(i)}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="group relative block w-full overflow-hidden rounded-xl border border-zinc-200 bg-white text-left shadow-xl shadow-zinc-900/[0.04] dark:border-zinc-800 dark:bg-zinc-900"
+              whileTap={{ opacity: 0.88 }}
+              className="focus-ring group relative block w-full overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] text-left transition-colors duration-200 hover:border-[var(--sf-accent)]"
               aria-label={item.title ? `查看大图：${item.title}` : '查看大图'}
             >
-              <img src={getPhotoUrl(item, '300x300')} alt={item.title || '相册图片'} loading="lazy" className="w-full object-cover" />
+              <img
+                src={getPhotoUrl(item, '300x300')}
+                alt={item.title || '相册图片'}
+                loading="lazy"
+                className="w-full object-cover transition-opacity duration-200 group-hover:opacity-95"
+              />
               {item.title && (
-                <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-zinc-950/70 to-transparent px-3 pb-2 pt-8 text-sm font-semibold text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                <span className="pointer-events-none absolute inset-x-0 bottom-0 border-t border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-2 text-xs font-medium text-[var(--sf-ink-2)] opacity-0 transition-opacity duration-200 group-hover:opacity-100">
                   {item.title}
                 </span>
               )}

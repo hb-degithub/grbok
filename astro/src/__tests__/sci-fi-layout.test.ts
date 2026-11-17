@@ -94,7 +94,9 @@ describe('共享布局科幻改造 · 首页', () => {
     const gridIndex = src.indexOf('lg:grid-cols-2');
     expect(src.indexOf('<HotArticles'), 'HotArticles 应位于两栏网格内').toBeGreaterThan(gridIndex);
     expect(src.indexOf('<RecentComments'), 'RecentComments 应位于两栏网格内').toBeGreaterThan(gridIndex);
-    for (const legacy of ['AnimatedList', 'Carousel', 'MagicBento', 'ParticleField', 'GlowCard', 'ProfileCard']) {
+    // ProfileCard 已按新设计恢复为首页「作者与友链」区块的一部分，不再是"旧侧栏装饰"，
+    // 因此不再列入禁止项；其余装饰（旧轮播/光效/粒子）仍禁止回潮。
+    for (const legacy of ['AnimatedList', 'Carousel', 'MagicBento', 'ParticleField', 'GlowCard']) {
       expect(src, `首页不应恢复旧装饰 ${legacy}`).not.toContain(legacy);
     }
   });

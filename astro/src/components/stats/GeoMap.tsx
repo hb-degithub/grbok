@@ -121,17 +121,18 @@ function GeoMap({ worldData, chinaData, maxViews }: GeoMapProps) {
     return pathGenerator(feature) || '';
   }, [pathGenerator]);
 
-  // 获取区域颜色
-  const getRegionColor = useCallback((regionId: string, mapMode: MapMode): string => {
+  // 区域填充：唯一强调色 + 透明度表达强度，交由 --sf-* 令牌切换深浅主题
+  const getRegionFill = useCallback((regionId: string, mapMode: MapMode): string => {
     const data = mapMode === 'china' ? chinaData[regionId] : worldData[regionId];
-    if (!data) return 'var(--color-zinc-200, #e4e4e7)';
-    const intensity = Math.min(data.views / maxViews, 1);
-    if (intensity > 0.8) return '#0d9488';
-    if (intensity > 0.6) return '#14b8a6';
-    if (intensity > 0.4) return '#2dd4bf';
-    if (intensity > 0.2) return '#5eead4';
-    if (intensity > 0.05) return '#99f6e4';
-    return '#ccfbf1';
+    return data ? 'var(--sf-accent)' : 'var(--sf-line-soft)';
+  }, [worldData, chinaData]);
+
+  // 浏览量强度 -> 填充透明度（0.14 ~ 0.9），替代原先 6 档写死色阶
+  const getRegionOpacity = useCallback((regionId: string, mapMode: MapMode): number => {
+    const data = mapMode === 'china' ? chinaData[regionId] : worldData[regionId];
+    if (!data) return 1;
+    const intensity = maxViews > 0 ? Math.min(data.views / maxViews, 1) : 0;
+    return 0.14 + intensity * 0.76;
   }, [worldData, chinaData, maxViews]);
 
   // 处理悬停
@@ -175,14 +176,14 @@ function GeoMap({ worldData, chinaData, maxViews }: GeoMapProps) {
   if (loading) {
     return (
       <div className="flex h-[420px] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--sf-line)] border-t-[var(--sf-accent)]" aria-hidden="true" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex h-[420px] items-center justify-center text-sm text-zinc-500">
+      <div className="flex h-[420px] items-center justify-center text-sm text-[var(--sf-ink-3)]">
         地图数据加载失败
       </div>
     );
@@ -196,20 +197,22 @@ function GeoMap({ worldData, chinaData, maxViews }: GeoMapProps) {
       <div className="mb-4 flex gap-2">
         <button
           onClick={() => setMode('world')}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+          aria-pressed={mode === 'world'}
+          className={`rounded-[2px] border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] ${
             mode === 'world'
-              ? 'bg-teal-600 text-white'
-              : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+              ? 'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-on-accent)]'
+              : 'border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)]'
           }`}
         >
           国际地图
         </button>
         <button
           onClick={() => setMode('china')}
-          className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+          aria-pressed={mode === 'china'}
+          className={`rounded-[2px] border px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] ${
             mode === 'china'
-              ? 'bg-teal-600 text-white'
-              : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+              ? 'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-on-accent)]'
+              : 'border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)]'
           }`}
         >
           中国地图
@@ -217,7 +220,7 @@ function GeoMap({ worldData, chinaData, maxViews }: GeoMapProps) {
       </div>
 
       {/* 地图容器 */}
-      <div className="relative overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800">
+      <div className="relative overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-canvas)]">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${width} ${height}`}
@@ -247,8 +250,9 @@ function GeoMap({ worldData, chinaData, maxViews }: GeoMapProps) {
               <path
                 key={regionId || `geo-${index}`}
                 d={path}
-                fill={getRegionColor(regionId, mode)}
-                stroke={isHovered ? '#0d9488' : 'var(--color-zinc-300, #d4d4d8)'}
+                fill={getRegionFill(regionId, mode)}
+                fillOpacity={getRegionOpacity(regionId, mode)}
+                stroke={isHovered ? 'var(--sf-accent)' : 'var(--sf-line)'}
                 strokeWidth={isHovered ? 2 : 0.5}
                 className="cursor-pointer transition-all duration-150"
                 style={{
@@ -266,22 +270,22 @@ function GeoMap({ worldData, chinaData, maxViews }: GeoMapProps) {
         {/* 悬停详情提示 */}
         {hoveredRegion && (
           <div
-            className="pointer-events-none absolute z-10 rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+            className="pointer-events-none absolute z-10 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-2"
             style={{
               left: Math.min(hoveredRegion.x + 10, (containerRef.current?.clientWidth || 300) - 150),
               top: Math.max(hoveredRegion.y - 10, 10),
             }}
           >
-            <div className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            <div className="text-sm font-semibold text-[var(--sf-ink)]">
               {hoveredRegion.name}
             </div>
             {hoveredRegion.data ? (
-              <div className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+              <div className="mt-1 text-xs text-[var(--sf-ink-2)]">
                 <div>{hoveredRegion.data.views} 次浏览</div>
                 <div>{hoveredRegion.data.uv} 独立访客</div>
               </div>
             ) : (
-              <div className="mt-1 text-xs text-zinc-400">暂无数据</div>
+              <div className="mt-1 text-xs text-[var(--sf-ink-3)]">暂无数据</div>
             )}
           </div>
         )}

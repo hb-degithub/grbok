@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { useFriendLinks } from '../../hooks/domains/useFriendLinks';
 import { trackLinkClick } from '../../lib/track';
@@ -21,7 +21,12 @@ function hostname(url: string): string {
   }
 }
 
-/** 友链卡片网格：头像/首字母 + 名称 + 简介 + 域名；点击上报后新标签打开 */
+/**
+ * 友链卡片网格：头像/首字母 + 名称 + 简介 + 域名；点击上报后新标签打开。
+ *
+ * 科幻简约：细线表面 + 小圆角，深浅主题由 `.dark` 覆写 `--sf-*` 令牌；
+ * 外链 hover 只换描边与文字色（不放大、不发光、不加阴影），缩略图统一方角细线。
+ */
 export default function FriendLinksGrid() {
   const { links, loading } = useFriendLinks();
 
@@ -29,9 +34,22 @@ export default function FriendLinksGrid() {
 
   if (loading) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true">
         {[0, 1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="skeleton h-28 rounded-xl" />
+          <div
+            key={i}
+            className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4"
+            aria-hidden="true"
+          >
+            <div className="flex items-start gap-3">
+              <div className="skeleton h-10 w-10 shrink-0 rounded-[2px]" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="skeleton h-3.5 w-24 rounded-[2px]" />
+                <div className="skeleton h-3 w-full rounded-[2px]" />
+                <div className="skeleton h-3 w-16 rounded-[2px]" />
+              </div>
+            </div>
+          </div>
         ))}
       </div>
     );
@@ -39,7 +57,7 @@ export default function FriendLinksGrid() {
 
   if (visibleLinks.length === 0) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
+      <div className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-10 text-center text-sm text-[var(--sf-ink-3)]">
         暂无友链，欢迎通过下方邮箱申请互换。
       </div>
     );
@@ -55,29 +73,31 @@ export default function FriendLinksGrid() {
           target="_blank"
           rel="noopener noreferrer"
           onClick={() => trackLinkClick(link.url)}
-          whileHover={{ y: -4 }}
-          whileTap={{ scale: 0.98 }}
-          className="group flex items-start gap-3 rounded-xl border border-zinc-200 bg-white p-4 no-underline shadow-xl shadow-zinc-900/[0.04] transition-colors hover:border-teal-500/50 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-teal-400/50"
+          className="group focus-ring flex items-start gap-3 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4 no-underline transition-colors duration-200 hover:border-[var(--sf-accent)]"
         >
           {link.avatar ? (
-            <img src={link.avatar} alt="" loading="lazy" className="h-10 w-10 shrink-0 rounded-lg object-cover" />
+            <img
+              src={link.avatar}
+              alt=""
+              loading="lazy"
+              className="h-10 w-10 shrink-0 rounded-[2px] border border-[var(--sf-line)] object-cover"
+            />
           ) : (
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-900 text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-950">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] font-mono text-sm font-semibold text-[var(--sf-ink-2)]">
               {link.name.charAt(0)}
             </span>
           )}
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-bold text-zinc-950 transition-colors group-hover:text-teal-600 dark:text-zinc-50 dark:group-hover:text-teal-400">
+            <span className="block truncate text-sm font-semibold text-[var(--sf-ink)] transition-colors group-hover:text-[var(--sf-accent-ink)]">
               {link.name}
             </span>
             {link.description && (
-              <span className="mt-0.5 block truncate text-xs text-zinc-500 dark:text-zinc-400">{link.description}</span>
+              <span className="mt-0.5 block truncate text-xs text-[var(--sf-ink-3)]">{link.description}</span>
             )}
-            <span className="mt-1 block truncate font-mono text-[11px] text-zinc-400 dark:text-zinc-500">{hostname(link.url)}</span>
+            <span className="mt-1 block truncate font-mono text-[11px] text-[var(--sf-ink-3)]">{hostname(link.url)}</span>
           </span>
         </motion.a>
       ))}
     </motion.div>
   );
 }
-

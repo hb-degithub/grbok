@@ -4,17 +4,17 @@
   touch-action: pan-y;
 }
 
-/* Individual card */
+/* 单张电影卡片：表面 + 冷灰细线，圆角 3px，不使用阴影 */
 .stack-card {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid #e4e4e7;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
+  background: var(--sf-surface);
+  border: 1px solid var(--sf-line);
+  box-shadow: none;
   cursor: grab;
   user-select: none;
   -webkit-user-select: none;
@@ -25,33 +25,33 @@
   cursor: grabbing;
 }
 
-/* Top card — full visibility */
+/* 顶层卡片：完整可见，描边略强 */
 .stack-card--top {
   opacity: 1;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-color: var(--sf-line-strong);
 }
 
-/* Cards behind — depth effect */
+/* 后层卡片：层级由位移/缩放/透明度表达，不再叠加阴影 */
 .stack-card--behind {
   pointer-events: none;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-color: var(--sf-line-soft);
 }
 
-/* Empty state */
+/* 空态 */
 .stack-empty {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
   height: 100%;
-  color: #a1a1aa;
+  color: var(--sf-ink-3);
   font-size: 0.875rem;
-  border-radius: 0.75rem;
-  border: 1px dashed #d4d4d8;
-  background: rgba(255, 255, 255, 0.5);
+  border-radius: 3px;
+  border: 1px dashed var(--sf-line);
+  background: var(--sf-canvas);
 }
 
-/* Reduced motion fallback */
+/* 减少动态效果降级 */
 .stack-reduced-list {
   list-style: none;
   margin: 0;
@@ -63,38 +63,12 @@
 
 .stack-reduced-item {
   padding: 0.75rem;
-  border-radius: 0.5rem;
-  border: 1px solid #e4e4e7;
-  background: rgba(255, 255, 255, 0.85);
+  border-radius: 3px;
+  border: 1px solid var(--sf-line);
+  background: var(--sf-surface);
 }
 
-/* Dark mode */
-.dark .stack-card {
-  background: rgba(39, 39, 42, 0.7);
-  border-color: #3f3f46;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.dark .stack-card--top {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-
-.dark .stack-card--behind {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.dark .stack-empty {
-  color: #71717a;
-  border-color: #3f3f46;
-  background: rgba(39, 39, 42, 0.5);
-}
-
-.dark .stack-reduced-item {
-  border-color: #3f3f46;
-  background: rgba(39, 39, 42, 0.7);
-}
-
-/* Reduced motion media query */
+/* 减少动态效果 */
 @media (prefers-reduced-motion: reduce) {
   .stack-card {
     transition: none !important;

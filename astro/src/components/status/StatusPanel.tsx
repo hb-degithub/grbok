@@ -54,10 +54,23 @@ const PING_INTERVAL_MS = 15_000;
 const PING_COUNT = 5;
 const PING_HISTORY = 30;
 
+/** 两位序号：服务分组的等宽索引。 */
+function formatOrdinal(index: number): string {
+  return String(index + 1).padStart(2, '0');
+}
+
+/** 状态标记：正常 = 强调色，异常 = 语义危险色，未知 = 次级文字色。 */
 function statusDot(ok: boolean | null) {
-  if (ok === true) return 'bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.15)]';
-  if (ok === false) return 'bg-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.15)]';
-  return 'bg-zinc-400 shadow-[0_0_0_4px_rgba(113,113,122,0.15)]';
+  if (ok === true) return 'bg-[var(--sf-accent)]';
+  if (ok === false) return 'bg-[var(--sf-danger)]';
+  return 'bg-[var(--sf-ink-3)]';
+}
+
+/** 状态徽标：与标记点同语义，细线框 + 等宽小字。 */
+function statusBadge(ok: boolean | null) {
+  if (ok === true) return 'border-[var(--sf-accent)] text-[var(--sf-accent-ink)]';
+  if (ok === false) return 'border-[var(--sf-danger)] text-[var(--sf-danger)]';
+  return 'border-[var(--sf-line)] text-[var(--sf-ink-3)]';
 }
 
 function statusText(ok: boolean | null) {
@@ -76,20 +89,24 @@ function formatRelative(iso: string | null): string {
   return `${Math.floor(diff / 60)} 分钟前`;
 }
 
-/** 最近 60 个采样点的可用率色条 */
+/** 最近采样点的可用率细线柱：正常=强调色，异常=危险色；高度仍按延迟映射。 */
 function UptimeBars({ recent }: { recent: SamplePoint[] }) {
   if (!recent.length) {
-    return <p className="text-xs text-zinc-400 dark:text-zinc-500">采样数据积累中…</p>;
+    return <p className="font-mono text-[11px] tracking-[0.04em] text-[var(--sf-ink-3)]">采样数据积累中…</p>;
   }
   return (
-    <div className="flex h-8 items-end gap-[2px]" role="img" aria-label="最近采样可用率">
+    <div
+      className="flex h-8 items-end gap-[2px] border-b border-[var(--sf-line-soft)]"
+      role="img"
+      aria-label="最近采样可用率"
+    >
       {recent.map((s, i) => (
         <span
           key={`${s.t}-${i}`}
           title={`${new Date(s.t.replace(' ', 'T')).toLocaleTimeString()} · ${s.ok ? '正常' : '异常'} · ${s.ms}ms`}
           className={cn(
-            'w-full min-w-[2px] flex-1 rounded-sm transition-colors',
-            s.ok ? 'bg-emerald-500/80 hover:bg-emerald-500' : 'bg-red-500 hover:bg-red-400',
+            'w-full min-w-[2px] flex-1 transition-opacity duration-150 hover:opacity-75',
+            s.ok ? 'bg-[var(--sf-accent)]' : 'bg-[var(--sf-danger)]',
           )}
           style={{ height: `${Math.max(25, Math.min(100, (s.ms / 400) * 100))}%` }}
         />
@@ -98,7 +115,7 @@ function UptimeBars({ recent }: { recent: SamplePoint[] }) {
   );
 }
 
-/** 用户端实测延迟迷你走势 */
+/** 用户端实测延迟迷你走势：单根 1.25px 描边折线，无填充无发光。 */
 function PingSparkline({ pings }: { pings: number[] }) {
   if (pings.length < 2) return null;
   const max = Math.max(...pings, 50);
@@ -108,25 +125,52 @@ function PingSparkline({ pings }: { pings: number[] }) {
     .map((v, i) => `${(i / (pings.length - 1)) * w},${h - (v / max) * (h - 4) - 2}`)
     .join(' ');
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="h-8 w-full text-teal-500 dark:text-teal-400" aria-hidden="true">
-      <polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className="h-8 w-full text-[var(--sf-accent)]"
+      aria-hidden="true"
+      preserveAspectRatio="none"
+    >
+      <polyline
+        points={points}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        vectorEffect="non-scaling-stroke"
+      />
     </svg>
   );
 }
 
+/** 资源占用仪表：2px 细线轨道 + 纯色填充，阈值判定沿用原有分档。 */
 function Gauge({ label, value, unit = '%' }: { label: string; value: number | null; unit?: string }) {
   const pct = value === null ? 0 : Math.min(100, Math.max(0, value));
-  const tone = value === null ? 'bg-zinc-300 dark:bg-zinc-700' : pct >= 85 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-500' : 'bg-teal-500';
+  const tone =
+    value === null
+      ? 'bg-[var(--sf-line-control)]'
+      : pct >= 85
+        ? 'bg-[var(--sf-danger)]'
+        : pct >= 70
+          ? 'bg-amber-500'
+          : 'bg-[var(--sf-accent)]';
   return (
     <div>
-      <div className="flex items-baseline justify-between">
-        <span className="text-xs text-zinc-400 dark:text-zinc-500">{label}</span>
-        <span className="font-mono text-sm font-semibold tabular-nums text-zinc-800 dark:text-zinc-100">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-mono text-[11px] tracking-[0.04em] text-[var(--sf-ink-3)]">{label}</span>
+        <span className="font-mono text-sm font-semibold tabular-nums text-[var(--sf-ink)]">
           {value === null ? '—' : `${value}${unit}`}
         </span>
       </div>
-      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-        <div className={cn('h-full rounded-full transition-all duration-700', tone)} style={{ width: `${pct}%` }} />
+      <div
+        className="mt-2 h-[2px] overflow-hidden bg-[var(--sf-line)]"
+        aria-hidden="true"
+      >
+        <div
+          className={cn('h-full transition-[width] duration-700 motion-reduce:transition-none', tone)}
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );
@@ -202,6 +246,12 @@ export default function StatusPanel() {
   }, []);
 
   const overall = statusError ? 'unknown' : status?.overall ?? 'unknown';
+  const overallTone =
+    overall === 'operational'
+      ? 'bg-[var(--sf-accent)]'
+      : overall === 'outage'
+        ? 'bg-[var(--sf-danger)]'
+        : 'bg-[var(--sf-ink-3)]';
   const currentPing = pings.length ? pings[pings.length - 1] : null;
   const minPing = pings.length ? Math.min(...pings) : null;
 
@@ -209,141 +259,168 @@ export default function StatusPanel() {
     <div className="flex flex-col gap-6">
       {/* 总览横幅 */}
       <div
-        className={cn(
-          'flex items-center gap-3 rounded-2xl border px-5 py-4',
-          overall === 'operational' && 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-800/50 dark:bg-emerald-950/30',
-          overall === 'outage' && 'border-red-200 bg-red-50/60 dark:border-red-800/50 dark:bg-red-950/30',
-          overall === 'unknown' && 'border-zinc-200 bg-zinc-50/60 dark:border-zinc-700/50 dark:bg-zinc-900/40',
-        )}
         role="status"
+        className="flex items-stretch overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]"
       >
-        <span className={cn('h-3 w-3 shrink-0 rounded-full', overall === 'operational' ? 'bg-emerald-500' : overall === 'outage' ? 'bg-red-500' : 'bg-zinc-400')} />
-        <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
-          {overall === 'operational' && '所有系统运行正常'}
-          {overall === 'outage' && '部分服务异常,正在处理'}
-          {overall === 'unknown' && (statusError ? '状态接口暂时不可用' : '状态加载中…')}
-        </p>
-        {status?.now && (
-          <span className="ml-auto text-xs text-zinc-400 dark:text-zinc-500">
-            更新于 {formatRelative(status.now)} · 每 30 秒自动刷新
+        <span aria-hidden="true" className={cn('w-[3px] shrink-0', overallTone)} />
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 py-3 pr-4 pl-3.5">
+          <span aria-hidden="true" className="font-mono text-[10px] tracking-[0.2em] text-[var(--sf-ink-3)]">
+            SYS
           </span>
-        )}
+          <p className="text-sm font-medium text-[var(--sf-ink)]">
+            {overall === 'operational' && '所有系统运行正常'}
+            {overall === 'outage' && '部分服务异常,正在处理'}
+            {overall === 'unknown' && (statusError ? '状态接口暂时不可用' : '状态加载中…')}
+          </p>
+          {status?.now && (
+            <span className="ml-auto font-mono text-[10px] tabular-nums tracking-[0.06em] text-[var(--sf-ink-3)]">
+              更新于 {formatRelative(status.now)} · 每 30 秒自动刷新
+            </span>
+          )}
+        </div>
       </div>
 
       {/* 用户到服务器延迟(本机实测) */}
-      <section className="rounded-2xl border border-zinc-200/70 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900/60">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">你到本站的延迟</h2>
-          <span className="text-xs text-zinc-400 dark:text-zinc-500">浏览器实测 · 每 15 秒探测 {PING_COUNT} 次取均值</span>
+      <section className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span aria-hidden="true" className="font-mono text-[10px] tracking-[0.16em] text-[var(--sf-ink-3)]">
+            PING / 01
+          </span>
+          <h2 className="text-sm font-semibold tracking-tight text-[var(--sf-ink)]">你到本站的延迟</h2>
+          <span className="ml-auto font-mono text-[10px] tracking-[0.06em] text-[var(--sf-ink-3)]">
+            浏览器实测 · 每 15 秒探测 {PING_COUNT} 次取均值
+          </span>
         </div>
-        <div className="mt-4 flex flex-wrap items-end gap-6">
+        <div className="mt-5 flex flex-wrap items-end gap-x-8 gap-y-4">
           <div>
-            <p className="font-mono text-3xl font-bold tabular-nums text-teal-600 dark:text-teal-300">
-              {currentPing !== null ? `${currentPing}` : '—'}
-              <span className="ml-1 text-sm font-normal text-zinc-400">ms</span>
+            <p className="flex items-baseline gap-1 font-mono text-[28px] leading-none font-semibold tabular-nums text-[var(--sf-accent-ink)]">
+              <span>{currentPing !== null ? `${currentPing}` : '—'}</span>
+              <span className="text-sm font-normal text-[var(--sf-ink-3)]">ms</span>
             </p>
-            <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">动态接口(回源)</p>
+            <p className="mt-2 font-mono text-[11px] tracking-[0.04em] text-[var(--sf-ink-3)]">动态接口(回源)</p>
           </div>
           <div>
-            <p className="font-mono text-xl font-semibold tabular-nums text-zinc-700 dark:text-zinc-200">
-              {staticMs !== null ? `${staticMs}` : '—'}
-              <span className="ml-1 text-xs font-normal text-zinc-400">ms</span>
+            <p className="flex items-baseline gap-1 font-mono text-xl leading-none font-semibold tabular-nums text-[var(--sf-ink)]">
+              <span>{staticMs !== null ? `${staticMs}` : '—'}</span>
+              <span className="text-[11px] font-normal text-[var(--sf-ink-3)]">ms</span>
             </p>
-            <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">静态资源(CDN 边缘)</p>
+            <p className="mt-2 font-mono text-[11px] tracking-[0.04em] text-[var(--sf-ink-3)]">
+              静态资源(CDN 边缘)
+            </p>
           </div>
           <div>
-            <p className="font-mono text-xl font-semibold tabular-nums text-zinc-700 dark:text-zinc-200">
-              {minPing !== null ? `${minPing}` : '—'}
-              <span className="ml-1 text-xs font-normal text-zinc-400">ms</span>
+            <p className="flex items-baseline gap-1 font-mono text-xl leading-none font-semibold tabular-nums text-[var(--sf-ink)]">
+              <span>{minPing !== null ? `${minPing}` : '—'}</span>
+              <span className="text-[11px] font-normal text-[var(--sf-ink-3)]">ms</span>
             </p>
-            <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">本时段最优</p>
+            <p className="mt-2 font-mono text-[11px] tracking-[0.04em] text-[var(--sf-ink-3)]">本时段最优</p>
           </div>
-          <div className="min-w-32 flex-1">
+          <div className="min-w-32 flex-1 border-b border-[var(--sf-line-soft)] pb-1">
             <PingSparkline pings={pings} />
           </div>
         </div>
         {edgeNode && (
-          <p className="mt-3 text-xs text-zinc-400 dark:text-zinc-500">
-            你当前接入的 ESA 边缘节点:<span className="font-mono font-semibold text-zinc-600 dark:text-zinc-300">{edgeNode}</span>
+          <p className="mt-4 border-t border-[var(--sf-line-soft)] pt-3 font-mono text-[11px] tracking-[0.04em] text-[var(--sf-ink-3)]">
+            你当前接入的 ESA 边缘节点:<span className="ml-1 font-semibold text-[var(--sf-ink)]">{edgeNode}</span>
             {EDGE_REGIONS[edgeNode] ? `(${EDGE_REGIONS[edgeNode]})` : ''}
           </p>
         )}
       </section>
 
       {/* 服务器性能 */}
-      <section className="rounded-2xl border border-zinc-200/70 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900/60">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">服务器性能</h2>
-          <span className="text-xs text-zinc-400 dark:text-zinc-500">
+      <section className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span aria-hidden="true" className="font-mono text-[10px] tracking-[0.16em] text-[var(--sf-ink-3)]">
+            HOST / 02
+          </span>
+          <h2 className="text-sm font-semibold tracking-tight text-[var(--sf-ink)]">服务器性能</h2>
+          <span className="ml-auto font-mono text-[10px] tracking-[0.06em] text-[var(--sf-ink-3)]">
             每分钟采样{status?.host ? ` · 更新于 ${formatRelative(status.host.at)}` : ''}
           </span>
         </div>
         {status?.host ? (
           <>
-            <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <div className="mt-5 grid gap-5 sm:grid-cols-3">
               <Gauge label="CPU 占用" value={status.host.cpuPct} />
               <Gauge label="内存占用" value={status.host.memPct} />
               <Gauge label="磁盘占用" value={status.host.diskPct} />
             </div>
-            <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-[var(--sf-line-soft)] pt-3 font-mono text-[11px] tracking-[0.04em] text-[var(--sf-ink-3)]">
               {(status.host.cpuCores || status.host.memTotalMb) && (
-                <span className="font-mono font-semibold text-zinc-700 dark:text-zinc-200">
+                <span className="font-semibold tabular-nums text-[var(--sf-ink-2)]">
                   规格 {status.host.cpuCores ? `${status.host.cpuCores} 核` : ''}{status.host.cpuCores && status.host.memTotalMb ? ' · ' : ''}{status.host.memTotalMb ? `${(status.host.memTotalMb / 1024).toFixed(1)} GB` : ''}
                 </span>
               )}
-              <span>
-                实时带宽 ↓ <span className="font-mono font-semibold text-teal-600 dark:text-teal-300">{formatKbps(status.host.rxKbps)}</span>
-                {'  '}↑ <span className="font-mono font-semibold text-indigo-500 dark:text-indigo-300">{formatKbps(status.host.txKbps)}</span>
+              <span className="flex flex-wrap items-center gap-1">
+                实时带宽 <span aria-hidden="true">↓</span>
+                <span className="font-semibold tabular-nums text-[var(--sf-accent-ink)]">
+                  {formatKbps(status.host.rxKbps)}
+                </span>
+                <span aria-hidden="true" className="ml-1">↑</span>
+                <span className="font-semibold tabular-nums text-[var(--sf-ink)]">
+                  {formatKbps(status.host.txKbps)}
+                </span>
               </span>
-              <span>系统负载(1min)<span className="ml-1 font-mono font-semibold text-zinc-700 dark:text-zinc-200">{status.host.load1}</span></span>
+              <span>
+                系统负载(1min)
+                <span className="ml-1 font-semibold tabular-nums text-[var(--sf-ink)]">{status.host.load1}</span>
+              </span>
             </div>
           </>
         ) : (
-          <p className="mt-4 text-xs text-zinc-400 dark:text-zinc-500">主机性能采样尚未就绪…</p>
+          <p className="mt-4 font-mono text-[11px] tracking-[0.04em] text-[var(--sf-ink-3)]">
+            主机性能采样尚未就绪…
+          </p>
         )}
       </section>
 
-      {/* 服务状态卡片 */}
+      {/* 服务状态分组 */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {(status?.services ?? []).map((s) => (
-          <section key={s.key} className="rounded-2xl border border-zinc-200/70 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900/60">
-            <div className="flex items-center gap-2.5">
-              <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', statusDot(s.ok))} />
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">{s.label}</h3>
+        {(status?.services ?? []).map((s, index) => (
+          <section
+            key={s.key}
+            className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4"
+          >
+            <div className="flex items-baseline justify-between gap-2 border-b border-[var(--sf-line-soft)] pb-2">
+              <span aria-hidden="true" className="font-mono text-[10px] tracking-[0.16em] text-[var(--sf-ink-3)]">
+                SVC / {formatOrdinal(index)}
+              </span>
               <span
                 className={cn(
-                  'ml-auto rounded-md px-2 py-0.5 text-xs font-medium',
-                  s.ok === true && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-                  s.ok === false && 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-                  s.ok === null && 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
+                  'shrink-0 rounded-[3px] border px-1.5 py-0.5 font-mono text-[10px] tracking-[0.06em]',
+                  statusBadge(s.ok),
                 )}
               >
                 {statusText(s.ok)}
               </span>
             </div>
-            <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <div className="mt-3 flex items-center gap-2">
+              <span aria-hidden="true" className={cn('h-2 w-2 shrink-0 rounded-full', statusDot(s.ok))} />
+              <h3 className="text-sm font-semibold tracking-tight text-[var(--sf-ink)]">{s.label}</h3>
+            </div>
+            <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-[var(--sf-line-soft)] pt-3 text-center">
               <div>
-                <dt className="text-[11px] text-zinc-400 dark:text-zinc-500">当前延迟</dt>
-                <dd className="mt-1 font-mono text-sm font-semibold tabular-nums text-zinc-800 dark:text-zinc-100">
+                <dt className="font-mono text-[11px] tracking-[0.02em] text-[var(--sf-ink-3)]">当前延迟</dt>
+                <dd className="mt-1 font-mono text-sm font-semibold tabular-nums text-[var(--sf-ink)]">
                   {s.latencyMs !== null ? `${s.latencyMs}ms` : '—'}
                 </dd>
               </div>
               <div>
-                <dt className="text-[11px] text-zinc-400 dark:text-zinc-500">24h 可用率</dt>
-                <dd className="mt-1 font-mono text-sm font-semibold tabular-nums text-zinc-800 dark:text-zinc-100">
+                <dt className="font-mono text-[11px] tracking-[0.02em] text-[var(--sf-ink-3)]">24h 可用率</dt>
+                <dd className="mt-1 font-mono text-sm font-semibold tabular-nums text-[var(--sf-ink)]">
                   {s.uptime24h !== null ? `${s.uptime24h}%` : '—'}
                 </dd>
               </div>
               <div>
-                <dt className="text-[11px] text-zinc-400 dark:text-zinc-500">24h 均延迟</dt>
-                <dd className="mt-1 font-mono text-sm font-semibold tabular-nums text-zinc-800 dark:text-zinc-100">
+                <dt className="font-mono text-[11px] tracking-[0.02em] text-[var(--sf-ink-3)]">24h 均延迟</dt>
+                <dd className="mt-1 font-mono text-sm font-semibold tabular-nums text-[var(--sf-ink)]">
                   {s.avgLatency24h !== null ? `${s.avgLatency24h}ms` : '—'}
                 </dd>
               </div>
             </dl>
             <div className="mt-4">
               <UptimeBars recent={s.recent} />
-              <p className="mt-1.5 flex justify-between text-[10px] text-zinc-400 dark:text-zinc-500">
+              <p className="mt-1.5 flex justify-between font-mono text-[10px] tracking-[0.04em] text-[var(--sf-ink-3)]">
                 <span>← 约 1 小时前</span>
                 <span>最近检查 {formatRelative(s.lastCheck)}</span>
               </p>
@@ -352,7 +429,7 @@ export default function StatusPanel() {
         ))}
       </div>
 
-      <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
+      <p className="text-center text-[11px] leading-6 text-[var(--sf-ink-3)]">
         数据来自站内探针(每分钟采样,保留 7 天)与你的浏览器实测,仅含非敏感运行指标。
       </p>
     </div>

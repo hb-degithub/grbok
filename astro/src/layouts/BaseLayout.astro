@@ -170,8 +170,8 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
   }
 </script>
 </head>
-  <body class="min-h-[100svh] bg-white font-sans text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-50">
-    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[70] focus:px-4 focus:py-2 focus:bg-teal-600 focus:text-white focus:rounded-md">跳转到主要内容</a>
+  <body class="min-h-[100svh] bg-[var(--sf-canvas)] font-sans text-[var(--sf-ink)] antialiased">
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[70] focus:px-4 focus:py-2 focus:bg-[var(--sf-accent)] focus:text-[var(--sf-on-accent)] focus:rounded-[2px]">跳转到主要内容</a>
     {showChrome && <Header transition:persist="header" client:load />}
     {showChrome && <SearchModal client:idle />}
     {showChrome && (

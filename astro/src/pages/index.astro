@@ -6,6 +6,8 @@ import HomeSideNav from '../components/sidebar/HomeSideNav';
 import StatusMini from '../components/sidebar/StatusMini';
 import HotArticles from '../components/sidebar/HotArticles';
 import RecentComments from '../components/sidebar/RecentComments';
+import FriendLinks from '../components/sidebar/FriendLinks';
+import ProfileCard from '../components/sidebar/ProfileCard';
 import CountUp from '../components/reactbits/CountUp';
 import { cachedFetchJson } from '../lib/pb-cache';
 import { SITE_CONFIG } from '../config/site';
@@ -124,6 +126,30 @@ const [postsCount, tagsCount] = await Promise.all([
       </div>
       <div class="sf-block">
         <RecentComments client:visible />
+      </div>
+    </div>
+  </section>
+
+  <!-- 作者与友链：恢复改版中丢失的两个内容块，沿用与「热榜文章 / 最近评论」相同的两栏细线面板 -->
+  <section id="connect" class="w-full border-b border-[var(--sf-line)]">
+    <div class="mx-auto max-w-[1180px] px-[var(--sf-pad)] py-16 lg:py-24">
+      <div class="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-[var(--sf-ink-3)]">03 / 作者与友链</p>
+          <h2 class="mt-2 text-3xl font-bold tracking-tight text-[var(--sf-ink)]">作者与友链</h2>
+          <p class="mt-2 text-sm text-[var(--sf-ink-2)]">关于博主，以及长期互访的站点。</p>
+        </div>
+        <a href="/links" class="sf-link inline-flex min-h-[44px] w-fit items-center gap-1.5 font-mono text-sm text-[var(--sf-accent)] no-underline transition-colors hover:text-[var(--sf-accent-ink)]">
+          全部友链 <span aria-hidden="true">→</span>
+        </a>
+      </div>
+      <div class="grid gap-6 lg:grid-cols-2 lg:gap-8">
+        <div class="sf-block">
+          <ProfileCard client:visible />
+        </div>
+        <div class="sf-block">
+          <FriendLinks client:visible />
+        </div>
       </div>
     </div>
   </section>

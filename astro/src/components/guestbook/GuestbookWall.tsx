@@ -34,14 +34,23 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-/** 留言墙：首字母色块 + 昵称 + 相对时间 + 内容（保留换行），分页加载更多 */
+/** 细线面板：空态 / 错误态共用，保持同一套结构线与方角 */
+function Panel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-10 text-center">
+      {children}
+    </div>
+  );
+}
+
+/** 留言墙：方角首字母 + 昵称 + 相对时间 + 内容（保留换行），分页加载更多 */
 export default function GuestbookWall({ messages, loading, error, hasMore, loadingMore, onLoadMore, onRetry }: GuestbookWallProps) {
   if (loading) {
     return (
       <div className="grid gap-4" role="status" aria-busy="true">
         <span className="sr-only">留言加载中</span>
         {[0, 1, 2].map((i) => (
-          <div key={i} className="skeleton h-24 rounded-xl" />
+          <div key={i} className="skeleton h-24 rounded-[3px]" />
         ))}
       </div>
     );
@@ -49,24 +58,26 @@ export default function GuestbookWall({ messages, loading, error, hasMore, loadi
 
   if (error) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-10 text-center dark:border-zinc-800 dark:bg-zinc-900">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">留言加载失败，请稍后再试。</p>
+      <Panel>
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-danger)]">Error / 留言</p>
+        <p className="mt-2 text-sm text-[var(--sf-ink-2)]">留言加载失败，请稍后再试。</p>
         <button
           type="button"
           onClick={onRetry}
-          className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+          className="focus-ring mt-4 inline-flex min-h-11 items-center rounded-[3px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
         >
           重新加载
         </button>
-      </div>
+      </Panel>
     );
   }
 
   if (messages.length === 0) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-10 text-center text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400">
-        还没有留言，来抢沙发～
-      </div>
+      <Panel>
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Guestbook / 00</p>
+        <p className="mt-2 text-sm text-[var(--sf-ink-3)]">还没有留言，来抢沙发～</p>
+      </Panel>
     );
   }
 
@@ -77,19 +88,19 @@ export default function GuestbookWall({ messages, loading, error, hasMore, loadi
           <motion.li
             key={msg.id}
             variants={fadeUp}
-            className="flex items-start gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-xl shadow-zinc-900/[0.04] dark:border-zinc-800 dark:bg-zinc-900"
+            className="flex items-start gap-3 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4 transition-colors hover:border-[var(--sf-line-strong)]"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-900 text-sm font-bold text-white dark:bg-zinc-100 dark:text-zinc-950" aria-hidden="true">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[2px] border border-[var(--sf-line-control)] bg-[var(--sf-canvas)] font-mono text-sm font-semibold text-[var(--sf-ink)]" aria-hidden="true">
               {Array.from(msg.nickname)[0] ?? ''}
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-3">
-                <span className="truncate text-sm font-bold text-zinc-950 dark:text-zinc-50">{msg.nickname}</span>
-                <time dateTime={msg.created} className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">
+                <span className="truncate text-sm font-semibold text-[var(--sf-ink)]">{msg.nickname}</span>
+                <time dateTime={msg.created} className="shrink-0 font-mono text-[11px] text-[var(--sf-ink-3)]">
                   {relativeTime(msg.created)}
                 </time>
               </div>
-              <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-6 text-zinc-600 [overflow-wrap:anywhere] dark:text-zinc-300">
+              <p className="mt-1.5 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--sf-ink-2)] [overflow-wrap:anywhere]">
                 {msg.content}
               </p>
             </div>
@@ -103,9 +114,9 @@ export default function GuestbookWall({ messages, loading, error, hasMore, loadi
             type="button"
             onClick={onLoadMore}
             disabled={loadingMore}
-            className="inline-flex min-h-10 items-center gap-2 rounded-full bg-zinc-100 px-5 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-200 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+            className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-[3px] border border-[var(--sf-line-control)] px-5 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50"
           >
-            {loadingMore && <span className="h-4 w-4 animate-spin rounded-full border-2 border-zinc-400 border-t-zinc-600" aria-hidden="true" />}
+            {loadingMore && <span className="h-3 w-3 animate-spin rounded-[1px] border border-[var(--sf-line-strong)] border-t-[var(--sf-accent)]" aria-hidden="true" />}
             {loadingMore ? '加载中…' : '加载更多'}
           </button>
         </div>

@@ -12,8 +12,8 @@ export interface Globe3DOptions {
 interface Region { feature: GlobeFeature; id: string; points: Location[]; center?: Location }
 const RADIUS = 150, RAD = Math.PI / 180;
 const PALETTES = {
-  light: { ocean: '#bbcdd3', land: '#617e89', border: '#658491', grid: '#547580', low: '#329e97', high: '#00796e', halo: '#65b8b3' },
-  dark: { ocean: '#152735', land: '#668894', border: '#54737f', grid: '#476775', low: '#3c9e9b', high: '#6fffe0', halo: '#27c5b4' },
+  light: { ocean: '#b3bcc5', land: '#5f6a75', border: '#7f8b97', grid: '#5f6a75', low: '#0b6d76', high: '#085159', halo: '#0b6d76' },
+  dark: { ocean: '#161a1e', land: '#7a8791', border: '#5a6a77', grid: '#7a8791', low: '#3fa8b2', high: '#6bc4cc', halo: '#3fa8b2' },
 };
 
 /** Owns WebGL resources and interaction; React owns accessible controls and copy. */
@@ -73,16 +73,16 @@ export class Globe3DEngine {
     this.raycaster = new THREE.Raycaster();
     this.globe = new THREE.Group();
     this.scene.add(this.globe);
-    this.scene.add(new THREE.AmbientLight('#d8eeee', 1.8));
-    const key = new THREE.DirectionalLight('#f0fffc', 2.8);
+    this.scene.add(new THREE.AmbientLight('#eef1f4', 1.8));
+    const key = new THREE.DirectionalLight('#ffffff', 2.8);
     key.position.set(-250, 300, 400);
     this.scene.add(key);
-    const fill = new THREE.DirectionalLight('#63b6c4', 0.7);
+    const fill = new THREE.DirectionalLight('#c3ccd4', 0.7);
     fill.position.set(250, -100, -150);
     this.scene.add(fill);
     // The depth-writing surface occludes every point and border on the far side.
     this.surface = new THREE.Mesh(new THREE.SphereGeometry(RADIUS, 96, 64), new THREE.MeshPhongMaterial({
-      color: PALETTES[this.dark ? 'dark' : 'light'].ocean, shininess: 32, specular: '#142b32',
+      color: PALETTES[this.dark ? 'dark' : 'light'].ocean, shininess: 32, specular: '#1b2127',
     }));
     this.globe.add(this.surface);
     this.atmosphere = new THREE.Mesh(new THREE.SphereGeometry(RADIUS * 1.025, 64, 48), new THREE.ShaderMaterial({

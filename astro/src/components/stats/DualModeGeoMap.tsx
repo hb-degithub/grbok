@@ -13,6 +13,10 @@ const Globe3D = lazy(() => import('./Globe3D'));
  * - 3D 模式：Three.js 粒子地球（世界）
  *
  * 技术：ECharts 地图渲染 + Three.js 粒子地球 + D3 辅助动画过渡
+ *
+ * 配色：ECharts 画布无法直接解析 CSS 变量，因此在构建 option 时从
+ * document.documentElement 读取 --sf-* 令牌，得到与深浅主题一致的颜色；
+ * 读取不到时退回令牌同值的字面量。数据结构、tooltip 字段与坐标轴含义不变。
  */
 
 interface GeoData {
@@ -28,8 +32,49 @@ interface DualModeGeoMapProps {
 
 type RenderMode = '2d' | '3d';
 
-// 颜色梯度（与现有 GeoMap 保持一致）
-const COLOR_RANGE = ['#ccfbf1', '#99f6e4', '#5eead4', '#2dd4bf', '#14b8a6', '#0d9488'];
+/** 令牌读取失败时的回退值：与 global.css 的浅色主题令牌一致。 */
+const TOKEN_FALLBACK = {
+  surface: '#ffffff',
+  ink: '#16191d',
+  ink2: '#454f59',
+  ink3: '#5f6a75',
+  line: '#d3d9df',
+  lineStrong: '#b3bcc5',
+  lineSoft: '#e3e7eb',
+  accent: '#0b6d76',
+} as const;
+
+function readToken(name: string, fallback: string): string {
+  if (typeof document === 'undefined') return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
+}
+
+function parseHex(value: string): [number, number, number] | null {
+  const match = /^#([0-9a-f]{6})$/i.exec(value.trim());
+  if (!match) return null;
+  const num = parseInt(match[1], 16);
+  return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+}
+
+/** 在两个 #rrggbb 之间插值；weight=0 取 from，weight=1 取 to。 */
+function mixHex(from: string, to: string, weight: number): string {
+  const a = parseHex(from);
+  const b = parseHex(to);
+  if (!a || !b) return weight >= 0.5 ? to : from;
+  const mixed: [number, number, number] = [
+    Math.round(a[0] + (b[0] - a[0]) * weight),
+    Math.round(a[1] + (b[1] - a[1]) * weight),
+    Math.round(a[2] + (b[2] - a[2]) * weight),
+  ];
+  return `#${mixed.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** 强调色的低透明度版本；令牌不是 6 位 hex 时原样返回。 */
+function withAlpha(value: string, alpha: number): string {
+  const rgb = parseHex(value);
+  return rgb ? `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})` : value;
+}
 
 function DualModeGeoMap({ worldData }: DualModeGeoMapProps) {
   const [renderMode, setRenderMode] = useState<RenderMode>('3d');
@@ -103,14 +148,27 @@ function DualModeGeoMap({ worldData }: DualModeGeoMapProps) {
       regionId: id,
     }));
 
+    // 从 CSS 令牌解析画布颜色（画布不解析 var()，必须取计算值）。
+    const surface = readToken('--sf-surface', TOKEN_FALLBACK.surface);
+    const ink = readToken('--sf-ink', TOKEN_FALLBACK.ink);
+    const ink2 = readToken('--sf-ink-2', TOKEN_FALLBACK.ink2);
+    const ink3 = readToken('--sf-ink-3', TOKEN_FALLBACK.ink3);
+    const line = readToken('--sf-line', TOKEN_FALLBACK.line);
+    const lineStrong = readToken('--sf-line-strong', TOKEN_FALLBACK.lineStrong);
+    const lineSoft = readToken('--sf-line-soft', TOKEN_FALLBACK.lineSoft);
+    const accent = readToken('--sf-accent', TOKEN_FALLBACK.accent);
+
+    // 中性灰阶 + 单一强调色的连续梯度（不是渐变阴影，仅用于数值映射图例）。
+    const colorRange = [0.86, 0.68, 0.5, 0.32, 0.16, 0].map((weight) => mixHex(accent, surface, weight));
+
     return {
       tooltip: {
         trigger: 'item',
-        backgroundColor: 'rgba(255, 255, 255, 0.96)',
-        borderColor: '#e4e4e7',
+        backgroundColor: surface,
+        borderColor: line,
         borderWidth: 1,
         padding: [8, 12],
-        textStyle: { color: '#18181b', fontSize: 13 },
+        textStyle: { color: ink, fontSize: 13 },
         formatter: (params: any) => {
           const { name, value, data: itemData } = params;
           const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c: string) =>
@@ -124,10 +182,10 @@ function DualModeGeoMap({ worldData }: DualModeGeoMapProps) {
         type: 'continuous',
         min: 0,
         max: viewMaximum(worldData),
-        inRange: { color: COLOR_RANGE },
-        outOfRange: { color: '#e4e4e7' },
+        inRange: { color: colorRange },
+        outOfRange: { color: lineSoft },
         text: ['高', '低'],
-        textStyle: { color: '#71717a', fontSize: 11 },
+        textStyle: { color: ink3, fontSize: 11 },
         left: 16,
         bottom: 16,
         itemWidth: 12,
@@ -142,20 +200,20 @@ function DualModeGeoMap({ worldData }: DualModeGeoMapProps) {
         label: {
           show: false,
           fontSize: 9,
-          color: '#52525b',
+          color: ink2,
         },
         itemStyle: {
-          areaColor: '#f4f4f5',
-          borderColor: '#d4d4d8',
+          areaColor: lineSoft,
+          borderColor: lineStrong,
           borderWidth: 0.5,
         },
         emphasis: {
           itemStyle: {
-            areaColor: '#99f6e4',
-            borderColor: '#0d9488',
+            areaColor: withAlpha(accent, 0.18),
+            borderColor: accent,
             borderWidth: 1.5,
           },
-          label: { show: true, color: '#134e4a', fontWeight: 'bold' },
+          label: { show: true, color: ink, fontWeight: 'bold' },
         },
       },
       series: [
@@ -251,8 +309,8 @@ function DualModeGeoMap({ worldData }: DualModeGeoMapProps) {
   if (renderMode === '2d' && loading) {
     return (
       <div className="flex h-[480px] items-center justify-center" role="status" aria-label="地图加载中">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
-        <span className="ml-3 text-sm text-zinc-500">地图数据加载中…</span>
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--sf-accent)] border-t-transparent" />
+        <span className="ml-3 text-sm text-[var(--sf-ink-2)]">地图数据加载中…</span>
       </div>
     );
   }
@@ -261,10 +319,10 @@ function DualModeGeoMap({ worldData }: DualModeGeoMapProps) {
   if (renderMode === '2d' && error) {
     return (
       <div className="flex h-[480px] flex-col items-center justify-center gap-3" role="alert">
-        <span className="text-sm text-zinc-500">{error}</span>
+        <span className="text-sm text-[var(--sf-ink-2)]">{error}</span>
         <button
           onClick={() => window.location.reload()}
-          className="rounded-lg bg-teal-600 px-4 py-2 text-sm text-white hover:bg-teal-700"
+          className="min-h-11 rounded-[3px] border border-[var(--sf-accent)] bg-[var(--sf-accent)] px-4 py-2 text-sm text-[var(--sf-on-accent)] transition-colors hover:bg-[var(--sf-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
         >
           重新加载
         </button>
@@ -277,15 +335,15 @@ function DualModeGeoMap({ worldData }: DualModeGeoMapProps) {
       {/* 切换按钮组 */}
       <div className="mb-3 flex flex-wrap items-center gap-2 sm:gap-3" role="tablist" aria-label="地图模式切换">
         {/* 2D/3D 切换 */}
-        <div className="flex rounded-lg bg-zinc-100 p-0.5 dark:bg-zinc-800" role="group" aria-label="渲染模式">
+        <div className="flex rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] p-0.5" role="group" aria-label="渲染模式">
           <button
             role="tab"
             aria-selected={renderMode === '3d'}
             onClick={() => handleRenderModeSwitch('3d')}
-            className={`min-h-11 min-w-11 rounded-md px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 ${
+            className={`min-h-11 min-w-11 rounded-[2px] px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] ${
               renderMode === '3d'
-                ? 'bg-teal-600 text-white shadow-sm'
-                : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
+                ? 'bg-[var(--sf-accent)] text-[var(--sf-on-accent)]'
+                : 'text-[var(--sf-ink-2)] hover:text-[var(--sf-ink)]'
             }`}
           >
             3D
@@ -294,10 +352,10 @@ function DualModeGeoMap({ worldData }: DualModeGeoMapProps) {
             role="tab"
             aria-selected={renderMode === '2d'}
             onClick={() => handleRenderModeSwitch('2d')}
-            className={`min-h-11 min-w-11 rounded-md px-3 py-2 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 ${
+            className={`min-h-11 min-w-11 rounded-[2px] px-3 py-2 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] ${
               renderMode === '2d'
-                ? 'bg-teal-600 text-white shadow-sm'
-                : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100'
+                ? 'bg-[var(--sf-accent)] text-[var(--sf-on-accent)]'
+                : 'text-[var(--sf-ink-2)] hover:text-[var(--sf-ink)]'
             }`}
           >
             2D
@@ -311,8 +369,8 @@ function DualModeGeoMap({ worldData }: DualModeGeoMapProps) {
         <Suspense
           fallback={
             <div className="flex h-[480px] items-center justify-center" role="status" aria-label="3D 地球加载中">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal-500 border-t-transparent" />
-              <span className="ml-3 text-sm text-zinc-500">3D 地球加载中…</span>
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--sf-accent)] border-t-transparent" />
+              <span className="ml-3 text-sm text-[var(--sf-ink-2)]">3D 地球加载中…</span>
             </div>
           }
         >
@@ -326,10 +384,7 @@ function DualModeGeoMap({ worldData }: DualModeGeoMapProps) {
       {/* 2D 模式 */}
       {renderMode === '2d' && (
         <>
-          <div
-            className="overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700"
-            style={{ background: 'var(--color-zinc-50, #fafafa)' }}
-          >
+          <div className="overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">
             <div
               ref={chartRef}
               className="h-[480px] w-full"

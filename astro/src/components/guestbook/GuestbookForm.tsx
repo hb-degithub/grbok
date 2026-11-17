@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -9,8 +9,12 @@ import { fadeUp } from '../../lib/motion';
 const NICKNAME_MAX = 30;
 const CONTENT_MAX = 500;
 
+/**
+ * 多行输入与 ui/Input 保持同一套令牌：
+ * 表面色 + 冷灰控制线，聚焦切到唯一强调色并画 2px 焦点环。
+ */
 const textareaClass =
-  'w-full rounded-xl border border-zinc-200 bg-white/70 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 transition-all duration-200 ease-out outline-none focus-visible:border-teal-500 focus-visible:ring-2 focus-visible:ring-teal-500/35 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus-visible:border-teal-400';
+  'min-h-[104px] w-full min-w-0 rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-[16px] leading-6 text-[var(--sf-ink)] placeholder:text-[var(--sf-ink-3)] transition-colors duration-200 ease-out outline-none focus-visible:border-[var(--sf-accent)] focus-visible:ring-2 focus-visible:ring-[var(--sf-accent)] sm:px-4 sm:text-sm';
 
 interface GuestbookFormProps {
   /** 提交成功回调：把新留言插入墙顶 */
@@ -56,9 +60,12 @@ export default function GuestbookForm({ onPosted }: GuestbookFormProps) {
 
   return (
     <motion.form variants={fadeUp} initial="hidden" animate="visible" onSubmit={handleSubmit} noValidate
-      className="rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] dark:border-zinc-800 dark:bg-zinc-900 sm:p-6">
-      <h2 className="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">写下留言</h2>
-      <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">匿名留言，昵称会公开展示</p>
+      className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5 sm:p-6">
+      <div className="border-b border-[var(--sf-line)] pb-3">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Guestbook / write</p>
+        <h2 className="mt-1 text-lg font-semibold tracking-tight text-[var(--sf-ink)]">写下留言</h2>
+        <p className="mt-1 text-xs text-[var(--sf-ink-3)]">匿名留言，昵称会公开展示</p>
+      </div>
       <div className="mt-4 grid gap-4">
         <Input
           label="昵称"
@@ -71,7 +78,7 @@ export default function GuestbookForm({ onPosted }: GuestbookFormProps) {
           autoComplete="name"
         />
         <div>
-          <label htmlFor="guestbook-content" className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="guestbook-content" className="mb-1.5 block break-words text-sm font-medium leading-snug text-[var(--sf-ink-2)]">
             留言内容
           </label>
           <textarea
@@ -84,7 +91,7 @@ export default function GuestbookForm({ onPosted }: GuestbookFormProps) {
             required
             className={textareaClass}
           />
-          <div className="mt-1 text-right text-[11px] text-zinc-400 dark:text-zinc-500">
+          <div className="mt-1 flex justify-end font-mono text-[11px] text-[var(--sf-ink-3)]">
             {trimmedContent.length}/{CONTENT_MAX}
           </div>
         </div>
