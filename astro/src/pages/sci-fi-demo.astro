@@ -1,0 +1,301 @@
+---
+/**
+ * 科幻简约首页 Demo —— 独立页面，仅用于确认视觉方向。
+ *
+ * 边界：
+ * - 不复用 BaseLayout（其中包含 SplashOverlay / CursorGlow / WelcomeOverlay 等大量特效），
+ *   改为自带最小 HTML shell，避免 Demo 被既有特效干扰，也不改动任何现有页面。
+ * - 只 import 既有的 @fontsource 字体与本 Demo 的局部样式，不新增依赖、不引用外链图片。
+ * - 页脚取 ../config/site 的 SITE_CONFIG（名称与备案链接）。
+ * - 移动端菜单用渐进增强的内联脚本：无 JS 时主内容与导航仍然可读（见 noscript 回退）。
+ */
+import '@fontsource/geist-sans/400.css';
+import '@fontsource/geist-sans/500.css';
+import '@fontsource/geist-sans/700.css';
+import '@fontsource/geist-mono/400.css';
+import '@fontsource/noto-sans-sc/400.css';
+import '@fontsource/noto-sans-sc/500.css';
+import '@fontsource/noto-sans-sc/700.css';
+import '../styles/sci-fi-demo.css';
+import { SITE_CONFIG } from '../config/site';
+
+const pageTitle = '科幻简约首页 Demo';
+const pageDescription =
+  '胡巴的博客科幻简约首页视觉 Demo：冷白画布、石墨文字与单一克制青色点缀的个人技术博客实验室。';
+
+/** 精选入口 —— 全部指向站点真实存在的路由。 */
+const entries = [
+  {
+    no: '01',
+    name: '文章',
+    href: '/posts',
+    desc: '按时间倒序的完整归档，从最近写的那一篇开始读。',
+  },
+  {
+    no: '02',
+    name: '标签',
+    href: '/tags',
+    desc: '按主题横向切入，把同一类问题的其它解法找出来。',
+  },
+  {
+    no: '03',
+    name: '关于',
+    href: '/about',
+    desc: '关于这个站点、正在用的工具链，以及怎么联系我。',
+  },
+];
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>{pageTitle} | {SITE_CONFIG.name}</title>
+    <meta name="description" content={pageDescription} />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#f1f3f5" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!--
+      无 JS 时的导航回退：在移动断点下把抽屉展开成静态列表。
+      放在 <head> 的 <noscript> 里是合法位置（<style> 不允许出现在 body），
+      也保证样式在首次渲染前生效。
+
+      顶栏退出 sticky 的主路径不在这里，而是外部样式表里的
+      .sf-topbar:has(.sf-nav__toggle[hidden])：toggle 在标记中带 hidden，
+      只有菜单脚本成功执行才移除，所以 [hidden] 就是「脚本没跑」的真实状态，
+      不受本 <noscript> 样式是否被保留、注入顺序或特异性影响。
+      这里保留 static 仅作为不支持 :has() 的旧浏览器兜底；
+      用 header 提高一级特异性，避免被后注入的 .sf-topbar{position:sticky} 盖掉。
+    -->
+    <noscript>
+      <style>
+        @media (max-width: 879px) {
+          header.sf-topbar {
+            position: static;
+          }
+          .sf-nav {
+            flex: 1 1 100%;
+            flex-wrap: wrap;
+            row-gap: 0;
+          }
+          .sf-nav__toggle {
+            display: none !important;
+          }
+          .sf-nav__panel[hidden] {
+            display: block !important;
+            position: static;
+            flex: 1 1 100%;
+            padding-inline: 0;
+            border-bottom: 0;
+            box-shadow: none;
+          }
+        }
+      </style>
+    </noscript>
+  </head>
+  <body>
+    <a class="sf-skip" href="#main">跳到主要内容</a>
+
+    <div class="sf-grid" aria-hidden="true"></div>
+
+    <header class="sf-topbar">
+      <div class="sf-topbar__inner">
+        <a class="sf-brand" href="/">
+          <span class="sf-brand__mark" aria-hidden="true"></span>
+          <span class="sf-brand__text">
+            <span class="sf-brand__name">{SITE_CONFIG.name}</span>
+            <span class="sf-brand__meta">PERSONAL TECH LOG · SINCE {SITE_CONFIG.since}</span>
+          </span>
+        </a>
+
+        <nav class="sf-nav" aria-label="主导航" data-sf-nav>
+          <ul class="sf-nav__list sf-nav__list--desktop" role="list">
+            {
+              entries.map((entry) => (
+                <li><a class="sf-nav__link" href={entry.href}>{entry.name}</a></li>
+              ))
+            }
+          </ul>
+
+          <button class="sf-nav__toggle" type="button" aria-label="导航菜单" aria-expanded="false" aria-controls="sf-nav-panel" hidden>
+            <span class="sf-nav__bars" aria-hidden="true"></span>
+          </button>
+
+          <ul class="sf-nav__panel" id="sf-nav-panel" role="list" hidden>
+            {
+              entries.map((entry) => (
+                <li>
+                  <a href={entry.href}>
+                    <span class="sf-nav__panel-no" aria-hidden="true">{entry.no}</span>
+                    <span>{entry.name}</span>
+                    <span class="sf-nav__panel-go" aria-hidden="true">→</span>
+                  </a>
+                </li>
+              ))
+            }
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <main class="sf-main" id="main" tabindex="-1">
+      <!-- Hero：左文右图，非对称 -->
+      <section class="sf-hero" aria-labelledby="sf-hero-title">
+        <div class="sf-hero__text">
+          <div class="sf-scale sf-anim sf-anim--1" aria-hidden="true">
+            <span class="sf-scale__ticks"></span>
+            <span class="sf-scale__label">LAB / 01</span>
+          </div>
+
+          <p class="sf-eyebrow sf-anim sf-anim--1">
+            <span class="sf-eyebrow__dot" aria-hidden="true"></span>
+            <span>PERSONAL TECH LOG / 个人技术博客</span>
+          </p>
+
+          <h1 class="sf-hero__title sf-anim sf-anim--2" id="sf-hero-title">{SITE_CONFIG.name}</h1>
+
+          <p class="sf-hero__lead sf-anim sf-anim--3">分享技术、思考与生活。<span class="sf-hero__lead-strong">把折腾过的东西写清楚。</span></p>
+
+          <p class="sf-hero__note sf-anim sf-anim--3">
+            站点用 Astro 与 PocketBase 搭建，写的是搭建、部署和日常折腾里想清楚的事。
+          </p>
+
+          <div class="sf-actions sf-anim sf-anim--4">
+            <a class="sf-actions__btn sf-actions__btn--primary" href="/posts">
+              浏览全部文章 <span class="sf-actions__arrow" aria-hidden="true">→</span>
+            </a>
+            <a class="sf-actions__btn sf-actions__btn--ghost" href="/about">关于这个站点</a>
+          </div>
+
+          <p class="sf-meta sf-anim sf-anim--5">
+            <span>SINCE {SITE_CONFIG.since}</span>
+            <span class="sf-meta__sep" aria-hidden="true">/</span>
+            <span>技术 · 思考 · 生活</span>
+            <span class="sf-meta__sep" aria-hidden="true">/</span>
+            <span>本页为独立视觉 Demo</span>
+          </p>
+        </div>
+
+        <figure class="sf-figure sf-anim sf-anim--4">
+          <div class="sf-instrument" aria-hidden="true">
+            <span class="sf-instrument__mark sf-instrument__mark--tl"></span>
+            <span class="sf-instrument__mark sf-instrument__mark--tr"></span>
+            <span class="sf-instrument__mark sf-instrument__mark--bl"></span>
+            <span class="sf-instrument__mark sf-instrument__mark--br"></span>
+            <span class="sf-instrument__label">ORBIT / 01</span>
+
+            <div class="sf-orbit">
+              <span class="sf-orbit__ring"></span>
+              <span class="sf-orbit__dash"></span>
+              <span class="sf-orbit__tilt"></span>
+              <span class="sf-orbit__axis"></span>
+              <span class="sf-orbit__core"></span>
+              <span class="sf-orbit__sweep"><span class="sf-orbit__node"></span></span>
+            </div>
+
+            <span class="sf-instrument__scale"></span>
+
+            <ul class="sf-readout">
+              <li><span class="sf-readout__k">REF</span><span class="sf-readout__v">/posts</span></li>
+              <li><span class="sf-readout__k">TAGS</span><span class="sf-readout__v">/tags</span></li>
+              <li><span class="sf-readout__k">ABOUT</span><span class="sf-readout__v">/about</span></li>
+            </ul>
+          </div>
+          <figcaption class="sf-figure__caption">坐标示意 · 站点入口轨道，纯 CSS 几何绘制，不使用外链图片。</figcaption>
+        </figure>
+      </section>
+
+      <!-- 索引：编号行列表，刻意不使用三列卡片 -->
+      <section class="sf-index" aria-labelledby="sf-index-title">
+        <div class="sf-index__head">
+          <p class="sf-index__eyebrow">02 / 索引</p>
+          <h2 class="sf-index__title" id="sf-index-title">从这三处开始</h2>
+          <p class="sf-index__count">共 {entries.length} 个入口</p>
+        </div>
+
+        <ol class="sf-index__list" role="list">
+          {
+            entries.map((entry) => (
+              <li class="sf-index__row">
+                <a class="sf-index__entry" href={entry.href}>
+                  <span class="sf-index__no" aria-hidden="true">{entry.no}</span>
+                  <h3 class="sf-index__name">{entry.name}</h3>
+                  <span class="sf-index__desc">{entry.desc}</span>
+                  <span class="sf-index__go" aria-hidden="true">进入 →</span>
+                </a>
+              </li>
+            ))
+          }
+        </ol>
+
+        <aside class="sf-note" aria-labelledby="sf-note-title">
+          <p class="sf-note__label">DEMO / 说明</p>
+          <h2 class="sf-note__title" id="sf-note-title">这个页面是什么</h2>
+          <p class="sf-note__text">
+            首页视觉方向的独立 Demo：本页是新增文件，现有页面、布局与业务逻辑都没有改动。确认方向之后，再决定是否把设计带到正式首页。
+          </p>
+        </aside>
+      </section>
+    </main>
+
+    <footer class="sf-footer">
+      <div class="sf-footer__inner">
+        <div class="sf-footer__brand">
+          <span class="sf-footer__name">{SITE_CONFIG.name}</span>
+          <span class="sf-footer__slogan">{SITE_CONFIG.slogan}</span>
+        </div>
+
+        <ul class="sf-footer__legal" role="list">
+          <li>
+            <a href={SITE_CONFIG.icp.url} target="_blank" rel="noopener noreferrer">{SITE_CONFIG.icp.text}</a>
+          </li>
+          <li>
+            <a href={SITE_CONFIG.police.url} target="_blank" rel="noopener noreferrer">{SITE_CONFIG.police.text}</a>
+          </li>
+        </ul>
+
+        <p class="sf-footer__meta">SINCE {SITE_CONFIG.since} · 独立视觉 Demo，不影响正式首页</p>
+      </div>
+    </footer>
+
+    <script>
+      // 移动端菜单：渐进增强。无 JS 时由 <noscript> 回退为可见的静态导航。
+      const nav = document.querySelector<HTMLElement>('[data-sf-nav]');
+      const toggle = nav?.querySelector<HTMLButtonElement>('.sf-nav__toggle');
+      const panel = nav?.querySelector<HTMLElement>('#sf-nav-panel');
+
+      if (nav && toggle && panel) {
+        // 脚本接管后才显示按钮：[hidden] 是「无 JS / 脚本未执行」的状态标记，
+        // 外部样式表据此让顶栏退出 sticky（见 sci-fi-demo.css 的 :has 规则）。
+        toggle.hidden = false;
+
+        const isOpen = () => toggle.getAttribute('aria-expanded') === 'true';
+        const setOpen = (open: boolean) => {
+          toggle.setAttribute('aria-expanded', String(open));
+          panel.hidden = !open;
+        };
+
+        setOpen(false);
+
+        toggle.addEventListener('click', () => setOpen(!isOpen()));
+
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && isOpen()) {
+            setOpen(false);
+            toggle.focus();
+          }
+        });
+
+        document.addEventListener('click', (event) => {
+          if (isOpen() && !nav.contains(event.target as Node)) setOpen(false);
+        });
+
+        window.addEventListener('resize', () => {
+          if (window.innerWidth >= 880 && isOpen()) setOpen(false);
+        });
+      }
+    </script>
+  </body>
+</html>

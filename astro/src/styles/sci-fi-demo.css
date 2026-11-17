@@ -1,0 +1,1190 @@
+/* ============================================================================
+   科幻简约首页 Demo —— 局部样式（仅 /sci-fi-demo 使用）
+
+   设计定位：个人技术博客的「实验室」首页，可阅读优先，而不是游戏控制台。
+   参数：DESIGN_VARIANCE 7 / MOTION_INTENSITY 4 / VISUAL_DENSITY 4。
+
+   约束：
+   - 冷白 + 银灰画布、石墨黑文字、单一克制青色点缀（无紫色、无霓虹光晕、
+     无夸张玻璃拟态、无大面积渐变）。
+   - 网格、刻度、坐标与序号用等宽字体；正文用无衬线。
+   - 动画只用 transform / opacity，且整段包在 prefers-reduced-motion: no-preference
+     里：关闭动效时元素保持默认（可见）状态，不依赖 JS。
+
+   边界：本文件只服务 Demo 页面，不修改 global.css，也不被现有页面引用。
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* 画布与表面 */
+  --sf-canvas: #f1f3f5;
+  --sf-surface: #ffffff;
+
+  /* 石墨文字层级（对比度均 ≥ 4.5:1） */
+  --sf-ink: #16191d;
+  --sf-ink-2: #454f59;
+  --sf-ink-3: #5f6a75;
+
+  /* 银灰结构线（装饰） */
+  --sf-line: #d3d9df;
+  --sf-line-strong: #b3bcc5;
+  --sf-line-soft: #e3e7eb;
+
+  /* 交互控件描边：对画布 3.12:1、对白底 3.48:1，满足 WCAG 1.4.11 非文本对比度 */
+  --sf-line-control: #7f8b97;
+
+  /* 唯一强调色：低饱和青 */
+  --sf-accent: #0b6d76;
+  --sf-accent-ink: #085159;
+  --sf-accent-soft: rgba(11, 109, 118, 0.09);
+
+  /* 网格纸 */
+  --sf-cell: 32px;
+  --sf-cell-coarse: 128px;
+  --sf-graph-fine: rgba(22, 25, 29, 0.045);
+  --sf-graph-coarse: rgba(22, 25, 29, 0.075);
+
+  --sf-sans: 'Geist Sans', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --sf-mono: 'Geist Mono', 'Noto Sans SC', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --sf-max: 1180px;
+  --sf-pad: max(clamp(1.25rem, 4vw, 3.5rem), env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+  --sf-ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  /* 移动端地址栏收放时 100vh 会跳动，dynamic viewport 更贴近可见区域 */
+  min-height: 100dvh;
+  background-color: var(--sf-canvas);
+  color: var(--sf-ink);
+  font-family: var(--sf-sans);
+  font-size: 1rem;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--sf-accent);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   工具类
+   -------------------------------------------------------------------------- */
+
+.sf-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sf-skip {
+  position: absolute;
+  top: 0;
+  left: var(--sf-pad);
+  z-index: 60;
+  transform: translateY(-140%);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 1.25rem;
+  background: var(--sf-ink);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: transform 0.2s var(--sf-ease);
+}
+
+.sf-skip:focus {
+  transform: translateY(0);
+}
+
+/* --------------------------------------------------------------------------
+   网格纸：固定背景，不参与滚动宽度
+   -------------------------------------------------------------------------- */
+
+.sf-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(to right, var(--sf-graph-coarse) 0 1px, transparent 1px var(--sf-cell-coarse)),
+    repeating-linear-gradient(to bottom, var(--sf-graph-coarse) 0 1px, transparent 1px var(--sf-cell-coarse)),
+    repeating-linear-gradient(to right, var(--sf-graph-fine) 0 1px, transparent 1px var(--sf-cell)),
+    repeating-linear-gradient(to bottom, var(--sf-graph-fine) 0 1px, transparent 1px var(--sf-cell));
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 0.5) 55%, rgba(0, 0, 0, 0.85));
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 0.5) 55%, rgba(0, 0, 0, 0.85));
+}
+
+/* --------------------------------------------------------------------------
+   顶栏与导航
+   -------------------------------------------------------------------------- */
+
+.sf-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid var(--sf-line);
+  background: var(--sf-canvas);
+}
+
+.sf-topbar__inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: var(--sf-max);
+  margin-inline: auto;
+  padding-inline: var(--sf-pad);
+  min-height: 72px;
+}
+
+.sf-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  min-height: 44px;
+  padding-block: 0.5rem;
+  text-decoration: none;
+}
+
+.sf-brand__mark {
+  position: relative;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--sf-line-strong);
+  border-radius: 50%;
+}
+
+.sf-brand__mark::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-top: 1px solid var(--sf-line-strong);
+  border-radius: 50%;
+  transform: rotate(-28deg);
+}
+
+.sf-brand__mark::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--sf-accent);
+}
+
+.sf-brand__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.sf-brand__name {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sf-brand__meta {
+  font-family: var(--sf-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sf-ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 极窄屏（320px 级）压缩等宽标签，避免顶栏把页面顶出横向滚动 */
+@media (max-width: 420px) {
+  .sf-brand__meta {
+    letter-spacing: 0.09em;
+  }
+}
+
+.sf-nav {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sf-nav__list {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.25rem, 1.4vw, 0.75rem);
+}
+
+.sf-nav__link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 0.6rem;
+  color: var(--sf-ink-2);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.sf-nav__link::after {
+  content: '';
+  position: absolute;
+  left: 0.6rem;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  height: 1px;
+  background: var(--sf-accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.25s var(--sf-ease);
+}
+
+.sf-nav__link:hover,
+.sf-nav__link:focus-visible {
+  color: var(--sf-ink);
+}
+
+.sf-nav__link:hover::after,
+.sf-nav__link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+.sf-nav__toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--sf-line-control);
+  border-radius: 4px;
+  background: var(--sf-surface);
+  color: var(--sf-ink);
+  cursor: pointer;
+  transition: background-color 0.2s var(--sf-ease), border-color 0.2s var(--sf-ease);
+}
+
+/* 渐进增强：按钮在标记里自带 hidden，只有菜单脚本成功执行后才移除。
+   这条规则保证「scripting 关闭 / 脚本没跑起来」时按钮真的不显示 ——
+   否则移动断点里的 .sf-nav__toggle{display:inline-flex} 会盖掉 UA 的 [hidden]，
+   并且 :has() 也就失去了可用的无 JS 状态标记。 */
+.sf-nav__toggle[hidden] {
+  display: none;
+}
+
+.sf-nav__toggle:hover {
+  background: var(--sf-accent-soft);
+  border-color: var(--sf-accent);
+}
+
+.sf-nav__toggle[aria-expanded='true'] {
+  border-color: var(--sf-accent);
+  background: var(--sf-accent-soft);
+  color: var(--sf-accent-ink);
+}
+
+.sf-nav__bars {
+  position: relative;
+  display: block;
+  width: 18px;
+  height: 12px;
+  border-top: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+}
+
+.sf-nav__bars::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  margin-top: -0.75px;
+  background: currentColor;
+}
+
+.sf-nav__panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  display: block;
+  padding: 0 var(--sf-pad) 0.75rem;
+  border-bottom: 1px solid var(--sf-line);
+  background: var(--sf-surface);
+  box-shadow: 0 18px 28px -24px rgba(22, 25, 29, 0.45);
+}
+
+.sf-nav__panel[hidden] {
+  display: none;
+}
+
+.sf-nav__panel li + li {
+  border-top: 1px solid var(--sf-line-soft);
+}
+
+.sf-nav__panel a {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 52px;
+  color: var(--sf-ink);
+  font-size: 1rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.sf-nav__panel-no {
+  font-family: var(--sf-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  color: var(--sf-ink-3);
+}
+
+.sf-nav__panel-go {
+  font-family: var(--sf-mono);
+  font-size: 0.875rem;
+  color: var(--sf-accent);
+}
+
+/* 断点：<880px 收起为抽屉，≥880px 展开为横向导航 */
+@media (max-width: 879px) {
+  /* 无 JS 回退：toggle 保持 hidden，noscript 已把抽屉展开成静态列表，
+     顶栏必须退出 sticky，否则展开后的整块导航会常驻吸顶（约 222px）。
+     这里用外部样式表 + 标记状态（[hidden]）而不是 noscript <style>，
+     position 的优先级因此不再受 Astro 注入顺序影响；
+     不支持 :has() 的旧浏览器由页面 <head> 里的 noscript <style> 兜底。
+     JS 正常执行时脚本会移除 hidden，此规则不匹配，移动顶栏照旧 sticky。 */
+  .sf-topbar:has(.sf-nav__toggle[hidden]) {
+    position: static;
+  }
+
+  .sf-nav__list--desktop {
+    display: none;
+  }
+
+  .sf-nav__toggle {
+    display: inline-flex;
+  }
+}
+
+@media (min-width: 880px) {
+  .sf-nav__panel {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   主区域
+   -------------------------------------------------------------------------- */
+
+.sf-main {
+  position: relative;
+  z-index: 1;
+}
+
+/* Hero：左文右图，不对称 */
+.sf-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(2rem, 5vw, 3.5rem);
+  align-items: center;
+  max-width: var(--sf-max);
+  margin-inline: auto;
+  padding: clamp(2.5rem, 6vw, 5rem) var(--sf-pad) clamp(2.5rem, 5vw, 4.5rem);
+}
+
+@media (min-width: 1000px) {
+  .sf-hero {
+    grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
+    align-items: start;
+  }
+}
+
+.sf-hero__text {
+  min-width: 0;
+}
+
+.sf-scale {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: clamp(1.25rem, 3vw, 1.75rem);
+}
+
+.sf-scale__ticks {
+  flex: 1 1 auto;
+  height: 7px;
+  min-width: 0;
+  border-bottom: 1px solid var(--sf-line-strong);
+  background-image: repeating-linear-gradient(to right, var(--sf-line-strong) 0 1px, transparent 1px 12px);
+  background-size: 100% 8px;
+  background-repeat: no-repeat;
+  background-position: bottom left;
+}
+
+.sf-scale__label {
+  flex: none;
+  font-family: var(--sf-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sf-ink-3);
+}
+
+.sf-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--sf-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sf-ink-3);
+}
+
+.sf-eyebrow__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sf-accent);
+}
+
+.sf-hero__title {
+  margin-top: 0.875rem;
+  font-size: clamp(2.5rem, 10.5vw, 4.5rem);
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  overflow-wrap: break-word;
+}
+
+.sf-hero__lead {
+  max-width: 32ch;
+  margin-top: clamp(1.25rem, 3vw, 1.75rem);
+  font-size: clamp(1.0625rem, 2.2vw, 1.375rem);
+  line-height: 1.6;
+  color: var(--sf-ink-2);
+  overflow-wrap: break-word;
+}
+
+.sf-hero__lead-strong {
+  color: var(--sf-ink);
+  font-weight: 500;
+}
+
+.sf-hero__note {
+  max-width: 44ch;
+  margin-top: 1rem;
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  color: var(--sf-ink-3);
+  overflow-wrap: break-word;
+}
+
+.sf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: clamp(1.75rem, 4vw, 2.5rem);
+}
+
+.sf-actions__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 48px;
+  min-width: 44px;
+  padding: 0 1.375rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: transform 0.22s var(--sf-ease), background-color 0.22s var(--sf-ease),
+    border-color 0.22s var(--sf-ease), color 0.22s var(--sf-ease);
+}
+
+.sf-actions__btn--primary {
+  background: var(--sf-accent);
+  color: #fff;
+}
+
+.sf-actions__btn--primary:hover,
+.sf-actions__btn--primary:focus-visible {
+  background: var(--sf-accent-ink);
+  transform: translateY(-1px);
+}
+
+.sf-actions__btn--ghost {
+  border-color: var(--sf-line-control);
+  background: var(--sf-surface);
+  color: var(--sf-ink);
+}
+
+.sf-actions__btn--ghost:hover,
+.sf-actions__btn--ghost:focus-visible {
+  border-color: var(--sf-accent);
+  color: var(--sf-accent-ink);
+  transform: translateY(-1px);
+}
+
+.sf-actions__arrow {
+  font-family: var(--sf-mono);
+  font-size: 0.875rem;
+  transition: transform 0.22s var(--sf-ease);
+}
+
+.sf-actions__btn:hover .sf-actions__arrow {
+  transform: translateX(3px);
+}
+
+.sf-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: clamp(1.75rem, 4vw, 2.5rem);
+  padding-top: 1rem;
+  border-top: 1px solid var(--sf-line-soft);
+  font-family: var(--sf-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sf-ink-3);
+}
+
+.sf-meta__sep {
+  color: var(--sf-line-strong);
+}
+
+/* 窄屏下分隔符会被折行留成尾随字符，改为堆叠的仪表读数式排布 */
+@media (max-width: 600px) {
+  .sf-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+
+  .sf-meta__sep {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Hero 右侧：CSS 几何轨道仪表
+   -------------------------------------------------------------------------- */
+
+.sf-figure {
+  margin: 0;
+  min-width: 0;
+}
+
+@media (min-width: 1000px) {
+  .sf-figure {
+    margin-top: clamp(1.5rem, 3.5vw, 3rem);
+    padding-left: clamp(1.5rem, 3vw, 2.75rem);
+    border-left: 1px solid var(--sf-line-soft);
+  }
+}
+
+.sf-instrument {
+  position: relative;
+  width: min(100%, 23rem);
+  margin-inline: auto;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--sf-line);
+  background: var(--sf-surface);
+}
+
+@media (min-width: 1000px) {
+  .sf-instrument {
+    margin-inline: 0;
+  }
+}
+
+.sf-instrument__mark {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--sf-line-strong);
+}
+
+.sf-instrument__mark--tl {
+  top: -1px;
+  left: -1px;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.sf-instrument__mark--tr {
+  top: -1px;
+  right: -1px;
+  border-left: 0;
+  border-bottom: 0;
+}
+
+.sf-instrument__mark--bl {
+  bottom: -1px;
+  left: -1px;
+  border-right: 0;
+  border-top: 0;
+}
+
+.sf-instrument__mark--br {
+  bottom: -1px;
+  right: -1px;
+  border-left: 0;
+  border-top: 0;
+}
+
+.sf-instrument__label {
+  position: absolute;
+  top: 0.9rem;
+  left: 1rem;
+  font-family: var(--sf-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sf-ink-3);
+}
+
+.sf-instrument__scale {
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  right: 0.55rem;
+  width: 6px;
+  background-image: repeating-linear-gradient(to bottom, var(--sf-line-strong) 0 1px, transparent 1px 10px);
+}
+
+.sf-orbit {
+  position: absolute;
+  inset: 16%;
+}
+
+.sf-orbit__ring,
+.sf-orbit__tilt,
+.sf-orbit__dash {
+  position: absolute;
+  border: 1px solid var(--sf-line-strong);
+  border-radius: 50%;
+}
+
+.sf-orbit__ring {
+  inset: 0;
+}
+
+.sf-orbit__dash {
+  inset: 26%;
+  border-style: dashed;
+  border-color: rgba(11, 109, 118, 0.35);
+}
+
+.sf-orbit__tilt {
+  top: 32%;
+  bottom: 32%;
+  left: -4%;
+  right: -4%;
+  transform: rotate(-18deg);
+}
+
+.sf-orbit__axis {
+  position: absolute;
+  top: 50%;
+  left: -10%;
+  right: -10%;
+  height: 1px;
+  background: var(--sf-line);
+  transform: rotate(-18deg);
+}
+
+.sf-orbit__core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--sf-ink);
+}
+
+.sf-orbit__core::before,
+.sf-orbit__core::after {
+  content: '';
+  position: absolute;
+  background: var(--sf-line-strong);
+}
+
+.sf-orbit__core::before {
+  top: 2px;
+  left: -13px;
+  width: 30px;
+  height: 1px;
+}
+
+.sf-orbit__core::after {
+  top: -13px;
+  left: 2px;
+  width: 1px;
+  height: 30px;
+}
+
+.sf-orbit__sweep {
+  position: absolute;
+  inset: 0;
+}
+
+.sf-orbit__node {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  background: var(--sf-accent);
+  box-shadow: 0 0 0 4px var(--sf-accent-soft);
+}
+
+.sf-readout {
+  position: absolute;
+  left: 1rem;
+  bottom: 0.9rem;
+  display: grid;
+  gap: 0.3rem;
+  font-family: var(--sf-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.1em;
+}
+
+.sf-readout li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.sf-readout__k {
+  min-width: 3.5rem;
+  color: var(--sf-ink-3);
+}
+
+.sf-readout__v {
+  color: var(--sf-ink-2);
+}
+
+.sf-figure__caption {
+  margin-top: 0.9rem;
+  font-family: var(--sf-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  line-height: 1.7;
+  color: var(--sf-ink-3);
+}
+
+@media (min-width: 1000px) {
+  .sf-figure__caption {
+    margin-top: 1.1rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   索引区：编号行列表（刻意不使用三列卡片）
+   -------------------------------------------------------------------------- */
+
+.sf-index {
+  max-width: var(--sf-max);
+  margin-inline: auto;
+  padding: clamp(2rem, 5vw, 3.25rem) var(--sf-pad) clamp(3rem, 7vw, 5.5rem);
+}
+
+.sf-index__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--sf-line);
+}
+
+.sf-index__eyebrow {
+  font-family: var(--sf-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sf-accent-ink);
+}
+
+.sf-index__title {
+  font-size: clamp(1.5rem, 3.6vw, 2.125rem);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.sf-index__count {
+  margin-left: auto;
+  font-family: var(--sf-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  color: var(--sf-ink-3);
+}
+
+.sf-index__list {
+  border-top: 1px solid var(--sf-line);
+  margin-top: 1.75rem;
+}
+
+.sf-index__row {
+  border-bottom: 1px solid var(--sf-line-soft);
+}
+
+.sf-index__entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  grid-template-areas:
+    'no name'
+    '. desc'
+    '. go';
+  align-items: center;
+  gap: 0.5rem 0.875rem;
+  min-height: 44px;
+  padding: 1.25rem 0.5rem;
+  text-decoration: none;
+  transition: transform 0.28s var(--sf-ease);
+}
+
+.sf-index__entry::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: var(--sf-accent);
+  transform: scaleY(0);
+  transform-origin: top center;
+  transition: transform 0.28s var(--sf-ease);
+}
+
+.sf-index__entry:hover,
+.sf-index__entry:focus-visible {
+  transform: translateX(4px);
+}
+
+.sf-index__entry:hover::before,
+.sf-index__entry:focus-visible::before {
+  transform: scaleY(1);
+}
+
+.sf-index__no {
+  grid-area: no;
+  align-self: start;
+  font-family: var(--sf-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  color: var(--sf-ink-3);
+}
+
+.sf-index__name {
+  grid-area: name;
+  font-size: clamp(1.25rem, 2.4vw, 1.5rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  transition: color 0.24s var(--sf-ease);
+}
+
+.sf-index__entry:hover .sf-index__name,
+.sf-index__entry:focus-visible .sf-index__name {
+  color: var(--sf-accent-ink);
+}
+
+.sf-index__desc {
+  grid-area: desc;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--sf-ink-2);
+  overflow-wrap: break-word;
+}
+
+.sf-index__go {
+  grid-area: go;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 32px;
+  font-family: var(--sf-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sf-accent-ink);
+  transition: transform 0.24s var(--sf-ease);
+}
+
+.sf-index__entry:hover .sf-index__go,
+.sf-index__entry:focus-visible .sf-index__go {
+  transform: translateX(4px);
+}
+
+@media (min-width: 860px) {
+  .sf-index__entry {
+    grid-template-columns: 3.5rem minmax(0, 9rem) minmax(0, 1fr) auto;
+    grid-template-areas: 'no name desc go';
+    gap: clamp(1rem, 3vw, 2rem);
+    padding: 1.5rem 0.75rem;
+    align-items: center;
+  }
+
+  /* 打破等距节奏：偶数行整体缩进，形成不对称排版 */
+  .sf-index__row:nth-child(even) .sf-index__entry {
+    margin-left: clamp(0rem, 4vw, 3rem);
+  }
+}
+
+.sf-note {
+  position: relative;
+  display: grid;
+  gap: 0.4rem;
+  max-width: 34rem;
+  margin-top: 2.5rem;
+  margin-left: auto;
+  padding: 1.25rem 0 1.25rem 1.25rem;
+  border-left: 2px solid var(--sf-accent);
+  border-top: 1px solid var(--sf-line-soft);
+}
+
+.sf-note__label {
+  font-family: var(--sf-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--sf-ink-3);
+}
+
+.sf-note__title {
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sf-note__text {
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  color: var(--sf-ink-2);
+  overflow-wrap: break-word;
+}
+
+/* --------------------------------------------------------------------------
+   页脚
+   -------------------------------------------------------------------------- */
+
+.sf-footer {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid var(--sf-line);
+  background: var(--sf-canvas);
+}
+
+.sf-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem 2rem;
+  max-width: var(--sf-max);
+  margin-inline: auto;
+  padding: 2rem var(--sf-pad) 2.5rem;
+}
+
+.sf-footer__brand {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.sf-footer__name {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sf-footer__slogan {
+  font-size: 0.875rem;
+  color: var(--sf-ink-3);
+}
+
+.sf-footer__legal {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.sf-footer__legal a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-family: var(--sf-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--sf-ink-2);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.sf-footer__legal a:hover,
+.sf-footer__legal a:focus-visible {
+  color: var(--sf-accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sf-footer__meta {
+  flex: 1 1 100%;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--sf-line-soft);
+  font-family: var(--sf-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sf-ink-3);
+}
+
+/* --------------------------------------------------------------------------
+   动效：入场 + 轨道自转。全部为 transform / opacity，且只在允许动效时启用。
+   关闭动效（prefers-reduced-motion: reduce）时这些规则不生效，元素保持默认可见。
+   -------------------------------------------------------------------------- */
+
+@keyframes sf-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sf-node-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sf-anim {
+    animation: sf-rise 0.7s var(--sf-ease) both;
+  }
+
+  .sf-anim--1 {
+    animation-delay: 0.06s;
+  }
+
+  .sf-anim--2 {
+    animation-delay: 0.12s;
+  }
+
+  .sf-anim--3 {
+    animation-delay: 0.18s;
+  }
+
+  .sf-anim--4 {
+    animation-delay: 0.24s;
+  }
+
+  .sf-anim--5 {
+    animation-delay: 0.3s;
+  }
+
+  .sf-orbit__sweep {
+    animation: sf-spin 52s linear infinite;
+  }
+
+  .sf-orbit__node {
+    animation: sf-node-pulse 7s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-skip,
+  .sf-nav__link,
+  .sf-nav__link::after,
+  .sf-nav__toggle,
+  .sf-actions__btn,
+  .sf-actions__arrow,
+  .sf-index__entry,
+  .sf-index__entry::before,
+  .sf-index__name,
+  .sf-index__go,
+  .sf-footer__legal a {
+    transition: none;
+  }
+}
