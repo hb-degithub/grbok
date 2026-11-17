@@ -13,7 +13,10 @@ import TechCard, { type TechDetail } from './TechCard';
  *   - 紧凑行必须是原生 `button[type=button]`，可用键盘聚焦/激活；
  *   - 任意 hover 能力下点击都 toggle，不再依赖媒体查询；
  *   - `aria-expanded` / `aria-controls` / 详情容器 `aria-hidden` 同步；
- *   - 详情容器始终挂载（供 CSS 过渡），内容只出现在内联容器里，没有 tooltip 浮层。
+ *   - 详情容器始终挂载（供 CSS 过渡），内容只出现在内联容器里，没有 tooltip 浮层；
+ *   - 详情容器 id 可由调用方显式传入（about 页按索引传 tech-${index}），未传时
+ *     回退 useId —— useId 只在同一个 React root 内唯一，Astro 每个 client:* 岛屿
+ *     是独立 root，跨岛屿必须传显式 id。
  *
  * 说明：jsdom 不实现原生 button 的 Enter/Space → click 激活行为
  * （已实测 jsdom 29 不会合成 click），因此键盘用例验证「控件是原生 button、
@@ -138,7 +141,17 @@ describe('TechCard（点击内联展开详情）', () => {
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
 
-  it('多张卡片的详情容器 id 唯一，展开状态互不影响', () => {
+  it('显式 id 优先：详情容器 id 为 tech-detail-${id}', () => {
+    render(<TechCard tech={tech} id="tech-0" />);
+
+    const toggle = getToggle();
+    const panel = getPanel(toggle);
+
+    expect(toggle.getAttribute('aria-controls')).toBe('tech-detail-tech-0');
+    expect(panel.id).toBe('tech-detail-tech-0');
+  });
+
+  it('多张卡片未传 id 时回退 useId：同一 root 内默认 id 唯一，状态互不影响', () => {
     render(
       <>
         <TechCard tech={tech} />
@@ -150,6 +163,9 @@ describe('TechCard（点击内联展开详情）', () => {
     const astroPanel = getPanel(astroToggle);
     const reactPanel = getPanel(reactToggle);
 
+    // 双卡都没传 id：回退 useId，并在同一个 React root 内保持唯一。
+    expect(astroPanel.id).toMatch(/^tech-detail-/);
+    expect(reactPanel.id).toMatch(/^tech-detail-/);
     expect(astroPanel.id).not.toBe(reactPanel.id);
 
     fireEvent.click(astroToggle);
@@ -158,5 +174,24 @@ describe('TechCard（点击内联展开详情）', () => {
     expect(astroPanel.getAttribute('aria-hidden')).toBe('false');
     expect(reactToggle.getAttribute('aria-expanded')).toBe('false');
     expect(reactPanel.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('模拟 Astro 独立岛屿（两个独立 React root）：显式 id 仍唯一', () => {
+    // 每个 client:* 岛屿是独立 React root，useId 各自从 _R_0_ 开始；只有显式 id
+    // 能跨岛屿区分详情容器。about 页按索引传入 tech-${index} 正是为此。
+    const firstRoot = document.createElement('div');
+    const secondRoot = document.createElement('div');
+
+    render(<TechCard tech={tech} id="tech-0" />, { container: firstRoot });
+    render(<TechCard tech={{ ...tech, name: 'React 19' }} id="tech-1" />, {
+      container: secondRoot,
+    });
+
+    const firstPanel = firstRoot.querySelector('[id^="tech-detail-"]');
+    const secondPanel = secondRoot.querySelector('[id^="tech-detail-"]');
+
+    expect(firstPanel?.id).toBe('tech-detail-tech-0');
+    expect(secondPanel?.id).toBe('tech-detail-tech-1');
+    expect(firstPanel?.id).not.toBe(secondPanel?.id);
   });
 });

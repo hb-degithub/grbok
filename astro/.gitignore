@@ -25,3 +25,7 @@ pnpm-debug.log*
 
 # visual check screenshots
 tmp-visual/
+
+# Playwright artifacts (traces / screenshots / videos)
+test-results/
+playwright-report/

@@ -143,6 +143,33 @@ describe('PostActions（点赞/收藏必须登录）', () => {
     });
   });
 
+  it('科幻视觉契约：按钮走 --sf-* 令牌、保留 min-h-11，不再出现旧调色板', async () => {
+    setAuthState(false);
+    render(<PostActions postId="post-1" initialLikes={3} />);
+
+    const likeButton = await screen.findByRole('button', { name: '点赞' });
+    const bookmarkButton = await screen.findByRole('button', { name: '收藏' });
+
+    for (const button of [likeButton, bookmarkButton]) {
+      expect(button.className).toContain('min-h-11');
+      expect(button.className).toContain('var(--sf-');
+      expect(button.className).not.toMatch(/zinc|teal|dark:/);
+    }
+  });
+
+  it('科幻视觉契约：登录/错误提示使用统一令牌，不使用 red-600、zinc', async () => {
+    setAuthState(false);
+    render(<PostActions postId="post-1" initialLikes={0} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '点赞' }));
+
+    const alert = await screen.findByRole('alert');
+    const status = await screen.findByRole('status');
+    expect(alert.className).toContain('var(--sf-');
+    expect(alert.className).not.toMatch(/red-|zinc|teal|dark:/);
+    expect(status.className).toContain('var(--sf-');
+  });
+
   it('服务端返回 401：降级为登录态失效并提示「请先登录」', async () => {
     setAuthState(true);
     isAuthRequiredErrorMock.mockReturnValue(true);
