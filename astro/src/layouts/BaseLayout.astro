@@ -174,7 +174,16 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
     <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[70] focus:px-4 focus:py-2 focus:bg-teal-600 focus:text-white focus:rounded-md">跳转到主要内容</a>
     {showChrome && <Header transition:persist="header" client:load />}
     {showChrome && <SearchModal client:idle />}
-    {showChrome && <AnnouncementBar client:idle />}
+    {showChrome && (
+      /*
+        仅当公告真实存在时才预留导航高度：桌面避开 Dock（80px），移动端避开汉堡按钮（56px）；
+        AnnouncementBar 无公告时返回 null，恒定间距会让 main 多出空白；
+        这里用容器 :has(.announcement-bar) 条件间距，关闭最后一个公告后自动归 0。
+      */
+      <div class="relative z-40 has-[.announcement-bar]:pt-14 sm:has-[.announcement-bar]:mt-20 sm:has-[.announcement-bar]:pt-0">
+        <AnnouncementBar client:idle />
+      </div>
+    )}
 
     <main id="main-content" class:list={["w-full overflow-x-clip", mainClass]}>
       <slot />

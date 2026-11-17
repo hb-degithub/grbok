@@ -208,10 +208,9 @@ const links = [
           技术栈
         </h2>
         <p class="mb-4 text-xs text-zinc-400 dark:text-zinc-500">
-          <span class="hidden [@media(hover:hover)]:inline">鼠标悬停查看技术细节</span>
-          <span class="[@media(hover:hover)]:hidden">点击卡片查看技术细节</span>
+          点击卡片展开技术详情
         </p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 items-start gap-3">
           {techStack.map((tech) => (
             <GlareHover client:visible glareColor="rgba(20, 184, 166, 0.08)">
               <TechCard client:visible tech={tech} />

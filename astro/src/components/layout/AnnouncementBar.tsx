@@ -24,7 +24,9 @@ export default function AnnouncementBar() {
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, height: 0 }}
-          className={cn('border-b px-4 py-2.5 text-center text-sm', typeStyles[a.type] || typeStyles.normal)}
+          // announcement-bar：公告根节点的稳定标识，供 BaseLayout 容器用
+          // :has(.announcement-bar) 只在公告真实存在时预留顶部间距。
+          className={cn('announcement-bar border-b px-4 py-2.5 text-center text-sm', typeStyles[a.type] || typeStyles.normal)}
         >
           <div className="mx-auto flex max-w-full sm:max-w-4xl items-center justify-center gap-3">
             <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap sm:whitespace-normal">

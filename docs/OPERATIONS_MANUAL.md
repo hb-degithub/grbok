@@ -531,7 +531,15 @@ curl -s https://hlydwz.com/
 
 ---
 
-## 八、联系信息
+## 八、2026-11-08 安全修复部署
+
+本轮应用与边缘修复的必填环境变量、源站安全组顺序、SafeLine 请求体检测边界和回滚验证见 [安全修复与部署验收](SECURITY_REMEDIATION_2026-11-08.md)。
+
+上线前至少设置 `PB_TRUSTED_PROXY_IPS` 为实际 Caddy 容器地址/网段；启用 AI 时设置 `AI_ALLOWED_ORIGINS`。不要把本机测试夹具部署到生产。
+
+---
+
+## 九、联系信息
 
 **技术支持**:
 - 阿里云技术支持: https://workorder.console.aliyun.com/

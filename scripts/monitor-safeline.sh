@@ -1,45 +1,70 @@
 #!/bin/sh
-# 雷池(SafeLine)防护统计采集器:每分钟汇总 hlydwz.com 与 img.hlydwz.com
+# 雷池(SafeLine)防护统计采集器(V2,API 版):每分钟汇总 hlydwz.com 与 img.hlydwz.com
 # 最近 24h 的检测(action=0)与拦截(action=1)事件数,POST 到本站 PocketBase。
-# action 语义已于 2026-09-18 实测核实(我自己的 XSS 测试拦截记录 action=1)。
-# 挑战数社区版无可靠事件流,不上报。
-# 只读查询,失败时上报 ok=false(公开端据此显示"数据过期",不冒充零事件)。
+# 数据来源:雷池 mgt 开放 API  GET /api/open/records(Authorization: Bearer <JWT>)
+#   - 时间参数 start/end 为毫秒时间戳;page_size 上限 100,按 total 分页拉全(最多 10 页)
+#   - 只读查询;失败上报 ok=false,公开端显示"数据过期"而不是冒充 0
 
 ENV_FILE="/opt/hlydwz-blog/current/.env"
 INGEST_URL="http://127.0.0.1:18080/api/internal/monitor/protection"
+API_BASE="https://127.0.0.1:9443"
+TMPD=$(mktemp -d)
+trap 'rm -rf "$TMPD"' EXIT
 
 SECRET=$(grep -E '^ADMIN_AUTH_INTERNAL_SECRET=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"\r')
+TOKEN=$(grep -E '^SAFELINE_API_TOKEN=' "$ENV_FILE" | head -1 | cut -d= -f2- | tr -d '"\r')
 [ -z "$SECRET" ] && exit 0
 
 SAMPLED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+NOW_MS=$(($(date +%s) * 1000))
+START_MS=$((NOW_MS - 86400000))
+PS=100
 
-ROWS=$(docker exec safeline-pg psql -U safeline-ce -d safeline-ce -t -A -F'|' -c \
-  "SELECT action, COUNT(*) FROM mgt_detect_log_basic WHERE host IN ('hlydwz.com','img.hlydwz.com') AND timestamp > EXTRACT(EPOCH FROM NOW())::bigint - 86400 GROUP BY action;" 2>/dev/null)
+fetch_page() {
+  curl -sk -m 15 -H "Authorization: Bearer $TOKEN" \
+    "$API_BASE/api/open/records?page=$1&page_size=$PS&start=$START_MS&end=$NOW_MS" -o "$TMPD/p$1.json"
+}
 
-if [ -z "$ROWS" ]; then
-  # 采集失败:报 ok=false,公开端会把数据标为过期/不可用而不是显示 0
-  curl -s -o /dev/null -m 8 -X POST "$INGEST_URL" \
-    -H 'Content-Type: application/json' \
-    -H "X-Internal-Secret: $SECRET" \
-    -d "{\"ok\":false,\"error\":\"safeline query failed\",\"sampledAt\":\"$SAMPLED_AT\"}"
+fetch_page 1
+TOTAL=$(python3 -c "
+import sys,json
+try:
+  d=json.load(open('$TMPD/p1.json')); print((d.get('data') or {}).get('total') or 0)
+except Exception: print(-1)
+")
+if [ "$TOTAL" = "-1" ]; then
+  curl -s -o /dev/null -m 8 -X POST "$INGEST_URL" -H 'Content-Type: application/json' -H "X-Internal-Secret: $SECRET" \
+    -d "{\"ok\":false,\"error\":\"safeline api failed\",\"sampledAt\":\"$SAMPLED_AT\"}"
   exit 0
 fi
 
-DETECTED=0
-BLOCKED=0
-echo "$ROWS" | while IFS='|' read -r action cnt; do
-  case "$action" in
-    0) DETECTED=$cnt ;;
-    1) BLOCKED=$cnt ;;
-  esac
-done
-# 子 shell 变量回传不了,用 awk 重算一次(行数极少,成本可忽略)
-DETECTED=$(echo "$ROWS" | awk -F'|' '$1=="0"{print $2}')
-BLOCKED=$(echo "$ROWS" | awk -F'|' '$1=="1"{print $2}')
-DETECTED=${DETECTED:-0}
-BLOCKED=${BLOCKED:-0}
+PAGES=1
+[ "$TOTAL" -gt "$PS" ] && PAGES=$(( (TOTAL + PS - 1) / PS ))
+[ "$PAGES" -gt 10 ] && PAGES=10
+i=2
+while [ "$i" -le "$PAGES" ]; do fetch_page "$i"; i=$((i+1)); done
 
-curl -s -o /dev/null -m 8 -X POST "$INGEST_URL" \
-  -H 'Content-Type: application/json' \
-  -H "X-Internal-Secret: $SECRET" \
+COUNTS=$(python3 -c "
+import glob,json
+rows=[]
+for f in sorted(glob.glob('$TMPD/p*.json')):
+    try:
+        d=json.load(open(f)); rows += (d.get('data') or {}).get('data') or []
+    except Exception: pass
+hosts={'hlydwz.com','img.hlydwz.com'}
+det=sum(1 for r in rows if r.get('host') in hosts and r.get('action')==0)
+blk=sum(1 for r in rows if r.get('host') in hosts and r.get('action')==1)
+print(f'{det} {blk} {len(rows)}')
+" 2>/dev/null)
+
+if [ -z "$COUNTS" ]; then
+  curl -s -o /dev/null -m 8 -X POST "$INGEST_URL" -H 'Content-Type: application/json' -H "X-Internal-Secret: $SECRET" \
+    -d "{\"ok\":false,\"error\":\"parse failed\",\"sampledAt\":\"$SAMPLED_AT\"}"
+  exit 0
+fi
+
+DETECTED=$(echo "$COUNTS" | awk '{print $1}'); BLOCKED=$(echo "$COUNTS" | awk '{print $2}')
+DETECTED=${DETECTED:-0}; BLOCKED=${BLOCKED:-0}
+
+curl -s -o /dev/null -m 8 -X POST "$INGEST_URL" -H 'Content-Type: application/json' -H "X-Internal-Secret: $SECRET" \
   -d "{\"ok\":true,\"detected\":$DETECTED,\"blocked\":$BLOCKED,\"windowHours\":24,\"sampledAt\":\"$SAMPLED_AT\"}"

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 export interface TechDetail {
   name: string;
@@ -12,24 +12,30 @@ interface TechCardProps {
 }
 
 /**
- * 技术栈卡片：桌面端 hover 显示悬浮详情，移动端点击展开内联详情。
- * hover 态用纯 CSS（group-hover + hover:hover 媒体查询），点击展开仅在不支持 hover 的设备生效。
+ * 技术栈卡片：桌面与触屏统一「点击内联展开/收起」详情。
+ *
+ * 旧实现把详情放在 absolute 浮层里 hover 展示，被外层 GlareHover 的
+ * `overflow: hidden` 裁切；桌面点击又被 `(hover: none)` 排除，导致详情不可达。
+ * 现在紧凑行是原生 button（Enter/Space 可激活），详情始终挂载在按钮下方，
+ * 用 grid-template-rows 0fr ↔ 1fr 过渡展开/收起，aria-expanded / aria-controls
+ * 与容器 aria-hidden 同步。
+ *
+ * 键盘焦点环使用 `ring-inset`：外层 GlareHover 是 `overflow: hidden`，
+ * ring-offset 的外扩阴影会被整圈裁掉，改用 inset 阴影保证焦点始终可见。
  */
 export default function TechCard({ tech }: TechCardProps) {
   const [open, setOpen] = useState(false);
+  // useId 保证 SSR/CSR 一致；清洗成 CSS 选择器安全的 id 供 aria-controls 使用。
+  const panelId = `tech-detail-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
   return (
-    <div
-      className="group relative"
-      onClick={() => {
-        // 仅在无 hover 能力的设备（触屏）上响应点击展开
-        if (window.matchMedia('(hover: none)').matches) {
-          setOpen((v) => !v);
-        }
-      }}
-    >
-      <div
-        className={`flex cursor-pointer items-center gap-3 rounded-md border px-4 py-3 transition-all duration-200 hover:-translate-y-0.5 ${
+    <div>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((v) => !v)}
+        className={`flex w-full cursor-pointer items-center gap-3 rounded-md border px-4 py-3 text-left transition-all duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-teal-500/60 focus-visible:ring-inset focus-visible:outline-none ${
           open
             ? 'border-teal-500/40 bg-teal-500/5'
             : 'border-zinc-200 hover:border-teal-500/30 dark:border-zinc-700/50'
@@ -39,10 +45,10 @@ export default function TechCard({ tech }: TechCardProps) {
           {tech.name}
         </span>
         <span className="truncate text-xs text-zinc-400 dark:text-zinc-500">{tech.desc}</span>
-        {/* 提示图标：有详情时显示 */}
+        {/* 展开指示箭头：随 open 旋转 */}
         <svg
           className={`ml-auto h-3.5 w-3.5 shrink-0 transition-all duration-200 ${
-            open ? 'rotate-180 text-teal-500' : 'text-zinc-300 group-hover:text-teal-500 dark:text-zinc-600'
+            open ? 'rotate-180 text-teal-500' : 'text-zinc-300 dark:text-zinc-600'
           }`}
           fill="none"
           viewBox="0 0 24 24"
@@ -52,44 +58,34 @@ export default function TechCard({ tech }: TechCardProps) {
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
         </svg>
-      </div>
+      </button>
 
-      {/* 桌面端：hover 悬浮详情卡 */}
+      {/* 内联详情：始终挂载，0fr ↔ 1fr 折叠；内层 min-height:0 + overflow 裁剪避免撑开网格 */}
       <div
-        className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-72 -translate-x-1/2 translate-y-1 rounded-lg border border-zinc-200/80 bg-white/95 p-4 opacity-0 shadow-lg shadow-zinc-900/5 backdrop-blur-md transition-all duration-200 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100 dark:border-zinc-700/60 dark:bg-zinc-900/95 dark:shadow-black/20 [@media(hover:hover)]:block"
-        role="tooltip"
+        id={panelId}
+        aria-hidden={!open}
+        className="grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none"
+        style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
       >
-        <p className="mb-2 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">{tech.detail}</p>
-        {tech.points && tech.points.length > 0 && (
-          <ul className="space-y-1">
-            {tech.points.map((p) => (
-              <li key={p} className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
-                <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-500" />
-                {p}
-              </li>
-            ))}
-          </ul>
-        )}
-        {/* 小三角 */}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-white/95 dark:border-t-zinc-900/95" />
-      </div>
-
-      {/* 移动端：点击展开内联详情 */}
-      {open && (
-        <div className="mt-2 rounded-md border border-teal-500/20 bg-teal-500/5 p-3 [@media(hover:hover)]:hidden">
-          <p className="mb-2 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">{tech.detail}</p>
-          {tech.points && tech.points.length > 0 && (
-            <ul className="space-y-1">
-              {tech.points.map((p) => (
-                <li key={p} className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
-                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-500" />
-                  {p}
-                </li>
-              ))}
-            </ul>
-          )}
+        <div style={{ minHeight: 0, overflow: 'hidden' }}>
+          <div className="mt-2 rounded-md border border-teal-500/20 bg-teal-500/5 p-3">
+            <p className="mb-2 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">{tech.detail}</p>
+            {tech.points && tech.points.length > 0 && (
+              <ul className="space-y-1">
+                {tech.points.map((p) => (
+                  <li
+                    key={p}
+                    className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400"
+                  >
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-teal-500" />
+                    {p}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
