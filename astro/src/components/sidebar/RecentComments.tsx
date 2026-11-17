@@ -1,38 +1,45 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { useRecentComments } from '../../hooks/domains/useRecentComments';
 import { sanitizeText } from '../../lib/security';
-import AnimatedList from '../reactbits/AnimatedList';
 
+/**
+ * 首页最近评论：编号行列表（等宽序号 + 作者 + 纯文本摘要），保留 useRecentComments 真实数据。
+ * 视觉迁移到 --sf-* 令牌，去掉 AnimatedList、玻璃与入场动效；内容仍经 sanitizeText。
+ */
 export default function RecentComments() {
   const { comments, loading } = useRecentComments(5);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }} className="space-y-3">
-      <div className="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">最近评论</div>
+    <div className="min-w-0">
+      <div className="mb-3 flex items-baseline justify-between border-b border-[var(--sf-line-soft)] pb-2">
+        <h3 className="text-sm font-semibold tracking-[0.05em] text-[var(--sf-ink)]">最近评论</h3>
+        <span className="font-mono text-[0.625rem] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">RECENT / 05</span>
+      </div>
       {loading ? (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-14 animate-pulse rounded-lg bg-zinc-50 dark:bg-zinc-900" />)}
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-12 animate-pulse rounded-[1px] bg-[var(--sf-line-soft)]" />
+          ))}
         </div>
+      ) : comments.length === 0 ? (
+        <p className="py-2 text-sm text-[var(--sf-ink-3)]">暂无评论</p>
       ) : (
-        <AnimatedList showGradients={false}>
-          {comments.length === 0 ? (
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">暂无评论</p>
-          ) : (
-            comments.map((comment) => (
-              <div key={comment.id} className="flex items-start gap-3">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-teal-500/10 text-xs font-bold text-teal-600 dark:text-teal-400">
-                  {comment.author_name.charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-50">{comment.author_name}</p>
-                  <p className="line-clamp-2 text-xs text-zinc-500 dark:text-zinc-400">{sanitizeText(comment.content)}</p>
-                </div>
+        <ol className="divide-y divide-[var(--sf-line-soft)]" role="list">
+          {comments.map((comment, index) => (
+            <li key={comment.id} className="flex min-h-[44px] items-start gap-3 py-2.5">
+              <span className="mt-0.5 w-6 shrink-0 font-mono text-[0.6875rem] tabular-nums text-[var(--sf-ink-3)]">
+                {String(index + 1).padStart(2, '0')}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold text-[var(--sf-ink)]">{comment.author_name}</p>
+                <p className="line-clamp-2 text-xs leading-relaxed text-[var(--sf-ink-2)]">
+                  {sanitizeText(comment.content)}
+                </p>
               </div>
-            ))
-          )}
-        </AnimatedList>
+            </li>
+          ))}
+        </ol>
       )}
-    </motion.div>
+    </div>
   );
 }

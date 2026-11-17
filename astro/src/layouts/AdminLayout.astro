@@ -26,28 +26,28 @@ const requiredRoleLabel: Record<AdminRole, string> = {
 
 <BaseLayout title={`${title} - 后台`} description={description} showChrome={false} noindex>
   <AdminGuard client:only="react" requiredRole={requiredRole}>
-    <div class="admin-shell min-h-[100svh] bg-[#f6f6f3] text-text">
+    <div class="admin-shell min-h-[100svh] bg-[var(--sf-canvas)] text-[var(--sf-ink)]">
       <AdminSidebar client:only="react" />
       <main class="min-h-[100svh] flex-1 px-4 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-16 transition-[margin] duration-300 ease-out sm:px-5 lg:ml-[var(--admin-sidebar-width,15.5rem)] lg:px-6 lg:pt-4">
         <div class="mx-auto w-full max-w-[1440px]">
-          <header class="admin-topbar sticky top-0 z-30 -mx-4 mb-5 border-b border-border/80 bg-[#f6f6f3]/92 px-4 py-3 pl-16 backdrop-blur-xl sm:-mx-5 sm:px-5 sm:pl-16 lg:-mx-6 lg:px-6">
+          <header class="admin-topbar sticky top-0 z-30 -mx-4 mb-5 border-b border-[var(--sf-line)] bg-[var(--sf-canvas)] px-4 py-3 pl-16 sm:-mx-5 sm:px-5 sm:pl-16 lg:-mx-6 lg:px-6">
             <div class="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <div class="min-w-0">
                 <div class="mb-1 flex items-center gap-2 text-[11px]">
-                  <span class="h-2 w-2 rounded-full bg-success shadow-[0_0_0_4px_rgba(16,185,129,0.12)]"></span>
-                  <span class="font-mono uppercase text-muted">运营控制台</span>
-                  <span class="text-muted">/</span>
-                  <span class="truncate font-mono uppercase text-text-secondary">{title}</span>
+                  <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--sf-accent)]" aria-hidden="true"></span>
+                  <span class="font-mono uppercase tracking-[0.16em] text-[var(--sf-ink-3)]">运营控制台</span>
+                  <span class="text-[var(--sf-ink-3)]">/</span>
+                  <span class="truncate font-mono uppercase tracking-[0.12em] text-[var(--sf-ink-2)]">{title}</span>
                 </div>
-                <h1 class="break-words text-xl font-black leading-tight text-text sm:text-2xl">{title}</h1>
+                <h1 class="break-words text-xl font-black leading-tight text-[var(--sf-ink)] sm:text-2xl">{title}</h1>
               </div>
               <div class="flex flex-wrap items-center gap-2 text-xs">
-                <span class="min-h-9 rounded-md border border-border bg-white px-3 py-1.5 font-mono text-text-secondary shadow-xs">
+                <span class="min-h-9 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-1.5 font-mono text-[var(--sf-ink-2)]">
                   当前权限：{requiredRoleLabel[requiredRole]}
                 </span>
                 <a
                   href="/"
-                  class="inline-flex min-h-9 items-center rounded-md border border-border bg-white px-3 py-1.5 font-mono text-text-secondary shadow-xs transition-colors hover:border-border-hover hover:text-text"
+                  class="inline-flex min-h-9 items-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-1.5 font-mono text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]"
                 >
                   返回首页
                 </a>
@@ -103,7 +103,7 @@ const requiredRoleLabel: Record<AdminRole, string> = {
   /* 按钮统一 hover / 按压反馈 */
   .admin-shell button:not(:disabled) {
     transition: transform 0.18s ease, background-color 0.18s ease, color 0.18s ease,
-      border-color 0.18s ease, box-shadow 0.18s ease;
+      border-color 0.18s ease;
   }
   .admin-shell button:not(:disabled):hover {
     transform: translateY(-1px);

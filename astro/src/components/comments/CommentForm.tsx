@@ -14,21 +14,21 @@ const CONTENT_MAX = 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const containerVariants: Variants = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5, staggerChildren: 0.1 } },
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.4, staggerChildren: 0.06 } },
 };
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 15 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
+  hidden: { opacity: 0, y: 6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } },
 };
 
 const successVariants: Variants = {
-  hidden: { scale: 0, opacity: 0 },
+  hidden: { scale: 0.96, opacity: 0 },
   visible: {
     scale: 1,
     opacity: 1,
-    transition: { type: 'spring' as const, stiffness: 500, damping: 15 },
+    transition: { type: 'spring' as const, stiffness: 400, damping: 24 },
   },
 };
 
@@ -45,15 +45,18 @@ interface CommentFormProps {
   serverError?: string | null;
 }
 
-/** 共享 textarea 样式 - 玻璃底 + teal focus-visible */
+/**
+ * 共享 textarea 样式 - 表面色 + 冷灰控制线 + 小圆角；
+ * 聚焦时换成唯一强调色，颜色全部来自 --sf-* 令牌。
+ */
 const textareaClass =
-  'w-full rounded-xl border border-zinc-200 bg-white/70 px-4 py-3 text-sm text-zinc-900 placeholder-zinc-400 transition-all duration-200 ease-out outline-none focus-visible:border-zinc-500 focus-visible:ring-2 focus-visible:ring-zinc-500/30 dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500 dark:focus-visible:border-zinc-400';
+  'w-full rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-sm text-[var(--sf-ink)] placeholder:text-[var(--sf-ink-3)] transition-colors duration-200 ease-out outline-none focus-visible:border-[var(--sf-accent)] focus-visible:ring-2 focus-visible:ring-[var(--sf-accent)]';
 
 /**
  * 主评论表单组件
  *
- * 设计决策：glass-strong 容器保证表单文字对比度；textarea 用 id 关联 label，
- * 支持 `aria-describedby` 错误播报；成功态用 emerald 打勾动画。
+ * 设计决策：细线表面容器保证表单文字对比度；textarea 用 id 关联 label，
+ * 支持 `aria-describedby` 错误播报；成功态保留绿色 ✓ 语义。
  */
 export default function CommentForm({ postId, onSubmit, moderationEnabled = true, userEmailVerified, serverError }: CommentFormProps) {
   // SSR 期（window === undefined）getPocketBase() 每次创建新实例且 authStore 为空，
@@ -166,27 +169,27 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
   if (userEmailVerified === false) {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="glass-strong flex flex-col items-center gap-3 rounded-lg p-8 text-center"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex flex-col items-center gap-3 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-7 text-center sm:p-8"
       >
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
-          <svg className="h-6 w-6 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <div className="flex h-11 w-11 items-center justify-center rounded-[2px] border border-[var(--sf-line)] text-[var(--sf-ink-3)]">
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         </div>
-        <h4 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">请先验证邮箱</h4>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">验证邮箱后即可发表评论</p>
+        <h4 className="text-base font-semibold text-[var(--sf-ink)]">请先验证邮箱</h4>
+        <p className="text-sm text-[var(--sf-ink-3)]">验证邮箱后即可发表评论</p>
         {verifyResendStatus === 'sent' ? (
-          <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">验证邮件已发送，请检查收件箱</p>
+          <p role="status" className="text-sm font-medium text-emerald-600 dark:text-emerald-400">验证邮件已发送，请检查收件箱</p>
         ) : verifyResendStatus === 'error' ? (
-          <p className="text-sm text-red-600 dark:text-red-400">发送失败，请稍后重试</p>
+          <p role="alert" className="text-sm text-[var(--sf-danger)]">发送失败，请稍后重试</p>
         ) : (
           <button
             type="button"
             onClick={handleResendVerification}
             disabled={verifyResendStatus === 'sending'}
-            className="focus-ring inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-4 py-2.5 sm:px-3 sm:py-1.5 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:opacity-50"
+            className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-[2px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50"
           >
             {verifyResendStatus === 'sending' ? '发送中...' : '重新发送验证邮件'}
           </button>
@@ -200,7 +203,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="glass-strong rounded-lg p-6 sm:p-7"
+      className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5 sm:p-7"
     >
       <AnimatePresence mode="wait">
         {status === 'success' ? (
@@ -215,38 +218,14 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
             role="status"
             aria-live="polite"
           >
-            <motion.div
-              className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30"
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-            >
-              <motion.svg
-                className="h-8 w-8 text-emerald-600 dark:text-emerald-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                aria-hidden="true"
-              >
-                <motion.path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                  initial={{ pathLength: 0 }}
-                  animate={{ pathLength: 1 }}
-                  transition={{ duration: 0.6, delay: 0.3 }}
-                />
-              </motion.svg>
-            </motion.div>
-            <motion.p
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="text-lg font-medium text-emerald-600 dark:text-emerald-400"
-            >
+            <div className="flex h-14 w-14 items-center justify-center rounded-[2px] border border-[var(--sf-line)] text-emerald-600 dark:text-emerald-400">
+              <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <p className="text-base font-medium text-emerald-600 dark:text-emerald-400">
               {moderationEnabled ? '评论提交成功，审核后展示！' : '评论提交成功！'}
-            </motion.p>
+            </p>
           </motion.div>
         ) : (
           /* ==================== 表单状态 ==================== */
@@ -261,8 +240,9 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
             noValidate
           >
             <motion.div variants={itemVariants}>
-              <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">发表评论</h3>
-              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Form / 02</p>
+              <h3 className="mt-1 text-lg font-semibold text-[var(--sf-ink)]">发表评论</h3>
+              <p className="mt-1 text-sm text-[var(--sf-ink-3)]">
                 {isLoggedIn
                   ? `以 ${formData.author_name || formData.author_email} 的身份评论${moderationEnabled ? '，审核后展示' : ''}`
                   : moderationEnabled
@@ -295,7 +275,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
             )}
 
             <motion.div variants={itemVariants}>
-              <label htmlFor="comment-content" className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              <label htmlFor="comment-content" className="mb-1.5 block text-sm font-medium text-[var(--sf-ink-2)]">
                 评论内容
               </label>
               <motion.textarea
@@ -309,7 +289,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
                 rows={4}
                 maxLength={CONTENT_MAX}
                 className={textareaClass}
-                whileFocus={{ scale: 1.005 }}
+                whileFocus={{ scale: 1.002 }}
                 transition={{ duration: 0.15 }}
                 required
               />
@@ -319,9 +299,9 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
             {status === 'error' && (
               <motion.p
                 role="alert"
-                initial={{ opacity: 0, y: -5 }}
+                initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400"
+                className="flex items-center gap-1.5 text-sm text-[var(--sf-danger)]"
               >
                 <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />

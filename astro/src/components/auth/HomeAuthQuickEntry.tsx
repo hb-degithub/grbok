@@ -6,7 +6,7 @@ import {
   useAuthStatus,
 } from '../../hooks/useAuthStatus';
 
-const linkClass = 'side-link group flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 text-sm font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950';
+const linkClass = 'side-link group flex min-h-[44px] items-center justify-between rounded-[2px] border border-[var(--sf-line-soft)] px-3 py-3 text-sm font-semibold text-[var(--sf-ink-2)] no-underline transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent)]';
 
 function ArrowIcon() {
   return (
@@ -23,9 +23,9 @@ export default function HomeAuthQuickEntry() {
 
   if (isLoading) {
     return (
-      <div className="rounded-lg bg-zinc-50 px-4 py-3 dark:bg-zinc-950/50" aria-label="正在读取登录状态">
-        <div className="h-4 w-28 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
-        <div className="mt-2 h-3 w-40 animate-pulse rounded bg-zinc-200 dark:bg-zinc-800" />
+      <div className="rounded-[2px] border border-[var(--sf-line-soft)] px-3 py-3" aria-label="正在读取登录状态">
+        <div className="h-4 w-28 animate-pulse rounded-[1px] bg-[var(--sf-line-soft)]" />
+        <div className="mt-2 h-3 w-40 animate-pulse rounded-[1px] bg-[var(--sf-line-soft)]" />
       </div>
     );
   }
@@ -41,18 +41,18 @@ export default function HomeAuthQuickEntry() {
 
   return (
     <>
-      <div className="rounded-lg border border-zinc-100 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/50">
+      <div className="rounded-[2px] border border-[var(--sf-line)] px-3 py-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-sm font-black text-white dark:bg-zinc-100 dark:text-zinc-950">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[2px] bg-[var(--sf-accent)] text-sm font-black text-[var(--sf-on-accent)]">
             {initial}
           </div>
           <div className="min-w-0">
-            <div className="truncate text-sm font-black text-zinc-950 dark:text-zinc-50">{displayName}</div>
-            <div className="truncate text-xs text-zinc-500 dark:text-zinc-400">{user?.email || '已登录'}</div>
+            <div className="truncate text-sm font-black text-[var(--sf-ink)]">{displayName}</div>
+            <div className="truncate text-xs text-[var(--sf-ink-3)]">{user?.email || '已登录'}</div>
           </div>
         </div>
         {user?.role && (
-          <div className="mt-3 inline-flex rounded-md border border-zinc-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+          <div className="mt-3 inline-flex rounded-[2px] border border-[var(--sf-line)] px-2 py-0.5 text-[11px] font-semibold text-[var(--sf-ink-2)]">
             {ROLE_LABELS[user.role]}
           </div>
         )}
@@ -68,7 +68,7 @@ export default function HomeAuthQuickEntry() {
       <button
         type="button"
         onClick={() => logout('/')}
-        className="side-link group flex w-full items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 text-left text-sm font-semibold text-red-600 transition-all hover:bg-red-50 dark:bg-zinc-950/50 dark:text-red-300 dark:hover:bg-red-950/40"
+        className="side-link group flex min-h-[44px] w-full items-center justify-between rounded-[2px] border border-[var(--sf-line-soft)] px-3 py-3 text-left text-sm font-semibold text-[var(--sf-danger)] transition-colors hover:border-[var(--sf-danger)]"
       >
         <span>退出登录</span>
         <ArrowIcon />

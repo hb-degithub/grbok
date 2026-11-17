@@ -169,10 +169,10 @@ export default function PasswordLoginForm() {
     <AnimatePresence mode="wait">
       {success ? (
         <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }} className="flex flex-col items-center gap-3 py-8">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-500/10">
-            <svg className="h-7 w-7 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          <div className="flex h-14 w-14 items-center justify-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-line-soft)]">
+            <svg className="h-7 w-7 text-[var(--sf-accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
           </div>
-          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">登录成功</p>
+          <p className="text-sm font-medium text-[var(--sf-ink)]">登录成功</p>
         </motion.div>
       ) : (
         <motion.div key="form" initial={false} exit={{ opacity: 0, scale: 0.95 }}>
@@ -191,7 +191,7 @@ export default function PasswordLoginForm() {
               </PixelButton>
             </motion.div>
             <motion.div variants={itemVariants} className="flex justify-end">
-              <a href="/forgot-password" className="text-xs text-zinc-500 no-underline transition-colors hover:text-indigo-600 dark:text-zinc-400 dark:hover:text-indigo-400">
+              <a href="/forgot-password" className="text-xs text-[var(--sf-ink-3)] no-underline transition-colors hover:text-[var(--sf-accent)]">
                 忘记密码？
               </a>
             </motion.div>

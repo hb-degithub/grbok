@@ -97,9 +97,9 @@ export default function EmailChangeForm() {
   if (!user) {
     return (
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="flex flex-col items-center gap-3 py-6 text-center">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">请先登录</h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">邮箱变更需要先登录账户。</p>
-        <a href="/login" className="mt-2 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white no-underline transition-colors hover:bg-indigo-700">
+        <h2 className="text-lg font-semibold text-[var(--sf-ink)]">请先登录</h2>
+        <p className="text-sm text-[var(--sf-ink-3)]">邮箱变更需要先登录账户。</p>
+        <a href="/login" className="mt-2 inline-block rounded-[3px] border border-[var(--sf-accent)] bg-[var(--sf-accent)] px-4 py-2 text-sm font-medium text-[var(--sf-on-accent)] no-underline transition-colors hover:bg-[var(--sf-accent-ink)]">
           前往登录
         </a>
       </motion.div>
@@ -109,20 +109,20 @@ export default function EmailChangeForm() {
   if (status === 'success') {
     return (
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="flex flex-col items-center gap-3 py-6 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900/30">
-          <svg className="h-7 w-7 text-sky-600 dark:text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <div className="flex h-14 w-14 items-center justify-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-line-soft)]">
+          <svg className="h-7 w-7 text-[var(--sf-accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         </div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">确认邮件已发送</h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <h2 className="text-lg font-semibold text-[var(--sf-ink)]">确认邮件已发送</h2>
+        <p className="text-sm text-[var(--sf-ink-3)]">
           我们已向新邮箱发送了一封确认邮件。请前往新邮箱查收并点击确认链接以完成变更。
         </p>
         {referenceId && (
-          <p className="font-mono text-xs text-zinc-400 dark:text-zinc-500">参考号：{referenceId}</p>
+          <p className="font-mono text-xs text-[var(--sf-ink-3)]">参考号：{referenceId}</p>
         )}
-        <p className="text-xs text-zinc-400 dark:text-zinc-500">确认前，当前邮箱仍可正常用于登录。</p>
-        <a href="/" className="mt-2 inline-block rounded-lg bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 no-underline transition-colors hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600">
+        <p className="text-xs text-[var(--sf-ink-3)]">确认前，当前邮箱仍可正常用于登录。</p>
+        <a href="/" className="mt-2 inline-block rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-4 py-2 text-sm font-medium text-[var(--sf-ink-2)] no-underline transition-colors hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)]">
           返回首页
         </a>
       </motion.div>
@@ -132,13 +132,13 @@ export default function EmailChangeForm() {
   return (
     <motion.form onSubmit={handleSubmit} variants={containerVariants} initial="hidden" animate="visible" className="space-y-4" noValidate>
       <motion.div variants={itemVariants}>
-        <p className="mb-1 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mb-1 text-sm text-[var(--sf-ink-3)]">
           当前用户：{getUserDisplayName(user)}
         </p>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="text-sm text-[var(--sf-ink-3)]">
           当前邮箱：{currentMasked}
         </p>
-        <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mt-3 text-sm text-[var(--sf-ink-3)]">
           输入新邮箱地址，我们将向其发送确认链接。变更将在新邮箱确认后生效。
         </p>
       </motion.div>
@@ -155,7 +155,7 @@ export default function EmailChangeForm() {
         />
       </motion.div>
       {status === 'error' && referenceId && (
-        <motion.p variants={itemVariants} className="font-mono text-xs text-zinc-400 dark:text-zinc-500">
+        <motion.p variants={itemVariants} className="font-mono text-xs text-[var(--sf-ink-3)]">
           参考号：{referenceId}
         </motion.p>
       )}
@@ -165,7 +165,7 @@ export default function EmailChangeForm() {
         </PixelButton>
       </motion.div>
       <motion.div variants={itemVariants} className="text-center">
-        <a href="/" className="text-sm text-zinc-500 no-underline hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200">
+        <a href="/" className="text-sm text-[var(--sf-ink-3)] no-underline transition-colors hover:text-[var(--sf-ink)]">
           返回首页
         </a>
       </motion.div>

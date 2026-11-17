@@ -100,95 +100,102 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
   {post ? (
     <>
     <ReadingProgress client:visible />
-    <article class="mx-auto w-full max-w-5xl px-[var(--page-pad,1rem)] py-8 sm:py-10">
+    <article class="mx-auto w-full max-w-5xl px-[var(--sf-pad)] py-10 sm:py-14">
       <!-- Mobile TOC -->
       {headings.length > 0 && (
-        <div class="mb-6 lg:hidden">
+        <div class="mb-8 lg:hidden">
           <TableOfContents client:idle headings={headings} />
         </div>
       )}
 
-      <div class="flex gap-8">
-        <div class="flex-1 min-w-0">
+      <div class="flex gap-10">
+        <div class="min-w-0 flex-1">
           <ScrollReveal client:visible>
-        <a href="/posts" class="mb-8 inline-flex min-h-11 items-center gap-2 rounded-lg text-zinc-500 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100">
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-          </svg>
+        <a href="/posts" class="mb-8 inline-flex min-h-11 items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--sf-ink-3)] no-underline transition-colors duration-200 hover:text-[var(--sf-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]">
+          <span aria-hidden="true">←</span>
           返回文章列表
         </a>
       </ScrollReveal>
 
       <ScrollReveal delay={0.1} client:visible>
-        <header class="post-hero mb-12">
-          <div class="mb-4 flex min-w-0 items-center gap-3">
-            <span class="h-px w-8 bg-zinc-400 dark:bg-zinc-500"></span>
-            <span class="font-mono text-[10px] uppercase tracking-widest text-zinc-500 dark:text-zinc-400">Article</span>
-          </div>
+        <header class="post-hero mb-10 border-b border-[var(--sf-line)] pb-8">
+          <p class="mb-4 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--sf-ink-3)]">
+            <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
+            Article / 01
+          </p>
 
-          <h1 class="post-title mb-6 break-words text-3xl font-black leading-tight tracking-normal text-zinc-900 [overflow-wrap:anywhere] dark:text-zinc-100 sm:text-4xl md:text-5xl">
+          <h1 class="post-title mb-5 break-words text-3xl font-bold leading-tight tracking-tight text-[var(--sf-ink)] [overflow-wrap:anywhere] sm:text-4xl md:text-5xl">
             {post.title}
           </h1>
 
-          <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[11px] tracking-[0.06em] text-[var(--sf-ink-3)]">
             {post.expand?.author && (
               <span class="flex items-center gap-2">
-                <span class="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+                <span class="flex h-6 w-6 items-center justify-center border border-[var(--sf-line)] text-[10px] text-[var(--sf-ink-2)]" aria-hidden="true">
                   {post.expand.author.name.charAt(0)}
                 </span>
-                {post.expand.author.name}
+                <span class="text-[var(--sf-ink-2)]">{post.expand.author.name}</span>
               </span>
             )}
             {formattedDate && <time datetime={post.published_at}>{formattedDate}</time>}
+            <span aria-hidden="true" class="text-[var(--sf-line-strong)]">/</span>
             <span>{readingTime} 分钟阅读</span>
+            <span aria-hidden="true" class="text-[var(--sf-line-strong)]">/</span>
             <span>{post.views} 次浏览</span>
           </div>
 
           {post.cover && (
-            <div class="post-cover mt-8 overflow-hidden rounded-xl border border-zinc-200 shadow-xl shadow-zinc-900/[0.04] dark:border-zinc-800">
-              <img src={post.cover} alt={post.title} class="h-auto w-full object-cover opacity-0 transition-opacity duration-500" loading="lazy" onload="this.style.opacity='1'" />
+            <div class="post-cover mt-7 border border-[var(--sf-line)] bg-[var(--sf-surface)] p-1">
+              <img src={post.cover} alt={post.title} class="h-auto w-full object-cover" loading="lazy" decoding="async" />
             </div>
           )}
         </header>
       </ScrollReveal>
 
-      <div class="prose mb-8 max-w-full break-words [overflow-wrap:anywhere] reveal-content">
+      <p class="mb-4 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--sf-ink-3)]">
+        <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
+        Body / 02
+      </p>
+
+      <div class="prose reveal-content mb-10 max-w-full break-words text-[var(--sf-ink-2)] [overflow-wrap:anywhere]">
         <div set:html={safeContent} />
       </div>
 
-      <div class="mb-8 flex justify-center border-b border-zinc-200 pb-8 dark:border-zinc-800">
-        <PostActions postId={post.id} initialLikes={post.likes ?? 0} client:visible />
+      <div class="mb-10 border-y border-[var(--sf-line)] py-4">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--sf-ink-3)]">React / 03</p>
+          <PostActions postId={post.id} initialLikes={post.likes ?? 0} client:visible />
+        </div>
       </div>
 
       <ScrollReveal delay={0.3} client:visible>
-        <footer class="border-t border-zinc-200 pt-10 dark:border-zinc-800">
-          <div class="flex flex-col gap-6">
+        <footer>
+          <div class="mb-10 border-t border-[var(--sf-line)] pt-8">
+            <p class="mb-6 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--sf-ink-3)]">Comments / 04</p>
             <CommentSection postId={post.id} client:visible />
-            <div class="flex justify-center">
-              <ShareButton client:visible />
-            </div>
-            <nav class="post-footer-nav grid gap-4 sm:grid-cols-2" aria-label="文章导航">
-              <a href="/posts" class="flex items-center gap-2 rounded-lg border border-zinc-200 p-4 text-sm text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-200">
-                <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
-                <span class="truncate">返回文章列表</span>
-              </a>
-              <a href="/" class="flex items-center justify-end gap-2 rounded-lg border border-zinc-200 p-4 text-sm text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-200">
-                <span class="truncate">返回首页</span>
-                <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </a>
-            </nav>
           </div>
+          <div class="flex flex-wrap items-center justify-between gap-4 border-t border-[var(--sf-line)] py-6">
+            <p class="font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--sf-ink-3)]">Share / 05</p>
+            <ShareButton client:visible />
+          </div>
+          <nav class="grid gap-3 border-t border-[var(--sf-line)] pt-6 sm:grid-cols-2" aria-label="文章导航">
+            <a href="/posts" class="inline-flex min-h-11 items-center gap-2 border border-[var(--sf-line)] px-4 text-sm text-[var(--sf-ink-2)] no-underline transition-colors duration-200 hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]">
+              <span aria-hidden="true" class="text-[var(--sf-line-control)]">←</span>
+              <span class="truncate">返回文章列表</span>
+            </a>
+            <a href="/" class="inline-flex min-h-11 items-center justify-start gap-2 border border-[var(--sf-line)] px-4 text-sm text-[var(--sf-ink-2)] no-underline transition-colors duration-200 hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] sm:justify-end">
+              <span class="truncate">返回首页</span>
+              <span aria-hidden="true" class="text-[var(--sf-line-control)]">→</span>
+            </a>
+          </nav>
         </footer>
       </ScrollReveal>
         </div>
 
         <!-- Desktop TOC sidebar -->
         {headings.length > 0 && (
-          <aside class="hidden lg:block w-52 shrink-0 sticky top-[calc(var(--header-offset,4rem)+2rem)] self-start max-h-[calc(100vh-8rem)]">
+          <aside class="hidden max-h-[calc(100vh-8rem)] w-52 shrink-0 self-start overflow-y-auto pr-1 lg:sticky lg:top-[calc(var(--header-offset,4rem)+2rem)] lg:block">
+            <p class="mb-3 border-b border-[var(--sf-line)] pb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">Contents / 目录</p>
             <TableOfContents client:idle headings={headings} />
           </aside>
         )}
@@ -196,29 +203,54 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
     </article>
     </>
   ) : (
-    <div class="flex flex-col items-center justify-center px-4 py-20 text-center">
-      <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
-        <svg class="h-8 w-8 text-zinc-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+    <section class="mx-auto w-full max-w-3xl px-[var(--sf-pad)] py-20">
+      <div class="border-y border-[var(--sf-line)] py-16 text-center">
+        <p class="mb-4 flex items-center justify-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--sf-ink-3)]">
+          <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
+          Not Found / 404
+        </p>
+        <h2 class="mb-2 text-2xl font-bold tracking-tight text-[var(--sf-ink)]">文章不存在</h2>
+        <p class="mb-8 text-sm text-[var(--sf-ink-2)]">该文章可能已被删除，或链接中的 slug 有误。</p>
+        <a href="/posts" class="inline-flex min-h-11 items-center gap-2 border border-[var(--sf-line-control)] px-4 text-sm text-[var(--sf-ink)] no-underline transition-colors duration-200 hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]">
+          <span aria-hidden="true">←</span>
+          返回文章列表
+        </a>
       </div>
-      <h2 class="mb-2 text-2xl font-bold text-zinc-900 dark:text-zinc-100">文章不存在</h2>
-      <p class="mb-6 text-zinc-500 dark:text-zinc-400">请先在 PocketBase 中创建文章。</p>
-      <a href="/posts" class="btn-primary">返回文章列表</a>
-    </div>
+    </section>
   )}
 </BaseLayout>
 
 <style is:global>
-  .reveal-content > div > * {
+  /* 正文滚动揭示：默认完全可见，禁用 JS 时正文照常可读。
+     只有脚本给容器加上 .is-reveal-ready 之后，才进入「隐藏 → 揭示」流程； */
+  .reveal-content.is-reveal-ready > div > * {
     opacity: 0;
-    transform: translateY(12px);
-    transition: opacity 0.5s ease, transform 0.5s ease;
+    transform: translateY(10px);
+    transition: opacity 0.45s ease, transform 0.45s ease;
   }
-  .reveal-content > div > *.revealed {
+  .reveal-content.is-reveal-ready > div > *.revealed {
     opacity: 1;
     transform: translateY(0);
   }
+
+  /* 正文色统一跟随设计令牌（global.css 的 .prose 排版保持不变） */
+  .reveal-content.prose {
+    color: var(--sf-ink-2);
+  }
+  .reveal-content.prose p,
+  .reveal-content.prose li {
+    color: var(--sf-ink-2);
+  }
+  .reveal-content.prose h2,
+  .reveal-content.prose h3,
+  .reveal-content.prose h4 {
+    color: var(--sf-ink);
+  }
+  .reveal-content.prose a {
+    color: var(--sf-accent-ink);
+  }
+
+  /* h2 左侧细线在揭示时自上而下展开：单一强调色细线，无渐变 */
   .reveal-content h2 {
     position: relative;
     padding-left: 0.875rem;
@@ -229,9 +261,8 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
     left: 0;
     top: 0.18em;
     bottom: 0.18em;
-    width: 3px;
-    border-radius: 9999px;
-    background: linear-gradient(to bottom, #14b8a6, #2dd4bf);
+    width: 2px;
+    background: var(--sf-accent);
     transform: scaleY(0);
     transform-origin: top;
     transition: transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
@@ -239,6 +270,7 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
   .reveal-content h2.revealed::before {
     transform: scaleY(1);
   }
+
   .reveal-content pre {
     position: relative;
   }
@@ -251,14 +283,14 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
     justify-content: center;
     width: 2rem;
     height: 2rem;
-    border-radius: 0.5rem;
-    border: 1px solid rgba(205, 214, 244, 0.16);
-    background: rgba(30, 30, 46, 0.85);
-    color: #a6adc8;
+    border: 1px solid var(--sf-line);
+    border-radius: 3px;
+    background: var(--sf-surface);
+    color: var(--sf-ink-2);
     cursor: pointer;
     opacity: 0;
     transform: translateY(-2px);
-    transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s ease;
+    transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s ease, border-color 0.2s ease;
   }
   .code-copy-btn svg {
     width: 0.95rem;
@@ -270,10 +302,12 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
     transform: translateY(0);
   }
   .code-copy-btn:hover {
-    color: #cdd6f4;
+    color: var(--sf-ink);
+    border-color: var(--sf-line-control);
   }
   .code-copy-btn.copied {
-    color: #a6e3a1;
+    color: var(--sf-accent-ink);
+    border-color: var(--sf-accent);
     opacity: 1;
     transform: translateY(0);
   }
@@ -283,14 +317,8 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
       transform: none;
     }
   }
-  .post-footer-nav a {
-    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, color 0.2s ease;
-  }
-  .post-footer-nav a:hover {
-    transform: translateY(-2px);
-  }
   @media (prefers-reduced-motion: reduce) {
-    .reveal-content > div > * {
+    .reveal-content.is-reveal-ready > div > * {
       opacity: 1;
       transform: none;
       transition: none;
@@ -302,31 +330,43 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
     .code-copy-btn {
       transition: none;
     }
-    .post-footer-nav a {
-      transition: none;
-    }
-    .post-footer-nav a:hover {
-      transform: none;
-    }
   }
 </style>
 
 <script>
-  const prose = document.querySelector('.reveal-content > div');
-  if (prose) {
-    const children = Array.from(prose.children);
-    const observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          const el = entry.target as HTMLElement;
-          const idx = children.indexOf(el);
-          el.style.transitionDelay = `${Math.min(idx * 40, 400)}ms`;
-          el.classList.add('revealed');
-          observer.unobserve(el);
-        }
+  // 先确认脚本可用，再给容器加 .is-reveal-ready；无 JS 时正文保持默认可见。
+  const revealRoot = document.querySelector<HTMLElement>('.reveal-content');
+  const prose = revealRoot?.querySelector<HTMLElement>(':scope > div');
+
+  if (revealRoot && prose) {
+    const children = Array.from(prose.children) as HTMLElement[];
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (reduceMotion) {
+      children.forEach((child) => child.classList.add('revealed'));
+    } else {
+      try {
+        // threshold 用 0：超长代码块/列表的高度可能远超视口，用比例阈值会永不触发。
+        const observer = new IntersectionObserver((entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              const el = entry.target as HTMLElement;
+              const idx = children.indexOf(el);
+              el.style.transitionDelay = `${Math.min(idx * 40, 400)}ms`;
+              el.classList.add('revealed');
+              observer.unobserve(el);
+            }
+          }
+        }, { rootMargin: '0px 0px -40px 0px', threshold: 0 });
+        // observer 构建成功后才解锁隐藏样式：构造失败时正文保持默认可见，
+        // 不会出现「已 opacity:0 且永不揭示」的死路。
+        revealRoot.classList.add('is-reveal-ready');
+        children.forEach((child) => observer.observe(child));
+      } catch {
+        // 极端环境（老浏览器/扩展破坏 IO）下退回「全部直接显示」，不让正文消失。
+        children.forEach((child) => child.classList.add('revealed'));
       }
-    }, { rootMargin: '0px 0px -40px 0px', threshold: 0.1 });
-    children.forEach(child => observer.observe(child));
+    }
   }
 
   // 代码块悬浮复制按钮（正文是构建期注入的 HTML，用客户端脚本挂载）

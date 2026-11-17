@@ -1,5 +1,4 @@
 import React from 'react';
-import PixelCard from '../reactbits/PixelCard';
 import './PixelButton.css';
 
 interface PixelButtonProps {
@@ -12,6 +11,15 @@ interface PixelButtonProps {
   className?: string;
 }
 
+/**
+ * 共享主操作按钮。
+ *
+ * 外壳 + 内层 button 两层结构保留，但不再挂载 PixelCard 的 canvas 像素层：
+ * 视觉全部交给 global.css 的 `--sf-*` 令牌（浅色画布 / 冷灰细线 / 唯一强调色），
+ * 主按钮 = `--sf-accent` 背景 + `--sf-on-accent` 前景，深浅主题各自可读。
+ * props 与提交语义（type / onClick / disabled / loading / variant / className）
+ * 与改造前完全一致，调用点无需改动。
+ */
 export default function PixelButton({
   children,
   onClick,
@@ -24,17 +32,14 @@ export default function PixelButton({
   const isDisabled = disabled || loading;
 
   return (
-    <PixelCard
-      className={`pixel-btn ${variant === 'secondary' ? 'pixel-btn--secondary' : ''} ${isDisabled ? 'pixel-btn--disabled' : ''} ${className}`}
-      variant={variant === 'primary' ? 'blue' : 'default'}
-      gap={variant === 'primary' ? 8 : 6}
-      speed={variant === 'primary' ? 30 : 40}
-      noFocus={true}
+    <div
+      className={`pixel-btn ${variant === 'secondary' ? 'pixel-btn--secondary' : 'pixel-btn--primary'} ${isDisabled ? 'pixel-btn--disabled' : ''} ${className}`.trim()}
     >
       <button
         type={type}
         onClick={onClick}
         disabled={isDisabled}
+        aria-busy={loading || undefined}
         className="pixel-btn__inner"
       >
         {loading && (
@@ -55,6 +60,6 @@ export default function PixelButton({
         )}
         {children}
       </button>
-    </PixelCard>
+    </div>
   );
 }

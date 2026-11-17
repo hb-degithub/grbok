@@ -45,16 +45,16 @@ export default function TotpVerifyStep({ onReturnToLogin }: TotpVerifyStepProps)
 
   return (
     <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }} className="space-y-4">
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200">
+      <div className="rounded-[3px] border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm leading-relaxed text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200">
         需要身份验证器动态码以进入管理后台
       </div>
-      <div className="text-sm text-zinc-600 dark:text-zinc-300">
+      <div className="text-sm leading-relaxed text-[var(--sf-ink-2)]">
         打开你的 Authenticator App，输入当前显示的 6 位动态码。
       </div>
-      <label className="block text-sm text-zinc-600 dark:text-zinc-300">
+      <label className="block text-sm text-[var(--sf-ink-2)]">
         6 位动态码
         <input
-          className="mt-2 w-full rounded-lg border border-zinc-300 bg-transparent px-3 py-2 text-center font-mono text-lg tracking-[0.5em] dark:border-zinc-600"
+          className="mt-2 w-full rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2 text-center font-mono text-lg tracking-[0.5em] text-[var(--sf-ink)]"
           value={code}
           onChange={(event) => setCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
           onKeyDown={(event) => { if (event.key === 'Enter') handleVerify(); }}
@@ -65,22 +65,22 @@ export default function TotpVerifyStep({ onReturnToLogin }: TotpVerifyStepProps)
           autoFocus
         />
       </label>
-      {status === 'error' && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">{errorMessage}</div>}
+      {status === 'error' && <div className="rounded-[3px] border border-red-300 bg-red-50 px-4 py-3 text-sm leading-relaxed text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200">{errorMessage}</div>}
       <Button type="button" variant="primary" size="lg" loading={status === 'loading'} onClick={handleVerify} className="w-full">
         {status === 'loading' ? '验证中…' : '验证'}
       </Button>
       <button
         type="button"
         onClick={() => setShowRecovery((v) => !v)}
-        className="w-full text-center text-xs text-zinc-400 underline-offset-2 hover:text-zinc-600 hover:underline dark:text-zinc-500 dark:hover:text-zinc-300"
+        className="w-full text-center text-xs text-[var(--sf-ink-3)] underline-offset-2 transition-colors hover:text-[var(--sf-ink-2)] hover:underline"
       >
         身份验证器不可用？使用恢复码
       </button>
       {showRecovery && (
-        <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/60 dark:bg-amber-950/30">
+        <div className="space-y-2 rounded-[3px] border border-amber-300 bg-amber-50 p-3 dark:border-amber-900/60 dark:bg-amber-950/30">
           <p className="text-xs text-amber-800 dark:text-amber-200">仅凭据全部丢失时使用：输入宿主机脚本显示的一次性恢复码，将引导你重新绑定。</p>
           <input
-            className="w-full rounded-lg border border-amber-300 bg-transparent px-3 py-2 font-mono text-sm dark:border-amber-700"
+            className="w-full rounded-[3px] border border-amber-400 bg-transparent px-3 py-2 font-mono text-sm text-[var(--sf-ink)] dark:border-amber-700"
             value={recoveryCode}
             onChange={(event) => setRecoveryCode(event.target.value)}
             placeholder="一次性恢复码"

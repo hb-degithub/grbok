@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 
+/**
+ * 复制链接 / 系统分享。两者使用同一套细线小圆角按钮样式，
+ * 只保留 --sf-* 令牌（无 zinc 色阶、无深色主题手工覆写、无玻璃/大圆角）。
+ * 复制与 nativeShare 的降级逻辑保持原样。
+ */
+const BUTTON_CLASS =
+  'focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-[4px] border border-[var(--sf-line)] px-3 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors duration-200 hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]';
+
 export default function ShareButton() {
   const [copied, setCopied] = useState(false);
   const copiedTimerRef = useRef<number | null>(null);
@@ -24,14 +32,14 @@ export default function ShareButton() {
   const canNative = typeof navigator !== 'undefined' && 'share' in navigator;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <motion.button
         type="button"
         onClick={copyLink}
         animate={copied ? { scale: [1, 1.15, 1] } : { scale: 1 }}
         transition={{ duration: 0.3 }}
         aria-label={copied ? '链接已复制' : '复制链接'}
-        className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-zinc-200 px-3 text-sm text-zinc-500 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+        className={BUTTON_CLASS}
       >
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           {copied
@@ -46,7 +54,7 @@ export default function ShareButton() {
           type="button"
           onClick={nativeShare}
           aria-label="分享"
-          className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-zinc-200 px-3 text-sm text-zinc-500 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+          className={BUTTON_CLASS}
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
           <span>分享</span>

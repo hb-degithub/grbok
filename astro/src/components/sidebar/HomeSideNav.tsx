@@ -58,17 +58,17 @@ export default function HomeSideNav() {
               whileHover={{ x: 4 }}
               whileTap={{ scale: 0.98 }}
               transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              className={`group relative flex items-center justify-between rounded-lg px-4 py-3 font-semibold no-underline transition-colors ${
+              className={`group relative flex items-center justify-between rounded-[2px] px-3 py-3 font-semibold no-underline transition-colors ${
                 isActive
-                  ? 'text-white dark:text-zinc-950'
-                  : 'bg-zinc-50 text-zinc-700 hover:text-zinc-950 dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:text-zinc-50'
+                  ? 'text-[var(--sf-on-accent)]'
+                  : 'bg-[var(--sf-line-soft)] text-[var(--sf-ink-2)] hover:text-[var(--sf-ink)]'
               }`}
             >
               {isActive && (
                 <motion.span
                   layoutId="home-side-nav-pill"
                   transition={{ duration: 0.3, ease: EASE_OUT_EXPO }}
-                  className="absolute inset-0 rounded-lg bg-zinc-900 dark:bg-zinc-100"
+                  className="absolute inset-0 rounded-[2px] bg-[var(--sf-accent)]"
                   aria-hidden="true"
                 />
               )}
@@ -76,8 +76,8 @@ export default function HomeSideNav() {
               <span
                 className={`relative z-10 font-mono text-xs transition-colors ${
                   isActive
-                    ? 'text-teal-400 dark:text-teal-600'
-                    : 'text-zinc-400 group-hover:text-teal-500 dark:group-hover:text-teal-400'
+                    ? 'text-[var(--sf-on-accent)]'
+                    : 'text-[var(--sf-ink-2)] group-hover:text-[var(--sf-accent)]'
                 }`}
               >
                 {item.num}

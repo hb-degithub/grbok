@@ -130,10 +130,10 @@ export default function MagicLinkForm() {
     <AnimatePresence mode="wait">
       {success ? (
         <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }} className="flex flex-col items-center gap-3 py-8">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-500/10">
-            <svg className="h-7 w-7 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          <div className="flex h-14 w-14 items-center justify-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-line-soft)]">
+            <svg className="h-7 w-7 text-[var(--sf-accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
           </div>
-          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">验证成功</p>
+          <p className="text-sm font-medium text-[var(--sf-ink)]">验证成功</p>
         </motion.div>
       ) : (
         <motion.div key="form" initial={false} exit={{ opacity: 0, scale: 0.95 }}>
@@ -148,8 +148,8 @@ export default function MagicLinkForm() {
             noValidate
           >
             <motion.div variants={itemVariants}>
-              <h2 className="break-words text-lg font-bold tracking-tight text-zinc-900 dark:text-white sm:text-2xl">邮箱验证码登录</h2>
-              <p className="mt-1.5 break-words text-sm leading-snug text-zinc-600 dark:text-zinc-400">
+              <h2 className="break-words text-lg font-bold tracking-tight text-[var(--sf-ink)] sm:text-2xl">邮箱验证码登录</h2>
+              <p className="mt-1.5 break-words text-sm leading-snug text-[var(--sf-ink-2)]">
                 使用 PocketBase OTP 验证码完成免密登录，也可作为二次验证入口。
               </p>
             </motion.div>
@@ -173,7 +173,7 @@ export default function MagicLinkForm() {
                 </motion.div>
               ) : (
                 <motion.div key="code-step" variants={itemVariants} initial="hidden" animate="visible" exit="exit" className="space-y-3 sm:space-y-4">
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm leading-snug text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200 sm:px-4 sm:py-3" role="status" aria-live="polite">
+                  <div className="rounded-[3px] border border-emerald-300 bg-emerald-50 px-3 py-2.5 text-sm leading-snug text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200 sm:px-4 sm:py-3" role="status" aria-live="polite">
                     验证码已发送，请查看邮箱并输入收到的验证码。
                   </div>
 

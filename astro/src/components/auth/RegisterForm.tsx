@@ -104,10 +104,10 @@ export default function RegisterForm() {
     <AnimatePresence mode="wait">
       {success ? (
         <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }} className="flex flex-col items-center gap-3 py-8">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-teal-500/10">
-            <svg className="h-7 w-7 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          <div className="flex h-14 w-14 items-center justify-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-line-soft)]">
+            <svg className="h-7 w-7 text-[var(--sf-accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
           </div>
-          <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">提交已受理，请验证邮箱</p>
+          <p className="text-sm font-medium text-[var(--sf-ink)]">提交已受理，请验证邮箱</p>
         </motion.div>
       ) : (
     <motion.form
@@ -182,7 +182,7 @@ export default function RegisterForm() {
         />
       </motion.div>
 
-      <motion.p variants={itemVariants} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm leading-snug text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-300 sm:px-4 sm:py-3">
+      <motion.p variants={itemVariants} className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-line-soft)] px-3 py-2.5 text-sm leading-snug text-[var(--sf-ink-2)] sm:px-4 sm:py-3">
         注册后默认获得 reader 权限，后台权限需要超级管理员另行分配。验证邮箱后即可发表评论。
       </motion.p>
 

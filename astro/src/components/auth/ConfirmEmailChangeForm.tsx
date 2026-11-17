@@ -72,14 +72,14 @@ export default function ConfirmEmailChangeForm() {
   if (status === 'success') {
     return (
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="flex flex-col items-center gap-3 py-6 text-center">
-        <motion.div variants={itemVariants} className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
-          <svg className="h-7 w-7 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+        <motion.div variants={itemVariants} className="flex h-14 w-14 items-center justify-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-line-soft)]">
+          <svg className="h-7 w-7 text-[var(--sf-accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </motion.div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">邮箱已变更</h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">你的账户邮箱已成功更新。请使用新邮箱登录。</p>
-        <a href="/login" className="mt-2 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white no-underline transition-colors hover:bg-indigo-700">
+        <h2 className="text-lg font-semibold text-[var(--sf-ink)]">邮箱已变更</h2>
+        <p className="text-sm text-[var(--sf-ink-3)]">你的账户邮箱已成功更新。请使用新邮箱登录。</p>
+        <a href="/login" className="mt-2 inline-block rounded-[3px] border border-[var(--sf-accent)] bg-[var(--sf-accent)] px-4 py-2 text-sm font-medium text-[var(--sf-on-accent)] no-underline transition-colors hover:bg-[var(--sf-accent-ink)]">
           重新登录
         </a>
       </motion.div>
@@ -89,14 +89,14 @@ export default function ConfirmEmailChangeForm() {
   if (tokenError) {
     return (
       <motion.div variants={containerVariants} initial="hidden" animate="visible" className="flex flex-col items-center gap-3 py-6 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
+        <div className="flex h-14 w-14 items-center justify-center rounded-[3px] border border-red-300 bg-red-50 dark:border-red-900/60 dark:bg-red-950/30">
           <svg className="h-7 w-7 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
         </div>
         <h2 className="text-lg font-semibold text-red-700 dark:text-red-300">链接无效</h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">{tokenError}</p>
-        <a href="/account/email-change" className="mt-2 inline-block rounded-lg bg-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 no-underline transition-colors hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600">
+        <p className="text-sm text-[var(--sf-ink-3)]">{tokenError}</p>
+        <a href="/account/email-change" className="mt-2 inline-block rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-4 py-2 text-sm font-medium text-[var(--sf-ink-2)] no-underline transition-colors hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)]">
           重新发起邮箱变更
         </a>
       </motion.div>
@@ -106,7 +106,7 @@ export default function ConfirmEmailChangeForm() {
   return (
     <motion.form onSubmit={handleSubmit} variants={containerVariants} initial="hidden" animate="visible" className="space-y-4" noValidate>
       <motion.div variants={itemVariants}>
-        <p className="mb-3 text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mb-3 text-sm text-[var(--sf-ink-3)]">
           请输入当前密码以确认邮箱变更。确认后，新邮箱将立即生效。
         </p>
       </motion.div>

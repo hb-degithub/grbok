@@ -1,32 +1,46 @@
 import React from 'react';
-import { motion, type Variants } from 'framer-motion';
+import { motion, MotionConfig, type Variants } from 'framer-motion';
 import type { Post } from '../../types/pocketbase';
 
 interface PostCardProps {
   post: Post;
+  /** 0 基位置，仅用于入场动效的错峰延迟。 */
   index?: number;
+  /**
+   * 展示用序号（1 基）。
+   * 缺省为 index + 1；分页列表由 PostList 传入跨页连续序号，避免每页从 01 重来。
+   */
+  ordinal?: number;
 }
 
-const makeCardVariants = (index: number): Variants => ({
-  hidden: { opacity: 0, y: 16 },
+/**
+ * 文章行组件 —— 科幻简约改造后的「编号行」。
+ *
+ * 设计决策：
+ * 1. 形态：编号 + 标题 + 摘要 + 元信息收进一条细线分隔的行，替代原来的
+ *    玻璃拟态卡片；不再有圆角容器、内高光、上浮阴影。
+ * 2. 信息层级：序号（等宽小字）→ 标题 → 摘要 → 标签 / 日期 / 阅读时长。
+ *    封面改为小缩略图，避免它压过标题。
+ * 3. 结构色全部走共享令牌 var(--sf-*)，深浅主题随 .dark 自动切换；
+ *    唯一强调色只出现在 hover 的标题与箭头上。
+ * 4. 整行仍是单个 <a>，保留 aria-label 与键盘焦点（全局 :focus-visible 轮廓）。
+ */
+const makeRowVariants = (index: number): Variants => ({
+  hidden: { opacity: 0, y: 8 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.45, delay: index * 0.06, ease: [0.16, 1, 0.3, 1] },
+    transition: { duration: 0.32, delay: Math.min(index, 12) * 0.04, ease: [0.22, 0.61, 0.36, 1] },
   },
 });
 
-/**
- * 文章卡片组件
- *
- * 设计决策：
- * 1. 玻璃拟态：半透明背景 + backdrop-blur + 内高光边框，让卡片「浮」在
- *    页面 aurora 背景之上。hover 时边框提亮 + 上浮 + 阴影加深，三层反馈。
- * 2. 信息层级：封面图 > 标题（lg semibold）> 摘要（sm 次要色）> 元信息（xs），
- *    用户 3 秒内可抓取标题。
- * 3. 整卡可点击（a 标签包裹），focus-visible 暴露焦点环，键盘可达。
- */
-export default function PostCard({ post, index = 0 }: PostCardProps) {
+/** 序号两位补零；非法输入回落到 01，保证列表不会出现空编号。 */
+function formatOrdinal(value: number): string {
+  const safe = Number.isFinite(value) ? Math.max(1, Math.trunc(value)) : 1;
+  return String(safe).padStart(2, '0');
+}
+
+export default function PostCard({ post, index = 0, ordinal }: PostCardProps) {
   const formattedDate = new Date(post.published_at).toLocaleDateString('zh-CN', {
     year: 'numeric',
     month: 'short',
@@ -35,78 +49,81 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
 
   const readingTime = Math.max(1, Math.ceil((post.content?.length || 0) / 300));
 
-  const cardVariants = makeCardVariants(index);
+  // 标签徽标：兼容两种历史数据形态（关联记录的 expand.tag_id 或记录自身 name）。
+  const firstPostTag = post.expand?.['post_tags(post_id)']?.[0];
+  const tagName =
+    firstPostTag?.expand?.tag_id?.name ??
+    (firstPostTag as unknown as { name?: string } | undefined)?.name;
+
+  const ordinalLabel = formatOrdinal(ordinal ?? index + 1);
+  const rowVariants = makeRowVariants(index);
 
   return (
-    <motion.article variants={cardVariants} initial="hidden" animate="visible" className="group h-full">
-      <a
-        href={`/posts/${post.slug}`}
-        className="focus-ring block h-full rounded-lg"
-        aria-label={`阅读文章：${post.title}`}
-      >
-        <motion.div
-          className="card relative flex h-full flex-col overflow-hidden rounded-lg transition-colors duration-300 group-hover:border-white/70 dark:group-hover:border-white/20"
-          whileHover={{ y: -4 }}
-          transition={{ duration: 0.25, ease: [0, 0, 0.2, 1] }}
+    // reducedMotion="user"：保留入场动效接口，但跟随系统「减少动态效果」设置降级。
+    <MotionConfig reducedMotion="user">
+      <motion.article variants={rowVariants} initial="hidden" animate="visible" className="group">
+        <a
+          href={`/posts/${post.slug}`}
+          aria-label={`阅读文章：${post.title}`}
+          className="block border-b border-[var(--sf-line-soft)] py-5 no-underline transition-colors duration-200 hover:bg-[var(--sf-surface)] focus-visible:bg-[var(--sf-surface)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] sm:py-6"
         >
-          {/* 顶部高光线 */}
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent dark:via-white/15"
-            aria-hidden="true"
-          />
+          <div className="flex items-start gap-x-4 gap-y-3 sm:items-center sm:gap-x-6">
+            {/* 编号索引 */}
+            <span
+              aria-hidden="true"
+              className="w-8 shrink-0 pt-1 font-mono text-[11px] leading-none tracking-[0.12em] text-[var(--sf-ink-3)] sm:pt-0"
+            >
+              {ordinalLabel}
+            </span>
 
-          {/* 封面图 */}
-          {post.cover && (
-            <div className="relative aspect-[16/10] overflow-hidden">
-              <motion.img
-                src={post.cover}
-                alt={post.title}
-                className="h-full w-full object-cover opacity-0 transition-opacity duration-500"
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                loading="lazy"
-                onLoad={(e) => { (e.target as HTMLImageElement).style.opacity = '1'; }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-            </div>
-          )}
-
-          {/* 内容 */}
-          <div className="flex flex-1 flex-col p-5">
-            <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400 dark:text-zinc-500">
-              {(post.expand as any)?.['post_tags(post_id)']?.[0]?.name && (
-                <>
-                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                    {(post.expand as any)['post_tags(post_id)'][0].name}
-                  </span>
-                  <span aria-hidden="true">·</span>
-                </>
-              )}
-              <time dateTime={post.published_at}>{formattedDate}</time>
-            </div>
-
-            <h3 className="mb-2 flex-1 break-words text-lg font-semibold leading-snug text-zinc-900 transition-colors duration-200 [overflow-wrap:anywhere] group-hover:text-teal-600 dark:text-zinc-100 dark:group-hover:text-teal-400">
-              {post.title}
-            </h3>
-
-            {post.excerpt && (
-              <p className="mb-4 line-clamp-2 break-words text-sm leading-relaxed text-zinc-500 [overflow-wrap:anywhere] dark:text-zinc-400">
-                {post.excerpt}
-              </p>
+            {/* 封面缩略 */}
+            {post.cover && (
+              <div className="h-14 w-20 shrink-0 overflow-hidden border border-[var(--sf-line-soft)] sm:h-20 sm:w-28">
+                <img
+                  src={post.cover}
+                  alt={post.title}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.03]"
+                />
+              </div>
             )}
 
-            <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-zinc-200/60 pt-4 dark:border-zinc-700/50">
-              <span className="text-xs text-zinc-400 dark:text-zinc-500">{readingTime} 分钟阅读</span>
-              <span className="flex items-center gap-1 text-xs font-medium text-zinc-600 transition-transform duration-200 group-hover:translate-x-1 dark:text-zinc-400">
-                阅读
-                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </span>
+            {/* 正文 */}
+            <div className="min-w-0 flex-1">
+              <h3 className="break-words text-[1.0625rem] font-semibold leading-snug text-[var(--sf-ink)] transition-colors duration-200 [overflow-wrap:anywhere] group-hover:text-[var(--sf-accent-ink)] sm:text-lg">
+                {post.title}
+              </h3>
+
+              {post.excerpt && (
+                <p className="mt-1.5 line-clamp-2 break-words text-sm leading-relaxed text-[var(--sf-ink-3)] [overflow-wrap:anywhere]">
+                  {post.excerpt}
+                </p>
+              )}
+
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-3)]">
+                {tagName && (
+                  <span className="border border-[var(--sf-line)] px-1.5 py-0.5 text-[var(--sf-ink-2)]">
+                    {tagName}
+                  </span>
+                )}
+                <time dateTime={post.published_at}>{formattedDate}</time>
+                <span aria-hidden="true" className="text-[var(--sf-line-strong)]">
+                  /
+                </span>
+                <span>{readingTime} 分钟阅读</span>
+              </div>
             </div>
+
+            {/* 进入提示：只在桌面显示，hover 时右移并转为强调色 */}
+            <span
+              aria-hidden="true"
+              className="hidden shrink-0 font-mono text-sm text-[var(--sf-line-control)] transition-transform duration-200 ease-out group-hover:translate-x-1 group-hover:text-[var(--sf-accent)] sm:block"
+            >
+              →
+            </span>
           </div>
-        </motion.div>
-      </a>
-    </motion.article>
+        </a>
+      </motion.article>
+    </MotionConfig>
   );
 }

@@ -29,31 +29,34 @@ interface CommentItemProps {
 }
 
 const itemVariants: Variants = {
-  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  hidden: { opacity: 0, y: 8 },
   visible: {
     opacity: 1,
     y: 0,
-    scale: 1,
-    transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] },
+    transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] },
   },
 };
 
-/** 新评论高亮 - stone 背景渐隐 */
-const highlightVariants: Variants = {
-  initial: { backgroundColor: 'rgba(120, 113, 108, 0.15)' },
-  animate: {
-    backgroundColor: 'rgba(120, 113, 108, 0)',
-    transition: { duration: 2, ease: 'easeOut' },
-  },
-};
+/** 小号次操作按钮：细线 + 小圆角，颜色全部走 --sf-* 令牌 */
+const actionButtonClass =
+  'focus-ring inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-[2px] border border-transparent px-2 py-1 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--sf-ink-3)] transition-colors hover:border-[var(--sf-line)] hover:text-[var(--sf-ink-2)] sm:min-h-9 sm:min-w-0';
+
+/** 小号输入框：细线 + 聚焦强调色 */
+const inputClass =
+  'w-full rounded-[2px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-1.5 text-xs text-[var(--sf-ink)] placeholder:text-[var(--sf-ink-3)] outline-none transition-colors focus-visible:border-[var(--sf-accent)] focus-visible:ring-2 focus-visible:ring-[var(--sf-accent)]';
+
+/** 小号次按钮：取消/发送验证码 */
+const secondarySmallButtonClass =
+  'focus-ring inline-flex min-h-9 items-center justify-center rounded-[2px] border border-[var(--sf-line-control)] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50';
 
 /**
  * 单条评论组件
  *
  * 设计决策：
- * 1. 玻璃卡片承载评论，hover 时跟随鼠标的 teal 径向光晕强化「玻璃透光」感。
- * 2. 新评论用 teal ring + 短暂背景渐隐高亮，3 秒后消退（由父组件控制 isNew）。
+ * 1. 细线卡片承载评论：1px 冷灰边 + 2–3px 小圆角，无玻璃、无阴影、无光晕。
+ * 2. 新评论用强调色细边 + 等宽 NEW 标记提示，3 秒后消退（由父组件控制 isNew）。
  * 3. 回复按钮带 aria-expanded/aria-controls，屏幕阅读器可知展开状态。
+ * 4. 语义红/绿只用于文字：错误可辨识，但不引入红色大色块。
  */
 export default function CommentItem({
   comment,
@@ -66,8 +69,6 @@ export default function CommentItem({
   currentUserEmail,
 }: CommentItemProps) {
   const [isReplyOpen, setIsReplyOpen] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const [mousePosition, setMousePosition] = useState({ x: 0.5, y: 0.5 });
   const [likes, setLikes] = useState(comment.likes || 0);
   const [isLiked, setIsLiked] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
@@ -97,15 +98,6 @@ export default function CommentItem({
   const isDeleted = comment.deleted;
   const isEdited = comment.edited;
 
-  /** 鼠标移动 - 跟随光晕 */
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setMousePosition({
-      x: (e.clientX - rect.left) / rect.width,
-      y: (e.clientY - rect.top) / rect.height,
-    });
-  };
-
   /** 相对时间格式化 */
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -123,20 +115,6 @@ export default function CommentItem({
   };
 
   const getAvatarLetter = (name: string) => name.charAt(0).toUpperCase();
-
-  /** 头像配色 - teal/violet 系，与整体玻璃风格协调 */
-  const getAvatarColor = (seed: string) => {
-    const colors = [
-      'bg-zinc-500',
-      'bg-zinc-600',
-      'bg-zinc-400',
-      'bg-zinc-500',
-      'bg-zinc-600',
-      'bg-zinc-400',
-    ];
-    const index = seed.charCodeAt(0) % colors.length;
-    return colors[index];
-  };
 
   const canReply = depth < maxDepth;
 
@@ -280,86 +258,68 @@ export default function CommentItem({
   }
 
   return (
-    <motion.article
-      variants={itemVariants}
-      initial="hidden"
-      animate="visible"
-      onMouseMove={handleMouseMove}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      className="relative"
-    >
-      <motion.div
+    <motion.article variants={itemVariants} initial="hidden" animate="visible" className="relative">
+      <div
         className={cn(
-          'card relative overflow-hidden rounded-lg p-4 sm:p-5',
-          'transition-colors duration-300',
-          isNew && 'ring-2 ring-zinc-400/50'
+          'relative overflow-hidden rounded-[3px] border bg-[var(--sf-surface)] p-4 transition-colors duration-300 sm:p-5',
+          isNew ? 'border-[var(--sf-accent)]' : 'border-[var(--sf-line)]'
         )}
-        {...(isNew && { initial: 'initial', animate: 'animate', variants: highlightVariants })}
       >
-        {/* 跟随鼠标的柔和光晕 */}
-        <motion.div
-          className="pointer-events-none absolute inset-0 z-0 rounded-lg transition-opacity duration-300"
-          style={{
-            background: `radial-gradient(300px circle at ${mousePosition.x * 100}% ${mousePosition.y * 100}%, rgba(120, 113, 108, 0.10), transparent 40%)`,
-            opacity: isHovered ? 1 : 0,
-          }}
-          aria-hidden="true"
-        />
-
         <div className="relative z-10">
           {/* 头部：头像 + 作者 + 时间 */}
-          <div className="mb-3 flex min-w-0 items-center gap-3">
+          <div className="mb-3 flex min-w-0 items-start gap-3">
             <div
-              className={cn(
-                'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white shadow-sm',
-                getAvatarColor(comment.id || comment.author_name)
-              )}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[2px] border border-[var(--sf-line)] font-mono text-xs font-semibold uppercase text-[var(--sf-ink-2)]"
               aria-hidden="true"
             >
               {getAvatarLetter(comment.author_name)}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <p className="break-words font-medium text-zinc-900 dark:text-white">{comment.author_name}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="break-words font-medium text-[var(--sf-ink)]">{comment.author_name}</p>
                 {comment.is_ai && (
                   <span
-                    className="inline-flex shrink-0 items-center rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent"
+                    className="inline-flex shrink-0 items-center rounded-[2px] border border-[var(--sf-line)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--sf-accent-ink)]"
                     title="该回复由 AI 生成"
                   >
                     AI
                   </span>
                 )}
                 {comment.author_level && <LevelBadge level={comment.author_level} size="sm" />}
+                {isNew && (
+                  <span className="inline-flex shrink-0 items-center rounded-[2px] border border-[var(--sf-accent)] px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--sf-accent-ink)]">
+                    NEW
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--sf-ink-3)]">
                 <time dateTime={comment.created}>{formatTime(comment.created)}</time>
               </p>
             </div>
           </div>
 
           {/* 评论内容 */}
-          <div className="mb-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-zinc-700 [overflow-wrap:anywhere] dark:text-zinc-300">
+          <div className="mb-3 whitespace-pre-wrap break-words text-sm leading-relaxed text-[var(--sf-ink-2)] [overflow-wrap:anywhere]">
             {sanitizeText(comment.content)}
             {isEdited && (
-              <span className="ml-2 text-xs text-zinc-400 dark:text-zinc-500" title={comment.edited_at ? `编辑于 ${new Date(comment.edited_at).toLocaleString('zh-CN')}` : '已编辑'}>
+              <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.06em] text-[var(--sf-ink-3)]" title={comment.edited_at ? `编辑于 ${new Date(comment.edited_at).toLocaleString('zh-CN')}` : '已编辑'}>
                 （已编辑）
               </span>
             )}
           </div>
 
           {/* 操作栏 */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             {/* 点赞（需登录；服务端按用户 id 去重） */}
             <button
               type="button"
               onClick={handleLike}
               disabled={isLiking}
               className={cn(
-                'focus-ring inline-flex items-center gap-1.5 rounded-md text-sm transition-colors',
+                'focus-ring inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-[2px] border px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.08em] transition-colors sm:min-h-9 sm:min-w-0',
                 isLiked
-                  ? 'text-teal-600 dark:text-teal-400'
-                  : 'text-zinc-500 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-500'
+                  ? 'border-[var(--sf-accent)] text-[var(--sf-accent-ink)]'
+                  : 'border-transparent text-[var(--sf-ink-3)] hover:border-[var(--sf-line)] hover:text-[var(--sf-ink-2)]'
               )}
               aria-label={isLiked ? '取消点赞' : '点赞'}
               aria-pressed={isLiked}
@@ -372,7 +332,7 @@ export default function CommentItem({
             </button>
 
             {likeError && (
-              <span role="alert" className="text-xs text-red-600 dark:text-red-400">
+              <span role="alert" className="text-xs text-[var(--sf-danger)]">
                 {likeError}
               </span>
             )}
@@ -383,7 +343,7 @@ export default function CommentItem({
                 onClick={() => setIsReplyOpen(!isReplyOpen)}
                 aria-expanded={isReplyOpen}
                 aria-controls={`reply-form-${comment.id}`}
-                className="focus-ring min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 inline-flex items-center justify-center gap-1.5 rounded-md text-sm text-zinc-500 transition-colors hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-500"
+                className={actionButtonClass}
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -396,7 +356,7 @@ export default function CommentItem({
             {!isOwner && (
               <button
                 onClick={() => setShowReportForm(!showReportForm)}
-                className="focus-ring inline-flex items-center gap-1.5 rounded-md text-sm text-zinc-400 transition-colors hover:text-zinc-500 dark:text-zinc-500 dark:hover:text-zinc-400"
+                className={actionButtonClass}
                 aria-label="举报"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -410,7 +370,7 @@ export default function CommentItem({
             {isOwner && (
               <button
                 onClick={() => setIsEditing(!isEditing)}
-                className="focus-ring inline-flex items-center gap-1.5 rounded-md text-sm text-zinc-400 transition-colors hover:text-zinc-500 dark:text-zinc-500 dark:hover:text-zinc-400"
+                className={actionButtonClass}
                 aria-label="编辑"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -424,7 +384,7 @@ export default function CommentItem({
             {isOwner && (
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="focus-ring inline-flex items-center gap-1.5 rounded-md text-sm text-red-400 transition-colors hover:text-red-500 dark:text-red-500 dark:hover:text-red-400"
+                className="focus-ring inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-[2px] border border-transparent px-2 py-1 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--sf-danger)] transition-colors hover:border-[var(--sf-line)] sm:min-h-9 sm:min-w-0"
                 aria-label="删除"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -452,7 +412,7 @@ export default function CommentItem({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800"
+            className="mt-3 rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-3"
           >
             <textarea
               value={reportReason}
@@ -460,19 +420,19 @@ export default function CommentItem({
               placeholder="请说明举报原因..."
               rows={2}
               maxLength={500}
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+              className={inputClass}
             />
-            <div className="mt-2 flex gap-2">
+            <div className="mt-2 flex flex-wrap gap-2">
               <button
                 onClick={handleReport}
                 disabled={!reportReason.trim() || isReporting}
-                className="rounded-md bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700 disabled:opacity-50"
+                className="focus-ring inline-flex min-h-9 items-center justify-center rounded-[2px] border border-[var(--sf-line-control)] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--sf-danger)] transition-colors hover:border-[var(--sf-line-strong)] disabled:opacity-50"
               >
                 {isReporting ? '提交中...' : '提交举报'}
               </button>
               <button
                 onClick={() => setShowReportForm(false)}
-                className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400"
+                className={secondarySmallButtonClass}
               >
                 取消
               </button>
@@ -485,6 +445,7 @@ export default function CommentItem({
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
+            role="status"
             className="mt-2 text-xs text-emerald-600 dark:text-emerald-400"
           >
             举报已提交，感谢反馈
@@ -497,28 +458,28 @@ export default function CommentItem({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800"
+            className="mt-3 rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-3"
           >
             <textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
               rows={3}
               maxLength={2000}
-              className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-900"
+              className={inputClass}
             />
             <div className="mt-2 space-y-2">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <input
                   type="email"
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
                   placeholder="你的邮箱"
-                  className="flex-1 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs dark:border-zinc-600 dark:bg-zinc-900"
+                  className={cn(inputClass, 'min-w-0 flex-1')}
                 />
                 <button
                   onClick={handleSendEditCode}
                   disabled={!editEmail.trim() || isSendingCode || codeSent}
-                  className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-400"
+                  className={secondarySmallButtonClass}
                 >
                   {isSendingCode ? '发送中...' : codeSent ? '已发送' : '发送验证码'}
                 </button>
@@ -529,20 +490,20 @@ export default function CommentItem({
                 onChange={(e) => setVerificationCode(e.target.value)}
                 placeholder="6 位验证码"
                 maxLength={6}
-                className="w-full rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs dark:border-zinc-600 dark:bg-zinc-900"
+                className={inputClass}
               />
-              {editError && <p className="text-xs text-red-500">{editError}</p>}
-              <div className="flex gap-2">
+              {editError && <p role="alert" className="text-xs text-[var(--sf-danger)]">{editError}</p>}
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleEdit}
                   disabled={!editContent.trim() || !verificationCode.trim() || isSaving}
-                  className="rounded-md bg-teal-600 px-3 py-1.5 text-xs text-white hover:bg-teal-700 disabled:opacity-50"
+                  className="focus-ring inline-flex min-h-9 items-center justify-center rounded-[2px] border border-[var(--sf-accent)] bg-[var(--sf-accent)] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--sf-on-accent)] transition-colors hover:bg-[var(--sf-accent-ink)] disabled:opacity-50"
                 >
                   {isSaving ? '保存中...' : '保存'}
                 </button>
                 <button
                   onClick={() => { setIsEditing(false); setEditContent(comment.content); setEditEmail(''); setVerificationCode(''); setCodeSent(false); setEditError(''); }}
-                  className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400"
+                  className={secondarySmallButtonClass}
                 >
                   取消
                 </button>
@@ -557,22 +518,22 @@ export default function CommentItem({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20"
+            className="mt-3 rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-3"
           >
-            <p className="text-sm text-red-700 dark:text-red-400">确定删除这条评论吗？此操作不可撤销。</p>
+            <p className="text-sm text-[var(--sf-danger)]">确定删除这条评论吗？此操作不可撤销。</p>
             <div className="mt-2 space-y-2">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <input
                   type="email"
                   value={deleteEmail}
                   onChange={(e) => setDeleteEmail(e.target.value)}
                   placeholder="你的邮箱"
-                  className="flex-1 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs dark:border-zinc-600 dark:bg-zinc-900"
+                  className={cn(inputClass, 'min-w-0 flex-1')}
                 />
                 <button
                   onClick={handleSendDeleteCode}
                   disabled={!deleteEmail.trim() || isSendingDeleteCode || deleteCodeSent}
-                  className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-400"
+                  className={secondarySmallButtonClass}
                 >
                   {isSendingDeleteCode ? '发送中...' : deleteCodeSent ? '已发送' : '发送验证码'}
                 </button>
@@ -583,20 +544,20 @@ export default function CommentItem({
                 onChange={(e) => setDeleteVerificationCode(e.target.value)}
                 placeholder="6 位验证码"
                 maxLength={6}
-                className="w-full rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-xs dark:border-zinc-600 dark:bg-zinc-900"
+                className={inputClass}
               />
-              {deleteError && <p className="text-xs text-red-500">{deleteError}</p>}
-              <div className="flex gap-2">
+              {deleteError && <p role="alert" className="text-xs text-[var(--sf-danger)]">{deleteError}</p>}
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleDelete}
                   disabled={!deleteVerificationCode.trim() || isDeleting}
-                  className="rounded-md bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700 disabled:opacity-50"
+                  className="focus-ring inline-flex min-h-9 items-center justify-center rounded-[2px] border border-[var(--sf-line-control)] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--sf-danger)] transition-colors hover:border-[var(--sf-line-strong)] disabled:opacity-50"
                 >
                   {isDeleting ? '删除中...' : '确认删除'}
                 </button>
                 <button
                   onClick={() => { setShowDeleteConfirm(false); setDeleteEmail(''); setDeleteVerificationCode(''); setDeleteCodeSent(false); setDeleteError(''); }}
-                  className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-400"
+                  className={secondarySmallButtonClass}
                 >
                   取消
                 </button>
@@ -604,11 +565,11 @@ export default function CommentItem({
             </div>
           </motion.div>
         )}
-      </motion.div>
+      </div>
 
-      {/* 子评论（递归渲染） - teal 竖线引导嵌套关系 */}
+      {/* 子评论（递归渲染） - 细线竖线引导嵌套关系 */}
       {comment.children.length > 0 && (
-        <div className="mt-3 space-y-3 border-l-2 border-zinc-200 pl-3 dark:border-zinc-800/60 sm:pl-6">
+        <div className="mt-3 space-y-3 border-l border-[var(--sf-line)] pl-3 sm:pl-6">
           {comment.children.map((child) => (
             <CommentItem
               key={child.id}

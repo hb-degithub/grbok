@@ -1,47 +1,54 @@
-/* ---- PixelButton: override PixelCard card defaults for button use ---- */
+/* ---- PixelButton: 科幻简约按钮 ----
+ *
+ * 只使用 global.css 的 `--sf-*` 设计令牌：冷灰控制线、唯一强调色、表面色。
+ * 已彻底移除 PixelCard 的 canvas 像素层与其 hover 光晕（没有替代用的装饰层），
+ * 主按钮 = `--sf-accent` 背景 + `--sf-on-accent` 前景（浅色 #fff / 暗色 #16191d，
+ * 由相邻改造在 global.css 提供；令牌未落地前回退到 --sf-canvas（浅色近白 / 暗色近黑），
+ * 两种主题下都能保持可读，令牌落地后自动接管）。
+ */
 
 .pixel-btn {
+  display: block;
   width: 100%;
   height: auto;
   aspect-ratio: auto;
-  border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.4);
+  overflow: hidden;
+  border: 1px solid var(--sf-line-control);
+  border-radius: 3px;
+  background: var(--sf-surface);
+  color: var(--sf-ink-2);
   cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
-.pixel-btn .pixel-canvas {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-/* Dark overlay on hover - lighter for button context */
-.pixel-btn::before {
-  background: radial-gradient(circle, rgba(15, 23, 42, 0.35), transparent 80%);
-}
-
-/* ---- Primary variant: solid white background for clear visibility ---- */
+/* ---- Primary: 唯一强调色实底 ---- */
 .pixel-btn--primary {
-  border-color: rgba(56, 189, 248, 0.5);
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08);
+  border-color: var(--sf-accent);
+  background: var(--sf-accent);
+  color: var(--sf-on-accent, var(--sf-canvas));
 }
 
-/* ---- Secondary variant ---- */
+/* ---- Secondary: 表面色 + 控制线 ---- */
 .pixel-btn--secondary {
-  border-color: rgba(148, 163, 184, 0.4);
-  background: #f1f5f9;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  border-color: var(--sf-line-control);
+  background: var(--sf-surface);
+  color: var(--sf-ink-2);
 }
 
-.pixel-btn--secondary::before {
-  background: radial-gradient(circle, rgba(15, 23, 42, 0.2), transparent 80%);
+.pixel-btn--primary:hover {
+  background: var(--sf-accent-ink);
+  border-color: var(--sf-accent-ink);
 }
 
-/* ---- Inner button ---- */
+.pixel-btn--secondary:hover {
+  border-color: var(--sf-line-strong);
+  background: var(--sf-line-soft);
+  color: var(--sf-ink);
+}
+
+/* ---- Inner button：透明承接外层配色 ---- */
 .pixel-btn__inner {
   position: relative;
-  z-index: 2;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -50,79 +57,36 @@
   min-height: 44px;
   padding: 0.625rem 1rem;
   border: none;
-  border-radius: 12px;
+  border-radius: 2px;
   background: transparent;
+  color: inherit;
   font-size: 0.95rem;
   font-weight: 600;
   line-height: 1.25;
-  color: rgb(24, 24, 27);
   cursor: pointer;
   user-select: none;
-  transition: color 200ms ease;
   outline: none;
+  transition: color 160ms ease;
 }
 
-.pixel-btn--primary .pixel-btn__inner {
-  color: #0c4a6e;
-}
-
-.pixel-btn--secondary .pixel-btn__inner {
-  color: rgb(63, 63, 70);
-}
-
-.pixel-btn:hover .pixel-btn__inner {
-  color: #fff;
-}
-
-.pixel-btn--secondary:hover .pixel-btn__inner {
-  color: rgb(244, 244, 245);
-}
-
-/* ---- Disabled state ---- */
+/* ---- Disabled ---- */
 .pixel-btn--disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
 
+.pixel-btn--disabled:hover {
+  border-color: var(--sf-line-control);
+  background: var(--sf-surface);
+}
+
+.pixel-btn--primary.pixel-btn--disabled:hover {
+  border-color: var(--sf-accent);
+  background: var(--sf-accent);
+}
+
 .pixel-btn--disabled .pixel-btn__inner {
   cursor: not-allowed;
-}
-
-/* ---- Dark mode: solid dark background for clear visibility ---- */
-.dark .pixel-btn {
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-.dark .pixel-btn--primary {
-  border-color: rgba(34, 211, 238, 0.4);
-  background: #0f172a;
-  box-shadow: 0 2px 8px rgba(34, 211, 238, 0.15), 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.dark .pixel-btn--secondary {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: #18181b;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
-}
-
-.dark .pixel-btn--primary .pixel-btn__inner {
-  color: #e0f2fe;
-}
-
-.dark .pixel-btn--secondary .pixel-btn__inner {
-  color: rgb(212, 212, 216);
-}
-
-.dark .pixel-btn:hover .pixel-btn__inner {
-  color: #fff;
-}
-
-.dark .pixel-btn--secondary:hover .pixel-btn__inner {
-  color: rgb(244, 244, 245);
-}
-
-.dark .pixel-btn::before {
-  background: radial-gradient(circle, rgba(0, 0, 0, 0.5), transparent 80%);
 }
 
 /* ---- Spinner ---- */
@@ -137,12 +101,34 @@
   to { transform: rotate(360deg); }
 }
 
-/* ---- Focus ring ---- */
-.pixel-btn__inner:focus-visible {
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.4);
-  border-radius: 12px;
+/* ---- Focus ring：细线强调，仅键盘可见 ---- */
+.pixel-btn:has(.pixel-btn__inner:focus-visible) {
+  border-color: var(--sf-accent);
+  box-shadow: 0 0 0 1px var(--sf-accent);
 }
 
-.dark .pixel-btn__inner:focus-visible {
-  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.4);
+.pixel-btn__inner:focus-visible {
+  outline: none;
+}
+
+/* :has() 不可用时上面的外层细线环根本不会命中，键盘焦点会完全看不见。
+   这里给内层按钮一个明确的 outline 回退（用负 offset 收进按钮内，
+   避免被 .pixel-btn 的 overflow: hidden 裁掉）。支持 :has() 的浏览器
+   仍走上面的「外层描边 + 细线环」，视觉效果不变。 */
+@supports not selector(:has(*)) {
+  .pixel-btn__inner:focus-visible {
+    outline: 2px solid var(--sf-accent);
+    outline-offset: -2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pixel-btn,
+  .pixel-btn__inner {
+    transition: none;
+  }
+
+  .pixel-btn__spinner {
+    animation-duration: 2s;
+  }
 }

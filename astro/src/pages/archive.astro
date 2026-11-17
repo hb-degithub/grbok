@@ -1,8 +1,5 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-import AnimatedContent from '../components/reactbits/AnimatedContent';
-import BlurText from '../components/reactbits/BlurText';
-import ParticleField from '../components/effects/ParticleField';
 import { cachedFetchJson } from '../lib/pb-cache';
 import { pbBaseUrl } from '../lib/pb-base-url';
 // SSR 取数走服务端回环地址，浏览器侧仍用公网域名（见 pb-base-url.ts）
@@ -35,66 +32,106 @@ for (const post of posts) {
   mg.posts.push(post);
 }
 ---
+
 <BaseLayout title="文章归档" description="按时间归档">
-<div class="pointer-events-none fixed inset-0 z-0 hidden lg:block" aria-hidden="true">
-  <ParticleField client:visible count={36} speed={0.25} />
-</div>
-<section class="relative z-10 mx-auto max-w-4xl px-5 py-16">
-<h1 class="text-3xl font-black"><BlurText client:visible text="文章归档" className="text-3xl font-black" /></h1>
-<p class="mt-2 text-zinc-500">共{posts.length}篇</p>
-{groups.map(y => <AnimatedContent client:visible>
-  <div>
-  <h2 class="mt-8 text-2xl font-bold">{y.year}</h2>
-  {y.months.map(m => <div class="archive-month ml-4 mt-4">
-    <h3 class="text-sm font-mono text-zinc-400">{m.month}月</h3>
-    <div class="mt-2 space-y-1">
-      {m.posts.map(p => <a href={"/posts/" + p.slug} class="flex items-center gap-3 py-1.5 text-sm transition-all duration-200 hover:pl-2 hover:text-teal-600 dark:hover:text-teal-400">
-        {new Date(p.published_at).toLocaleDateString("zh-CN",{month:"2-digit",day:"2-digit"})}
-        <span>{p.title}</span>
-      </a>)}
-    </div>
-  </div>)}
-  </div>
-</AnimatedContent>)}
-</section>
-<style>
-  .archive-month {
-    position: relative;
-    border-left: 1px solid rgba(161, 161, 170, 0.35);
-    padding-left: 1rem;
-  }
-  .archive-month a {
-    position: relative;
-  }
-  .archive-month a::before {
-    content: "";
-    position: absolute;
-    left: calc(-1rem - 3px);
-    top: 50%;
-    width: 5px;
-    height: 5px;
-    margin-top: -2.5px;
-    border-radius: 9999px;
-    background: #a1a1aa;
-    transition: background 0.2s ease, transform 0.2s ease;
-  }
-  .archive-month a:hover::before {
-    background: #14b8a6;
-    transform: scale(1.5);
-  }
-  :global(.dark) .archive-month {
-    border-left-color: rgba(82, 82, 91, 0.6);
-  }
-  :global(.dark) .archive-month a::before {
-    background: #52525b;
-  }
-  :global(.dark) .archive-month a:hover::before {
-    background: #2dd4bf;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .archive-month a::before {
-      transition: none;
+  <section class="mx-auto max-w-3xl px-5 py-16 sm:px-8">
+    <header class="mb-10 border-b border-[var(--sf-line)] pb-6">
+      <p class="mb-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
+        <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
+        Archive / 01
+      </p>
+      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <h1 class="text-4xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-5xl">文章归档</h1>
+        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">
+          共 {posts.length} 篇
+        </p>
+      </div>
+    </header>
+
+    {groups.length === 0 ? (
+      <div class="border-y border-[var(--sf-line)] px-1 py-16 text-center">
+        <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">Empty / 0</p>
+        <p class="mt-3 text-[var(--sf-ink-2)]">暂无归档文章</p>
+      </div>
+    ) : (
+      groups.map((yearGroup) => (
+        <section class="mb-12 last:mb-0">
+          <div class="flex items-baseline justify-between gap-4 border-b border-[var(--sf-line)] pb-2">
+            <h2 class="font-mono text-2xl font-bold tabular-nums tracking-[0.06em] text-[var(--sf-ink)]">
+              {yearGroup.year}
+            </h2>
+            <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">
+              {yearGroup.months.length} 个月
+            </span>
+          </div>
+
+          {yearGroup.months.map((monthGroup) => (
+            <div class="archive-month mt-5">
+              <h3 class="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">
+                {monthGroup.month} 月
+              </h3>
+              <ul class="mt-2 list-none p-0">
+                {monthGroup.posts.map((post) => (
+                  <li>
+                    <a
+                      href={"/posts/" + post.slug}
+                      class="archive-entry group flex items-baseline gap-4 py-1.5 text-sm no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
+                    >
+                      <time
+                        datetime={post.published_at}
+                        class="shrink-0 font-mono text-[11px] tabular-nums tracking-[0.08em] text-[var(--sf-ink-3)]"
+                      >
+                        {new Date(post.published_at).toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" })}
+                      </time>
+                      <span class="min-w-0 flex-1 text-[var(--sf-ink-2)] transition-colors duration-200 [overflow-wrap:anywhere] group-hover:text-[var(--sf-accent-ink)]">
+                        {post.title}
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </section>
+      ))
+    )}
+  </section>
+
+  <style>
+    /* 归档时间轴：冷灰细线 + 小色点，hover 才用强调色 */
+    .archive-month {
+      position: relative;
+      border-left: 1px solid var(--sf-line);
+      padding-left: 1.25rem;
     }
-  }
-</style>
+
+    .archive-entry {
+      position: relative;
+    }
+
+    .archive-entry::before {
+      content: "";
+      position: absolute;
+      left: calc(-1.25rem - 3px);
+      top: 50%;
+      width: 5px;
+      height: 5px;
+      margin-top: -2.5px;
+      border-radius: 9999px;
+      background: var(--sf-line-strong);
+      transition: background 0.2s ease, transform 0.2s ease;
+    }
+
+    .archive-entry:hover::before,
+    .archive-entry:focus-visible::before {
+      background: var(--sf-accent);
+      transform: scale(1.6);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .archive-entry::before {
+        transition: none;
+      }
+    }
+  </style>
 </BaseLayout>

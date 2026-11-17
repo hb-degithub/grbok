@@ -15,8 +15,10 @@ interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, '
  * 1. 无障碍：label 通过 htmlFor 与 input 关联；错误时自动设置
  *    aria-invalid 与 aria-describedby，屏幕阅读器可定位错误原因。
  * 2. 焦点：用 focus-visible 而非 focus，保证纯键盘操作时显示焦点环，
- *    鼠标点击不残留蓝环，符合 WCAG 2.4.7。
- * 3. 玻璃适配：半透明背景 + 聚焦时边框/光晕强化，在玻璃卡片上保持可读。
+ *    鼠标点击不残留焦点描边，符合 WCAG 2.4.7。
+ * 3. 科幻简约：表面色 + 冷灰控制线（`--sf-line-control`），聚焦时换成唯一强调色；
+ *    深浅主题由 `.dark` 覆写 `--sf-*` 令牌，组件内不写死配色。
+ *    错误红保留为语义色（可辨识优先于统一色板）。
  */
 export default function Input({
   label,
@@ -35,7 +37,7 @@ export default function Input({
       {label && (
         <label
           htmlFor={inputId}
-          className="mb-1.5 block break-words text-sm font-medium leading-snug text-zinc-700 dark:text-zinc-300"
+          className="mb-1.5 block break-words text-sm font-medium leading-snug text-[var(--sf-ink-2)]"
         >
           {label}
         </label>
@@ -47,14 +49,13 @@ export default function Input({
           aria-invalid={!!error}
           aria-describedby={error ? errorId : helperText ? helperId : undefined}
           className={cn(
-            'min-h-[40px] w-full min-w-0 rounded-xl border px-3 py-2.5 text-[16px] leading-snug sm:px-4 sm:text-sm',
-            'bg-white/90 text-zinc-900 placeholder-zinc-400',
-            'transition-all duration-200 ease-out',
+            'min-h-[40px] w-full min-w-0 rounded-[3px] border px-3 py-2.5 text-[16px] leading-snug sm:px-4 sm:text-sm',
+            'bg-[var(--sf-surface)] text-[var(--sf-ink)] placeholder:text-[var(--sf-ink-3)]',
+            'transition-colors duration-200 ease-out',
             error
-              ? 'border-red-400 focus-visible:border-red-500 focus-visible:ring-red-500/30'
-              : 'border-zinc-200 focus-visible:border-teal-500 dark:border-zinc-700 dark:focus-visible:border-teal-400 focus-visible:ring-teal-500/35',
+              ? 'border-red-500 focus-visible:border-red-600 focus-visible:ring-red-500/40'
+              : 'border-[var(--sf-line-control)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-[var(--sf-accent)]',
             'outline-none focus-visible:ring-2 focus-visible:ring-offset-0',
-            'dark:bg-zinc-900/50 dark:text-zinc-100 dark:placeholder-zinc-500',
             'disabled:cursor-not-allowed disabled:opacity-50',
             className
           )}
@@ -80,7 +81,7 @@ export default function Input({
 
       {/* 帮助文本 */}
       {helperText && !error && (
-        <p id={helperId} className="mt-1.5 break-words text-sm leading-snug text-zinc-500 dark:text-zinc-400">
+        <p id={helperId} className="mt-1.5 break-words text-sm leading-snug text-[var(--sf-ink-3)]">
           {helperText}
         </p>
       )}

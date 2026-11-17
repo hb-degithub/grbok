@@ -12,11 +12,18 @@ interface TableOfContentsProps {
   headings: Heading[];
 }
 
+/**
+ * 桌面指示条高度：优先取当前行实测 offsetHeight（标题换行时行会高于 44px），
+ * 取不到时退回 `.min-h-11`（2.75rem / 44px）作为默认值。
+ */
+const ACTIVE_MARK_FALLBACK = 44;
+
 export default function TableOfContents({ headings }: TableOfContentsProps) {
   const { isMobile } = useBreakpoint();
   const prefersReducedMotion = useReducedMotion();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeTop, setActiveTop] = useState(0);
+  const [activeHeight, setActiveHeight] = useState(ACTIVE_MARK_FALLBACK);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
 
@@ -55,6 +62,8 @@ export default function TableOfContents({ headings }: TableOfContentsProps) {
     );
     if (linkEl) {
       setActiveTop(linkEl.offsetTop);
+      // 标题换行时行高会超过 min-h-11，用实测高度让指示条覆盖整行。
+      setActiveHeight(linkEl.offsetHeight || ACTIVE_MARK_FALLBACK);
     }
   }, [activeId]);
 
@@ -73,7 +82,7 @@ export default function TableOfContents({ headings }: TableOfContentsProps) {
 
   if (headings.length === 0) return null;
 
-  // Render a single heading link item
+  // Render a single heading link item (mobile 下拉与桌面侧栏共用)
   const renderHeading = (heading: Heading) => {
     const isActive = activeId === heading.id;
     return (
@@ -86,12 +95,12 @@ export default function TableOfContents({ headings }: TableOfContentsProps) {
           scrollToHeading(heading.id);
         }}
         className={`
-          block cursor-pointer py-1.5 text-[13px] leading-snug transition-colors duration-200
-          ${heading.level === 3 ? 'pl-4' : ''}
+          flex min-h-11 cursor-pointer items-center py-1.5 text-[13px] leading-snug no-underline transition-colors duration-200
+          ${heading.level === 3 ? 'pl-7' : 'pl-3'}
           ${
             isActive
-              ? 'text-teal-600 font-semibold dark:text-teal-400'
-              : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+              ? 'font-semibold text-[var(--sf-accent-ink)]'
+              : 'text-[var(--sf-ink-3)] hover:text-[var(--sf-ink)]'
           }
         `}
       >
@@ -106,12 +115,12 @@ export default function TableOfContents({ headings }: TableOfContentsProps) {
       <div className="mb-4">
         <button
           onClick={() => setMobileOpen((prev) => !prev)}
-          className="focus-ring inline-flex items-center gap-1.5 rounded-lg bg-white/60 px-3 py-2 text-sm font-medium text-zinc-700 backdrop-blur-sm transition-colors hover:bg-white/80 dark:bg-zinc-800/60 dark:text-zinc-300 dark:hover:bg-zinc-800/80"
+          className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-[4px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 font-mono text-[11px] tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors duration-200 hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]"
           aria-expanded={mobileOpen}
           aria-controls="toc-mobile-panel"
         >
           <svg
-            className="h-4 w-4 text-zinc-400 dark:text-zinc-500"
+            className="h-4 w-4 text-[var(--sf-ink-3)]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -128,7 +137,8 @@ export default function TableOfContents({ headings }: TableOfContentsProps) {
           <motion.span
             animate={{ rotate: mobileOpen ? 180 : 0 }}
             transition={{ duration: 0.2 }}
-            className="text-xs"
+            className="text-[10px] text-[var(--sf-ink-3)]"
+            aria-hidden="true"
           >
             ▾
           </motion.span>
@@ -144,7 +154,7 @@ export default function TableOfContents({ headings }: TableOfContentsProps) {
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               className="overflow-hidden"
             >
-              <nav className="mt-2 rounded-lg border border-zinc-200/60 bg-white/70 p-3 backdrop-blur-sm dark:border-zinc-700/50 dark:bg-zinc-800/70">
+              <nav className="mt-2 rounded-[4px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-3">
                 {headings.map(renderHeading)}
               </nav>
             </motion.div>
@@ -154,18 +164,24 @@ export default function TableOfContents({ headings }: TableOfContentsProps) {
     );
   }
 
-  // Desktop: vertical sidebar with sliding indicator
+  // Desktop: vertical sidebar with a hairline rail + sliding accent indicator
   return (
     <nav
       ref={navRef}
       aria-label="目录"
       className="relative w-44 shrink-0"
     >
+      {/* 静态细线轨道：没有 active 时也保留结构线，而不是一条空悬的强调色 */}
+      <div
+        className="absolute inset-y-0 left-0 w-px bg-[var(--sf-line-soft)]"
+        aria-hidden="true"
+      />
+
       {/* Sliding active indicator */}
       {activeId && !prefersReducedMotion && (
         <motion.div
-          className="absolute left-0 w-0.5 rounded-full bg-teal-500 dark:bg-teal-400"
-          animate={{ top: activeTop, height: 20 }}
+          className="absolute left-0 w-0.5 bg-[var(--sf-accent)]"
+          animate={{ top: activeTop, height: activeHeight }}
           transition={{ type: 'spring', stiffness: 350, damping: 30 }}
           aria-hidden="true"
         />
@@ -174,13 +190,13 @@ export default function TableOfContents({ headings }: TableOfContentsProps) {
       {/* Static indicator for reduced motion */}
       {activeId && prefersReducedMotion && (
         <div
-          className="absolute left-0 w-0.5 rounded-full bg-teal-500 dark:bg-teal-400"
-          style={{ top: activeTop, height: 20 }}
+          className="absolute left-0 w-0.5 bg-[var(--sf-accent)]"
+          style={{ top: activeTop, height: activeHeight }}
           aria-hidden="true"
         />
       )}
 
-      <div className="relative pl-3">
+      <div className="relative">
         {headings.map(renderHeading)}
       </div>
     </nav>

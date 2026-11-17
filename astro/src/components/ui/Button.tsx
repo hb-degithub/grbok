@@ -17,16 +17,18 @@ interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
 
 /**
  * 按钮变体样式映射
+ *
+ * 全部落到 global.css 的 `--sf-*` 令牌：唯一强调色 + 冷灰细线 + 表面色，
+ * 深浅主题由 `.dark` 覆写令牌整体切换，组件内不再写死配色。
  */
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-zinc-700 text-white shadow-sm shadow-zinc-700/30 hover:bg-zinc-800 active:bg-zinc-900 dark:bg-zinc-600 dark:hover:bg-zinc-700',
+    'bg-[var(--sf-accent)] text-[var(--sf-on-accent,var(--sf-canvas))] hover:bg-[var(--sf-accent-ink)]',
   secondary:
-    'bg-zinc-100 text-zinc-900 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700',
-  ghost:
-    'bg-transparent text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800',
+    'border border-[var(--sf-line-control)] bg-[var(--sf-surface)] text-[var(--sf-ink)] hover:border-[var(--sf-line-strong)]',
+  ghost: 'bg-transparent text-[var(--sf-ink-2)] hover:bg-[var(--sf-line-soft)] hover:text-[var(--sf-ink)]',
   outline:
-    'border border-zinc-300 bg-transparent text-zinc-700 hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:border-zinc-500 dark:hover:bg-zinc-800/50',
+    'border border-[var(--sf-line-control)] bg-transparent text-[var(--sf-ink-2)] hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)]',
 };
 
 /**
@@ -41,7 +43,7 @@ const sizeStyles: Record<ButtonSize, string> = {
 /**
  * 按钮组件
  * 支持多种变体、尺寸和加载状态
- * 使用 Framer Motion 实现悬停和点击动画
+ * 保留悬停/点击的轻微缩放，但幅度收敛到几乎不可察觉，符合克制动效
  */
 export default function Button({
   variant = 'primary',
@@ -54,18 +56,18 @@ export default function Button({
 }: ButtonProps) {
   return (
     <motion.button
-      // 悬停时轻微放大
-      whileHover={{ scale: 1.02 }}
+      // 悬停时轻微放大（克制）
+      whileHover={{ scale: 1.01 }}
       // 点击时轻微缩小
-      whileTap={{ scale: 0.98 }}
+      whileTap={{ scale: 0.99 }}
       // 过渡动画配置
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
       className={cn(
         // 基础样式
-        'inline-flex min-h-[44px] min-w-[44px] sm:min-h-[40px] sm:min-w-[40px] max-w-full items-center justify-center rounded-xl font-medium',
+        'inline-flex min-h-[44px] min-w-[44px] max-w-full items-center justify-center rounded-[3px] font-medium sm:min-h-[40px] sm:min-w-[40px]',
         'whitespace-normal break-words text-center leading-snug',
         'transition-colors duration-200 ease-out',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-900',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sf-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--sf-canvas)]',
         'disabled:cursor-not-allowed disabled:opacity-50',
         // 变体样式
         variantStyles[variant],

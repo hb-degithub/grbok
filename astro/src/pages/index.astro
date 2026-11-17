@@ -1,24 +1,16 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PostList from '../components/posts/PostList';
-import HomeParticlesBackground from '../components/effects/HomeParticlesBackground';
-import Typewriter from '../components/ui/Typewriter';
 import HomeAuthQuickEntry from '../components/auth/HomeAuthQuickEntry';
-import ProfileCard from '../components/sidebar/ProfileCard';
-import HotArticles from '../components/sidebar/HotArticles';
-import RecentComments from '../components/sidebar/RecentComments';
-import FriendLinks from '../components/sidebar/FriendLinks';
 import HomeSideNav from '../components/sidebar/HomeSideNav';
 import StatusMini from '../components/sidebar/StatusMini';
-import MagicBento from '../components/reactbits/MagicBento';
+import HotArticles from '../components/sidebar/HotArticles';
+import RecentComments from '../components/sidebar/RecentComments';
 import CountUp from '../components/reactbits/CountUp';
-import Carousel from '../components/reactbits/Carousel';
-import ScrollFloat from '../components/reactbits/ScrollFloat';
-import ScrollVelocity from '../components/reactbits/ScrollVelocity';
 import { cachedFetchJson } from '../lib/pb-cache';
+import { SITE_CONFIG } from '../config/site';
 import { pbBaseUrl } from '../lib/pb-base-url';
 
-// SSR 取数走服务端回环地址，浏览器侧仍用公网域名（见 pb-base-url.ts）
 const PB_URL = pbBaseUrl();
 
 async function fetchCount(collection: string, filter?: string): Promise<number> {
@@ -41,483 +33,285 @@ const [postsCount, tagsCount] = await Promise.all([
 ]);
 ---
 
-<BaseLayout title="首页" description="欢迎来到胡巴的个人博客" mainClass="pt-0 sm:pt-0 sm:pb-8">
-  <aside class="floating-sidebar sidebar-left fixed top-28 z-30 hidden w-[clamp(15rem,20vw,18rem)] xl:block xl:left-[max(1.5rem,calc(50%-61.5rem))]" aria-label="固定分区导航">
-    <div class="sidebar-parallax-left space-y-5">
-    <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
-      <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">站内导航</h3>
-      <div class="mt-4">
-        <HomeSideNav client:visible />
-      </div>
-    </section>
-
-    <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
-      <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">专题分类</h3>
-      <div class="mt-4 flex flex-wrap gap-2">
-        <a href="/tags" class="topic-chip rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600 no-underline dark:bg-zinc-800 dark:text-zinc-300">技术记录</a>
-        <a href="/tags" class="topic-chip rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600 no-underline dark:bg-zinc-800 dark:text-zinc-300">生活随笔</a>
-        <a href="/tags" class="topic-chip rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-600 no-underline dark:bg-zinc-800 dark:text-zinc-300">部署运维</a>
-      </div>
-    </section>
-    </div>
-  </aside>
-
-  <aside class="floating-sidebar fixed left-4 top-28 z-30 hidden lg:block xl:hidden" aria-label="快捷导航">
-    <nav class="side-panel flex flex-col gap-1 rounded-xl border border-zinc-200 bg-white p-2 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900" aria-label="分区导航">
-      <a href="/" title="首页" aria-label="首页" class="rail-link flex h-11 w-11 items-center justify-center rounded-lg text-zinc-500 transition-all hover:bg-zinc-900 hover:text-white dark:text-zinc-400 dark:hover:bg-zinc-100 dark:hover:text-zinc-950">
-        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h4m9-11v10a1 1 0 01-1 1h-4" /></svg>
-      </a>
-      <a href="#latest" title="最新文章" aria-label="最新文章" class="rail-link flex h-11 w-11 items-center justify-center rounded-lg text-zinc-500 transition-all hover:bg-zinc-900 hover:text-white dark:text-zinc-400 dark:hover:bg-zinc-100 dark:hover:text-zinc-950">
-        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-      </a>
-      <a href="/posts" title="全部文章" aria-label="全部文章" class="rail-link flex h-11 w-11 items-center justify-center rounded-lg text-zinc-500 transition-all hover:bg-zinc-900 hover:text-white dark:text-zinc-400 dark:hover:bg-zinc-100 dark:hover:text-zinc-950">
-        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2" /></svg>
-      </a>
-      <a href="/tags" title="标签索引" aria-label="标签索引" class="rail-link flex h-11 w-11 items-center justify-center rounded-lg text-zinc-500 transition-all hover:bg-zinc-900 hover:text-white dark:text-zinc-400 dark:hover:bg-zinc-100 dark:hover:text-zinc-950">
-        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-      </a>
-    </nav>
-  </aside>
-
-  <aside class="floating-sidebar sidebar-right fixed top-28 z-30 hidden w-[clamp(15rem,20vw,18rem)] xl:block xl:right-[max(1.5rem,calc(50%-61.5rem))]" aria-label="固定资料侧栏">
-    <div class="sidebar-parallax-right space-y-5">
-    <section class="side-panel overflow-hidden rounded-xl border border-zinc-200 bg-white p-6 shadow-2xl shadow-zinc-900/[0.06] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
-      <div class="flex items-center gap-4">
-        <div class="flex h-14 w-14 items-center justify-center rounded-lg bg-zinc-900 text-xl font-black text-white shadow-lg shadow-zinc-900/15 dark:bg-zinc-100 dark:text-zinc-950">B</div>
-        <div>
-          <p class="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-400">个人侧边栏</p>
-          <h2 class="mt-1 text-lg font-black tracking-tight text-zinc-950 dark:text-zinc-50">胡巴的博客</h2>
+<BaseLayout title="首页" description={SITE_CONFIG.description} mainClass="pt-0 sm:pt-0 sm:pb-0">
+  <!-- 科幻简约 Hero：左文右轨道 -->
+  <section class="sf-hero relative w-full overflow-hidden border-b border-[var(--sf-line)]">
+    <div class="sf-grid-bg" aria-hidden="true"></div>
+    <div class="mx-auto grid max-w-[1180px] gap-12 px-[var(--sf-pad)] pb-20 pt-[calc(var(--header-offset,4rem)+3rem)] lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-16 lg:pb-28 lg:pt-[calc(var(--header-offset,4rem)+4rem)]">
+      <!-- 左侧文案 -->
+      <div class="min-w-0">
+        <div class="sf-scale mb-6 flex items-end gap-3" aria-hidden="true">
+          <span class="sf-scale__ticks"></span>
+          <span class="sf-scale__label">LAB / 01</span>
         </div>
-      </div>
-      <p class="mt-5 text-sm leading-7 text-zinc-500 dark:text-zinc-400">技术、生活和偶尔冒出来的奇思妙想。</p>
-      <div class="mt-5 grid gap-3 sm:grid-cols-2">
-        <div class="stat-tile rounded-lg bg-zinc-50 p-4 dark:bg-zinc-950/50"><div class="text-2xl font-black text-zinc-950 dark:text-zinc-50"><CountUp client:visible to={postsCount} duration={1.5} /></div><div class="text-xs text-zinc-500 dark:text-zinc-400">已发布文章</div></div>
-        <div class="stat-tile rounded-lg bg-zinc-50 p-4 dark:bg-zinc-950/50"><div class="text-2xl font-black text-zinc-950 dark:text-zinc-50"><CountUp client:visible to={tagsCount} duration={1.5} /></div><div class="text-xs text-zinc-500 dark:text-zinc-400">内容标签</div></div>
-      </div>
-    </section>
-
-      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
-        <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">运行状态</h3>
-        <div class="mt-4">
-          <StatusMini client:visible />
-        </div>
-      </section>
-
-      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
-        <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">快速入口</h3>
-      <div class="mt-4 grid gap-2">
-        <HomeAuthQuickEntry client:visible />
-        <a href="/about" class="side-link group flex items-center justify-between rounded-lg bg-zinc-50 px-4 py-3 text-sm font-semibold text-zinc-700 no-underline transition-all hover:bg-zinc-900 hover:text-white dark:bg-zinc-950/50 dark:text-zinc-300 dark:hover:bg-zinc-100 dark:hover:text-zinc-950"><span>关于博主</span><svg class="h-4 w-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg></a>
-      </div>
-    </section>
-    </div>
-  </aside>
-
-  <section class="journal-hero relative min-h-[var(--hero-min-h,100svh)] w-full overflow-hidden border-b border-zinc-200/70 px-[var(--page-pad,1rem)] pb-16 pt-[calc(var(--header-offset,4rem)+1.5rem)] shadow-sm dark:border-zinc-800/70 sm:px-6 lg:px-20 lg:pb-20 lg:pt-24 xl:px-[clamp(19rem,26vw,21rem)] min-[2016px]:px-[calc(50%-42rem)]">
-
-    <div class="hero-particles absolute inset-0 overflow-hidden">
-
-      <HomeParticlesBackground client:only="react" />
-    </div>
-
-    <div class="journal-hero-content relative z-10 flex min-h-[var(--hero-content-min-h,calc(100svh-9rem))] items-center">
-      <div class="max-w-3xl xl:max-w-4xl">
-        <div class="animate-enter inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500 shadow-sm backdrop-blur dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-400">
-          <span class="accent-dot"></span>
-          Personal Journal
-        </div>
-
-        <h1 class="animate-enter mt-6 sm:mt-8 break-words text-[clamp(2rem,9vw,4.5rem)] font-black tracking-normal text-zinc-950 [overflow-wrap:anywhere] dark:text-zinc-50" style="animation-delay: 0.1s">
-          胡巴的博客        </h1>
-
-        <div class="animate-enter mt-5 sm:mt-6 min-h-[3.5rem] sm:min-h-8 max-w-2xl text-base leading-7 text-zinc-600 dark:text-zinc-300 sm:text-lg sm:leading-8" style="animation-delay: 0.2s">
-          <Typewriter
-            text="分享技术、思考与生活。把折腾过的东西写清楚。"
-            speed={42}
-            delay={500}
-            className="text-zinc-600 dark:text-zinc-300"
-            cursorClassName="text-zinc-500"
-            client:visible
-          />
-        </div>
-
-        <div class="animate-enter mt-8 sm:mt-10 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center" style="animation-delay: 0.3s">
-          <a href="#latest" class="inline-flex w-full flex-1 items-center justify-center gap-2 rounded-lg bg-zinc-900 px-6 py-3 text-sm font-semibold text-white no-underline shadow-xl shadow-zinc-900/15 transition-all hover:-translate-y-0.5 hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white sm:w-auto sm:flex-none">
-            浏览文章
-            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+        <p class="sf-eyebrow mb-4 flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-[var(--sf-ink-3)]">
+          <span class="sf-dot"></span>
+          PERSONAL TECH LOG / 个人技术博客
+        </p>
+        <h1 class="sf-title break-words text-[clamp(2.5rem,8vw,4.5rem)] font-bold leading-[1.04] tracking-[-0.02em] text-[var(--sf-ink)] [overflow-wrap:anywhere]">
+          {SITE_CONFIG.name}
+        </h1>
+        <p class="sf-lead mt-6 max-w-[32ch] text-[clamp(1.0625rem,2.2vw,1.375rem)] leading-[1.6] text-[var(--sf-ink-2)]">
+          {SITE_CONFIG.slogan}<span class="font-medium text-[var(--sf-ink)]">。把折腾过的东西写清楚。</span>
+        </p>
+        <p class="sf-note mt-4 max-w-[44ch] text-[0.9375rem] leading-[1.75] text-[var(--sf-ink-3)]">
+          {SITE_CONFIG.description}
+        </p>
+        <div class="mt-10 flex flex-wrap gap-3">
+          <a href="/posts" class="sf-btn-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[4px] bg-[var(--sf-accent)] px-6 text-[0.9375rem] font-medium text-[var(--sf-on-accent)] no-underline transition-[transform,background-color] hover:-translate-y-px hover:bg-[var(--sf-accent-ink)]">
+            浏览全部文章 <span class="font-mono text-sm" aria-hidden="true">→</span>
           </a>
-          <a href="/about" class="inline-flex w-full flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white/70 px-6 py-3 text-sm font-semibold text-zinc-700 no-underline backdrop-blur transition-all hover:-translate-y-0.5 hover:border-zinc-300 hover:bg-white dark:border-zinc-700 dark:bg-zinc-900/50 dark:text-zinc-200 dark:hover:bg-zinc-900 sm:w-auto sm:flex-none">
-            了解我          </a>
+          <a href="/about" class="sf-btn-ghost inline-flex min-h-[48px] items-center justify-center rounded-[4px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-6 text-[0.9375rem] font-medium text-[var(--sf-ink)] no-underline transition-[transform,border-color,color] hover:-translate-y-px hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]">
+            关于这个站点
+          </a>
         </div>
+        <p class="mt-10 flex flex-wrap items-center gap-2 border-t border-[var(--sf-line-soft)] pt-4 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">
+          <span>SINCE {SITE_CONFIG.since}</span>
+          <span class="text-[var(--sf-line-strong)]" aria-hidden="true">/</span>
+          <span>技术 · 思考 · 生活</span>
+        </p>
       </div>
+
+      <!-- 右侧轨道仪表 -->
+      <figure class="sf-figure relative mx-auto w-full max-w-[23rem]">
+        <div class="sf-instrument relative aspect-square w-full border border-[var(--sf-line)] bg-[var(--sf-surface)] p-6">
+          <span class="sf-corner sf-corner-tl"></span>
+          <span class="sf-corner sf-corner-tr"></span>
+          <span class="sf-corner sf-corner-bl"></span>
+          <span class="sf-corner sf-corner-br"></span>
+          <span class="sf-instrument-label font-mono text-[0.625rem] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">ORBIT / 01</span>
+          <div class="sf-orbit relative mx-auto mt-8 aspect-square w-full max-w-[16rem]">
+            <span class="sf-orbit-ring"></span>
+            <span class="sf-orbit-dash"></span>
+            <span class="sf-orbit-tilt"></span>
+            <span class="sf-orbit-axis"></span>
+            <span class="sf-orbit-core"></span>
+            <span class="sf-orbit-sweep"><span class="sf-orbit-node"></span></span>
+          </div>
+          <ul class="sf-readout mt-6 grid gap-1 font-mono text-[0.6875rem] text-[var(--sf-ink-3)]" role="list">
+            <li class="flex justify-between"><span>REF</span><span class="text-[var(--sf-ink-2)]">/posts</span></li>
+            <li class="flex justify-between"><span>TAGS</span><span class="text-[var(--sf-ink-2)]">/tags</span></li>
+            <li class="flex justify-between"><span>ABOUT</span><span class="text-[var(--sf-ink-2)]">/about</span></li>
+          </ul>
+        </div>
+        <figcaption class="mt-3 text-center font-mono text-[0.625rem] text-[var(--sf-ink-3)]">坐标示意 · 站点入口轨道</figcaption>
+      </figure>
     </div>
   </section>
 
-  <section id="latest" class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-20 xl:px-[clamp(19rem,26vw,21rem)] min-[2016px]:px-[calc(50%-42rem)]">
-    <div class="min-w-0">
-      <div class="section-head mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+  <!-- 最新文章 -->
+  <section id="latest" class="w-full border-b border-[var(--sf-line)]">
+    <div class="mx-auto max-w-[1180px] px-[var(--sf-pad)] py-16 lg:py-24">
+      <div class="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p class="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-400">Latest Notes</p>
-          <h2 class="mt-2 text-3xl font-black tracking-tight text-zinc-950 dark:text-zinc-50"><ScrollFloat client:visible text="最新文章" /></h2>
-          <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">最近发布的技术文章和思考。</p>
+          <p class="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-[var(--sf-ink-3)]">02 / 最新文章</p>
+          <h2 class="mt-2 text-3xl font-bold tracking-tight text-[var(--sf-ink)]">最新文章</h2>
+          <p class="mt-2 text-sm text-[var(--sf-ink-2)]">最近发布的技术文章和思考。</p>
         </div>
-        <a href="/posts" class="inline-flex min-h-10 w-fit items-center gap-1.5 rounded-full bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-700 no-underline transition-all hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700">
-          查看全部
-          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+        <a href="/posts" class="sf-link inline-flex min-h-[44px] w-fit items-center gap-1.5 font-mono text-sm text-[var(--sf-accent)] no-underline transition-colors hover:text-[var(--sf-accent-ink)]">
+          查看全部 <span aria-hidden="true">→</span>
         </a>
       </div>
       <PostList client:visible perPage={6} />
     </div>
+  </section>
 
-    <div class="mt-8 grid gap-5 lg:grid-cols-2 xl:hidden">
-      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
-        <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">站内导航</h3>
-        <div class="mt-4 grid gap-2">
-          <HomeAuthQuickEntry client:visible />
-        </div>
-        <p class="mt-4 text-sm leading-7 text-zinc-500 dark:text-zinc-400">写作与代码，一起慢慢积累。</p>
-      </section>
-      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
-        <h3 class="text-sm font-black tracking-tight text-zinc-950 dark:text-zinc-50">站点状态</h3>
-        <div class="mt-4">
-          <StatusMini client:visible />
-        </div>
-        <p class="mt-4 text-sm leading-7 text-zinc-500 dark:text-zinc-400">内容积累 {postsCount} 篇文章 / {tagsCount} 个标签</p>
-      </section>
-    </div>
-
-    <div class="mt-8 grid gap-5 lg:grid-cols-2 xl:hidden">
-      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
-        <ProfileCard client:visible />
-      </section>
-      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900">
+  <!-- 热榜与最近评论：保留真实数据源，编号行列表替代旧侧栏浮动组件 -->
+  <section id="community" class="w-full border-b border-[var(--sf-line)]">
+    <div class="mx-auto grid max-w-[1180px] gap-6 px-[var(--sf-pad)] py-16 lg:grid-cols-2 lg:gap-8 lg:py-24">
+      <div class="sf-block">
         <HotArticles client:visible />
-      </section>
-    </div>
-    <div class="mt-5 xl:hidden">
-      <section class="side-panel rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900"><RecentComments client:visible /></section>
-      <section class="side-panel mt-5 rounded-xl border border-zinc-200 bg-white p-5 shadow-xl shadow-zinc-900/[0.04] backdrop-blur-xl dark:border-zinc-800 dark:bg-zinc-900"><FriendLinks client:visible /></section>
+      </div>
+      <div class="sf-block">
+        <RecentComments client:visible />
+      </div>
     </div>
   </section>
 
-  <div class="hidden xl:block">
-    <ScrollVelocity client:visible text="胡巴的博客 · 技术与生活 · Huba's Blog · " baseVelocity={1} />
-  </div>
-
-  <section class="w-full px-[var(--page-pad,1rem)] py-12 sm:px-8 sm:py-16 lg:px-20 xl:px-[clamp(19rem,26vw,21rem)] min-[2016px]:px-[calc(50%-42rem)]">
-    <div class="section-head mb-8">
-      <p class="text-sm font-semibold uppercase tracking-[0.2em] text-zinc-400">探索</p>
-      <h2 class="mt-2 text-3xl font-black tracking-tight text-zinc-950 dark:text-zinc-50"><ScrollFloat client:visible text="探索更多" /></h2>
-      <p class="mt-2 text-sm text-zinc-500 dark:text-zinc-400">发现博客的更多功能和内容。</p>
-    </div>
-    <div class="bento-wrapper">
-      <!-- Mobile: Carousel, Desktop: MagicBento -->
-      <div class="sm:hidden">
-        <Carousel client:visible autoplay={true} autoplayInterval={4000}>
-          <a href="/posts" class="block rounded-xl border border-zinc-200 bg-white p-6 no-underline dark:border-zinc-800 dark:bg-zinc-900">
-            <span class="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">文章</span>
-            <h3 class="mt-2 text-lg font-bold text-zinc-950 dark:text-zinc-50">技术文章</h3>
-            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">深度技术解析与实践分享</p>
-          </a>
-          <a href="/tags" class="block rounded-xl border border-zinc-200 bg-white p-6 no-underline dark:border-zinc-800 dark:bg-zinc-900">
-            <span class="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">标签</span>
-            <h3 class="mt-2 text-lg font-bold text-zinc-950 dark:text-zinc-50">标签索引</h3>
-            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">按主题浏览所有内容</p>
-          </a>
-          <a href="/about" class="block rounded-xl border border-zinc-200 bg-white p-6 no-underline dark:border-zinc-800 dark:bg-zinc-900">
-            <span class="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">关于</span>
-            <h3 class="mt-2 text-lg font-bold text-zinc-950 dark:text-zinc-50">关于博主</h3>
-            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">了解写这些文字的人</p>
-          </a>
-          <a href="/login" class="block rounded-xl border border-zinc-200 bg-white p-6 no-underline dark:border-zinc-800 dark:bg-zinc-900">
-            <span class="text-xs font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">登录</span>
-            <h3 class="mt-2 text-lg font-bold text-zinc-950 dark:text-zinc-50">登录入口</h3>
-            <p class="mt-1 text-sm text-zinc-500 dark:text-zinc-400">进入账号和后台页面</p>
-          </a>
-        </Carousel>
+  <!-- 侧栏信息合并 -->
+  <section class="w-full border-b border-[var(--sf-line)]">
+    <div class="mx-auto grid max-w-[1180px] gap-8 px-[var(--sf-pad)] py-16 lg:grid-cols-3 lg:py-24">
+      <div class="sf-panel">
+        <h3 class="sf-panel-title">站内导航</h3>
+        <HomeSideNav client:visible />
       </div>
-      <div class="hidden sm:block">
-        <MagicBento
-          textAutoHide={true}
-          enableStars={true}
-          enableSpotlight={true}
-          enableBorderGlow={true}
-          enableTilt={true}
-          enableMagnetism={true}
-          clickEffect={true}
-          spotlightRadius={300}
-          particleCount={12}
-          glowColor="20, 184, 166"
-          client:only="react"
-        />
+      <div class="sf-panel">
+        <h3 class="sf-panel-title">站点状态</h3>
+        <StatusMini client:visible />
+        <div class="mt-4 grid grid-cols-2 gap-4 border-t border-[var(--sf-line-soft)] pt-4">
+          <div><div class="text-2xl font-bold text-[var(--sf-ink)]"><CountUp client:visible to={postsCount} duration={1.5} /></div><div class="text-xs text-[var(--sf-ink-3)]">已发布文章</div></div>
+          <div><div class="text-2xl font-bold text-[var(--sf-ink)]"><CountUp client:visible to={tagsCount} duration={1.5} /></div><div class="text-xs text-[var(--sf-ink-3)]">内容标签</div></div>
+        </div>
+      </div>
+      <div class="sf-panel">
+        <h3 class="sf-panel-title">快速入口</h3>
+        <HomeAuthQuickEntry client:visible />
+        <a href="/about" class="sf-link mt-4 inline-flex min-h-[44px] items-center gap-1.5 font-mono text-sm text-[var(--sf-accent)] no-underline transition-colors hover:text-[var(--sf-accent-ink)]">
+          关于博主 <span aria-hidden="true">→</span>
+        </a>
       </div>
     </div>
   </section>
 </BaseLayout>
 
-<script>
-  import '../scripts/sidebar-motion';
-  import '../scripts/hero-motion';
-</script>
-
 <style>
-  .journal-hero {
-    background:
-      radial-gradient(circle at 18% 20%, rgba(120, 113, 108, 0.14), transparent 30%),
-      radial-gradient(circle at 76% 18%, rgba(14, 165, 233, 0.08), transparent 26%),
-      linear-gradient(135deg, #fafaf9 0%, #ffffff 42%, #f4f1eb 100%);
+  /* 科幻简约首页局部样式；设计令牌统一由 global.css 提供。 */
+  .sf-hero {
+    background: var(--sf-canvas);
   }
 
-  /* 暗色背景规则：.dark 类在 html 上（BaseLayout 渲染），Astro scoped 会给
-     .dark 也加组件作用域属性导致永不匹配，必须 :global 前缀声明。 */
-  :global(.dark) .journal-hero {
-    background:
-      radial-gradient(circle at 18% 20%, rgba(168, 162, 158, 0.13), transparent 30%),
-      radial-gradient(circle at 76% 18%, rgba(45, 212, 191, 0.08), transparent 26%),
-      linear-gradient(135deg, #0c0a09 0%, #18181b 54%, #111827 100%);
-  }
-
-  .journal-paper {
-    opacity: 0.42;
-    background-image:
-      radial-gradient(circle at 1px 1px, rgba(28, 25, 23, 0.12) 1px, transparent 0),
-      linear-gradient(115deg, transparent 0 43%, rgba(120, 113, 108, 0.08) 43% 44%, transparent 44% 100%);
-    background-size: 24px 24px, 180px 180px;
-    mask-image: linear-gradient(to bottom, black 0%, black 72%, transparent 100%);
-  }
-
-  :global(.dark) .journal-paper {
-    opacity: 0.34;
-    background-image:
-      radial-gradient(circle at 1px 1px, rgba(250, 250, 249, 0.16) 1px, transparent 0),
-      linear-gradient(115deg, transparent 0 43%, rgba(168, 162, 158, 0.12) 43% 44%, transparent 44% 100%);
-  }
-
-  .journal-grid {
-    opacity: 0.1;
-    background-image:
-      linear-gradient(currentColor 1px, transparent 1px),
-      linear-gradient(90deg, currentColor 1px, transparent 1px);
-    background-size: 46px 46px;
-    color: rgb(28 25 23);
-    transform: perspective(900px) rotateX(58deg) translateY(-8%);
-    transform-origin: top center;
-  }
-
-  :global(.dark) .journal-grid {
-    color: rgb(245 245 244);
-    opacity: 0.12;
-  }
-
-  .journal-scan {
-    background: linear-gradient(to bottom, rgba(255,255,255,0.5), transparent);
-    animation: journal-scan 7s ease-in-out infinite;
-  }
-
-  :global(.dark) .journal-scan {
-    background: linear-gradient(to bottom, rgba(255,255,255,0.08), transparent);
-  }
-
-  .journal-corner {
-    border: 1px solid rgba(120, 113, 108, 0.28);
-    border-right: 0;
-    border-bottom: 0;
-    opacity: 0.55;
-  }
-
-  .journal-corner-b {
-    border: 1px solid rgba(120, 113, 108, 0.28);
-    border-left: 0;
-    border-top: 0;
-  }
-
-  :global(.dark) .journal-corner,
-  :global(.dark) .journal-corner-b {
-    border-color: rgba(168, 162, 158, 0.28);
-  }
-
-  .journal-note {
-    animation: journal-float 7s ease-in-out infinite;
-  }
-
-  .note-b {
-    animation-delay: -2.5s;
-  }
-
-  @keyframes journal-float {
-    0%, 100% { transform: translateY(0) rotate(var(--note-rotate, 0deg)); }
-    50% { transform: translateY(-10px) rotate(var(--note-rotate, 0deg)); }
-  }
-
-  @keyframes journal-scan {
-    0%, 100% { opacity: 0.2; transform: translateY(-100%); }
-    45%, 55% { opacity: 0.55; transform: translateY(70vh); }
-  }
-  .floating-sidebar {
-    animation: sidebar-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
-    transform-origin: top center;
-  }
-
-  .sidebar-left { animation-delay: 120ms; }
-  .sidebar-right { animation-delay: 220ms; }
-
-  .side-panel {
-    position: relative;
-    overflow: hidden;
-    transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease, background-color 220ms ease;
-  }
-
-  .side-panel::before {
-    content: "";
+  .sf-grid-bg {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background: linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.45) 42%, transparent 70%);
-    transform: translateX(-120%);
-    transition: transform 650ms ease;
+    background-image:
+      repeating-linear-gradient(to right, rgba(22, 25, 29, 0.045) 0 1px, transparent 1px 32px),
+      repeating-linear-gradient(to bottom, rgba(22, 25, 29, 0.045) 0 1px, transparent 1px 32px);
+    mask-image: linear-gradient(to bottom, black 0%, transparent 80%);
   }
 
-  .side-panel:hover {
-    transform: translateY(-3px);
-    border-color: rgba(120, 113, 108, 0.28);
-    box-shadow: 0 22px 45px rgba(28, 25, 23, 0.09);
+  :global(.dark) .sf-grid-bg {
+    background-image:
+      repeating-linear-gradient(to right, rgba(232, 236, 240, 0.04) 0 1px, transparent 1px 32px),
+      repeating-linear-gradient(to bottom, rgba(232, 236, 240, 0.04) 0 1px, transparent 1px 32px);
   }
 
-  .side-panel:hover::before {
-    transform: translateX(120%);
+  .sf-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sf-accent);
   }
 
-  .side-link {
+  .sf-scale__ticks {
+    flex: 1;
+    height: 7px;
+    border-bottom: 1px solid var(--sf-line-strong);
+    background-image: repeating-linear-gradient(to right, var(--sf-line-strong) 0 1px, transparent 1px 12px);
+    background-size: 100% 8px;
+    background-repeat: no-repeat;
+    background-position: bottom left;
+  }
+
+  .sf-scale__label {
+    font-family: 'Geist Mono', monospace;
+    font-size: 0.625rem;
+    letter-spacing: 0.2em;
+    color: var(--sf-ink-3);
+  }
+
+  /* 轨道仪表 */
+  .sf-instrument {
     position: relative;
-    overflow: hidden;
   }
 
-  .side-link:hover {
-    transform: translateX(4px);
+  /* 四个角标：边框简写显式带 var(--sf-line-strong)。
+     若只写 `border-top: 1px solid`，简写会把 color 重置为 currentColor，
+     暗色主题下线条会变成近白（.sf-corner 上的 border-color 被覆盖）。 */
+  .sf-corner {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-color: var(--sf-line-strong);
   }
 
-  .rail-link {
-    transform: translateX(0);
-  }
-  .rail-link:hover {
-    transform: translateX(3px);
-  }
+  .sf-corner-tl { top: -1px; left: -1px; border-top: 1px solid var(--sf-line-strong); border-left: 1px solid var(--sf-line-strong); }
+  .sf-corner-tr { top: -1px; right: -1px; border-top: 1px solid var(--sf-line-strong); border-right: 1px solid var(--sf-line-strong); }
+  .sf-corner-bl { bottom: -1px; left: -1px; border-bottom: 1px solid var(--sf-line-strong); border-left: 1px solid var(--sf-line-strong); }
+  .sf-corner-br { bottom: -1px; right: -1px; border-bottom: 1px solid var(--sf-line-strong); border-right: 1px solid var(--sf-line-strong); }
 
-  .topic-chip {
-    display: inline-flex;
-    align-items: center;
-    transition: transform 180ms ease, background-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
-  }
-
-  .topic-chip:hover {
-    transform: translateY(-2px);
-    background-color: rgb(28 25 23);
-    color: white;
-    box-shadow: 0 10px 24px rgba(28, 25, 23, 0.14);
+  .sf-orbit-ring {
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--sf-line-strong);
+    border-radius: 50%;
   }
 
-  .stat-tile {
-    transition: transform 180ms ease, background-color 180ms ease;
+  .sf-orbit-dash {
+    position: absolute;
+    inset: 15%;
+    border: 1px dashed var(--sf-line);
+    border-radius: 50%;
   }
 
-  .stat-tile:hover {
-    transform: translateY(-2px);
+  .sf-orbit-tilt {
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--sf-line);
+    border-radius: 50%;
+    transform: rotateX(60deg) rotateZ(-20deg);
   }
 
-
-@media (max-width: 767px) and (max-height: 520px) {
-  .journal-hero { padding-bottom: 2rem; }
-  .journal-hero-content { min-height: 0; align-items: flex-start; }
-}
-
-@media (max-width: 639px) {
-  .journal-grid {
-    transform: perspective(600px) rotateX(50deg) translateY(-4%);
-    opacity: 0.06;
+  .sf-orbit-axis {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1px;
+    height: 100%;
+    background: var(--sf-line);
+    transform: translate(-50%, -50%);
   }
-  .journal-paper { background-size: 18px 18px, 120px 120px; }
-  .journal-corner, .journal-corner-b { display: none; }
-}
-  @keyframes sidebar-rise {
-    from {
-      opacity: 0;
-      transform: translateY(18px) scale(0.98);
-      filter: blur(6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-      filter: blur(0);
-    }
+
+  .sf-orbit-core {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    border: 1px solid var(--sf-ink-3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .sf-orbit-sweep {
+    position: absolute;
+    inset: 0;
+    animation: sf-spin 52s linear infinite;
+  }
+
+  .sf-orbit-node {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--sf-accent);
+    transform: translateX(-50%);
+    animation: sf-pulse 7s ease-in-out infinite;
+  }
+
+  @keyframes sf-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes sf-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .floating-sidebar,
-    .side-panel,
-    .side-link,
-    .rail-link,
-    .topic-chip,
-    .stat-tile {
-      animation: none;
-      transition: none;
-    }
-    .journal-note,
-    .journal-scan {
+    .sf-orbit-sweep,
+    .sf-orbit-node {
       animation: none;
     }
   }
 
-  /* ---- Particles background ---- */
-  .home-particles-bg {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: auto;
+  /* 面板 */
+  .sf-panel {
+    border-left: 2px solid var(--sf-accent);
+    padding-left: 1.25rem;
   }
 
-  .home-particles-bg .particles-container {
-    position: absolute;
-    inset: 0;
-  }
-  /* ---- Bento section ---- */
-  .bento-wrapper {
-    display: flex;
-    justify-content: center;
+  .sf-panel-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--sf-ink);
+    margin-bottom: 1rem;
   }
 
-  .bento-wrapper .magic-bento-grid {
-    width: 100%;
-    max-width: 100%;
-  }
-
-  /* Light theme overrides for bento cards */
-  :root:not(.dark) .magic-bento-card {
-    background: #fafaf9;
-    border-color: rgba(0, 0, 0, 0.08);
-  }
-
-  :root:not(.dark) .magic-bento-card__header,
-  :root:not(.dark) .magic-bento-card__content {
-    color: #18181b;
-  }
-
-  :root:not(.dark) .magic-bento-card__label {
-    color: #71717a;
-  }
-
-  :root:not(.dark) .magic-bento-card__title {
-    color: #09090b;
-  }
-
-  :root:not(.dark) .magic-bento-card__description {
-    color: #52525b;
-  }
-
-  :root:not(.dark) .magic-bento-card:hover {
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-  }
-
-  :root:not(.dark) .magic-bento-particle-container:hover {
-    box-shadow: 0 4px 20px rgba(20, 184, 166, 0.1), 0 0 30px rgba(20, 184, 166, 0.08);
+  .sf-link {
+    text-decoration: none;
   }
 </style>

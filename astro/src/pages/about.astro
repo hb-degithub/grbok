@@ -1,20 +1,15 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import ScrollReveal from '../components/ui/ScrollReveal';
-import Typewriter from '../components/ui/Typewriter';
-import GlareHover from '../components/reactbits/GlareHover';
-import BlurText from '../components/reactbits/BlurText';
-import ParticleField from '../components/effects/ParticleField';
 import TechCard from '../components/ui/TechCard';
 import FeatureCard from '../components/ui/FeatureCard';
 
 const techStack = [
   {
-    name: 'Astro 6.4',
-    desc: '纯 SSG 静态生成，群岛架构',
-    detail: '纯静态生成（SSG）元框架，构建产物为纯 HTML/CSS/JS，页面默认零 JS 输出，仅在需要的交互"岛屿"中按需水合 React 组件。',
+    name: 'Astro 7',
+    desc: 'SSR 服务端渲染，群岛架构',
+    detail: '服务端渲染（SSR）元框架，页面由 Node 适配器按需渲染为 HTML，仅在需要的交互"岛屿"中按需水合 React 组件。',
     points: [
-      '群岛架构：静态 HTML + 按需水合，首屏 JS 体积最小化',
+      '群岛架构：服务端 HTML + 按需水合，首屏 JS 体积最小化',
       'client:visible / client:idle 分级水合策略，非首屏组件延迟加载',
       'MDX 内容管线：文章支持内嵌交互组件与代码高亮',
     ],
@@ -34,8 +29,8 @@ const techStack = [
     desc: '原子化样式，深色主题设计系统',
     detail: '基于 Tailwind 4 的原子化样式体系，配合 CSS 变量实现明暗双主题无缝切换。',
     points: [
-      'zinc 中性色 + teal 强调色的统一设计令牌',
-      '玻璃态工具类：glass / glass-strong / glass-overlay',
+      '冷白 / 石墨中性色 + 低饱和青强调色，统一走 --sf-* 令牌',
+      '细网格背景 / 冷灰细线 / 等宽短标签三档层级',
       'Vite 插件零配置集成，构建时 purge 未用样式',
     ],
   },
@@ -114,10 +109,10 @@ const features = [
   },
   {
     title: '交互体验',
-    desc: '粒子背景、网格扫描、Dock 导航、Bento 卡片、阅读进度、滚动揭示动效',
+    desc: '细网格背景、坐标刻度、Dock 导航、内联展开、阅读进度、克制动效',
     detail: '全站动效系统以"克制的华丽"为原则，视觉丰富但不牺牲性能。',
     points: [
-      'OGL 粒子与网格扫描按需懒加载，非首屏延迟水合',
+      '共享 --sf-* 深浅主题令牌与低对比细网格背景',
       'macOS 风格 Dock 导航，客户端路由同步激活态',
       '阅读进度条 + 滚动揭示，长文阅读节奏引导',
     ],
@@ -162,100 +157,86 @@ const links = [
 ---
 
 <BaseLayout title="关于" description="关于这个博客和作者">
-  <div class="pointer-events-none fixed inset-0 z-0 hidden lg:block" aria-hidden="true">
-    <ParticleField client:visible count={36} speed={0.25} />
-  </div>
-  <div class="relative z-10 max-w-3xl mx-auto">
-    <!-- 头部 -->
-    <ScrollReveal client:visible>
-      <div class="mb-16 text-center">
-        <div class="mb-6 inline-flex h-24 w-24 items-center justify-center rounded-full border-2 border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
-          <span class="font-display text-3xl font-black text-zinc-500 dark:text-zinc-400">B</span>
+  <div class="mx-auto max-w-3xl px-5 py-16 sm:px-8">
+    <header class="mb-12 border-b border-[var(--sf-line)] pb-8">
+      <p class="mb-4 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
+        <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
+        About / 01
+      </p>
+      <div class="flex items-center gap-4">
+        <div
+          class="flex h-14 w-14 shrink-0 items-center justify-center border border-[var(--sf-line-strong)] bg-[var(--sf-surface)] font-mono text-xl text-[var(--sf-ink)]"
+          aria-hidden="true"
+        >
+          B
         </div>
-        <h1 class="font-display text-4xl font-black uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-4">
-          <BlurText client:visible text="关于博客" className="text-4xl font-black tracking-tight text-zinc-950 dark:text-zinc-50 sm:text-5xl" />
-        </h1>
-        <div class="text-zinc-500 dark:text-zinc-400">
-          <Typewriter
-            text="分享技术、思考与生活"
-            client:visible
-          />
+        <div class="min-w-0">
+          <h1 class="text-4xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-5xl">关于博客</h1>
+          <p class="mt-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">
+            分享技术、思考与生活
+          </p>
         </div>
       </div>
-    </ScrollReveal>
+    </header>
 
     <!-- 介绍 -->
-    <ScrollReveal delay={0.1} client:visible>
-      <div class="card rounded-lg p-8 mb-8">
-        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-4">
-          关于这个博客
-        </h2>
-        <div class="space-y-4 text-zinc-500 dark:text-zinc-400">
-          <p>
-            胡巴的博客是一个自建的全栈个人博客系统，使用 Astro 6.4 + React 19 + PocketBase 0.22 构建，自 2025 年运行至今。
-          </p>
-          <p>
-            前端采用 Astro 纯静态生成（SSG）与 React 岛屿架构，后端依托 PocketBase 0.22 提供 Auth、数据库与 API 服务，Caddy 2.8 负责反向代理与安全防护，admin-auth 内部服务承载 TOTP 二次验证与邮件、ESA 缓存刷新，Docker Compose 统一编排部署。
-          </p>
-        </div>
+    <section class="mb-12 border-t border-[var(--sf-line)] pt-6">
+      <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Site / 这个站点</p>
+      <h2 class="mt-2 text-xl font-semibold tracking-tight text-[var(--sf-ink)]">关于这个博客</h2>
+      <div class="mt-4 space-y-4 text-[var(--sf-ink-2)]">
+        <p>
+          胡巴的博客是一个自建的全栈个人博客系统，使用 Astro 7 + React 19 + PocketBase 0.22 构建，自 2025 年运行至今。
+        </p>
+        <p>
+          前端采用 Astro SSR 服务端渲染与 React 岛屿架构，后端依托 PocketBase 0.22 提供 Auth、数据库与 API 服务，Caddy 2.8 负责反向代理与安全防护，admin-auth 内部服务承载 TOTP 二次验证与邮件、ESA 缓存刷新，Docker Compose 统一编排部署。
+        </p>
       </div>
-    </ScrollReveal>
+    </section>
 
     <!-- 技术栈 -->
-    <ScrollReveal delay={0.2} client:visible>
-      <div class="card rounded-lg p-8 mb-8">
-        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-6">
-          技术栈
-        </h2>
-        <p class="mb-4 text-xs text-zinc-400 dark:text-zinc-500">
-          点击卡片展开技术详情
-        </p>
-        <div class="grid grid-cols-1 sm:grid-cols-2 items-start gap-3">
-          {techStack.map((tech) => (
-            <GlareHover client:visible glareColor="rgba(20, 184, 166, 0.08)">
-              <TechCard client:visible tech={tech} />
-            </GlareHover>
-          ))}
-        </div>
+    <section class="mb-12 border-t border-[var(--sf-line)] pt-6">
+      <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Stack / 工具链</p>
+      <h2 class="mt-2 text-xl font-semibold tracking-tight text-[var(--sf-ink)]">技术栈</h2>
+      <p class="mt-1.5 font-mono text-[11px] tracking-[0.1em] text-[var(--sf-ink-3)]">
+        点击行展开技术详情
+      </p>
+      <div class="mt-4 grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
+        {techStack.map((tech, index) => (
+          <TechCard client:visible tech={tech} id={`tech-${index}`} />
+        ))}
       </div>
-    </ScrollReveal>
+    </section>
 
     <!-- 功能特性 -->
-    <ScrollReveal delay={0.25} client:visible>
-      <div class="card rounded-lg p-8 mb-8">
-        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-6">
-          功能特性
-        </h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {features.map((f) => (
-            <FeatureCard client:visible feature={f} />
-          ))}
-        </div>
+    <section class="mb-12 border-t border-[var(--sf-line)] pt-6">
+      <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Features / 能力</p>
+      <h2 class="mt-2 text-xl font-semibold tracking-tight text-[var(--sf-ink)]">功能特性</h2>
+      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {features.map((feature, index) => (
+          <FeatureCard client:visible feature={feature} id={`feature-${index}`} />
+        ))}
       </div>
-    </ScrollReveal>
+    </section>
 
     <!-- 联系方式 -->
-    <ScrollReveal delay={0.3} client:visible>
-      <div class="card rounded-lg p-8">
-        <h2 class="font-display text-xl font-bold uppercase tracking-wide text-zinc-900 dark:text-zinc-100 mb-6">
-          联系方式
-        </h2>
-        <div class="flex flex-wrap gap-4">
-          {links.map((link) => (
-            <a
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              class="btn-ghost flex items-center gap-2"
-            >
-              <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d={link.icon} />
-              </svg>
-              {link.name}
-            </a>
-          ))}
-        </div>
+    <section class="border-t border-[var(--sf-line)] pt-6">
+      <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Contact / 联系</p>
+      <h2 class="mt-2 text-xl font-semibold tracking-tight text-[var(--sf-ink)]">联系方式</h2>
+      <div class="mt-4 flex flex-wrap gap-3">
+        {links.map((link) => (
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex min-h-[44px] items-center gap-2 rounded-[3px] border border-[var(--sf-line)] px-4 text-sm text-[var(--sf-ink-2)] no-underline transition-colors duration-200 hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
+          >
+            <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path d={link.icon} />
+            </svg>
+            {link.name}
+          </a>
+        ))}
       </div>
-    </ScrollReveal>
+    </section>
   </div>
 </BaseLayout>

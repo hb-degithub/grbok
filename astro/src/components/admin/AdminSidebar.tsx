@@ -39,12 +39,12 @@ const roleLabels: Record<AdminRole, string> = {
   super_admin: '超级管理员',
 };
 
-const roleTone: Record<AdminRole, string> = {
-  reader: 'border-text-muted/30 bg-text-muted/10 text-text-secondary',
-  author: 'border-accent/25 bg-accent/10 text-accent',
-  admin: 'border-warning/25 bg-warning/10 text-warning',
-  super_admin: 'border-danger/25 bg-danger/10 text-danger',
-};
+/** 细网格：冷灰线，低对比，只出现在品牌区，避免整栏噪点。 */
+const gridStyle = {
+  backgroundImage:
+    'linear-gradient(var(--sf-line-soft) 1px, transparent 1px), linear-gradient(90deg, var(--sf-line-soft) 1px, transparent 1px)',
+  backgroundSize: '16px 16px',
+} as const;
 
 function isActivePath(href: string, currentPath: string) {
   return href === '/admin' ? currentPath === '/admin' || currentPath === '/admin/' : currentPath.startsWith(href);
@@ -122,10 +122,16 @@ export default function AdminSidebar() {
   const renderNav = (isCollapsed: boolean, onNavigate?: () => void) => (
     <>
       <nav className="flex-1 overflow-y-auto px-2 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-        {sections.map((section) => (
+        {sections.map((section, sectionIndex) => (
           <div key={section} className="mb-4">
-            {!isCollapsed && <div className="mb-1.5 px-2 font-mono text-[10px] uppercase tracking-wide text-muted">{section}</div>}
-            <div className="space-y-1">
+            {!isCollapsed && (
+              <div className="mb-2 flex items-center gap-2 px-2">
+                <span className="font-mono text-[10px] tracking-[0.2em] text-[var(--sf-ink-3)]">{String(sectionIndex + 1).padStart(2, '0')}</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">{section}</span>
+                <span className="ml-1 h-px flex-1 bg-[var(--sf-line)]" aria-hidden="true" />
+              </div>
+            )}
+            <div className="space-y-0.5">
               {visibleItems.filter((item) => item.section === section).map((item) => {
                 const active = isActivePath(item.href, currentPath);
                 return (
@@ -135,18 +141,18 @@ export default function AdminSidebar() {
                     title={isCollapsed ? item.label : undefined}
                     onClick={onNavigate}
                     className={cn(
-                      'group relative flex min-h-11 items-center gap-3 rounded-md px-2.5 text-sm font-medium transition-all',
+                      'group relative flex min-h-11 items-center gap-3 rounded-[3px] px-2.5 text-sm font-medium transition-colors',
                       isCollapsed && 'justify-center px-0',
-                      active ? 'bg-text text-white shadow-sm' : 'text-text-secondary hover:bg-bg-soft hover:text-text'
+                      active ? 'bg-[var(--sf-line-soft)] text-[var(--sf-ink)]' : 'text-[var(--sf-ink-2)] hover:bg-[var(--sf-line-soft)] hover:text-[var(--sf-ink)]'
                     )}
                     aria-current={active ? 'page' : undefined}
                   >
-                    {active && <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-white/80" />}
-                    <svg className={cn('h-5 w-5 shrink-0', active ? 'text-white' : 'text-muted group-hover:text-text')} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d={item.icon} /></svg>
+                    {active && <span className="absolute left-0 top-1/2 h-6 w-[2px] -translate-y-1/2 bg-[var(--sf-accent)]" aria-hidden="true" />}
+                    <svg className={cn('h-[18px] w-[18px] shrink-0', active ? 'text-[var(--sf-accent)]' : 'text-[var(--sf-ink-3)] group-hover:text-[var(--sf-ink-2)]')} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} /></svg>
                     {!isCollapsed && (
                       <>
                         <span className="truncate">{item.label}</span>
-                        <span className={cn('ml-auto rounded px-1.5 py-0.5 font-mono text-[10px]', active ? 'bg-white/12 text-white/80' : 'bg-bg-soft text-muted')}>{item.hint}</span>
+                        <span className={cn('ml-auto shrink-0 rounded-[2px] border px-1.5 py-0.5 font-mono text-[10px] leading-none tracking-wide', active ? 'border-[var(--sf-accent)] text-[var(--sf-accent)]' : 'border-[var(--sf-line)] text-[var(--sf-ink-3)]')}>{item.hint}</span>
                       </>
                     )}
                   </a>
@@ -157,39 +163,40 @@ export default function AdminSidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-border p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
+      <div className="border-t border-[var(--sf-line)] p-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))]">
         <a
           href="/"
           onClick={onNavigate}
-          className={cn('mb-2 flex min-h-11 items-center gap-3 rounded-md border border-border bg-bg-soft px-2.5 text-sm text-text-secondary transition-colors hover:border-border-hover hover:bg-white hover:text-text', isCollapsed && 'justify-center px-0')}
+          className={cn('mb-2 flex min-h-11 items-center gap-3 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-2.5 text-sm text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]', isCollapsed && 'justify-center px-0')}
           title="查看站点"
         >
-          <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M14 3h7m0 0v7m0-7L10 14m-1 7H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /></svg>
+          <svg className="h-[18px] w-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 3h7m0 0v7m0-7L10 14m-1 7H5a2 2 0 01-2-2V5a2 2 0 012-2h4" /></svg>
           {!isCollapsed && <span>查看站点</span>}
         </a>
-        <div className={cn('mb-2 rounded-md border border-border bg-white p-2 shadow-xs', isCollapsed && 'flex justify-center p-1.5')}>
+        <div className={cn('mb-2 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] p-2', isCollapsed && 'flex justify-center p-1.5')}>
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-text text-xs font-bold text-white">{initial}</div>
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[2px] bg-[var(--sf-accent)] font-mono text-xs font-bold text-[var(--sf-canvas)]">{initial}</div>
             {!isCollapsed && (
               <div className="min-w-0 flex-1">
-                <div className="truncate text-xs font-semibold text-text">{user?.name || '后台用户'}</div>
-                <div className="truncate font-mono text-[10px] text-muted">{user?.email || '已登录'}</div>
+                <div className="truncate text-xs font-semibold text-[var(--sf-ink)]">{user?.name || '后台用户'}</div>
+                <div className="truncate font-mono text-[10px] tracking-wide text-[var(--sf-ink-3)]">{user?.email || '已登录'}</div>
               </div>
             )}
           </div>
           {!isCollapsed && role && (
-            <div className={cn('mt-2 inline-flex rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase', roleTone[role])}>
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-[2px] border border-[var(--sf-accent)] px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--sf-accent)]">
+              <span className="h-1 w-1 rounded-full bg-[var(--sf-accent)]" aria-hidden="true" />
               {roleLabels[role]}
             </div>
           )}
         </div>
         <button
           onClick={handleLogout}
-          className={cn('flex min-h-11 w-full items-center gap-3 rounded-md px-2.5 text-sm text-text-secondary transition-colors hover:bg-danger/10 hover:text-danger', isCollapsed && 'justify-center px-0')}
+          className={cn('flex min-h-11 w-full items-center gap-3 rounded-[3px] border border-transparent px-2.5 text-sm text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-line)] hover:bg-[var(--sf-line-soft)] hover:text-[var(--sf-ink)]', isCollapsed && 'justify-center px-0')}
           title="退出登录"
           aria-label="退出登录"
         >
-          <svg className="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+          <svg className="h-[18px] w-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
           {!isCollapsed && <span>退出登录</span>}
         </button>
       </div>
@@ -202,38 +209,41 @@ export default function AdminSidebar() {
         ref={triggerRef}
         type="button"
         onClick={() => setDrawerOpen(true)}
-        className="fixed left-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-50 flex h-11 w-11 items-center justify-center rounded-md border border-border bg-white text-text shadow-md backdrop-blur lg:hidden"
+        className="fixed left-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-50 flex h-11 w-11 items-center justify-center rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] transition-colors hover:text-[var(--sf-ink)] lg:hidden"
         aria-label="打开后台菜单"
         aria-expanded={drawerOpen}
         aria-controls="admin-mobile-sidebar"
       >
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7h16M4 12h16M4 17h16" /></svg>
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M4 7h16M4 12h16M4 17h16" /></svg>
       </button>
 
       <motion.aside
         animate={{ width }}
         transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed inset-y-0 left-0 z-40 hidden h-auto flex-col border-r border-border bg-white/96 shadow-[10px_0_30px_rgba(28,25,23,0.045)] backdrop-blur-xl lg:flex"
+        className="fixed inset-y-0 left-0 z-40 hidden h-auto flex-col border-r border-[var(--sf-line)] bg-[var(--sf-surface)] lg:flex"
       >
-        <div className="flex h-16 items-center justify-between border-b border-border px-3">
+        <div
+          className="relative flex h-16 items-center justify-between overflow-hidden border-b border-[var(--sf-line)] px-3"
+          style={gridStyle}
+        >
           {!collapsed && (
-            <a href="/admin" className="min-w-0 text-text hover:text-text" aria-label="后台首页">
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-md bg-text text-sm font-black text-white">B</span>
+            <a href="/admin" className="relative z-10 min-w-0 text-[var(--sf-ink)]" aria-label="后台首页">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[2px] bg-[var(--sf-accent)] font-mono text-sm font-bold text-[var(--sf-canvas)]">B</span>
                 <div className="min-w-0">
-                  <div className="text-sm font-black leading-tight text-text">博客后台</div>
-                  <div className="font-mono text-[10px] uppercase text-muted">Operate / Publish</div>
+                  <div className="truncate text-[13px] font-bold leading-tight tracking-tight">博客后台</div>
+                  <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Operate / Publish</div>
                 </div>
               </div>
             </a>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-bg-soft text-text-secondary transition-colors hover:border-border-hover hover:bg-white hover:text-text"
+            className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]"
             aria-label="切换侧边栏"
             title="切换侧边栏"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={collapsed ? 'M9 5l7 7-7 7' : 'M15 19l-7-7 7-7'} /></svg>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d={collapsed ? 'M9 5l7 7-7 7' : 'M15 19l-7-7 7-7'} /></svg>
           </button>
         </div>
         {renderNav(collapsed)}
@@ -246,7 +256,7 @@ export default function AdminSidebar() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-zinc-950/35 backdrop-blur-sm lg:hidden"
+              className="fixed inset-0 z-50 bg-black/45 lg:hidden"
               onClick={() => setDrawerOpen(false)}
               aria-hidden="true"
             />
@@ -261,26 +271,29 @@ export default function AdminSidebar() {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-              className="fixed inset-y-0 left-0 z-50 flex h-auto max-h-none w-[min(20rem,88dvw)] max-w-[calc(100dvw-env(safe-area-inset-right))] flex-col border-r border-border bg-white shadow-2xl outline-none lg:hidden"
+              className="fixed inset-y-0 left-0 z-50 flex h-auto max-h-none w-[min(20rem,88dvw)] max-w-[calc(100dvw-env(safe-area-inset-right))] flex-col border-r border-[var(--sf-line)] bg-[var(--sf-surface)] outline-none lg:hidden"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="flex min-h-16 items-center justify-between border-b border-border px-4 pt-[max(env(safe-area-inset-top),0.5rem)]">
-                <a href="/admin" onClick={() => setDrawerOpen(false)} className="min-w-0 text-text hover:text-text" aria-label="后台首页">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-md bg-text text-sm font-black text-white">B</span>
+              <div
+                className="relative flex min-h-16 items-center justify-between overflow-hidden border-b border-[var(--sf-line)] px-4 pt-[max(env(safe-area-inset-top),0.5rem)]"
+                style={gridStyle}
+              >
+                <a href="/admin" onClick={() => setDrawerOpen(false)} className="relative z-10 min-w-0 text-[var(--sf-ink)]" aria-label="后台首页">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-[2px] bg-[var(--sf-accent)] font-mono text-sm font-bold text-[var(--sf-canvas)]">B</span>
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-black leading-tight text-text">博客后台</div>
-                      <div className="font-mono text-[10px] uppercase text-muted">Mobile Console</div>
+                      <div className="truncate text-[13px] font-bold leading-tight tracking-tight">博客后台</div>
+                      <div className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Mobile Console</div>
                     </div>
                   </div>
                 </a>
                 <button
                   type="button"
                   onClick={() => setDrawerOpen(false)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-text-secondary transition-colors hover:bg-bg-soft hover:text-text"
+                  className="relative z-10 flex h-11 w-11 shrink-0 items-center justify-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]"
                   aria-label="关闭后台菜单"
                 >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
               {renderNav(false, () => setDrawerOpen(false))}

@@ -35,7 +35,7 @@ export default function TotpStepGate({ onReturnToLogin }: TotpStepGateProps) {
   if (failed) {
     return (
       <div className="space-y-4">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+        <div className="rounded-[3px] border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
           无法获取二次验证状态（网络或边缘节点异常），请重试。
         </div>
         <Button type="button" variant="primary" size="lg" className="w-full" onClick={() => setAttempt((n) => n + 1)}>

@@ -135,17 +135,17 @@ export default function PostActions({ postId, initialLikes = 0 }: PostActionsPro
   };
 
   return (
-    <div className="flex items-center gap-4">
+    <div className="flex flex-wrap items-center gap-3">
       {/* 点赞 */}
       <button
         type="button"
         onClick={handleLike}
         disabled={isLiking}
         className={cn(
-          'focus-ring inline-flex items-center gap-1.5 rounded-md text-sm transition-colors',
+          'focus-ring inline-flex min-h-11 items-center gap-2 border px-3 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-200 disabled:opacity-60',
           isLiked
-            ? 'text-teal-600 dark:text-teal-400'
-            : 'text-zinc-500 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-500'
+            ? 'border-[var(--sf-accent)] text-[var(--sf-accent-ink)]'
+            : 'border-[var(--sf-line)] text-[var(--sf-ink-2)] hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]'
         )}
         aria-label={isLiked ? '取消点赞' : '点赞'}
         aria-pressed={isLiked}
@@ -163,10 +163,10 @@ export default function PostActions({ postId, initialLikes = 0 }: PostActionsPro
         onClick={handleBookmark}
         disabled={isBookmarking}
         className={cn(
-          'focus-ring inline-flex items-center gap-1.5 rounded-md text-sm transition-colors',
+          'focus-ring inline-flex min-h-11 items-center gap-2 border px-3 font-mono text-[11px] uppercase tracking-[0.12em] transition-colors duration-200 disabled:opacity-60',
           isBookmarked
-            ? 'text-teal-600 dark:text-teal-400'
-            : 'text-zinc-500 hover:text-zinc-600 dark:text-zinc-400 dark:hover:text-zinc-500'
+            ? 'border-[var(--sf-accent)] text-[var(--sf-accent-ink)]'
+            : 'border-[var(--sf-line)] text-[var(--sf-ink-2)] hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]'
         )}
         aria-label={isBookmarked ? '取消收藏' : '收藏'}
         aria-pressed={isBookmarked}
@@ -180,16 +180,16 @@ export default function PostActions({ postId, initialLikes = 0 }: PostActionsPro
 
       {/* 需要登录 / 操作失败的可见反馈 */}
       {needsLogin && (
-        <p role="status" className="text-xs text-zinc-500 dark:text-zinc-400">
+        <p role="status" className="font-mono text-[11px] tracking-[0.06em] text-[var(--sf-ink-3)]">
           请先
-          <a href="/login" className="mx-0.5 text-teal-600 no-underline hover:underline dark:text-teal-400">
+          <a href="/login" className="mx-0.5 text-[var(--sf-accent-ink)] no-underline hover:underline">
             登录
           </a>
           后再操作
         </p>
       )}
       {actionError && (
-        <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+        <p role="alert" className="border-l-2 border-[var(--sf-danger)] pl-2 font-mono text-[11px] tracking-[0.06em] text-[var(--sf-danger)]">
           {actionError}
         </p>
       )}
