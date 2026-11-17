@@ -22,11 +22,46 @@ const auditItems: AuditItem[] = [
   { name: '本地临时敏感文件', status: 'warn', description: 'tmp/ 和 .env.local 已被 .gitignore 忽略，但本地 tmp 目录中仍有旧部署包、私钥和环境备份。', recommendation: '定期清理不再需要的 tmp 部署包；部署私钥继续只保存在忽略目录，不要提交。' },
 ];
 
-const statusIcons: Record<string, { icon: string; color: string; label: string }> = {
-  pass: { icon: 'M5 13l4 4L19 7', color: 'text-success', label: '通过' },
-  warn: { icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z', color: 'text-warning', label: '警告' },
-  fail: { icon: 'M6 18L18 6M6 6l12 12', color: 'text-danger', label: '失败' },
+/* 审计状态只映射语义色：通过 emerald、警告 amber、失败 --sf-danger。 */
+const statusIcons: Record<AuditItem['status'], { icon: string; label: string; iconClass: string; chipClass: string }> = {
+  pass: {
+    icon: 'M5 13l4 4L19 7',
+    label: '通过',
+    iconClass: 'text-emerald-700 dark:text-emerald-300',
+    chipClass: 'border-emerald-600/45 text-emerald-700 dark:border-emerald-400/45 dark:text-emerald-300',
+  },
+  warn: {
+    icon: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z',
+    label: '警告',
+    iconClass: 'text-amber-700 dark:text-amber-300',
+    chipClass: 'border-amber-600/45 text-amber-700 dark:border-amber-400/45 dark:text-amber-300',
+  },
+  fail: {
+    icon: 'M6 18L18 6M6 6l12 12',
+    label: '失败',
+    iconClass: 'text-[var(--sf-danger)]',
+    chipClass: 'border-[var(--sf-danger)] text-[var(--sf-danger)]',
+  },
 };
+
+const PANEL =
+  'min-w-0 overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]';
+const CHIP =
+  'inline-flex items-center rounded-[2px] border px-1.5 py-0.5 font-mono text-[10px] leading-none tracking-[0.08em]';
+const TONE_VALUE: Record<AuditItem['status'], string> = {
+  pass: 'text-emerald-700 dark:text-emerald-300',
+  warn: 'text-amber-700 dark:text-amber-300',
+  fail: 'text-[var(--sf-danger)]',
+};
+
+function Metric({ label, value, valueClassName }: { label: string; value: number; valueClassName: string }) {
+  return (
+    <div className={`${PANEL} px-3 py-2.5`}>
+      <p className={`font-mono text-2xl font-bold leading-none tracking-tight tabular-nums ${valueClassName}`}>{value}</p>
+      <p className="mt-1 break-words font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)] [overflow-wrap:anywhere]">{label}</p>
+    </div>
+  );
+}
 
 export default function SecurityAudit() {
   const passCount = auditItems.filter(i => i.status === 'pass').length;
@@ -34,26 +69,46 @@ export default function SecurityAudit() {
   const failCount = auditItems.filter(i => i.status === 'fail').length;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-w-0 space-y-6">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-w-0 space-y-4">
       <TotpManager />
       <SecurityStatus />
       <SecurityRatePolicyForm />
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="card min-w-0 rounded-xl p-4 text-center"><p className="font-display text-2xl font-black text-success">{passCount}</p><p className="break-words font-mono text-[10px] uppercase tracking-widest text-muted [overflow-wrap:anywhere]">通过</p></div>
-        <div className="card min-w-0 rounded-xl p-4 text-center"><p className="font-display text-2xl font-black text-warning">{warnCount}</p><p className="break-words font-mono text-[10px] uppercase tracking-widest text-muted [overflow-wrap:anywhere]">警告</p></div>
-        <div className="card min-w-0 rounded-xl p-4 text-center"><p className="font-display text-2xl font-black text-danger">{failCount}</p><p className="break-words font-mono text-[10px] uppercase tracking-widest text-muted [overflow-wrap:anywhere]">失败</p></div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Metric label="通过" value={passCount} valueClassName={TONE_VALUE.pass} />
+        <Metric label="警告" value={warnCount} valueClassName={TONE_VALUE.warn} />
+        <Metric label="失败" value={failCount} valueClassName={TONE_VALUE.fail} />
       </div>
-      <div className="space-y-3">
+
+      {/* 审计清单：细线行，状态图标 + 名称 + 说明 + 建议 */}
+      <div className="min-w-0 border-t border-[var(--sf-line)]">
         {auditItems.map((item, index) => {
           const s = statusIcons[item.status];
           return (
-            <motion.div key={item.name} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }} className="card max-w-full overflow-hidden rounded-xl p-4 sm:p-5">
+            <motion.div
+              key={item.name}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.03 }}
+              className="max-w-full overflow-hidden border-b border-[var(--sf-line-soft)] px-1 py-3"
+            >
               <div className="flex items-start gap-3">
-                <svg className={'h-5 w-5 shrink-0 mt-0.5 ' + s.color} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={s.icon} /></svg>
+                <svg className={`mt-0.5 h-4 w-4 shrink-0 ${s.iconClass}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={s.icon} />
+                </svg>
                 <div className="min-w-0 flex-1">
-                  <div className="mb-1 flex flex-wrap items-center gap-2"><h3 className="break-words text-sm font-medium text-text [overflow-wrap:anywhere]">{item.name}</h3><span className={'font-mono text-[10px] uppercase ' + s.color}>[{s.label}]</span></div>
-                  <p className="break-words text-sm text-text-secondary [overflow-wrap:anywhere]">{item.description}</p>
-                  {item.status !== 'pass' && <p className="mt-2 break-words text-xs text-accent [overflow-wrap:anywhere]"><strong>建议：</strong>{item.recommendation}</p>}
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <h3 className="break-words text-sm font-medium text-[var(--sf-ink)] [overflow-wrap:anywhere]">{item.name}</h3>
+                    <span className={`${CHIP} ${s.chipClass}`}>[{s.label}]</span>
+                    <span className="ml-auto font-mono text-[10px] tabular-nums tracking-[0.16em] text-[var(--sf-ink-3)]">{String(index + 1).padStart(2, '0')}</span>
+                  </div>
+                  <p className="break-words text-sm leading-relaxed text-[var(--sf-ink-2)] [overflow-wrap:anywhere]">{item.description}</p>
+                  {item.status !== 'pass' && (
+                    <p className="mt-2 break-words text-xs leading-relaxed text-[var(--sf-ink-2)] [overflow-wrap:anywhere]">
+                      <strong className="font-semibold text-[var(--sf-ink)]">建议：</strong>
+                      {item.recommendation}
+                    </p>
+                  )}
                 </div>
               </div>
             </motion.div>

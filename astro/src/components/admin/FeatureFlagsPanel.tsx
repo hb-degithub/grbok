@@ -3,6 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useFeatureFlags } from '../../hooks/domains/useFeatureFlags';
 import type { FeatureFlag } from '../../lib/services/featureFlagService';
 
+/* 功能开关（科幻简约 · 批次 C5）
+   面板与弹窗都是 surface 底 + 冷灰细线，圆角 3px；开关用 2px 方角轨道（开启=唯一强调色）。
+   输入与 ui/Input.tsx 同一套。新建/编辑/启用/删除、window.confirm 与 saveFlag 逻辑保持不变。 */
+
 interface FlagFormData {
   key: string;
   name: string;
@@ -16,6 +20,38 @@ const defaultFormData: FlagFormData = {
   description: '',
   enabled: false,
 };
+
+const LABEL = 'mb-1.5 block font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-3)]';
+const INPUT =
+  'min-h-[40px] w-full min-w-0 rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-[16px] leading-snug text-[var(--sf-ink)] outline-none transition-colors placeholder:text-[var(--sf-ink-3)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-2 focus-visible:ring-[var(--sf-accent)] disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm';
+const BTN_BASE =
+  'inline-flex items-center justify-center gap-1.5 rounded-[3px] border font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] disabled:cursor-not-allowed disabled:opacity-50';
+const BTN_PRIMARY = 'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-on-accent)] hover:border-[var(--sf-accent-ink)] hover:bg-[var(--sf-accent-ink)]';
+const BTN_SECONDARY = 'border-[var(--sf-line-control)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)]';
+const BTN_DANGER = 'border-[var(--sf-danger)] bg-[var(--sf-surface)] text-[var(--sf-danger)] hover:bg-[var(--sf-danger)] hover:text-[var(--sf-on-accent)]';
+
+/** 开关：轨道 2px 方角，开启 accent 实底 + on-accent 滑块，关闭 canvas 底 + 控制线滑块。 */
+function Switch({ checked, onToggle, label }: { checked: boolean; onToggle: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      className={`inline-flex h-5 w-9 shrink-0 items-center rounded-[2px] border px-[3px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] ${
+        checked ? 'justify-end border-[var(--sf-accent)] bg-[var(--sf-accent)]' : 'justify-start border-[var(--sf-line-control)] bg-[var(--sf-canvas)]'
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`inline-block h-3.5 w-3.5 rounded-[1px] transition-colors ${
+          checked ? 'bg-[var(--sf-on-accent)]' : 'bg-[var(--sf-ink-3)]'
+        }`}
+      />
+    </button>
+  );
+}
 
 function FlagModal({
   flag,
@@ -47,23 +83,30 @@ function FlagModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sf-scrim)] p-4"
       onClick={onClose}
     >
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.95, opacity: 0 }}
-        className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="flag-dialog-title"
+        className="w-full max-w-md rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-6"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-start justify-between">
-          <h3 className="text-lg font-bold text-text">{flag ? '编辑功能开关' : '新建功能开关'}</h3>
+        <div className="mb-4 flex items-start justify-between gap-3 border-b border-[var(--sf-line)] pb-3">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">{flag ? 'EDIT' : 'NEW'}</p>
+            <h3 id="flag-dialog-title" className="mt-0.5 break-words text-sm font-semibold tracking-tight text-[var(--sf-ink)] [overflow-wrap:anywhere]">{flag ? '编辑功能开关' : '新建功能开关'}</h3>
+          </div>
           <button
             onClick={onClose}
-            className="rounded-md p-1 text-text-secondary hover:bg-bg-soft hover:text-text"
+            aria-label="关闭对话框"
+            className="shrink-0 rounded-[3px] border border-transparent p-1 text-[var(--sf-ink-3)] transition-colors hover:border-[var(--sf-line)] hover:bg-[var(--sf-line-soft)] hover:text-[var(--sf-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
@@ -71,45 +114,48 @@ function FlagModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">
+            <label htmlFor="flag-key" className={LABEL}>
               开关标识
             </label>
             <input
+              id="flag-key"
               type="text"
               value={formData.key}
               onChange={(e) => setFormData({ ...formData, key: e.target.value })}
               placeholder="feature_key"
               required
               disabled={!!flag}
-              className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 font-mono text-sm text-text outline-none focus:border-accent focus:bg-white disabled:opacity-60"
+              className={`${INPUT} font-mono`}
             />
-            <p className="mt-1 text-xs text-text-secondary">唯一标识符，创建后不可修改</p>
+            <p className="mt-1 text-xs text-[var(--sf-ink-3)]">唯一标识符，创建后不可修改</p>
           </div>
 
           <div>
-            <label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">
+            <label htmlFor="flag-name" className={LABEL}>
               显示名称
             </label>
             <input
+              id="flag-name"
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="功能名称"
               required
-              className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white"
+              className={INPUT}
             />
           </div>
 
           <div>
-            <label className="mb-1.5 block font-mono text-xs uppercase tracking-wide text-text-secondary">
+            <label htmlFor="flag-description" className={LABEL}>
               描述
             </label>
             <textarea
+              id="flag-description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               placeholder="功能描述..."
               rows={3}
-              className="min-h-10 w-full min-w-0 rounded-md border border-border bg-bg-soft px-3 py-2.5 text-sm text-text outline-none focus:border-accent focus:bg-white"
+              className={INPUT}
             />
           </div>
 
@@ -117,31 +163,35 @@ function FlagModal({
             <button
               type="button"
               onClick={() => setFormData({ ...formData, enabled: !formData.enabled })}
-              className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors ${
-                formData.enabled ? 'border-accent bg-accent' : 'border-border bg-bg-soft'
+              role="switch"
+              aria-checked={formData.enabled}
+              aria-label={formData.enabled ? '禁用开关' : '启用开关'}
+              className={`inline-flex h-6 w-11 shrink-0 items-center rounded-[2px] border px-[3px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] ${
+                formData.enabled ? 'justify-end border-[var(--sf-accent)] bg-[var(--sf-accent)]' : 'justify-start border-[var(--sf-line-control)] bg-[var(--sf-canvas)]'
               }`}
             >
               <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                  formData.enabled ? 'translate-x-5' : 'translate-x-0.5'
+                aria-hidden="true"
+                className={`inline-block h-5 w-5 rounded-[1px] transition-colors ${
+                  formData.enabled ? 'bg-[var(--sf-on-accent)]' : 'bg-[var(--sf-line-control)]'
                 }`}
               />
             </button>
-            <span className="text-sm text-text">{formData.enabled ? '已启用' : '已禁用'}</span>
+            <span className="text-sm text-[var(--sf-ink)]">{formData.enabled ? '已启用' : '已禁用'}</span>
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 border-t border-[var(--sf-line)] pt-3">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md border border-border bg-white px-4 py-2 text-sm text-text-secondary transition-colors hover:bg-bg-soft"
+              className={`${BTN_BASE} min-h-10 px-4 text-sm ${BTN_SECONDARY}`}
             >
               取消
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="btn-primary rounded-md px-4 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+              className={`${BTN_BASE} min-h-10 px-4 text-sm ${BTN_PRIMARY}`}
             >
               {saving ? '保存中...' : '保存'}
             </button>
@@ -181,67 +231,63 @@ export default function FeatureFlagsPanel() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-w-0 space-y-4">
-      <section className="card rounded-md p-4 shadow-xs">
-        <div className="mb-4 flex items-center justify-between border-b border-border pb-3">
-          <div>
-            <h2 className="break-words text-sm font-black text-text">功能开关</h2>
-            <p className="mt-1 break-words text-xs text-text-secondary">控制网站功能的启用和禁用。</p>
+      <section className="min-w-0 overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--sf-line)] px-4 py-3">
+          <div className="min-w-0">
+            <h2 className="break-words text-sm font-semibold tracking-tight text-[var(--sf-ink)] [overflow-wrap:anywhere]">功能开关</h2>
+            <p className="mt-1 break-words text-xs text-[var(--sf-ink-3)] [overflow-wrap:anywhere]">控制网站功能的启用和禁用。</p>
           </div>
           <button
             onClick={handleCreate}
-            className="btn-primary min-h-10 rounded-md px-4 text-xs"
+            className={`${BTN_BASE} min-h-10 px-4 text-xs ${BTN_PRIMARY}`}
           >
             新建开关
           </button>
         </div>
 
         {loading ? (
-          <div className="space-y-3">
+          <div className="divide-y divide-[var(--sf-line-soft)]" aria-hidden="true">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-20 animate-pulse rounded-md bg-bg-soft" />
+              <div key={i} className="h-20 animate-pulse bg-[var(--sf-canvas)]" />
             ))}
           </div>
         ) : flags.length === 0 ? (
-          <div className="py-8 text-center text-sm text-text-secondary">暂无功能开关</div>
+          <div className="flex flex-col items-center gap-1.5 px-4 py-10 text-center">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">EMPTY / 0</p>
+            <p className="text-sm text-[var(--sf-ink-2)]">暂无功能开关</p>
+          </div>
         ) : (
-          <div className="space-y-3">
+          <div className="divide-y divide-[var(--sf-line-soft)]">
             {flags.map((flag) => (
               <div
                 key={flag.id}
-                className="flex items-center justify-between rounded-md border border-border bg-white p-4"
+                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-[var(--sf-canvas)]"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-medium text-text">{flag.key}</span>
-                    <button
-                      onClick={() => toggleFlag(flag.key, !flag.enabled)}
-                      className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors ${
-                        flag.enabled ? 'border-success bg-success' : 'border-border bg-bg-soft'
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                          flag.enabled ? 'translate-x-4' : 'translate-x-0.5'
-                        }`}
-                      />
-                    </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="break-all font-mono text-sm font-medium text-[var(--sf-ink)] [overflow-wrap:anywhere]">{flag.key}</span>
+                    <Switch
+                      checked={!!flag.enabled}
+                      onToggle={() => toggleFlag(flag.key, !flag.enabled)}
+                      label={`${flag.name}：${flag.enabled ? '已启用' : '已禁用'}`}
+                    />
                   </div>
-                  <p className="mt-1 text-sm text-text">{flag.name}</p>
+                  <p className="mt-1 break-words text-sm text-[var(--sf-ink-2)] [overflow-wrap:anywhere]">{flag.name}</p>
                   {flag.description && (
-                    <p className="mt-1 text-xs text-text-secondary">{flag.description}</p>
+                    <p className="mt-1 break-words text-xs text-[var(--sf-ink-3)] [overflow-wrap:anywhere]">{flag.description}</p>
                   )}
                 </div>
-                <div className="ml-4 flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 items-center gap-2">
                   <button
                     onClick={() => handleEdit(flag)}
-                    className="rounded-md border border-border bg-white px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-bg-soft hover:text-text"
+                    className={`${BTN_BASE} min-h-8 px-3 text-xs ${BTN_SECONDARY}`}
                   >
                     编辑
                   </button>
                   <button
                     onClick={() => handleDelete(flag.key)}
                     disabled={deletingKey === flag.key}
-                    className="rounded-md border border-error/25 bg-error/10 px-3 py-1.5 text-xs text-error transition-colors hover:bg-error/20 disabled:opacity-50"
+                    className={`${BTN_BASE} min-h-8 px-3 text-xs ${BTN_DANGER}`}
                   >
                     {deletingKey === flag.key ? '删除中...' : '删除'}
                   </button>

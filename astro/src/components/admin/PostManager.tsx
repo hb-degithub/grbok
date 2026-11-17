@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useAdminPosts } from '../../hooks/domains/useAdminPosts';
 import { useAiAssist } from '../../hooks/domains/useAiAssist';
@@ -12,13 +12,23 @@ import { mediaService } from '../../lib/services/mediaService';
 import { adminPostService, type Post } from '../../lib/services/adminPostService';
 import type { AssistMetaResult } from '../../lib/services/aiAssistService';
 
+/*
+ * 文章管理（后台）
+ * - 只用 --sf-* 令牌：surface/canvas + 四档细线 + 三档墨色 + 单一强调色，圆角统一 3px（徽标 2px）；
+ * - 列表：等宽表头小字 + 1px 细线，行 hover 只改底色；
+ * - 状态徽标细线 chip：已发布 emerald、草稿 amber、已归档中性 ink-3；
+ * - 弹窗为实底表面 + 细线，输入与 ui/Input 一致（控制线 + 强调色 focus 环）；
+ * - 筛选/搜索/分页/编辑/保存/删除/AI 辅助与媒体库选择逻辑与改造前完全一致。
+ */
+
 type PostDraft = Omit<Post, 'id' | 'created' | 'updated' | 'author' | 'published_at' | 'views'> & { id?: string };
 type PostFilter = 'all' | 'published' | 'draft' | 'archived';
 
+/* 状态徽标细线 chip：已发布 emerald、草稿 amber、已归档中性 ink-3。 */
 const statusColors: Record<string, string> = {
-  published: 'bg-success/15 text-success border-success/30',
-  draft: 'bg-warning/15 text-warning border-warning/30',
-  archived: 'bg-text-muted/15 text-text-muted border-text-muted/30',
+  published: 'border-emerald-600/45 text-emerald-700 dark:border-emerald-400/45 dark:text-emerald-300',
+  draft: 'border-amber-600/45 text-amber-700 dark:border-amber-400/45 dark:text-amber-300',
+  archived: 'border-[var(--sf-line)] text-[var(--sf-ink-3)]',
 };
 
 const statusLabels: Record<string, string> = {
@@ -33,6 +43,26 @@ const filterLabels: Record<PostFilter, string> = {
   draft: '草稿',
   archived: '已归档',
 };
+
+const CHIP_BASE =
+  'inline-flex items-center gap-1 rounded-[2px] border px-1.5 py-0.5 font-mono text-[10px] leading-none tracking-[0.08em]';
+
+const BTN_BASE =
+  'inline-flex items-center justify-center gap-1.5 rounded-[3px] border font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] disabled:cursor-not-allowed disabled:opacity-50';
+const BTN_PRIMARY =
+  'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-on-accent)] hover:border-[var(--sf-accent-ink)] hover:bg-[var(--sf-accent-ink)]';
+const BTN_QUIET =
+  'border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)]';
+const BTN_SM = 'min-h-10 px-3 text-[12px]';
+
+const FILTER_ON = 'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-on-accent)]';
+const FILTER_OFF =
+  'border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)]';
+
+const FIELD_CLS =
+  'min-h-[40px] w-full min-w-0 rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-sm text-[var(--sf-ink)] placeholder:text-[var(--sf-ink-3)] outline-none transition-colors focus-visible:border-[var(--sf-accent)] focus-visible:ring-2 focus-visible:ring-[var(--sf-accent)] disabled:cursor-not-allowed disabled:opacity-50';
+
+const LABEL_CLS = 'mb-1.5 block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]';
 
 const listVariants = {
   hidden: { opacity: 1 },
@@ -325,40 +355,40 @@ export default function PostManager() {
   }, [posts]);
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-3">
       {/* 工具栏 */}
-      <div className="card rounded-md p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+      <div className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-3 sm:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             {(['all', 'published', 'draft', 'archived'] as PostFilter[]).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
+                aria-pressed={filter === f}
                 className={cn(
-                  'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                  filter === f
-                    ? 'bg-accent text-white'
-                    : 'bg-bg-soft text-text-secondary hover:bg-accent/10'
+                  'min-h-10 rounded-[3px] border px-2.5 font-mono text-[11px] tracking-[0.06em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]',
+                  filter === f ? FILTER_ON : FILTER_OFF
                 )}
               >
                 {filterLabels[f]}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <input
               type="text"
               placeholder="搜索文章..."
+              aria-label="搜索文章"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="min-w-[200px] rounded-md border border-border bg-bg-soft px-3 py-2 text-sm text-text outline-none focus:border-accent"
+              className={cn(FIELD_CLS, 'w-full py-2 sm:w-auto sm:min-w-[200px]')}
             />
-            <button onClick={handleNew} className="btn-primary min-h-10 px-4 text-xs">
+            <button onClick={handleNew} className={cn(BTN_BASE, BTN_PRIMARY, BTN_SM)}>
               + 新建文章
             </button>
             <button
               onClick={() => setShowAiGenerator(true)}
-              className="btn-ghost min-h-10 px-4 text-xs"
+              className={cn(BTN_BASE, BTN_QUIET, BTN_SM)}
               title="用 AI 依据主题与大纲生成草稿"
             >
               ✨ AI 生成
@@ -371,116 +401,125 @@ export default function PostManager() {
       {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-20 animate-pulse rounded-md bg-bg-soft" />
+            <div key={i} className="h-20 animate-pulse rounded-[3px] border border-[var(--sf-line-soft)] bg-[var(--sf-canvas)]" />
           ))}
         </div>
       ) : filteredPosts.length === 0 ? (
-        <div className="card rounded-md p-8 text-center text-text-secondary">
-          暂无文章
+        <div className="flex flex-col items-center gap-1.5 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-10 text-center">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">EMPTY / 0</p>
+          <p className="text-[13px] text-[var(--sf-ink-2)]">暂无文章</p>
         </div>
       ) : (
-        <motion.div
-          variants={listVariants}
-          initial="hidden"
-          animate="visible"
-          className="space-y-2"
-        >
-          {filteredPosts.map((post) => (
-            <motion.div
-              key={post.id}
-              variants={itemVariants}
-              className="card rounded-md p-4"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={cn('rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase', statusColors[post.status])}>
-                      {statusLabels[post.status]}
-                    </span>
-                    {post.is_pinned && (
-                      <span className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 font-mono text-[10px] uppercase text-accent">
-                        置顶
+        <div className="min-w-0 overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">
+          <div className="flex items-center justify-between gap-2 border-b border-[var(--sf-line)] bg-[var(--sf-canvas)] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--sf-ink-3)]">
+            <span>Post / 文章</span>
+            <span className="tabular-nums">共 {filteredPosts.length} 条</span>
+          </div>
+          <motion.div
+            variants={listVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {filteredPosts.map((post) => (
+              <motion.div
+                key={post.id}
+                variants={itemVariants}
+                className="min-w-0 border-b border-[var(--sf-line-soft)] px-3 py-3 transition-colors last:border-b-0 hover:bg-[var(--sf-canvas)]"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={CHIP_BASE + ' ' + (statusColors[post.status] || 'border-[var(--sf-line)] text-[var(--sf-ink-3)]')}>
+                        {statusLabels[post.status]}
                       </span>
-                    )}
-                    {post.is_featured && (
-                      <span className="rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 font-mono text-[10px] uppercase text-warning">
-                        精选
-                      </span>
-                    )}
-                    {post.is_ai && (
-                      <span
-                        className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 font-mono text-[10px] uppercase text-accent"
-                        title="本文由 AI 一键成文创建"
-                      >
-                        AI 生成
-                      </span>
-                    )}
+                      {post.is_pinned && (
+                        <span className={CHIP_BASE + ' border-[var(--sf-accent)] text-[var(--sf-accent-ink)]'}>
+                          置顶
+                        </span>
+                      )}
+                      {post.is_featured && (
+                        <span className={CHIP_BASE + ' border-amber-600/45 text-amber-700 dark:border-amber-400/45 dark:text-amber-300'}>
+                          精选
+                        </span>
+                      )}
+                      {post.is_ai && (
+                        <span
+                          className={CHIP_BASE + ' border-[var(--sf-accent)] text-[var(--sf-accent-ink)]'}
+                          title="本文由 AI 一键成文创建"
+                        >
+                          AI 生成
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mt-1.5 break-words text-[13px] font-semibold leading-snug text-[var(--sf-ink)] [overflow-wrap:anywhere]">{post.title}</h3>
+                    <p className="mt-1 line-clamp-2 break-words text-[13px] leading-relaxed text-[var(--sf-ink-2)] [overflow-wrap:anywhere]">{post.excerpt}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] tracking-[0.06em] text-[var(--sf-ink-3)]">
+                      <span className="tabular-nums">{formatDate(post.published_at || post.updated)}</span>
+                      <span className="tabular-nums">{post.views || 0} 浏览</span>
+                      <span className="break-all">/{post.slug}</span>
+                    </div>
                   </div>
-                  <h3 className="mt-2 font-medium text-text">{post.title}</h3>
-                  <p className="mt-1 line-clamp-2 text-sm text-text-secondary">{post.excerpt}</p>
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-text-secondary">
-                    <span>{formatDate(post.published_at || post.updated)}</span>
-                    <span>{post.views || 0} 浏览</span>
-                    <span className="font-mono text-muted">/{post.slug}</span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      onClick={() => handleAiOptimize(post)}
+                      disabled={assisting !== null}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:cursor-not-allowed disabled:opacity-50"
+                      title="AI 优化（生成标题/摘要/标签建议）"
+                      aria-label="AI 优化"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleEdit(post)}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]"
+                      title="编辑"
+                      aria-label="编辑"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(post.id)}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-danger)] hover:text-[var(--sf-danger)]"
+                      title="删除"
+                      aria-label="删除"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <button
-                    onClick={() => handleAiOptimize(post)}
-                    disabled={assisting !== null}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-md text-text-secondary hover:bg-accent/10 hover:text-accent disabled:opacity-50"
-                    title="AI 优化（生成标题/摘要/标签建议）"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => handleEdit(post)}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-md text-text-secondary hover:bg-accent/10 hover:text-accent"
-                    title="编辑"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={() => handleDelete(post.id)}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-md text-text-secondary hover:bg-danger/10 hover:text-danger"
-                    title="删除"
-                  >
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </motion.div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
       )}
 
       {/* 分页 */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
+        <nav className="flex flex-wrap items-center gap-2" aria-label="文章分页">
+          <span className="mr-auto font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">
+            PAGE / {page} / {totalPages}
+          </span>
           <button
             onClick={() => setPage(page - 1)}
             disabled={page <= 1}
-            className="btn-ghost min-h-10 px-4 text-xs disabled:opacity-50"
+            className={cn(BTN_BASE, BTN_QUIET, BTN_SM)}
           >
             上一页
           </button>
-          <span className="text-sm text-text-secondary">
-            {page} / {totalPages}
-          </span>
           <button
             onClick={() => setPage(page + 1)}
             disabled={page >= totalPages}
-            className="btn-ghost min-h-10 px-4 text-xs disabled:opacity-50"
+            className={cn(BTN_BASE, BTN_QUIET, BTN_SM)}
           >
             下一页
           </button>
-        </div>
+        </nav>
       )}
 
       {/* 编辑弹窗 */}
@@ -490,7 +529,7 @@ export default function PostManager() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-stretch justify-center overflow-y-auto glass-overlay p-0 sm:items-center sm:p-4"
+            className="fixed inset-0 z-50 flex items-stretch justify-center overflow-y-auto bg-[var(--sf-scrim)] p-0 sm:items-center sm:p-4"
             onClick={() => setEditing(null)}
           >
             <motion.div
@@ -498,45 +537,48 @@ export default function PostManager() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
               onClick={(e) => e.stopPropagation()}
-              className="card flex min-h-[var(--vvh,100dvh)] w-full max-w-4xl flex-col overflow-hidden rounded-none p-5 sm:min-h-0 sm:rounded-lg sm:p-6"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="post-manager-title"
+              className="flex min-h-[var(--vvh,100dvh)] w-full max-w-4xl flex-col overflow-hidden rounded-none border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4 sm:min-h-0 sm:rounded-[3px] sm:p-6"
             >
-              <h2 className="mb-6 break-words font-display text-lg font-bold uppercase tracking-wide text-text [overflow-wrap:anywhere]">
+              <h2 id="post-manager-title" className="mb-4 break-words border-b border-[var(--sf-line)] pb-3 text-base font-bold tracking-tight text-[var(--sf-ink)] [overflow-wrap:anywhere]">
                 {editing.id ? '编辑文章' : '新建文章'}
               </h2>
 
               {/* AI 工具条：三个动作共用 assisting 状态防重入 */}
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span className="font-mono text-[10px] uppercase tracking-widest text-muted">AI</span>
+              <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">AI</span>
                 <button
                   onClick={handleAiMeta}
                   disabled={assisting !== null}
-                  className="btn-ghost min-h-8 px-3 text-xs disabled:opacity-50"
+                  className={cn(BTN_BASE, BTN_QUIET, 'min-h-8 px-2.5 text-[12px]')}
                 >
                   {assisting === 'meta' ? '生成中…' : 'AI 标题/摘要/标签'}
                 </button>
                 <button
                   onClick={handleAiPolish}
                   disabled={assisting !== null}
-                  className="btn-ghost min-h-8 px-3 text-xs disabled:opacity-50"
+                  className={cn(BTN_BASE, BTN_QUIET, 'min-h-8 px-2.5 text-[12px]')}
                 >
                   {assisting === 'polish' ? '生成中…' : 'AI 润色'}
                 </button>
                 <button
                   onClick={handleAiContinue}
                   disabled={assisting !== null}
-                  className="btn-ghost min-h-8 px-3 text-xs disabled:opacity-50"
+                  className={cn(BTN_BASE, BTN_QUIET, 'min-h-8 px-2.5 text-[12px]')}
                 >
                   {assisting === 'continue' ? '生成中…' : 'AI 续写'}
                 </button>
               </div>
 
               {metaResult && (
-                <div className="mb-4 space-y-3 rounded-lg border border-accent/25 bg-accent/5 p-4">
+                <div className="mb-4 space-y-3 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] p-3 sm:p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-[10px] uppercase tracking-widest text-accent">AI 建议</span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-accent-ink)]">AI 建议</span>
                     <button
                       onClick={() => setMetaResult(null)}
-                      className="min-h-8 rounded-md px-2 text-xs text-text-secondary hover:bg-accent/10"
+                      className="min-h-8 rounded-[3px] border border-[var(--sf-line)] px-2 font-mono text-[11px] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]"
                     >
                       收起
                     </button>
@@ -544,13 +586,13 @@ export default function PostManager() {
 
                   {metaResult.titles.length > 0 && (
                     <div>
-                      <div className="mb-1.5 text-xs text-text-secondary">候选标题（点击回填）</div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">候选标题（点击回填）</div>
+                      <div className="flex flex-wrap gap-1.5">
                         {metaResult.titles.map((title, i) => (
                           <button
                             key={`${i}-${title}`}
                             onClick={() => handleApplyTitle(title)}
-                            className="rounded-md border border-border bg-bg-soft px-3 py-1.5 text-left text-xs text-text hover:border-accent hover:text-accent"
+                            className="max-w-full break-words rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-2.5 py-1.5 text-left text-[12px] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] [overflow-wrap:anywhere]"
                           >
                             {title}
                           </button>
@@ -561,11 +603,11 @@ export default function PostManager() {
 
                   {metaResult.excerpt && (
                     <div>
-                      <div className="mb-1.5 text-xs text-text-secondary">摘要</div>
-                      <p className="text-xs leading-5 text-text">{metaResult.excerpt}</p>
+                      <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">摘要</div>
+                      <p className="break-words text-[12px] leading-relaxed text-[var(--sf-ink)] [overflow-wrap:anywhere]">{metaResult.excerpt}</p>
                       <button
                         onClick={handleApplyExcerpt}
-                        className="btn-ghost mt-2 min-h-8 px-3 text-xs"
+                        className={cn(BTN_BASE, BTN_QUIET, 'mt-2 min-h-8 px-2.5 text-[12px]')}
                       >
                         回填摘要
                       </button>
@@ -574,12 +616,12 @@ export default function PostManager() {
 
                   {metaResult.tag_names.length > 0 && (
                     <div>
-                      <div className="mb-1.5 text-xs text-text-secondary">建议标签</div>
+                      <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">建议标签</div>
                       <div className="flex flex-wrap gap-1.5">
                         {metaResult.tag_names.map((name, i) => (
                           <span
                             key={`${i}-${name}`}
-                            className="rounded-full bg-bg-soft px-2.5 py-0.5 text-xs text-text-secondary"
+                            className={CHIP_BASE + ' border-[var(--sf-line)] text-[var(--sf-ink-3)]'}
                           >
                             {name}
                           </span>
@@ -587,7 +629,7 @@ export default function PostManager() {
                       </div>
                       <button
                         onClick={handleApplyTags}
-                        className="btn-ghost mt-2 min-h-8 px-3 text-xs"
+                        className={cn(BTN_BASE, BTN_QUIET, 'mt-2 min-h-8 px-2.5 text-[12px]')}
                       >
                         并入已选标签
                       </button>
@@ -596,11 +638,11 @@ export default function PostManager() {
 
                   {metaResult.seo_description && (
                     <div>
-                      <div className="mb-1.5 text-xs text-text-secondary">SEO 描述</div>
-                      <p className="text-xs leading-5 text-text">{metaResult.seo_description}</p>
+                      <div className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">SEO 描述</div>
+                      <p className="break-words text-[12px] leading-relaxed text-[var(--sf-ink)] [overflow-wrap:anywhere]">{metaResult.seo_description}</p>
                       <button
                         onClick={handleApplySeoDescription}
-                        className="btn-ghost mt-2 min-h-8 px-3 text-xs"
+                        className={cn(BTN_BASE, BTN_QUIET, 'mt-2 min-h-8 px-2.5 text-[12px]')}
                       >
                         回填 SEO 描述
                       </button>
@@ -609,48 +651,52 @@ export default function PostManager() {
                 </div>
               )}
               
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2 md:gap-4">
+                <div className="space-y-3">
                   <div>
-                    <label className="mb-1.5 block font-mono text-xs uppercase tracking-widest text-text-secondary">标题</label>
+                    <label htmlFor="post-manager-title-field" className={LABEL_CLS}>标题</label>
                     <input
+                      id="post-manager-title-field"
                       type="text"
                       value={editing.title}
                       onChange={(e) => { setEditing({ ...editing, title: e.target.value }); setDirty(true); }}
-                      className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-bg-soft px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
+                      className={FIELD_CLS}
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block font-mono text-xs uppercase tracking-widest text-text-secondary">Slug</label>
+                    <label htmlFor="post-manager-slug" className={LABEL_CLS}>Slug</label>
                     <input
+                      id="post-manager-slug"
                       type="text"
                       value={editing.slug}
                       onChange={(e) => { setEditing({ ...editing, slug: e.target.value }); setDirty(true); }}
-                      className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-bg-soft px-4 py-2.5 font-mono text-sm text-text outline-none focus:border-accent"
+                      className={cn(FIELD_CLS, 'font-mono')}
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block font-mono text-xs uppercase tracking-widest text-text-secondary">摘要</label>
+                    <label htmlFor="post-manager-excerpt" className={LABEL_CLS}>摘要</label>
                     <textarea
+                      id="post-manager-excerpt"
                       value={editing.excerpt || ''}
                       onChange={(e) => { setEditing({ ...editing, excerpt: e.target.value }); setDirty(true); }}
                       rows={3}
-                      className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-bg-soft px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
+                      className={cn(FIELD_CLS, 'min-h-[80px] resize-y')}
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block font-mono text-xs uppercase tracking-widest text-text-secondary">封面</label>
+                    <label htmlFor="post-manager-cover" className={LABEL_CLS}>封面</label>
                     <div className="flex gap-2">
                       <input
+                        id="post-manager-cover"
                         type="text"
                         value={editing.cover || ''}
                         onChange={(e) => { setEditing({ ...editing, cover: e.target.value }); setDirty(true); }}
-                        className="min-h-10 flex-1 min-w-0 rounded-lg border border-border bg-bg-soft px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
+                        className={FIELD_CLS}
                         placeholder="封面图片 URL"
                       />
                       <button
                         onClick={() => setShowMediaLibrary(true)}
-                        className="btn-ghost min-h-10 px-3 text-xs"
+                        className={cn(BTN_BASE, BTN_QUIET, 'min-h-[40px] shrink-0 px-3 text-[12px]')}
                       >
                         选择
                       </button>
@@ -658,42 +704,43 @@ export default function PostManager() {
                   </div>
                 </div>
                 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div>
-                    <label className="mb-1.5 block font-mono text-xs uppercase tracking-widest text-text-secondary">状态</label>
+                    <label htmlFor="post-manager-status" className={LABEL_CLS}>状态</label>
                     <select
+                      id="post-manager-status"
                       value={editing.status}
                       onChange={(e) => { setEditing({ ...editing, status: e.target.value as Post['status'] }); setDirty(true); }}
-                      className="min-h-10 w-full rounded-lg border border-border bg-bg-soft px-4 py-2.5 text-sm text-text outline-none focus:border-accent"
+                      className={FIELD_CLS}
                     >
                       <option value="draft">草稿</option>
                       <option value="published">已发布</option>
                       <option value="archived">已归档</option>
                     </select>
                   </div>
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-x-4 gap-y-2">
                     <label className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         checked={(editing as any).is_pinned || false}
                         onChange={(e) => { setEditing({ ...editing, is_pinned: e.target.checked } as any); setDirty(true); }}
-                        className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                        className="h-4 w-4 rounded-[2px] border-[var(--sf-line-control)] accent-[var(--sf-accent)]"
                       />
-                      <span className="text-sm text-text">置顶</span>
+                      <span className="text-[13px] text-[var(--sf-ink)]">置顶</span>
                     </label>
                     <label className="flex items-center gap-2">
                       <input
                         type="checkbox"
                         checked={(editing as any).is_featured || false}
                         onChange={(e) => { setEditing({ ...editing, is_featured: e.target.checked } as any); setDirty(true); }}
-                        className="h-4 w-4 rounded border-border text-accent focus:ring-accent"
+                        className="h-4 w-4 rounded-[2px] border-[var(--sf-line-control)] accent-[var(--sf-accent)]"
                       />
-                      <span className="text-sm text-text">精选</span>
+                      <span className="text-[13px] text-[var(--sf-ink)]">精选</span>
                     </label>
                   </div>
                   <div>
-                    <label className="mb-1.5 block font-mono text-xs uppercase tracking-widest text-text-secondary">标签</label>
-                    <div className="flex flex-wrap gap-2">
+                    <span className={LABEL_CLS}>标签</span>
+                    <div className="flex flex-wrap gap-1.5">
                       {allTags.map((tag) => (
                         <button
                           key={tag.id}
@@ -704,11 +751,12 @@ export default function PostManager() {
                             setSelectedTagIds(newIds);
                             setDirty(true);
                           }}
+                          aria-pressed={selectedTagIds.includes(tag.id)}
                           className={cn(
-                            'rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                            'break-words rounded-[3px] border px-2 py-0.5 font-mono text-[11px] tracking-[0.04em] transition-colors [overflow-wrap:anywhere]',
                             selectedTagIds.includes(tag.id)
-                              ? 'bg-accent text-white'
-                              : 'bg-bg-soft text-text-secondary hover:bg-accent/10'
+                              ? 'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-on-accent)]'
+                              : 'border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)]'
                           )}
                         >
                           {tag.name}
@@ -719,9 +767,10 @@ export default function PostManager() {
                 </div>
               </div>
               
-              <div className="mt-4">
-                <label className="mb-1.5 block font-mono text-xs uppercase tracking-widest text-text-secondary">内容</label>
+              <div className="mt-3">
+                <label htmlFor="post-manager-content" className={LABEL_CLS}>内容</label>
                 <textarea
+                  id="post-manager-content"
                   ref={contentRef}
                   value={editing.content || ''}
                   onChange={(e) => { setEditing({ ...editing, content: e.target.value }); setDirty(true); }}
@@ -743,15 +792,15 @@ export default function PostManager() {
                   }}
                   placeholder={imageUploading ? '图片上传中…' : '支持 Markdown；可直接粘贴或拖拽图片到此处上传'}
                   rows={12}
-                  className="min-h-10 w-full min-w-0 rounded-lg border border-border bg-bg-soft px-4 py-2.5 font-mono text-sm text-text outline-none focus:border-accent"
+                  className={cn(FIELD_CLS, 'min-h-[240px] resize-y font-mono text-[12px] leading-relaxed')}
                 />
               </div>
               
-              <div className="mt-6 flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
-                <button onClick={() => setEditing(null)} className="btn-ghost min-h-10 text-xs">
+              <div className="mt-4 flex flex-col-reverse gap-2 border-t border-[var(--sf-line)] pt-3 sm:flex-row sm:justify-end">
+                <button onClick={() => setEditing(null)} className={cn(BTN_BASE, BTN_QUIET, BTN_SM)}>
                   取消
                 </button>
-                <button onClick={handleSave} disabled={saving} className="btn-primary min-h-10 text-xs">
+                <button onClick={handleSave} disabled={saving} className={cn(BTN_BASE, BTN_PRIMARY, BTN_SM)}>
                   {saving ? '保存中...' : '保存文章'}
                 </button>
               </div>
@@ -762,20 +811,27 @@ export default function PostManager() {
 
       {/* 媒体库选择器 */}
       {showMediaLibrary && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-lg bg-bg shadow-xl">
-            <div className="flex items-center justify-between border-b border-border p-4">
-              <h3 className="text-lg font-semibold text-text">选择封面图片</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sf-scrim)] p-3 sm:p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="选择封面图片"
+            className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]"
+          >
+            <div className="flex items-center justify-between gap-2 border-b border-[var(--sf-line)] px-3 py-2.5 sm:px-4">
+              <h3 className="break-words text-sm font-bold tracking-tight text-[var(--sf-ink)]">选择封面图片</h3>
               <button
                 onClick={() => setShowMediaLibrary(false)}
-                className="rounded-md p-1 text-text-secondary hover:bg-bg-soft"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[3px] border border-[var(--sf-line)] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]"
+                title="关闭"
+                aria-label="关闭"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <div className="max-h-[calc(90vh-60px)] overflow-auto p-4">
+            <div className="max-h-[calc(90vh-60px)] min-h-0 overflow-auto p-3 sm:p-4">
               <MediaLibrary onSelect={handleCoverSelect} onClose={() => setShowMediaLibrary(false)} />
             </div>
           </div>

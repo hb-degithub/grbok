@@ -5,6 +5,11 @@ import type { AiArticleLength } from '../../lib/services/aiAssistService';
 import { showToast } from '../ui/Toast';
 import { cn } from '../../lib/utils';
 
+/* AI 生成文章弹窗（科幻简约 · 批次 C5）
+   遮罩走 --sf-scrim，面板实底 surface + 细线，桌面端圆角 3px、移动端保持全屏。
+   输入与 ui/Input.tsx 一致；篇幅选择为细线分段控件，选中强调色实底 + on-accent。
+   生成、Toast、失败保留表单内容、关闭清空等逻辑完全不变。 */
+
 interface AiArticleGeneratorProps {
   open: boolean;
   onClose: () => void;
@@ -18,8 +23,13 @@ const LENGTH_OPTIONS: { value: AiArticleLength; label: string; hint: string }[] 
 ];
 
 const inputClass =
-  'min-h-10 w-full min-w-0 rounded-lg border border-border bg-bg-soft px-4 py-2.5 text-sm text-text outline-none focus:border-accent disabled:opacity-60';
-const labelClass = 'mb-1.5 block font-mono text-xs uppercase tracking-widest text-text-secondary';
+  'min-h-[40px] w-full min-w-0 rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-[16px] leading-snug text-[var(--sf-ink)] outline-none transition-colors placeholder:text-[var(--sf-ink-3)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-2 focus-visible:ring-[var(--sf-accent)] disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm';
+const labelClass = 'mb-1.5 block font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]';
+
+const BTN_BASE =
+  'inline-flex items-center justify-center gap-1.5 rounded-[3px] border font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] disabled:cursor-not-allowed disabled:opacity-50';
+const BTN_PRIMARY = 'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-on-accent)] hover:border-[var(--sf-accent-ink)] hover:bg-[var(--sf-accent-ink)]';
+const BTN_GHOST = 'border-transparent bg-transparent text-[var(--sf-ink-2)] hover:border-[var(--sf-line)] hover:bg-[var(--sf-line-soft)] hover:text-[var(--sf-ink)]';
 
 export default function AiArticleGenerator({ open, onClose, onCreated }: AiArticleGeneratorProps) {
   const { generating, runArticle } = useAiAssist();
@@ -61,7 +71,7 @@ export default function AiArticleGenerator({ open, onClose, onCreated }: AiArtic
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-stretch justify-center overflow-y-auto glass-overlay p-0 sm:items-center sm:p-4"
+          className="fixed inset-0 z-50 flex items-stretch justify-center overflow-y-auto bg-[var(--sf-scrim)] p-0 sm:items-center sm:p-4"
           onClick={() => { if (!generating) onClose(); }}
         >
           <motion.div
@@ -69,16 +79,20 @@ export default function AiArticleGenerator({ open, onClose, onCreated }: AiArtic
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
             onClick={(e) => e.stopPropagation()}
-            className="card flex min-h-[var(--vvh,100dvh)] w-full max-w-lg flex-col overflow-hidden rounded-none p-5 sm:min-h-0 sm:rounded-lg sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ai-article-dialog-title"
+            className="flex min-h-[var(--vvh,100dvh)] w-full max-w-lg flex-col overflow-hidden rounded-none border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5 sm:min-h-0 sm:rounded-[3px] sm:p-6"
           >
-            <h2 className="mb-6 font-display text-lg font-bold uppercase tracking-wide text-text">
+            <h2 id="ai-article-dialog-title" className="mb-6 font-display text-lg font-bold uppercase tracking-wide text-[var(--sf-ink)]">
               AI 生成文章
             </h2>
 
             <div className="space-y-4">
               <div>
-                <label className={labelClass}>主题 *</label>
+                <label htmlFor="ai-article-topic" className={labelClass}>主题 *</label>
                 <input
+                  id="ai-article-topic"
                   type="text"
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
@@ -88,8 +102,9 @@ export default function AiArticleGenerator({ open, onClose, onCreated }: AiArtic
                 />
               </div>
               <div>
-                <label className={labelClass}>大纲</label>
+                <label htmlFor="ai-article-outline" className={labelClass}>大纲</label>
                 <textarea
+                  id="ai-article-outline"
                   value={outline}
                   onChange={(e) => setOutline(e.target.value)}
                   disabled={generating}
@@ -99,8 +114,9 @@ export default function AiArticleGenerator({ open, onClose, onCreated }: AiArtic
                 />
               </div>
               <div>
-                <label className={labelClass}>风格</label>
+                <label htmlFor="ai-article-style" className={labelClass}>风格</label>
                 <input
+                  id="ai-article-style"
                   type="text"
                   value={style}
                   onChange={(e) => setStyle(e.target.value)}
@@ -110,19 +126,20 @@ export default function AiArticleGenerator({ open, onClose, onCreated }: AiArtic
                 />
               </div>
               <div>
-                <label className={labelClass}>篇幅</label>
-                <div className="flex flex-wrap gap-2">
+                <label id="ai-article-length-label" className={labelClass}>篇幅</label>
+                <div className="flex flex-wrap gap-2" role="group" aria-labelledby="ai-article-length-label">
                   {LENGTH_OPTIONS.map((option) => (
                     <button
                       key={option.value}
                       type="button"
                       disabled={generating}
                       onClick={() => setLength(option.value)}
+                      aria-pressed={length === option.value}
                       className={cn(
-                        'rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60',
+                        'min-h-9 rounded-[3px] border px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] disabled:cursor-not-allowed disabled:opacity-60',
                         length === option.value
-                          ? 'bg-accent text-white'
-                          : 'bg-bg-soft text-text-secondary hover:bg-accent/10'
+                          ? 'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-on-accent)]'
+                          : 'border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)]'
                       )}
                     >
                       {option.label} · {option.hint}
@@ -133,23 +150,23 @@ export default function AiArticleGenerator({ open, onClose, onCreated }: AiArtic
             </div>
 
             {generating && (
-              <div className="mt-5 rounded-lg border border-accent/25 bg-accent/10 px-4 py-3 text-xs text-accent">
+              <div className="mt-5 rounded-[3px] border border-[var(--sf-accent)] px-4 py-3 text-xs text-[var(--sf-accent)]">
                 AI 生成中，通常需要 30-90 秒，请勿关闭…
               </div>
             )}
 
-            <div className="mt-6 flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
+            <div className="mt-6 flex flex-col-reverse gap-2 border-t border-[var(--sf-line)] pt-4 sm:flex-row sm:justify-end">
               <button
                 onClick={onClose}
                 disabled={generating}
-                className="btn-ghost min-h-10 text-xs disabled:opacity-50"
+                className={cn(BTN_BASE, BTN_GHOST, 'min-h-10 px-3 text-xs')}
               >
                 取消
               </button>
               <button
                 onClick={handleGenerate}
                 disabled={generating || !topic.trim()}
-                className="btn-primary min-h-10 text-xs disabled:opacity-50"
+                className={cn(BTN_BASE, BTN_PRIMARY, 'min-h-10 px-3 text-xs')}
               >
                 {generating ? '生成中…' : '开始生成'}
               </button>

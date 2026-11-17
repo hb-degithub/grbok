@@ -63,10 +63,12 @@ interface ProtectionData {
   consecutiveFailures: number;
 }
 
+/* 图表配色统一走共享令牌：强调青为主序列，石墨/冷灰为次序列，
+   深浅主题由 var(--sf-*) 自动切换，不再写死十六进制色值。 */
 const TARGET_COLORS: Record<string, string> = {
-  site_http: '#14b8a6',
-  pb_self: '#6366f1',
-  admin_auth: '#f59e0b',
+  site_http: 'var(--sf-accent)',
+  pb_self: 'var(--sf-ink-2)',
+  admin_auth: 'var(--sf-line-control)',
 };
 
 const TARGET_LABELS: Record<string, string> = {
@@ -97,7 +99,7 @@ function DualLineChart({
   const h = 140;
   const pad = { l: 44, r: 8, t: 10, b: 18 };
   if (buckets.length < 2) {
-    return <p className="py-10 text-center text-xs text-muted">采样数据积累中(每分钟一个点)…</p>;
+    return <p className="py-10 text-center text-xs text-[var(--sf-ink-3)]">采样数据积累中(每分钟一个点)…</p>;
   }
   const top = maxY ?? Math.max(...buckets.map((x) => Math.max(Number(x[a.key]) || 0, Number(x[b.key]) || 0)), 1);
   const minT = Date.parse(buckets[0].bucket);
@@ -109,7 +111,7 @@ function DualLineChart({
     buckets.map((bk) => `${x(Date.parse(bk.bucket)).toFixed(1)},${y(Number(bk[key as keyof HostBucket]) || 0).toFixed(1)}`).join(' ');
   return (
     <div>
-      <div className="mb-1 flex gap-4 text-[11px] text-muted">
+      <div className="mb-1 flex gap-4 text-[11px] text-[var(--sf-ink-3)]">
         <span className="flex items-center gap-1"><span className="inline-block h-1.5 w-3 rounded-full" style={{ background: a.color }} />{a.label}</span>
         <span className="flex items-center gap-1"><span className="inline-block h-1.5 w-3 rounded-full" style={{ background: b.color }} />{b.label}</span>
       </div>
@@ -136,7 +138,7 @@ function LatencyChart({ target, buckets }: { target: string; buckets: SeriesBuck
   const h = 140;
   const pad = { l: 40, r: 8, t: 10, b: 18 };
   if (data.length < 2) {
-    return <p className="py-10 text-center text-xs text-muted">采样数据积累中(每分钟一个点)…</p>;
+    return <p className="py-10 text-center text-xs text-[var(--sf-ink-3)]">采样数据积累中(每分钟一个点)…</p>;
   }
   const maxMs = Math.max(...data.map((b) => b.avgMs), 20);
   const minT = Date.parse(data[0].bucket);
@@ -146,7 +148,7 @@ function LatencyChart({ target, buckets }: { target: string; buckets: SeriesBuck
   const y = (ms: number) => pad.t + (1 - ms / maxMs) * (h - pad.t - pad.b);
   const points = data.map((b) => `${x(Date.parse(b.bucket)).toFixed(1)},${y(b.avgMs).toFixed(1)}`).join(' ');
   const badPoints = data.filter((b) => b.okRatio < 1);
-  const color = TARGET_COLORS[target] || '#14b8a6';
+  const color = TARGET_COLORS[target] || 'var(--sf-accent)';
   const ticks = [0, 0.5, 1].map((r) => ({ y: y(r * maxMs), label: `${Math.round(r * maxMs)}` }));
 
   return (
@@ -161,7 +163,7 @@ function LatencyChart({ target, buckets }: { target: string; buckets: SeriesBuck
       ))}
       <polyline points={points} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
       {badPoints.map((b) => (
-        <circle key={b.bucket} cx={x(Date.parse(b.bucket))} cy={y(b.avgMs)} r="3" fill="#ef4444">
+        <circle key={b.bucket} cx={x(Date.parse(b.bucket))} cy={y(b.avgMs)} r="3" fill="var(--sf-danger)">
           <title>{`${new Date(b.bucket).toLocaleString()} · 可用率 ${Math.round(b.okRatio * 100)}%`}</title>
         </circle>
       ))}
@@ -223,16 +225,18 @@ export default function MonitorDashboard() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted">每分钟自动采样 · 保留 7 天 · 每 60 秒自动刷新</p>
-        <div className="flex gap-1 rounded-lg border border-border bg-white p-0.5 text-xs shadow-xs">
+        <p className="text-xs text-[var(--sf-ink-3)]">每分钟自动采样 · 保留 7 天 · 每 60 秒自动刷新</p>
+        <div className="flex gap-1 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-0.5 text-xs">
           {[24, 48, 168].map((h) => (
             <button
               key={h}
               type="button"
               onClick={() => setHours(h)}
               className={cn(
-                'min-h-8 rounded-md px-3 font-mono transition-colors',
-                hours === h ? 'bg-accent/10 font-semibold text-accent' : 'text-text-secondary hover:text-text',
+                'min-h-8 rounded-[2px] border px-3 font-mono transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]',
+                hours === h
+                  ? 'border-[var(--sf-accent)] bg-[var(--sf-accent)] font-semibold text-[var(--sf-on-accent)]'
+                  : 'border-transparent text-[var(--sf-ink-2)] hover:border-[var(--sf-line)] hover:text-[var(--sf-ink)]',
               )}
             >
               {h < 100 ? `${h}h` : '7d'}
@@ -242,38 +246,38 @@ export default function MonitorDashboard() {
       </div>
 
       {error && (
-        <div className="rounded-xl border border-danger/30 bg-danger/5 px-4 py-3 text-sm text-danger">{error}</div>
+        <div role="alert" className="rounded-[3px] border border-[var(--sf-danger)] px-4 py-3 text-sm text-[var(--sf-danger)]">{error}</div>
       )}
 
       {/* 汇总卡片 */}
       <div className="grid gap-4 md:grid-cols-3">
         {(summary?.targets ?? []).map((t) => (
-          <section key={t.target} className="rounded-xl border border-border bg-white p-4 shadow-xs">
+          <section key={t.target} className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4">
             <div className="flex items-center gap-2">
-              <span className={cn('h-2.5 w-2.5 rounded-full', t.latest?.ok ? 'bg-success' : 'bg-danger')} />
-              <h3 className="text-sm font-semibold text-text">{t.label}</h3>
-              <span className="ml-auto font-mono text-[11px] text-muted">{t.target}</span>
+              <span className={cn('h-2.5 w-2.5 rounded-full', t.latest?.ok ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-[var(--sf-danger)]')} />
+              <h3 className="text-sm font-semibold text-[var(--sf-ink)]">{t.label}</h3>
+              <span className="ml-auto font-mono text-[11px] text-[var(--sf-ink-3)]">{t.target}</span>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-center">
               <div>
-                <p className="font-mono text-lg font-bold tabular-nums text-text">{fmtUptime(t.h24.uptime)}</p>
-                <p className="text-[11px] text-muted">24h 可用率</p>
+                <p className="font-mono text-lg font-bold tabular-nums text-[var(--sf-ink)]">{fmtUptime(t.h24.uptime)}</p>
+                <p className="text-[11px] text-[var(--sf-ink-3)]">24h 可用率</p>
               </div>
               <div>
-                <p className="font-mono text-lg font-bold tabular-nums text-text">{fmtMs(t.h24.avgMs)}</p>
-                <p className="text-[11px] text-muted">24h 均延迟</p>
+                <p className="font-mono text-lg font-bold tabular-nums text-[var(--sf-ink)]">{fmtMs(t.h24.avgMs)}</p>
+                <p className="text-[11px] text-[var(--sf-ink-3)]">24h 均延迟</p>
               </div>
               <div>
-                <p className="font-mono text-lg font-bold tabular-nums text-text">{fmtMs(t.h24.p95Ms)}</p>
-                <p className="text-[11px] text-muted">24h P95</p>
+                <p className="font-mono text-lg font-bold tabular-nums text-[var(--sf-ink)]">{fmtMs(t.h24.p95Ms)}</p>
+                <p className="text-[11px] text-[var(--sf-ink-3)]">24h P95</p>
               </div>
             </div>
-            <div className="mt-3 flex justify-between border-t border-border/60 pt-2 font-mono text-[11px] text-muted">
+            <div className="mt-3 flex justify-between border-t border-[var(--sf-line-soft)] pt-2 font-mono text-[11px] text-[var(--sf-ink-3)]">
               <span>7d 可用率 {fmtUptime(t.d7.uptime)}</span>
               <span>样本 {t.h24.total}</span>
             </div>
             {t.latest && !t.latest.ok && (
-              <p className="mt-2 truncate rounded-md bg-danger/10 px-2 py-1 font-mono text-[11px] text-danger" title={t.latest.error}>
+              <p className="mt-2 truncate rounded-[2px] border border-[var(--sf-danger)] px-2 py-1 font-mono text-[11px] text-[var(--sf-danger)]" title={t.latest.error}>
                 最近异常: {t.latest.error || `HTTP ${t.latest.statusCode}`}
               </p>
             )}
@@ -282,11 +286,11 @@ export default function MonitorDashboard() {
       </div>
 
       {/* 宿主机性能 */}
-      <section className="rounded-xl border border-border bg-white p-4 shadow-xs">
+      <section className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-text">宿主机性能</h3>
+          <h3 className="text-sm font-semibold text-[var(--sf-ink)]">宿主机性能</h3>
           {host?.latest && (
-            <p className="font-mono text-[11px] text-muted">
+            <p className="font-mono text-[11px] text-[var(--sf-ink-3)]">
               内存 {host.latest.memUsedMb}/{host.latest.memTotalMb}MB · 磁盘 {host.latest.diskPct}% · load1 {host.latest.load1}
             </p>
           )}
@@ -295,30 +299,30 @@ export default function MonitorDashboard() {
           <div className="grid gap-4 lg:grid-cols-2">
             <DualLineChart
               buckets={host.buckets}
-              a={{ key: 'cpuPct', label: 'CPU %', color: '#14b8a6' }}
-              b={{ key: 'memPct', label: '内存 %', color: '#6366f1' }}
+              a={{ key: 'cpuPct', label: 'CPU %', color: 'var(--sf-accent)' }}
+              b={{ key: 'memPct', label: '内存 %', color: 'var(--sf-ink-2)' }}
               maxY={100}
               unit="%"
             />
             <DualLineChart
               buckets={host.buckets}
-              a={{ key: 'rxKbps', label: '下行 KB/s', color: '#14b8a6' }}
-              b={{ key: 'txKbps', label: '上行 KB/s', color: '#f59e0b' }}
+              a={{ key: 'rxKbps', label: '下行 KB/s', color: 'var(--sf-accent)' }}
+              b={{ key: 'txKbps', label: '上行 KB/s', color: 'var(--sf-line-control)' }}
               unit=""
             />
           </div>
         ) : (
-          <p className="py-6 text-center text-xs text-muted">宿主机采样尚未上报(cron 每分钟一次)…</p>
+          <p className="py-6 text-center text-xs text-[var(--sf-ink-3)]">宿主机采样尚未上报(cron 每分钟一次)…</p>
         )}
       </section>
 
       {/* 延迟趋势 */}
       <div className="grid gap-4 lg:grid-cols-1">
         {Object.keys(TARGET_LABELS).map((target) => (
-          <section key={target} className="rounded-xl border border-border bg-white p-4 shadow-xs">
+          <section key={target} className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4">
             <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-text">{TARGET_LABELS[target]} · 5 分钟均值延迟</h3>
-              <span className="font-mono text-[11px] text-muted" style={{ color: TARGET_COLORS[target] }}>
+              <h3 className="text-sm font-semibold text-[var(--sf-ink)]">{TARGET_LABELS[target]} · 5 分钟均值延迟</h3>
+              <span className="font-mono text-[11px] text-[var(--sf-ink-3)]" style={{ color: TARGET_COLORS[target] }}>
                 — {target}
               </span>
             </div>
@@ -328,13 +332,13 @@ export default function MonitorDashboard() {
       </div>
 
       {/* 失败明细 */}
-      <section className="rounded-xl border border-border bg-white p-4 shadow-xs">
-        <h3 className="mb-3 text-sm font-semibold text-text">最近失败样本</h3>
+      <section className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4">
+        <h3 className="mb-3 text-sm font-semibold text-[var(--sf-ink)]">最近失败样本</h3>
         {series?.failures?.length ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-border text-muted">
+                <tr className="border-b border-[var(--sf-line)] text-[var(--sf-ink-3)]">
                   <th className="py-2 pr-3 font-medium">时间</th>
                   <th className="py-2 pr-3 font-medium">目标</th>
                   <th className="py-2 pr-3 font-medium">状态码</th>
@@ -344,48 +348,48 @@ export default function MonitorDashboard() {
               </thead>
               <tbody>
                 {series.failures.map((f, i) => (
-                  <tr key={`${f.at}-${i}`} className="border-b border-border/50 last:border-0">
-                    <td className="whitespace-nowrap py-2 pr-3 font-mono text-text-secondary">{new Date(f.at.replace(' ', 'T')).toLocaleString()}</td>
-                    <td className="py-2 pr-3 font-mono text-text-secondary">{TARGET_LABELS[f.target] || f.target}</td>
-                    <td className="py-2 pr-3 font-mono text-text-secondary">{f.statusCode || '—'}</td>
-                    <td className="py-2 pr-3 font-mono text-text-secondary">{f.latencyMs}ms</td>
-                    <td className="max-w-64 truncate py-2 font-mono text-danger" title={f.error}>{f.error || '—'}</td>
+                  <tr key={`${f.at}-${i}`} className="border-b border-[var(--sf-line)] last:border-0">
+                    <td className="whitespace-nowrap py-2 pr-3 font-mono text-[var(--sf-ink-2)]">{new Date(f.at.replace(' ', 'T')).toLocaleString()}</td>
+                    <td className="py-2 pr-3 font-mono text-[var(--sf-ink-2)]">{TARGET_LABELS[f.target] || f.target}</td>
+                    <td className="py-2 pr-3 font-mono text-[var(--sf-ink-2)]">{f.statusCode || '—'}</td>
+                    <td className="py-2 pr-3 font-mono text-[var(--sf-ink-2)]">{f.latencyMs}ms</td>
+                    <td className="max-w-64 truncate py-2 font-mono text-[var(--sf-danger)]" title={f.error}>{f.error || '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         ) : (
-          <p className="py-6 text-center text-xs text-muted">{loading ? '加载中…' : '所选时段内没有失败样本,运行良好。'}</p>
+          <p className="py-6 text-center text-xs text-[var(--sf-ink-3)]">{loading ? '加载中…' : '所选时段内没有失败样本,运行良好。'}</p>
         )}
       </section>
 
       {/* 防护采集(雷池 WAF 统计) */}
-      <section className="rounded-xl border border-border bg-white p-4 shadow-xs">
+      <section className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-text">防护采集(雷池 WAF,近 24h)</h3>
+          <h3 className="text-sm font-semibold text-[var(--sf-ink)]">防护采集(雷池 WAF,近 24h)</h3>
           {protection && (
-            <p className="font-mono text-[11px] text-muted">
+            <p className="font-mono text-[11px] text-[var(--sf-ink-3)]">
               最近成功 {protection.lastSuccessAt ? new Date(protection.lastSuccessAt.replace(' ', 'T')).toLocaleString() : '从未'}
               {protection.consecutiveFailures > 0 && (
-                <span className="ml-2 rounded bg-warning/10 px-1.5 py-0.5 text-warning">连续失败 {protection.consecutiveFailures}</span>
+                <span className="ml-2 rounded-[2px] border border-amber-600/45 px-1.5 py-0.5 text-amber-700 dark:border-amber-400/45 dark:text-amber-300">连续失败 {protection.consecutiveFailures}</span>
               )}
             </p>
           )}
         </div>
         {protectionError && (
-          <p className="py-4 text-center text-xs text-muted">防护采集接口不可用(不影响本页其他监控)。</p>
+          <p className="py-4 text-center text-xs text-[var(--sf-ink-3)]">防护采集接口不可用(不影响本页其他监控)。</p>
         )}
-        {!protectionError && !protection && <p className="py-4 text-center text-xs text-muted">加载中…</p>}
+        {!protectionError && !protection && <p className="py-4 text-center text-xs text-[var(--sf-ink-3)]">加载中…</p>}
         {!protectionError && protection && (
           <>
             {protection.latest10.length === 0 ? (
-              <p className="py-4 text-center text-xs text-muted">暂无采集快照(cron 每分钟写入)。</p>
+              <p className="py-4 text-center text-xs text-[var(--sf-ink-3)]">暂无采集快照(cron 每分钟写入)。</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-border text-muted">
+                    <tr className="border-b border-[var(--sf-line)] text-[var(--sf-ink-3)]">
                       <th className="py-2 pr-3 font-medium">采集时间</th>
                       <th className="py-2 pr-3 font-medium">窗口截止</th>
                       <th className="py-2 pr-3 font-medium">检测</th>
@@ -395,12 +399,12 @@ export default function MonitorDashboard() {
                   </thead>
                   <tbody>
                     {protection.latest10.map((s, i) => (
-                      <tr key={`${s.at}-${i}`} className="border-b border-border/50 last:border-0">
-                        <td className="whitespace-nowrap py-2 pr-3 font-mono text-text-secondary">{new Date(s.at.replace(' ', 'T')).toLocaleString()}</td>
-                        <td className="whitespace-nowrap py-2 pr-3 font-mono text-text-secondary">{s.sampledAt ? new Date(s.sampledAt).toLocaleString() : '—'}</td>
-                        <td className="py-2 pr-3 font-mono text-text-secondary">{s.ok ? s.detected : '—'}</td>
-                        <td className="py-2 pr-3 font-mono text-text-secondary">{s.ok ? s.blocked : '—'}</td>
-                        <td className={cn('max-w-56 truncate py-2 font-mono', s.ok ? 'text-success' : 'text-danger')} title={s.error}>
+                      <tr key={`${s.at}-${i}`} className="border-b border-[var(--sf-line)] last:border-0">
+                        <td className="whitespace-nowrap py-2 pr-3 font-mono text-[var(--sf-ink-2)]">{new Date(s.at.replace(' ', 'T')).toLocaleString()}</td>
+                        <td className="whitespace-nowrap py-2 pr-3 font-mono text-[var(--sf-ink-2)]">{s.sampledAt ? new Date(s.sampledAt).toLocaleString() : '—'}</td>
+                        <td className="py-2 pr-3 font-mono text-[var(--sf-ink-2)]">{s.ok ? s.detected : '—'}</td>
+                        <td className="py-2 pr-3 font-mono text-[var(--sf-ink-2)]">{s.ok ? s.blocked : '—'}</td>
+                        <td className={cn('max-w-56 truncate py-2 font-mono', s.ok ? 'text-emerald-700 dark:text-emerald-300' : 'text-[var(--sf-danger)]')} title={s.error}>
                           {s.ok ? '正常' : `失败: ${s.error || 'unknown'}`}
                         </td>
                       </tr>

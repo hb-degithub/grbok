@@ -31,17 +31,21 @@ export default function FeedCopyButton({ url }: FeedCopyButtonProps) {
       onClick={handleCopy}
       whileHover={{ scale: 1.03 }}
       whileTap={{ scale: 0.97 }}
-      className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-white"
+      className={`inline-flex min-h-[44px] items-center gap-2 rounded-[3px] border px-4 py-2 font-mono text-xs uppercase tracking-[0.14em] transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] ${
+        copied
+          ? 'border-[var(--sf-accent)] bg-[var(--sf-surface)] text-[var(--sf-accent-ink)]'
+          : 'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-canvas)] hover:bg-[var(--sf-accent-ink)]'
+      }`}
       aria-live="polite"
     >
       {copied ? (
         <>
-          <svg className="h-4 w-4 text-teal-400 dark:text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M5 13l4 4L19 7" /></svg>
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M5 13l4 4L19 7" /></svg>
           已复制
         </>
       ) : (
         <>
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" strokeWidth="2" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" strokeWidth="2" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" /></svg>
           复制订阅地址
         </>
       )}

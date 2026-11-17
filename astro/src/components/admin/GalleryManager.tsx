@@ -4,10 +4,52 @@ import { useAdminAuth } from '../../hooks/useAdminAuth';
 import { useGallery } from '../../hooks/domains/useGallery';
 import type { GalleryItem } from '../../lib/services/galleryService';
 
-const STATUS_TONE: Record<string, string> = {
-  show: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-  hidden: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500',
+/* ===========================
+   相册管理（后台）
+   - 只用 --sf-* 令牌：surface/canvas + 四档细线 + 三档墨色 + 单一强调色；
+   - 圆角统一 3px（徽标 2px），列表靠 1px 细线分隔，行 hover 只改底色；
+   - 状态色只用于语义：显示中 emerald、已隐藏 ink-3、删除 --sf-danger。
+   业务逻辑（上传、上下架、删除确认、鉴权分支）与改造前完全一致。
+   =========================== */
+
+type Tone = 'neutral' | 'success';
+
+const TONE_CHIP: Record<Tone, string> = {
+  neutral: 'border-[var(--sf-line)] text-[var(--sf-ink-3)]',
+  success: 'border-emerald-600/45 text-emerald-700 dark:border-emerald-400/45 dark:text-emerald-300',
 };
+
+const BTN_BASE =
+  'inline-flex items-center justify-center gap-1.5 rounded-[3px] border font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] disabled:cursor-not-allowed disabled:opacity-50';
+const BTN_PRIMARY =
+  'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-on-accent)] hover:border-[var(--sf-accent-ink)] hover:bg-[var(--sf-accent-ink)]';
+const BTN_SECONDARY =
+  'border-[var(--sf-line-control)] bg-[var(--sf-surface)] text-[var(--sf-ink)] hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]';
+const BTN_DANGER =
+  'border-[var(--sf-danger)] bg-[var(--sf-surface)] text-[var(--sf-danger)] hover:bg-[var(--sf-danger)] hover:text-[var(--sf-on-accent)]';
+const BTN_MD = 'min-h-10 px-3 text-[13px]';
+const BTN_SM = 'min-h-8 px-2.5 text-[12px]';
+
+const FILTER_ON = 'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-on-accent)]';
+const FILTER_OFF =
+  'border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)]';
+
+/** 与 ui/Input.tsx 同一套输入样式：surface 底 + 控制线 + 强调色焦点环。 */
+const INPUT =
+  'min-h-[40px] w-full min-w-0 rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 text-[13px] text-[var(--sf-ink)] outline-none transition-colors placeholder:text-[var(--sf-ink-3)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-2 focus-visible:ring-[var(--sf-accent)] focus-visible:ring-offset-0';
+const FILE_INPUT =
+  'block w-full min-w-0 cursor-pointer rounded-[3px] border border-dashed border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2 text-[13px] text-[var(--sf-ink-2)] file:mr-3 file:cursor-pointer file:border-0 file:bg-transparent file:font-mono file:text-[11px] file:tracking-[0.08em] file:text-[var(--sf-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]';
+const LABEL = 'mb-1 block font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-3)]';
+
+const TABLE_HEAD =
+  'border-b border-[var(--sf-line)] bg-[var(--sf-canvas)] text-left font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]';
+const TABLE_ROW = 'border-b border-[var(--sf-line-soft)] transition-colors last:border-b-0 hover:bg-[var(--sf-canvas)]';
+const TH = 'whitespace-nowrap px-3 py-2 font-medium';
+const TD = 'px-3 py-2.5 align-middle';
+
+function cx(...classes: (string | false | null | undefined)[]) {
+  return classes.filter(Boolean).join(' ');
+}
 
 export default function GalleryManager() {
   const { user } = useAdminAuth();
@@ -67,111 +109,183 @@ export default function GalleryManager() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-w-0 space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">相册管理</h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">管理相册图片的显示与删除</p>
-      </div>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-w-0 space-y-4">
+      <header className="min-w-0">
+        <p className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--sf-ink-3)]">
+          <span className="h-1 w-1 bg-[var(--sf-accent)]" aria-hidden="true" />
+          Gallery / Manage
+        </p>
+        <h1 className="mt-1.5 break-words text-xl font-bold leading-tight tracking-tight text-[var(--sf-ink)]">相册管理</h1>
+        <p className="mt-1.5 text-[13px] text-[var(--sf-ink-2)]">管理相册图片的显示与删除</p>
+      </header>
 
       {isAuthor && (
-        <form onSubmit={handleUpload} className="card rounded-xl p-5 space-y-3">
-          <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">上传新相片</h2>
-          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              className="text-sm text-zinc-700 dark:text-zinc-300"
-              required
-            />
-            <input
-              type="text"
-              placeholder="标题（可选）"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              maxLength={100}
-              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-            />
-            <input
-              type="text"
-              placeholder="相册（可选）"
-              value={newAlbum}
-              onChange={(e) => setNewAlbum(e.target.value)}
-              maxLength={50}
-              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-            />
+        <section className="min-w-0 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-[var(--sf-line)] px-3 py-2">
+            <span className="font-mono text-[10px] tracking-[0.2em] text-[var(--sf-ink-3)]">01</span>
+            <h2 className="text-[13px] font-semibold tracking-tight text-[var(--sf-ink)]">上传新相片</h2>
+            <span className="ml-1 h-px min-w-4 flex-1 bg-[var(--sf-line)]" aria-hidden="true" />
+            <span className="font-mono text-[10px] tracking-[0.12em] text-[var(--sf-ink-3)]">UPLOAD</span>
           </div>
-          <button
-            type="submit"
-            disabled={uploading}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {uploading ? '上传中…' : '上传'}
-          </button>
-          <p className="text-xs text-zinc-400 dark:text-zinc-500">仅允许 JPEG/PNG/WebP/GIF，单文件最大 10MB。</p>
-        </form>
+          <form onSubmit={handleUpload} className="space-y-3 p-3">
+            <div>
+              <label htmlFor="gallery-file" className={LABEL}>图片文件</label>
+              <input
+                id="gallery-file"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className={FILE_INPUT}
+                required
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label htmlFor="gallery-title" className={LABEL}>标题</label>
+                <input
+                  id="gallery-title"
+                  type="text"
+                  placeholder="标题（可选）"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  maxLength={100}
+                  className={INPUT}
+                />
+              </div>
+              <div>
+                <label htmlFor="gallery-album" className={LABEL}>相册</label>
+                <input
+                  id="gallery-album"
+                  type="text"
+                  placeholder="相册（可选）"
+                  value={newAlbum}
+                  onChange={(e) => setNewAlbum(e.target.value)}
+                  maxLength={50}
+                  className={INPUT}
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="submit" disabled={uploading} className={cx(BTN_BASE, BTN_PRIMARY, BTN_MD)}>
+                {uploading ? '上传中…' : '上传'}
+              </button>
+              <p className="text-[11px] leading-relaxed text-[var(--sf-ink-3)]">仅允许 JPEG/PNG/WebP/GIF，单文件最大 10MB。</p>
+            </div>
+          </form>
+        </section>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="相册状态筛选">
         {['', 'show', 'hidden'].map((s) => (
           <button
             key={s || 'all'}
+            type="button"
             onClick={() => setFilter(s)}
-            className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-              filter === s
-                ? 'bg-indigo-600 text-white'
-                : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700'
-            }`}
+            aria-pressed={filter === s}
+            className={cx(
+              'min-h-8 rounded-[3px] border px-2.5 font-mono text-[11px] tracking-[0.06em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]',
+              filter === s ? FILTER_ON : FILTER_OFF
+            )}
           >
             {s === 'show' ? '显示中' : s === 'hidden' ? '已隐藏' : '全部'}
           </button>
         ))}
       </div>
 
-      {error && <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</div>}
-      {status && <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">{status}</div>}
-      {loading && <p className="text-sm text-zinc-500 dark:text-zinc-400">加载中…</p>}
+      {error && (
+        <div role="alert" className="break-words rounded-[3px] border border-[var(--sf-danger)] bg-[var(--sf-surface)] px-3 py-2 text-[13px] text-[var(--sf-danger)] [overflow-wrap:anywhere]">
+          {error}
+        </div>
+      )}
+      {status && (
+        <div className="break-words rounded-[3px] border border-emerald-600/45 bg-[var(--sf-surface)] px-3 py-2 text-[13px] text-emerald-700 dark:border-emerald-400/45 dark:text-emerald-300 [overflow-wrap:anywhere]">
+          {status}
+        </div>
+      )}
+      {loading && (
+        <p className="flex items-center gap-2 font-mono text-[11px] tracking-[0.18em] text-[var(--sf-ink-3)]">
+          <span className="h-1 w-1 animate-pulse bg-[var(--sf-accent)]" aria-hidden="true" />
+          加载中…
+        </p>
+      )}
 
       {!loading && items.length === 0 && (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">暂无相片</p>
+        <div className="flex flex-col items-center gap-1.5 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-10 text-center">
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">EMPTY / 0</p>
+          <p className="text-[13px] text-[var(--sf-ink-2)]">暂无相片</p>
+        </div>
       )}
 
       {!loading && items.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((item) => (
-            <div key={item.id} className="card overflow-hidden rounded-xl">
-              <div className="aspect-video overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-                {photoUrl(item, '300x300') && (
-                  <img src={photoUrl(item, '300x300')} alt={item.title || ''} className="h-full w-full object-cover" loading="lazy" />
-                )}
-              </div>
-              <div className="p-3">
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{item.title || '未命名'}</span>
-                  <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${STATUS_TONE[item.status] || STATUS_TONE.hidden}`}>{item.status === 'show' ? '显示' : '隐藏'}</span>
-                </div>
-                {item.album && <p className="text-xs text-zinc-500 dark:text-zinc-400">相册：{item.album}</p>}
-                {item.description && <p className="mt-1 break-words text-xs text-zinc-600 dark:text-zinc-400">{item.description}</p>}
-                <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">{fmtDate(item.created)}</p>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={() => toggleStatus(item)}
-                    className="rounded-lg bg-zinc-200 px-3 py-1 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600"
-                  >
-                    {item.status === 'show' ? '隐藏' : '显示'}
-                  </button>
-                  {isSuperAdmin && (
-                    <button
-                      onClick={() => remove(item)}
-                      className="rounded-lg bg-red-100 px-3 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-200 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/40"
-                    >
-                      删除
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="min-w-0 overflow-x-auto rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">
+          <table className="w-full min-w-[44rem] border-collapse text-[13px]">
+            <caption className="sr-only">相册图片列表</caption>
+            <thead>
+              <tr className={TABLE_HEAD}>
+                <th scope="col" className={TH}>预览</th>
+                <th scope="col" className={TH}>标题</th>
+                <th scope="col" className={TH}>状态</th>
+                <th scope="col" className={TH}>创建时间</th>
+                <th scope="col" className={cx(TH, 'text-right')}>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => {
+                const thumb = photoUrl(item, '300x300');
+                return (
+                  <tr key={item.id} className={TABLE_ROW}>
+                    <td className={cx(TD, 'w-16')}>
+                      <div className="h-10 w-14 overflow-hidden rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-canvas)]">
+                        {thumb && (
+                          <img src={thumb} alt={item.title || ''} className="h-full w-full object-cover" loading="lazy" />
+                        )}
+                      </div>
+                    </td>
+                    <td className={cx(TD, 'min-w-[16rem] max-w-[32rem]')}>
+                      <p className="break-words font-medium text-[var(--sf-ink)] [overflow-wrap:anywhere]">{item.title || '未命名'}</p>
+                      {item.album && <p className="mt-0.5 break-words font-mono text-[11px] text-[var(--sf-ink-3)] [overflow-wrap:anywhere]">相册：{item.album}</p>}
+                      {item.description && <p className="mt-0.5 break-words text-[12px] leading-snug text-[var(--sf-ink-2)] [overflow-wrap:anywhere]">{item.description}</p>}
+                    </td>
+                    <td className={TD}>
+                      <span
+                        className={cx(
+                          'inline-flex items-center gap-1 rounded-[2px] border px-1.5 py-0.5 font-mono text-[10px] leading-none tracking-[0.08em]',
+                          item.status === 'show' ? TONE_CHIP.success : TONE_CHIP.neutral
+                        )}
+                      >
+                        {item.status === 'show' ? '显示' : '隐藏'}
+                      </span>
+                    </td>
+                    <td className={cx(TD, 'whitespace-nowrap font-mono text-[11px] text-[var(--sf-ink-3)]')}>{fmtDate(item.created)}</td>
+                    <td className={cx(TD, 'text-right')}>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleStatus(item)}
+                          className={cx(BTN_BASE, BTN_SECONDARY, BTN_SM)}
+                          title={item.status === 'show' ? '隐藏相片' : '显示相片'}
+                          aria-label={item.status === 'show' ? '隐藏相片' : '显示相片'}
+                        >
+                          {item.status === 'show' ? '隐藏' : '显示'}
+                        </button>
+                        {isSuperAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => remove(item)}
+                            className={cx(BTN_BASE, BTN_DANGER, BTN_SM)}
+                            title="删除相片"
+                            aria-label="删除相片"
+                          >
+                            删除
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </motion.div>
