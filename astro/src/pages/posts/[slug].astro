@@ -52,6 +52,10 @@ async function fetchPost(postSlug: string): Promise<Post | null> {
 }
 
 const post = await fetchPost(slug ?? '');
+// 文章不存在时返回真正的 404（此前 SSR 渲染 404 文案但状态码是 200，软 404 会被搜索引擎收录）。
+if (!post) {
+  Astro.response.status = 404;
+}
 
 // 2026-11-16：users 的 viewRule 只允许本人/管理员读，匿名 expand=author 恒为空
 // （实测 items[0].expand === null），文章页因此一直不显示作者。这里在 expand 缺失时

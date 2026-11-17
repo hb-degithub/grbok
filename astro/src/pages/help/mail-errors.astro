@@ -15,7 +15,8 @@ const errors = [
 ---
 
 <BaseLayout title="邮件与注册错误代码">
-  <main class="mx-auto max-w-3xl px-[var(--sf-pad)] py-16 sm:py-20">
+  <!-- 不能再用 <main>：BaseLayout 已经提供了页面唯一的 main 地标（审计 P1-2）。 -->
+  <div class="mx-auto max-w-3xl px-[var(--sf-pad)] py-16 sm:py-20">
     <header class="mb-10 border-b border-[var(--sf-line)] pb-6">
       <p class="mb-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
         <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
@@ -39,5 +40,5 @@ const errors = [
         </section>
       ))}
     </div>
-  </main>
+  </div>
 </BaseLayout>

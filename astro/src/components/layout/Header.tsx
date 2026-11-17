@@ -235,7 +235,8 @@ export default function Header() {
   }, [currentPath, resolvedTheme, activeThemeLabel, themeMenuOpen, moreMenuOpen, isLoading, isAuthenticated, user]);
 
   return (
-    <>
+    // 顶层用 <header>：此前是裸 fragment，导致全站没有 banner 地标（可访问性审计 P1-1）。
+    <header>
       {/* Mobile: hamburger + SideNav (hidden on desktop) */}
       <button
         type="button"
@@ -251,7 +252,8 @@ export default function Header() {
       </button>
 
       {/* Desktop: top Dock (hidden on mobile) */}
-      <motion.div
+      <motion.nav
+        aria-label="主导航"
         initial={{ y: -100 }}
         animate={{ y: isVisible ? 0 : -120 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
@@ -343,9 +345,9 @@ export default function Header() {
           )}
         </AnimatePresence>
 
-      </motion.div>
+      </motion.nav>
 
       <SideNav id="mobile-side-nav" isOpen={sideNavOpen} onClose={() => setSideNavOpen(false)} currentPath={currentPath} />
-    </>
+    </header>
   );
 }
