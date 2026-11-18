@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLatestAnnouncements } from '../../hooks/domains/useAnnouncements';
 import { cn } from '../../lib/utils';
+import type { Announcement } from '../../types/pocketbase';
 
 /**
  * 公告类型配色
@@ -17,8 +18,13 @@ const typeStyles: Record<string, string> = {
   normal: 'border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)]',
 };
 
-export default function AnnouncementBar() {
-  const { announcements } = useLatestAnnouncements(3);
+interface AnnouncementBarProps {
+  /** 布局层 SSR 预取的公告；有值时首屏即渲染，避免把整页推下 80px 的布局位移。 */
+  initialAnnouncements?: Announcement[] | null;
+}
+
+export default function AnnouncementBar({ initialAnnouncements }: AnnouncementBarProps = {}) {
+  const { announcements } = useLatestAnnouncements(3, initialAnnouncements ?? null);
   const [closed, setClosed] = useState<Set<string>>(new Set());
 
   if (announcements.length === 0) return null;

@@ -16,6 +16,8 @@ import CursorGlow from '../components/effects/CursorGlow';
 import CursorAim from '../components/effects/CursorAim';
 import ToastContainer from '../components/ui/Toast';
 import { SITE_CONFIG } from '../config/site';
+import { pbBaseUrl } from '../lib/pb-base-url';
+import { cachedFetchJson } from '../lib/pb-cache';
 
 interface Props {
   title: string;
@@ -35,6 +37,31 @@ const {
   noindex = false,
 } = Astro.props;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+
+/**
+ * 服务端预取公告。
+ *
+ * 为什么在布局里取：公告条此前是纯客户端渲染，水合完成后才出现，
+ * 容器的 `:has(.announcement-bar)` 间距随之从 0 变 80px，整页被推下去 ——
+ * 这是全站 CLS（首页 0.098、/stats/ 0.39）的主要来源。
+ * 预取后公告在首屏 HTML 里就存在，间距一次到位，不再发生位移。
+ *
+ * 取数：走与浏览器相同的公开访问规则（匿名），800ms 超时 + 30s 进程内缓存；
+ * 失败就当作没有公告（与之前客户端静默失败的表现一致），不影响页面渲染。
+ */
+let announcementsSeed: { id: string; title?: string; content?: string; type?: string }[] = [];
+if (showChrome) {
+  try {
+    const data = await cachedFetchJson<{ items?: typeof announcementsSeed }>(
+      `${pbBaseUrl()}/api/collections/announcements/records?perPage=3&sort=-created`,
+      { signal: AbortSignal.timeout(800) },
+      30_000,
+    );
+    announcementsSeed = Array.isArray(data.items) ? data.items : [];
+  } catch {
+    announcementsSeed = [];
+  }
+}
 ---
 
 <!doctype html>
@@ -179,7 +206,7 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
         这里用容器 :has(.announcement-bar) 条件间距，关闭最后一个公告后自动归 0。
       */
       <div class="relative z-40 has-[.announcement-bar]:pt-14 sm:has-[.announcement-bar]:mt-20 sm:has-[.announcement-bar]:pt-0">
-        <AnnouncementBar client:idle />
+        <AnnouncementBar client:idle initialAnnouncements={announcementsSeed} />
       </div>
     )}
 

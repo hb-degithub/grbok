@@ -68,16 +68,20 @@ export function useAnnouncements(limit: number = 3) {
 }
 
 /** 前台轻量 Hook：仅最新启用中的公告 */
-export function useLatestAnnouncements(limit: number = 3) {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [loading, setLoading] = useState(true);
+export function useLatestAnnouncements(limit: number = 3, initial?: Announcement[] | null) {
+  // SSR 已经预取过公告时用它做初始值：既避免重复请求，也避免「水合后才有公告」
+  // 造成的整页位移（容器 :has(.announcement-bar) 的间距会从 0 跳到 80px）。
+  const seeded = Array.isArray(initial) && initial.length > 0;
+  const [announcements, setAnnouncements] = useState<Announcement[]>(seeded ? initial : []);
+  const [loading, setLoading] = useState(!seeded);
 
   useEffect(() => {
+    if (seeded) return;
     announcementService.getLatest(limit)
       .then(setAnnouncements)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [limit]);
+  }, [limit, seeded]);
 
   return { announcements, loading };
 }
