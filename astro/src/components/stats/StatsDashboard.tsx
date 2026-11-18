@@ -67,13 +67,53 @@ export default function StatsDashboard({ variant = 'public' }: StatsDashboardPro
     );
   }
 
-  // SSR 和客户端首次渲染都显示骨架屏，避免 hydration 不匹配
+  // SSR 和客户端首次渲染都显示骨架屏，避免 hydration 不匹配。
+  // 骨架必须与真实结构「等高」：原先只有一行 4 张卡（约 96px），数据到达后整块
+  // 长到 1400px 以上，把页脚推下去，是 /stats/ CLS 0.22 的主因。
   if (!mounted || !data) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="skeleton h-24 rounded-[3px]" />
-        ))}
+      <div className="space-y-6" aria-busy="true">
+        {/* 读数卡 */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="skeleton h-24 rounded-[3px]" />
+          ))}
+        </div>
+        {/* 30 天趋势 */}
+        <div className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5">
+          <div className="mb-4 skeleton h-4 w-32" />
+          <div className="skeleton h-28 w-full" />
+        </div>
+        {/* 热门页面 / 访问来源 */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          {[0, 1].map((col) => (
+            <div key={col} className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5">
+              <div className="mb-4 skeleton h-4 w-28" />
+              <ul className="m-0 list-none divide-y divide-[var(--sf-line-soft)] p-0">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <li key={i} className="py-2">
+                    <div className="skeleton h-4 w-full" />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        {/* 访客地理分布 */}
+        <div className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4 sm:p-6">
+          <div className="mb-6 flex items-end justify-between gap-3">
+            <div className="skeleton h-5 w-40" />
+            <div className="skeleton h-4 w-24" />
+          </div>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_220px]">
+            <div className="skeleton h-[480px] rounded-[3px]" />
+            <div className="space-y-5">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="skeleton h-8" />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
