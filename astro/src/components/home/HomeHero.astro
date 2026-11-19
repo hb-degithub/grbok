@@ -1,0 +1,248 @@
+---
+/**
+ * 首页 Hero：轨道日志主视觉 + 真实请求链路。
+ *
+ * - 文案直接消费 SITE_CONFIG（name / slogan / description / since），不写死站点信息；
+ * - 保留 /posts 与 /about 两个 CTA、真实链路的 figcaption 与「未采集」说明；
+ * - RequestPath 仍是同一个 React 岛（client:visible），只是换了布局位置；
+ * - 统计计数与 PB 取数留在 index.astro，Hero 不接收计数 props、不发请求；
+ * - 装饰层 OrbitalScene 纯 CSS/SVG，aria-hidden 且不拦截指针。
+ */
+import RequestPath from '../layout/RequestPath';
+import OrbitalScene from './OrbitalScene.astro';
+import { SITE_CONFIG } from '../../config/site';
+import { orbitalClasses } from '../../styles/orbital';
+---
+
+<section class="orbital-hero" aria-labelledby="home-hero-title">
+  <OrbitalScene />
+
+  <div class={`orbital-hero__inner ${orbitalClasses.shell}`}>
+    <div class="orbital-hero__meta">
+      <p class={orbitalClasses.eyebrow}>PERSONAL TECH LOG / 个人技术博客</p>
+      <p class="orbital-hero__meta-note">SINCE {SITE_CONFIG.since} · 持续更新</p>
+    </div>
+
+    <div class="orbital-hero__grid">
+      <div class="orbital-hero__copy">
+        <h1 id="home-hero-title" class="orbital-hero__title">{SITE_CONFIG.name}</h1>
+
+        <p class="orbital-hero__lead">
+          {SITE_CONFIG.slogan}<span class="orbital-hero__lead-tail">。把折腾过的东西写清楚。</span>
+        </p>
+
+        <p class="orbital-hero__desc">{SITE_CONFIG.description}</p>
+
+        <div class="orbital-hero__actions">
+          <a href="/posts" class="orbital-hero__cta">
+            浏览全部文章 <span aria-hidden="true" class="orbital-hero__cta-arrow">→</span>
+          </a>
+          <a href="/about" class="orbital-hero__cta orbital-hero__cta--ghost">关于这个站点</a>
+        </div>
+
+        <p class="orbital-hero__facts">
+          <span>SINCE {SITE_CONFIG.since}</span>
+          <span aria-hidden="true" class="orbital-hero__facts-sep">/</span>
+          <span>技术</span>
+          <span aria-hidden="true" class="orbital-hero__facts-sep">·</span>
+          <span>思考</span>
+          <span aria-hidden="true" class="orbital-hero__facts-sep">·</span>
+          <span>生活</span>
+        </p>
+      </div>
+
+      <!-- 公网访客 → ESA 边缘 → 雷池 SafeLine → Caddy → Astro SSR / PocketBase。
+           指标来自 /api/public/status、/api/public/protection、/api/public/ping 三个既有公开接口；
+           Caddy 一跳没有独立逐跳探测时显示「未采集」，不写死毫秒数。 -->
+      <figure class="orbital-hero__telemetry">
+        <RequestPath client:visible />
+        <figcaption class="orbital-hero__caption">
+          真实请求链路 · 公网 / ESA → 雷池 → Caddy 分叉到页面与接口 ·「未采集」= 这一跳没有独立测量，不显示估算值
+        </figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<style>
+  .orbital-hero {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border-bottom: 1px solid var(--sf-line);
+    background-color: var(--sf-canvas);
+  }
+
+  .orbital-hero__inner {
+    position: relative;
+    z-index: 1;
+    max-width: 76rem;
+    padding-top: calc(var(--header-offset, 4rem) + clamp(1.5rem, 4vw, 3.25rem));
+    padding-bottom: clamp(2rem, 6vw, 5rem);
+  }
+
+  .orbital-hero__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--sf-line-soft);
+  }
+
+  .orbital-hero__meta-note {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    line-height: 1.4;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--sf-ink-3);
+    white-space: nowrap;
+  }
+
+  .orbital-hero__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(2rem, 5vw, 3.5rem);
+    padding-top: clamp(1.75rem, 4vw, 3rem);
+  }
+
+  .orbital-hero__copy {
+    min-width: 0;
+  }
+
+  .orbital-hero__title {
+    margin: 0;
+    max-width: 14ch;
+    font-size: clamp(2.75rem, 7vw, 5rem);
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+    font-weight: 700;
+    color: var(--sf-ink);
+    overflow-wrap: anywhere;
+  }
+
+  .orbital-hero__lead {
+    margin: clamp(1.25rem, 3vw, 1.75rem) 0 0;
+    max-width: 32ch;
+    font-size: clamp(1.0625rem, 2.1vw, 1.375rem);
+    line-height: 1.6;
+    color: var(--sf-ink-2);
+  }
+
+  .orbital-hero__lead-tail {
+    color: var(--sf-ink);
+    font-weight: 500;
+  }
+
+  .orbital-hero__desc {
+    margin: 0.875rem 0 0;
+    max-width: 44ch;
+    font-size: 0.9375rem;
+    line-height: 1.75;
+    color: var(--sf-ink-3);
+  }
+
+  .orbital-hero__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: clamp(1.75rem, 4vw, 2.5rem);
+  }
+
+  .orbital-hero__cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 48px;
+    padding-inline: 1.5rem;
+    border: 1px solid var(--sf-accent);
+    border-radius: 4px;
+    background-color: var(--sf-accent);
+    color: var(--sf-on-accent);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  }
+
+  .orbital-hero__cta:hover {
+    border-color: var(--sf-accent-ink);
+    background-color: var(--sf-accent-ink);
+    transform: translateY(-1px);
+  }
+
+  .orbital-hero__cta:focus-visible {
+    outline: 2px solid var(--sf-accent);
+    outline-offset: 2px;
+  }
+
+  .orbital-hero__cta--ghost {
+    border-color: var(--sf-line-control);
+    background-color: transparent;
+    color: var(--sf-ink);
+  }
+
+  .orbital-hero__cta--ghost:hover {
+    border-color: var(--sf-accent);
+    background-color: transparent;
+    color: var(--sf-accent-ink);
+  }
+
+  .orbital-hero__cta-arrow {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1;
+  }
+
+  .orbital-hero__facts {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: clamp(1.75rem, 4vw, 2.5rem) 0 0;
+    padding-top: 1rem;
+    border-top: 1px solid var(--sf-line-soft);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    line-height: 1.5;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--sf-ink-3);
+  }
+
+  .orbital-hero__facts-sep {
+    color: var(--sf-line-strong);
+  }
+
+  .orbital-hero__telemetry {
+    min-width: 0;
+    width: 100%;
+    max-width: 23rem;
+    margin: 0 auto;
+  }
+
+  .orbital-hero__caption {
+    margin-top: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    line-height: 1.7;
+    text-align: center;
+    color: var(--sf-ink-3);
+  }
+
+  @media (min-width: 1024px) {
+    .orbital-hero__grid {
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      align-items: center;
+      column-gap: clamp(2.5rem, 5vw, 5rem);
+    }
+
+    .orbital-hero__telemetry {
+      margin: 0 0 0 auto;
+    }
+  }
+</style>

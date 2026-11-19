@@ -272,3 +272,70 @@ test.describe('@interaction C10 禁用 JavaScript（渐进增强）', () => {
     });
   });
 });
+
+test('@interaction C11 轨道装饰层：aria-hidden / pointer-events:none / 不遮挡主 CTA', async ({ page }, testInfo) => {
+  const errors = collectErrors(page);
+  await mockPocketBase(page);
+  await openRoute(page, themeOf(testInfo.project.name), '/');
+
+  const scene = page.locator('[data-orbital-decoration]');
+  await expect(scene).toHaveCount(1);
+  await expect(scene).toHaveAttribute('aria-hidden', 'true');
+
+  // 纯装饰：不拦截指针，也不含任何可聚焦元素。
+  const pointerEvents = await scene.evaluate((el) => getComputedStyle(el).pointerEvents);
+  expect(pointerEvents, '装饰层必须 pointer-events:none').toBe('none');
+  expect(await scene.locator('a, button, input, select, textarea, [tabindex]').count()).toBe(0);
+
+  // 主 CTA 的中心点必须命中 CTA 本身，而不是上面的装饰层。
+  const cta = page.locator('main a[href="/posts"]').first();
+  await expect(cta).toBeVisible();
+  await cta.scrollIntoViewIfNeeded();
+  const hit = await cta.evaluate((el) => {
+    const rect = el.getBoundingClientRect();
+    const target = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    return target ? (target.closest('a') === el ? 'self' : target.tagName.toLowerCase()) : 'none';
+  });
+  expect(hit, '装饰层不应遮住主 CTA').toBe('self');
+
+  // 真的可以点进去，而不是只靠 elementFromPoint 的静态判断。
+  await cta.click();
+  await page.waitForURL('**/posts', { timeout: 15_000 });
+
+  expectCleanErrors(errors, 'C11 轨道装饰层');
+});
+
+test.describe('@interaction C12 320px 首页', () => {
+  test.use({ viewport: { width: 320, height: 900 } });
+
+  test('文案先于真实链路、装饰层不越界、无横向滚动', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-light', '320px 只采样一次，避免 4 project 重复');
+    const errors = collectErrors(page);
+    await mockPocketBase(page);
+    await openRoute(page, 'light', '/');
+
+    await expectNoHorizontalOverflow(page, '首页 320px');
+
+    const title = page.locator('h1');
+    const telemetry = page.locator('main figure').first();
+    await expect(title).toBeVisible();
+    await expect(telemetry).toBeVisible();
+    const titleBox = await title.boundingBox();
+    const telemetryBox = await telemetry.boundingBox();
+    expect(titleBox, 'h1 应有尺寸').not.toBeNull();
+    expect(telemetryBox, '真实链路 figure 应有尺寸').not.toBeNull();
+    expect(titleBox!.y, '320px 下文案应先于真实链路').toBeLessThan(telemetryBox!.y);
+
+    const sceneBox = await page.locator('[data-orbital-decoration]').boundingBox();
+    expect(sceneBox, '装饰层应有尺寸').not.toBeNull();
+    expect(sceneBox!.x, '装饰层左边界不得越出视口').toBeGreaterThanOrEqual(-1);
+    expect(sceneBox!.x + sceneBox!.width, '装饰层右边界不得越出视口').toBeLessThanOrEqual(321);
+
+    const ctaBox = await page.locator('main a[href="/posts"]').first().boundingBox();
+    expect(ctaBox, '主 CTA 应有尺寸').not.toBeNull();
+    expect(ctaBox!.x, '320px 下 CTA 不应被裁切').toBeGreaterThanOrEqual(-1);
+    expect(ctaBox!.x + ctaBox!.width, '320px 下 CTA 不应溢出').toBeLessThanOrEqual(321);
+
+    expectCleanErrors(errors, 'C12 320px 首页');
+  });
+});

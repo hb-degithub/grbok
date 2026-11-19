@@ -6,18 +6,26 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * 共享布局（首页 + Header/SideNav/Dock + 首页嵌套旧组件）科幻简约修复的静态契约。
+ * 共享布局（首页「轨道日志」+ Header/SideNav/Dock + 首页嵌套组件）的静态契约。
  *
- * 这一层只锁定「设计令牌 + 真实内容与数据源没有在改造中被删掉」这类文本契约；
- * 菜单 Esc/焦点循环、Dock 键盘触发等交互行为由同批次的 jsdom 测试覆盖，
- * 不在这里用正则假装验证交互。
+ * 本轮迁移的目标：
+ * - 保留仍然有效的契约：站点配置来源、真实岛屿、公开数据源、无局部令牌覆盖、键盘/导航；
+ * - 把旧首页的 `sf-btn-primary`、固定两栏、旧 Dock 尺寸、禁止新视觉形状等断言，
+ *   换成首页分区、CTA、岛屿与真实数据源的断言；
+ * - 装饰层 / CTA 遮挡 / 横向溢出 / 可访问性等**行为**由
+ *   `e2e/sci-fi-site/interactions.spec.ts` 在真实浏览器里验证，不在这里用正则假装。
  */
 
 const SRC_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (relPath: string) => readFileSync(resolve(SRC_ROOT, relPath), 'utf8');
+/** 去掉注释再做「不得引入某能力」的断言，避免注释里的说明文字误伤。 */
+const stripComments = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
 
 const files = {
   index: read('pages/index.astro'),
+  hero: read('components/home/HomeHero.astro'),
+  scene: read('components/home/OrbitalScene.astro'),
+  requestPath: read('components/layout/RequestPath.tsx'),
   globalCss: read('styles/global.css'),
   header: read('components/layout/Header.tsx'),
   sideNav: read('components/layout/SideNav.tsx'),
@@ -44,60 +52,175 @@ const BANNED_VISUALS: Array<[label: string, pattern: RegExp]> = [
   ['深浅主题调色板覆写 dark:(bg|text|border)-', /dark:(?:bg|text|border)-/],
 ];
 
-describe('共享布局科幻改造 · 首页', () => {
+describe('轨道日志首页 · 站点配置与文案来源', () => {
   it('首页文案/开始年份来自 SITE_CONFIG，不写死也不取当前年', () => {
-    const src = files.index;
-    expect(src).toContain("import { SITE_CONFIG } from '../config/site'");
+    const hero = files.hero;
+    expect(hero).toContain("import { SITE_CONFIG } from '../../config/site'");
     for (const field of ['SITE_CONFIG.name', 'SITE_CONFIG.slogan', 'SITE_CONFIG.description', 'SITE_CONFIG.since']) {
-      expect(src, `首页硬编码，未使用 ${field}`).toContain(field);
+      expect(hero, `Hero 硬编码，未使用 ${field}`).toContain(field);
     }
-    expect(src, 'SINCE 不得使用当前年份动态计算').not.toMatch(/new Date\(\)\.getFullYear\(\)/);
-    expect(src, '站点名应来自 SITE_CONFIG，不再写死').not.toContain('胡巴的博客');
+    expect(hero, 'SINCE 不得使用当前年份动态计算').not.toMatch(/new Date\(\)\.getFullYear\(\)/);
+    expect(hero, '站点名应来自 SITE_CONFIG，不再写死').not.toContain('胡巴的博客');
+
+    // index 仍把站点描述交给 BaseLayout，但正文文案已全部下沉到 HomeHero。
+    expect(files.index).toContain('description={SITE_CONFIG.description}');
+    expect(files.index).not.toContain('胡巴的博客');
   });
 
-  it('设计令牌只在 global.css 定义，首页不再局部覆盖 :root/.dark', () => {
-    const src = files.index;
-    expect(src, '首页不应再出现局部 :root 令牌块').not.toMatch(/^\s*:root\s*\{/m);
-    expect(src, '首页不应重复声明 --sf-* 令牌').not.toMatch(/^\s*--sf-[a-z0-9-]+\s*:/m);
-    expect(src, '首页不应再写局部 .dark 令牌块').not.toMatch(/^\s*\.dark\s*\{/m);
+  it('首页只保留一个 h1，且 Hero 由 HomeHero 负责', () => {
+    expect(files.hero.match(/<h1\b/g)).toHaveLength(1);
+    expect(files.hero).toContain('id="home-hero-title"');
+    expect(files.index).toContain("import HomeHero from '../components/home/HomeHero.astro'");
+    expect(files.index).toContain('<HomeHero />');
+    expect(files.index, 'index 不应再手写第二个 h1').not.toMatch(/<h1\b/);
   });
 
-  it('暗色细网格走全局作用域，不会被 Astro scoped 样式裁掉', () => {
-    expect(files.index, '暗色网格必须使用 :global(.dark) 前缀').toContain(':global(.dark) .sf-grid-bg');
-    expect(files.index, '局部 .dark .sf-grid-bg 会被加上 scope 属性而永不命中').not.toMatch(
-      /^\s*\.dark \.sf-grid-bg/m,
-    );
+  it('Hero 保留 slogan 尾句与真实描述，不丢旧文案', () => {
+    expect(files.hero).toContain('把折腾过的东西写清楚。');
+    expect(files.hero).toContain('{SITE_CONFIG.description}');
   });
+});
 
+describe('轨道日志首页 · 令牌单一来源', () => {
+  it('设计令牌只在 global.css 定义，首页/Hero/装饰层不局部覆盖', () => {
+    for (const [name, src] of [
+      ['index.astro', files.index],
+      ['HomeHero.astro', files.hero],
+      ['OrbitalScene.astro', files.scene],
+    ] as const) {
+      expect(src, `${name} 不应出现局部 :root 令牌块`).not.toMatch(/^\s*:root\s*\{/m);
+      expect(src, `${name} 不应重复声明 --sf-* 令牌`).not.toMatch(/^\s*--sf-[a-z0-9-]+\s*:/m);
+      expect(src, `${name} 不应再写局部 .dark 令牌块`).not.toMatch(/^\s*\.dark\s*\{/m);
+    }
+  });
+});
+
+describe('轨道日志首页 · CTA 与分区构图', () => {
   it('主 CTA「浏览全部文章」指向 /posts，并使用 on-accent 文字色', () => {
-    const src = files.index;
+    const src = files.hero;
     expect(src).toContain('浏览全部文章');
-    expect(src).toMatch(/<a\s+href="\/posts"[^>]*class="sf-btn-primary/);
+    expect(src).toMatch(/<a\s+href="\/posts"[^>]*class="orbital-hero__cta"/);
     expect(src, '强调色背景上禁用 text-white').not.toContain('text-white');
-    expect(src).toContain('text-[var(--sf-on-accent)]');
+    expect(src).toContain('var(--sf-on-accent)');
   });
 
-  it('保留真实交互岛与数据源（没有为了排版静默删内容）', () => {
+  it('保留 /about CTA 与「关于这个站点」入口', () => {
+    expect(files.hero).toMatch(/<a\s+href="\/about"[^>]*class="orbital-hero__cta orbital-hero__cta--ghost"/);
+    expect(files.hero).toContain('关于这个站点');
+  });
+
+  it('首页用共享容器 + SectionHeading 建立分区，而不是旧的固定两栏', () => {
+    expect(files.index).toContain("import SectionHeading from '../components/layout/SectionHeading.astro'");
+    expect(files.index.match(/<SectionHeading\b/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
+    expect(files.index).toContain('orbital-shell');
+    expect(files.index).toContain('orbital-panel');
+
+    for (const [sectionId, titleId] of [
+      ['latest', 'latest-title'],
+      ['community', 'community-title'],
+      ['connect', 'connect-title'],
+      ['status', 'status-title'],
+    ] as const) {
+      expect(files.index, `缺少分区 #${sectionId}`).toContain(`id="${sectionId}"`);
+      expect(files.index, `分区 #${sectionId} 缺少 aria-labelledby`).toContain(
+        `aria-labelledby="${titleId}"`,
+      );
+      expect(files.index, `SectionHeading 缺少唯一 id=${titleId}`).toContain(`id="${titleId}"`);
+    }
+
+    expect(files.index, '不应回到旧的等宽两栏').not.toContain('lg:grid-cols-2');
+    expect(files.index, '应使用非对称分栏').toMatch(/lg:grid-cols-\[[^\]]+fr[^\]]*\]/);
+  });
+
+  it('装饰层不进入可访问树、不拦截指针、减少动效时静止', () => {
+    const scene = files.scene;
+    const sceneCode = stripComments(scene);
+    expect(scene).toContain('data-orbital-decoration="true"');
+    expect(scene).toContain('aria-hidden="true"');
+    expect(scene).toContain('pointer-events: none');
+    expect(scene).toContain('prefers-reduced-motion: no-preference');
+    // 装饰层不得引入业务数据源或外部资源。
+    expect(sceneCode).not.toContain('fetch(');
+    expect(sceneCode).not.toContain('SITE_CONFIG');
+    expect(sceneCode).not.toContain("from 'react");
+    expect(scene).not.toMatch(/<img\b/);
+    expect(scene).not.toMatch(/https?:\/\//);
+    expect(scene, '装饰层不应输出毫秒等伪数据').not.toMatch(/\bms\b/);
+    expect(scene, '装饰层不应包含可读文本节点').not.toContain('<text');
+  });
+
+  it('Hero 在移动端先文案、后真实链路（DOM 顺序）', () => {
+    const src = files.hero;
+    const title = src.indexOf('home-hero-title');
+    const telemetry = src.indexOf('orbital-hero__telemetry');
+    const requestPath = src.indexOf('<RequestPath');
+    expect(title).toBeGreaterThan(-1);
+    expect(telemetry).toBeGreaterThan(title);
+    expect(requestPath).toBeGreaterThan(telemetry);
+  });
+});
+
+describe('轨道日志首页 · 真实岛屿与数据源', () => {
+  it('保留全部业务岛屿与 client:visible 水合', () => {
     const src = files.index;
-    for (const island of ['PostList', 'HomeSideNav', 'StatusMini', 'HomeAuthQuickEntry', 'HotArticles', 'RecentComments']) {
+    for (const island of [
+      'PostList',
+      'HomeSideNav',
+      'StatusMini',
+      'HomeAuthQuickEntry',
+      'HotArticles',
+      'RecentComments',
+      'ProfileCard',
+      'FriendLinks',
+      'CountUp',
+    ]) {
       expect(src, `首页丢失交互岛 ${island}`).toMatch(new RegExp(`<${island}\\b[^>]*client:visible`));
     }
+    expect(src).toContain("import PostList from '../components/posts/PostList'");
     expect(src).toContain("import HotArticles from '../components/sidebar/HotArticles'");
     expect(src).toContain("import RecentComments from '../components/sidebar/RecentComments'");
-    expect(src, '统计仍来自 PocketBase 计数').toContain('fetchCount');
-    expect(src, '统计动效组件保留').toContain('CountUp');
+    expect(src).toContain("import ProfileCard from '../components/sidebar/ProfileCard'");
+    expect(src).toContain("import FriendLinks from '../components/sidebar/FriendLinks'");
   });
 
-  it('热榜/最近评论补回为两栏网格，不恢复旧侧栏与轮播', () => {
+  it('统计仍由 index.astro SSR 取数，CountUp 仍在首页状态区块', () => {
     const src = files.index;
-    expect(src, '补回区应使用两栏网格').toMatch(/lg:grid-cols-2/);
-    const gridIndex = src.indexOf('lg:grid-cols-2');
-    expect(src.indexOf('<HotArticles'), 'HotArticles 应位于两栏网格内').toBeGreaterThan(gridIndex);
-    expect(src.indexOf('<RecentComments'), 'RecentComments 应位于两栏网格内').toBeGreaterThan(gridIndex);
-    // ProfileCard 已按新设计恢复为首页「作者与友链」区块的一部分，不再是"旧侧栏装饰"，
-    // 因此不再列入禁止项；其余装饰（旧轮播/光效/粒子）仍禁止回潮。
+    expect(src, '统计仍来自 PocketBase 计数').toContain('fetchCount');
+    expect(src).toContain("fetchCount('posts', 'status = \"published\"')");
+    expect(src).toContain("fetchCount('tags')");
+    expect(src).toContain('to={postsCount}');
+    expect(src).toContain('to={tagsCount}');
+    expect(src).toContain('已发布文章');
+    expect(src).toContain('内容标签');
+    expect(files.hero, 'Hero 不包含计数 props').not.toMatch(/postsCount|tagsCount/);
+  });
+
+  it('RequestPath 以真实链路岛挂载，并保留 figcaption 与未采集说明', () => {
+    expect(files.hero).toContain("import RequestPath from '../layout/RequestPath'");
+    expect(files.hero).toMatch(/<RequestPath\s+client:visible\s*\/>/);
+    expect(files.hero).toContain('真实请求链路');
+    expect(files.hero).toContain('未采集');
+    expect(files.hero).toContain('不显示估算值');
+  });
+
+  it('RequestPath 消费共享公开状态，不再自行 fetch / 轮询', () => {
+    const src = files.requestPath;
+    const srcCode = stripComments(src);
+    expect(src).toContain("import { usePublicStatus } from '../../hooks/usePublicStatus'");
+    expect(src).toContain('usePublicStatus()');
+    expect(srcCode, '组件不应自行请求接口').not.toContain('fetch(');
+    expect(srcCode, '组件不应自行建轮询').not.toContain('setInterval');
+    expect(src).toContain('aria-label="真实请求链路"');
+    expect(src).toContain('未采集');
+    expect(src).toContain('无逐跳探测');
+    // 不能写死毫秒数（真实数值只能来自接口/浏览器实测）。
+    expect(src).not.toMatch(/\d+\s*ms/);
+  });
+
+  it('不恢复旧装饰组件', () => {
     for (const legacy of ['AnimatedList', 'Carousel', 'MagicBento', 'ParticleField', 'GlowCard']) {
-      expect(src, `首页不应恢复旧装饰 ${legacy}`).not.toContain(legacy);
+      expect(files.index, `首页不应恢复旧装饰 ${legacy}`).not.toContain(legacy);
+      expect(files.hero, `Hero 不应恢复旧装饰 ${legacy}`).not.toContain(legacy);
     }
   });
 });
@@ -124,9 +247,10 @@ describe('共享布局科幻改造 · global.css 单一来源', () => {
     );
   });
 
-  it('提供共享区块包装类，供首页子组件保持主题一致', () => {
+  it('内页共享区块包装类仍在，首页复用新的 orbital-panel', () => {
     expect(files.globalCss).toContain('.sf-block');
-    expect(files.index, '首页新 section 应复用共享包装类').toContain('sf-block');
+    expect(files.globalCss).toContain('.orbital-panel');
+    expect(files.index, '首页面板应复用共享包装类').toContain('orbital-panel');
   });
 });
 
@@ -139,13 +263,13 @@ describe('共享布局科幻改造 · Header / SideNav', () => {
     expect(src, '主题/更多下拉的描述文字仍用旧 zinc').not.toMatch(/text-zinc-/);
   });
 
-  it('Header 保留 Dock 放大参数、移动菜单与真实路由', () => {
+  it('Header 保留 Dock 参数接线、移动菜单与真实路由（不锁死像素尺寸）', () => {
     const src = files.header;
     for (const token of [
-      'magnification={62}',
-      'baseItemSize={46}',
-      'distance={180}',
-      'panelHeight={64}',
+      'magnification={',
+      'baseItemSize={',
+      'distance={',
+      'panelHeight={',
       '打开导航菜单',
       'aria-expanded={sideNavOpen}',
       "href: '/posts'",
@@ -177,7 +301,7 @@ describe('共享布局科幻改造 · Header / SideNav', () => {
     expect(src).toMatch(/export default function SideNav/);
   });
 
-  it('Header/SideNav/首页嵌套组件不再引入玻璃、重阴影与大圆角', () => {
+  it('Header/SideNav/首页嵌套组件与 Hero/装饰层不再引入玻璃、重阴影与大圆角', () => {
     for (const [name, src] of [
       ['Header.tsx', files.header],
       ['SideNav.tsx', files.sideNav],
@@ -187,6 +311,9 @@ describe('共享布局科幻改造 · Header / SideNav', () => {
       ['HotArticles.tsx', files.hotArticles],
       ['RecentComments.tsx', files.recentComments],
       ['index.astro', files.index],
+      ['HomeHero.astro', files.hero],
+      ['OrbitalScene.astro', files.scene],
+      ['RequestPath.tsx', files.requestPath],
     ] as const) {
       for (const [label, pattern] of BANNED_VISUALS) {
         expect(src, `${name} 仍包含${label}`).not.toMatch(pattern);

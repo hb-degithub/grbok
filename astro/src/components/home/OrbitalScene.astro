@@ -1,0 +1,120 @@
+---
+/**
+ * 首页 Hero 的纯展示轨道场景。
+ *
+ * 硬约束（与 Task 4 brief 对齐）：
+ * - 只有 CSS / 内联 SVG 的轨道、光带与刻度纹理，没有任何业务数字或图表标题；
+ * - 不开 WebGL、不加载外部资源、不发请求、不读取 SITE_CONFIG；
+ * - 整层 aria-hidden + pointer-events:none，是纯装饰，不参与命中测试与可访问树；
+ * - prefers-reduced-motion: reduce 时完全静止（动画只写在 no-preference 分支里）。
+ */
+---
+
+<div class="orbital-scene" data-orbital-decoration="true" aria-hidden="true">
+  <div class="orbital-scene__grid"></div>
+  <div class="orbital-scene__beam"></div>
+
+  <svg
+    class="orbital-scene__orbits"
+    viewBox="0 0 1200 680"
+    preserveAspectRatio="none"
+    fill="none"
+    focusable="false"
+    aria-hidden="true"
+  >
+    <g class="orbital-scene__spin">
+      <ellipse cx="760" cy="330" rx="400" ry="168" stroke="var(--sf-orbit)" stroke-width="1" />
+      <ellipse cx="760" cy="330" rx="330" ry="126" stroke="var(--sf-line-strong)" stroke-width="1" opacity="0.45" />
+      <ellipse cx="760" cy="330" rx="226" ry="84" stroke="var(--sf-orbit)" stroke-width="1" opacity="0.7" />
+      <circle cx="1140" cy="330" r="3" fill="var(--sf-accent)" opacity="0.65" />
+      <circle cx="390" cy="330" r="2" fill="var(--sf-accent)" opacity="0.5" />
+    </g>
+
+    <path d="M0 520H1200" stroke="var(--sf-line)" stroke-width="1" opacity="0.55" />
+    <path d="M0 520H1200" stroke="var(--sf-line-strong)" stroke-width="1" stroke-dasharray="1 11" opacity="0.5" />
+
+    <g stroke="var(--sf-line-strong)" stroke-width="1" opacity="0.5">
+      <path d="M40 520v-5M120 520v-5M200 520v-8M280 520v-5M360 520v-5M440 520v-8M520 520v-5M600 520v-5M680 520v-8M760 520v-5M840 520v-5M920 520v-8M1000 520v-5M1080 520v-5M1160 520v-8" />
+      <path d="M0 184H1200" stroke-dasharray="1 9" opacity="0.6" />
+    </g>
+
+    <g stroke="var(--sf-line)" stroke-width="1" opacity="0.45">
+      <path d="M64 84v40M1144 84v40" />
+      <path d="M64 84h20M1124 84h20M64 124h20M1124 124h20" />
+    </g>
+  </svg>
+</div>
+
+<style>
+  .orbital-scene {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .orbital-scene__grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(to right, color-mix(in srgb, var(--sf-ink) 6%, transparent) 0 1px, transparent 1px 48px),
+      repeating-linear-gradient(to bottom, color-mix(in srgb, var(--sf-ink) 6%, transparent) 0 1px, transparent 1px 48px);
+    mask-image: linear-gradient(to bottom, black 0%, black 45%, transparent 92%);
+  }
+
+  .orbital-scene__beam {
+    position: absolute;
+    inset: 0;
+    opacity: 0.5;
+    background: radial-gradient(ellipse 58% 76% at 78% 36%, var(--sf-glow), transparent 68%);
+  }
+
+  .orbital-scene__orbits {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .orbital-scene__spin {
+    transform-box: view-box;
+    transform-origin: 760px 330px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .orbital-scene__spin {
+      animation: orbital-drift 120s linear infinite;
+    }
+
+    .orbital-scene__beam {
+      animation: orbital-glow 18s ease-in-out infinite;
+    }
+  }
+
+  @keyframes orbital-drift {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes orbital-glow {
+    0%,
+    100% {
+      opacity: 0.38;
+    }
+    50% {
+      opacity: 0.62;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .orbital-scene__orbits {
+      opacity: 0.7;
+    }
+  }
+</style>

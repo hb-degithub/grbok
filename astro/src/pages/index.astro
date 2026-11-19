@@ -1,10 +1,11 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import HomeHero from '../components/home/HomeHero.astro';
+import SectionHeading from '../components/layout/SectionHeading.astro';
 import PostList from '../components/posts/PostList';
 import HomeAuthQuickEntry from '../components/auth/HomeAuthQuickEntry';
 import HomeSideNav from '../components/sidebar/HomeSideNav';
 import StatusMini from '../components/sidebar/StatusMini';
-import RequestPath from '../components/layout/RequestPath';
 import HotArticles from '../components/sidebar/HotArticles';
 import RecentComments from '../components/sidebar/RecentComments';
 import FriendLinks from '../components/sidebar/FriendLinks';
@@ -37,202 +38,181 @@ const [postsCount, tagsCount] = await Promise.all([
 ---
 
 <BaseLayout title="首页" description={SITE_CONFIG.description} mainClass="pt-0 sm:pt-0 sm:pb-0">
-  <!-- 科幻简约 Hero：左文 + 右侧站点结构拓扑 -->
-  <section class="sf-hero relative w-full overflow-hidden border-b border-[var(--sf-line)]">
-    <div class="sf-grid-bg" aria-hidden="true"></div>
-    <div class="mx-auto grid max-w-[1180px] gap-12 px-[var(--sf-pad)] pb-20 pt-[calc(var(--header-offset,4rem)+3rem)] lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-16 lg:pb-28 lg:pt-[calc(var(--header-offset,4rem)+4rem)]">
-      <!-- 左侧文案 -->
-      <div class="min-w-0">
-        <div class="sf-scale mb-6 flex items-end gap-3" aria-hidden="true">
-          <span class="sf-scale__ticks"></span>
-          <span class="sf-scale__label">LAB / 01</span>
-        </div>
-        <p class="sf-eyebrow mb-4 flex items-center gap-2 font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-[var(--sf-ink-3)]">
-          <span class="sf-dot"></span>
-          PERSONAL TECH LOG / 个人技术博客
-        </p>
-        <h1 class="sf-title break-words text-[clamp(2.5rem,8vw,4.5rem)] font-bold leading-[1.04] tracking-[-0.02em] text-[var(--sf-ink)] [overflow-wrap:anywhere]">
-          {SITE_CONFIG.name}
-        </h1>
-        <p class="sf-lead mt-6 max-w-[32ch] text-[clamp(1.0625rem,2.2vw,1.375rem)] leading-[1.6] text-[var(--sf-ink-2)]">
-          {SITE_CONFIG.slogan}<span class="font-medium text-[var(--sf-ink)]">。把折腾过的东西写清楚。</span>
-        </p>
-        <p class="sf-note mt-4 max-w-[44ch] text-[0.9375rem] leading-[1.75] text-[var(--sf-ink-3)]">
-          {SITE_CONFIG.description}
-        </p>
-        <div class="mt-10 flex flex-wrap gap-3">
-          <a href="/posts" class="sf-btn-primary inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[4px] bg-[var(--sf-accent)] px-6 text-[0.9375rem] font-medium text-[var(--sf-on-accent)] no-underline transition-[transform,background-color] hover:-translate-y-px hover:bg-[var(--sf-accent-ink)]">
-            浏览全部文章 <span class="font-mono text-sm" aria-hidden="true">→</span>
-          </a>
-          <a href="/about" class="sf-btn-ghost inline-flex min-h-[48px] items-center justify-center rounded-[4px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-6 text-[0.9375rem] font-medium text-[var(--sf-ink)] no-underline transition-[transform,border-color,color] hover:-translate-y-px hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]">
-            关于这个站点
-          </a>
-        </div>
-        <p class="mt-10 flex flex-wrap items-center gap-2 border-t border-[var(--sf-line-soft)] pt-4 font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">
-          <span>SINCE {SITE_CONFIG.since}</span>
-          <span class="text-[var(--sf-line-strong)]" aria-hidden="true">/</span>
-          <span>技术 · 思考 · 生活</span>
-        </p>
-      </div>
+  <HomeHero />
 
-      <!-- 右侧真实请求链路：公网访客 → ESA 边缘 → 雷池 SafeLine → Caddy → Astro SSR / PocketBase。
-           面板（含骨架、overall 状态、分叉）由 RequestPath 客户端岛渲染，指标全部来自
-           /api/public/status、/api/public/protection、/api/public/ping 三个既有公开接口；
-           Caddy 一跳没有独立逐跳探测，面板固定显示「未采集」，不写死毫秒数。 -->
-      <figure class="sf-figure relative mx-auto w-full max-w-[23rem]">
-        <RequestPath client:visible />
-        <figcaption class="mt-3 text-center font-mono text-[0.625rem] leading-relaxed text-[var(--sf-ink-3)]">
-          真实请求链路 · 公网 / ESA → 雷池 → Caddy 分叉到页面与接口 ·「未采集」= 这一跳没有独立测量，不显示估算值
-        </figcaption>
-      </figure>
-    </div>
-  </section>
-
-  <!-- 最新文章 -->
-  <section id="latest" class="w-full border-b border-[var(--sf-line)]">
-    <div class="mx-auto max-w-[1180px] px-[var(--sf-pad)] py-16 lg:py-24">
-      <div class="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p class="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-[var(--sf-ink-3)]">02 / 最新文章</p>
-          <h2 class="mt-2 text-3xl font-bold tracking-tight text-[var(--sf-ink)]">最新文章</h2>
-          <p class="mt-2 text-sm text-[var(--sf-ink-2)]">最近发布的技术文章和思考。</p>
-        </div>
-        <a href="/posts" class="sf-link inline-flex min-h-[44px] w-fit items-center gap-1.5 font-mono text-sm text-[var(--sf-accent)] no-underline transition-colors hover:text-[var(--sf-accent-ink)]">
+  <!-- 最新文章：左侧分区索引 + 右侧内容，先建立「轨道日志」的分栏层次 -->
+  <section id="latest" class="home-section" aria-labelledby="latest-title">
+    <div class="orbital-shell">
+      <SectionHeading
+        id="latest-title"
+        eyebrow="02 / 最新文章"
+        title="最新文章"
+        description="最近发布的技术文章和思考。"
+      >
+        <a slot="action" href="/posts" class="orbital-action">
           查看全部 <span aria-hidden="true">→</span>
         </a>
-      </div>
-      <PostList client:visible perPage={6} />
-    </div>
-  </section>
+      </SectionHeading>
 
-  <!-- 热榜与最近评论：保留真实数据源，编号行列表替代旧侧栏浮动组件 -->
-  <section id="community" class="w-full border-b border-[var(--sf-line)]">
-    <div class="mx-auto grid max-w-[1180px] gap-6 px-[var(--sf-pad)] py-16 lg:grid-cols-2 lg:gap-8 lg:py-24">
-      <div class="sf-block">
-        <HotArticles client:visible />
-      </div>
-      <div class="sf-block">
-        <RecentComments client:visible />
-      </div>
-    </div>
-  </section>
-
-  <!-- 作者与友链：恢复改版中丢失的两个内容块，沿用与「热榜文章 / 最近评论」相同的两栏细线面板 -->
-  <section id="connect" class="w-full border-b border-[var(--sf-line)]">
-    <div class="mx-auto max-w-[1180px] px-[var(--sf-pad)] py-16 lg:py-24">
-      <div class="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p class="font-mono text-[0.6875rem] uppercase tracking-[0.16em] text-[var(--sf-ink-3)]">03 / 作者与友链</p>
-          <h2 class="mt-2 text-3xl font-bold tracking-tight text-[var(--sf-ink)]">作者与友链</h2>
-          <p class="mt-2 text-sm text-[var(--sf-ink-2)]">关于博主，以及长期互访的站点。</p>
+      <div class="mt-8 grid gap-8 lg:mt-10 lg:grid-cols-[15rem_minmax(0,1fr)] lg:items-start lg:gap-12">
+        <aside class="orbital-panel min-w-0" aria-label="首页分区导航">
+          <p class="home-index-note">SECTION INDEX</p>
+          <HomeSideNav client:visible />
+        </aside>
+        <div class="min-w-0">
+          <PostList client:visible perPage={6} />
         </div>
-        <a href="/links" class="sf-link inline-flex min-h-[44px] w-fit items-center gap-1.5 font-mono text-sm text-[var(--sf-accent)] no-underline transition-colors hover:text-[var(--sf-accent-ink)]">
+      </div>
+    </div>
+  </section>
+
+  <!-- 热榜与最近评论：两栏错位，保留真实数据源与编号行列表 -->
+  <section id="community" class="home-section" aria-labelledby="community-title">
+    <div class="orbital-shell">
+      <SectionHeading
+        id="community-title"
+        eyebrow="03 / 社区切片"
+        title="热榜与最近评论"
+        description="被读得最多的文章，以及刚刚发生的讨论。"
+      />
+
+      <div class="mt-8 grid gap-6 lg:mt-10 lg:grid-cols-[1.05fr_0.95fr] lg:items-start lg:gap-10">
+        <div class="orbital-panel min-w-0">
+          <HotArticles client:visible />
+        </div>
+        <div class="orbital-panel min-w-0 lg:mt-10">
+          <RecentComments client:visible />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 作者与友链：非对称两栏，避免回到旧的等宽侧栏拼接 -->
+  <section id="connect" class="home-section" aria-labelledby="connect-title">
+    <div class="orbital-shell">
+      <SectionHeading
+        id="connect-title"
+        eyebrow="04 / 作者与友链"
+        title="作者与友链"
+        description="关于博主，以及长期互访的站点。"
+      >
+        <a slot="action" href="/links" class="orbital-action">
           全部友链 <span aria-hidden="true">→</span>
         </a>
-      </div>
-      <div class="grid gap-6 lg:grid-cols-2 lg:gap-8">
-        <div class="sf-block">
+      </SectionHeading>
+
+      <div class="home-connect-grid mt-8 grid gap-6 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:items-start lg:mt-10">
+        <div class="orbital-panel min-w-0">
           <ProfileCard client:visible />
         </div>
-        <div class="sf-block">
+        <div class="orbital-panel min-w-0 md:mt-12">
           <FriendLinks client:visible />
         </div>
       </div>
     </div>
   </section>
 
-  <!-- 侧栏信息合并 -->
-  <section class="w-full border-b border-[var(--sf-line)]">
-    <div class="mx-auto grid max-w-[1180px] gap-8 px-[var(--sf-pad)] py-16 lg:grid-cols-3 lg:py-24">
-      <div class="sf-panel">
-        <h3 class="sf-panel-title">站内导航</h3>
-        <HomeSideNav client:visible />
-      </div>
-      <div class="sf-panel">
-        <h3 class="sf-panel-title">站点状态</h3>
-        <StatusMini client:visible />
-        <div class="mt-4 grid grid-cols-2 gap-4 border-t border-[var(--sf-line-soft)] pt-4">
-          <div><div class="text-2xl font-bold text-[var(--sf-ink)]"><CountUp client:visible to={postsCount} duration={1.5} /></div><div class="text-xs text-[var(--sf-ink-3)]">已发布文章</div></div>
-          <div><div class="text-2xl font-bold text-[var(--sf-ink)]"><CountUp client:visible to={tagsCount} duration={1.5} /></div><div class="text-xs text-[var(--sf-ink-3)]">内容标签</div></div>
+  <!-- 运行与入口：状态、计数、账户入口分三栏，计数仍由本页 SSR 取数 -->
+  <section id="status" class="home-section" aria-labelledby="status-title">
+    <div class="orbital-shell">
+      <SectionHeading
+        id="status-title"
+        eyebrow="05 / 运行与入口"
+        title="站点状态与快速入口"
+        description="公开状态、内容计数与账户入口，全部来自真实接口。"
+      />
+
+      <div class="mt-8 grid gap-6 lg:mt-10 lg:grid-cols-[1.15fr_0.85fr_1fr] lg:items-start">
+        <div class="orbital-panel min-w-0">
+          <h3 class="home-panel-title">站点状态</h3>
+          <StatusMini client:visible />
         </div>
-      </div>
-      <div class="sf-panel">
-        <h3 class="sf-panel-title">快速入口</h3>
-        <HomeAuthQuickEntry client:visible />
-        <a href="/about" class="sf-link mt-4 inline-flex min-h-[44px] items-center gap-1.5 font-mono text-sm text-[var(--sf-accent)] no-underline transition-colors hover:text-[var(--sf-accent-ink)]">
-          关于博主 <span aria-hidden="true">→</span>
-        </a>
+
+        <div class="orbital-panel min-w-0 lg:mt-10">
+          <h3 class="home-panel-title">内容计数</h3>
+          <div class="grid grid-cols-2 gap-6">
+            <div>
+              <div class="home-count"><CountUp client:visible to={postsCount} duration={1.5} /></div>
+              <div class="home-count-label">已发布文章</div>
+            </div>
+            <div>
+              <div class="home-count"><CountUp client:visible to={tagsCount} duration={1.5} /></div>
+              <div class="home-count-label">内容标签</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="orbital-panel min-w-0">
+          <h3 class="home-panel-title">快速入口</h3>
+          <HomeAuthQuickEntry client:visible />
+          <a
+            href="/about"
+            class="orbital-action mt-4 inline-flex"
+          >
+            关于博主 <span aria-hidden="true">→</span>
+          </a>
+        </div>
       </div>
     </div>
   </section>
 </BaseLayout>
 
 <style>
-  /* 科幻简约首页局部样式；设计令牌统一由 global.css 提供。 */
-  .sf-hero {
-    background: var(--sf-canvas);
+  /* 首页分区只负责节奏与分隔线；颜色/间距令牌统一来自 global.css。 */
+  .home-section {
+    border-bottom: 1px solid var(--sf-line);
+    scroll-margin-top: calc(var(--header-offset, 4rem) + 1rem);
   }
 
-  .sf-grid-bg {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background-image:
-      repeating-linear-gradient(to right, rgba(22, 25, 29, 0.045) 0 1px, transparent 1px 32px),
-      repeating-linear-gradient(to bottom, rgba(22, 25, 29, 0.045) 0 1px, transparent 1px 32px);
-    mask-image: linear-gradient(to bottom, black 0%, transparent 80%);
+  /* 友链为空时 FriendLinks 返回 null，只留下一个空的 astro-island。
+     这里隐藏空面板并让作者卡占满整行，避免首页出现一条空白白条。 */
+  .home-connect-grid > .orbital-panel:has(> astro-island:empty) {
+    display: none;
   }
 
-  :global(.dark) .sf-grid-bg {
-    background-image:
-      repeating-linear-gradient(to right, rgba(232, 236, 240, 0.04) 0 1px, transparent 1px 32px),
-      repeating-linear-gradient(to bottom, rgba(232, 236, 240, 0.04) 0 1px, transparent 1px 32px);
+  .home-connect-grid:has(> .orbital-panel > astro-island:empty) {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .sf-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--sf-accent);
+  /* 单列时不要把作者卡拉成整行宽：限制阅读宽度，右侧留白。 */
+  .home-connect-grid:has(> .orbital-panel > astro-island:empty) > .orbital-panel:first-child {
+    max-width: 36rem;
   }
 
-  .sf-scale__ticks {
-    flex: 1;
-    height: 7px;
-    border-bottom: 1px solid var(--sf-line-strong);
-    background-image: repeating-linear-gradient(to right, var(--sf-line-strong) 0 1px, transparent 1px 12px);
-    background-size: 100% 8px;
-    background-repeat: no-repeat;
-    background-position: bottom left;
-  }
-
-  .sf-scale__label {
-    font-family: 'Geist Mono', monospace;
+  .home-index-note {
+    margin: 0 0 0.875rem;
+    font-family: var(--font-mono);
     font-size: 0.625rem;
-    letter-spacing: 0.2em;
+    line-height: 1.4;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
     color: var(--sf-ink-3);
   }
 
-  /* 说明：Hero 右侧的「真实请求链路」面板由 React 岛 RequestPath 渲染。
-     Astro 的 scoped 样式只作用于本文件的元素，不会命中子组件渲染的 DOM，
-     因此该面板的细线/骨架/分叉全部用 Tailwind 令牌类写在组件内部，
-     这里只保留页面自身的骨架与下方区块样式。 */
-
-  /* 面板 */
-  .sf-panel {
-    border-left: 2px solid var(--sf-accent);
-    padding-left: 1.25rem;
-  }
-
-  .sf-panel-title {
+  .home-panel-title {
+    margin: 0 0 1rem;
     font-size: 0.875rem;
     font-weight: 600;
+    line-height: 1.4;
     letter-spacing: 0.05em;
     color: var(--sf-ink);
-    margin-bottom: 1rem;
   }
 
-  .sf-link {
-    text-decoration: none;
+  .home-count {
+    font-size: clamp(2rem, 4.5vw, 2.75rem);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--sf-ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .home-count-label {
+    margin-top: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    letter-spacing: 0.08em;
+    color: var(--sf-ink-3);
   }
 </style>

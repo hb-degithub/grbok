@@ -1,43 +1,30 @@
-import { useCallback, useEffect, useState } from 'react';
+import { usePublicStatus } from '../../hooks/usePublicStatus';
 import { cn } from '../../lib/utils';
+import { orbitalClasses } from '../../styles/orbital';
 
 /**
  * 首页 Hero 右侧：本站**真实请求链路**（Browser → ESA → 雷池 SafeLine → Caddy → Astro SSR / PocketBase）。
  *
- * 链路结构来自 CLAUDE.md 的线上拓扑；指标全部复用 StatusMini 已在用的三个公开接口，
- * 不新增任何接口、不改后端：
+ * 数据全部来自共享公开状态 store（`usePublicStatus`，由 StatusMini / RequestPath 共用），
+ * 组件自身不再 fetch、不再持有 setInterval：
  *   GET /api/public/status      → overall、services[].ok / avgLatency24h / uptime24h
  *   GET /api/public/protection  → safeline.state、safeline.blocked（24h 拦截数）
- *   GET /api/public/ping        → 客户端实测往返，取 3 次均值（与 StatusMini 完全一致）
+ *   GET /api/public/ping        → 客户端实测往返，取 3 次均值
  *
- * 硬约束：Caddy 这一跳**没有独立的逐跳探测**，因此固定显示「未采集」，
+ * 硬约束：Caddy 这一跳**没有独立的逐跳探测**时固定显示「未采集」，
  * 生产代码里不写死任何毫秒字面量——所有数字只能来自上面三个接口或浏览器实测。
  *
  * 布局：自上而下的流向图（不是「左侧主干 + 节点挂右树状表」）。
- *   01 → 02 → 03 之间是居中的 1px 竖直连线（11px + 细小下箭头）；
+ *   01 → 02 → 03 之间是居中的 1px 竖直连线（7px + 细小下箭头）；
  *   Caddy 底边中点向下 7px 后横向分叉，再向下 8px 落到 04 / 05 顶边中点。
  *   ≥380px 时 04 / 05 两列并排；<380px 退回单列，并用左侧短括号线保留分叉语义。
  *   连线全部是 aria-hidden 的装饰层，节点内容仍是真实文本。
+ *
+ * 视觉沿用「轨道日志」令牌（--sf-*）与跨框架 class（orbitalClasses）；
+ * 只改布局与状态表现，不改变公开接口、真实 RTT、防护与「未采集」语义。
  */
 
-type SourcePhase = 'loading' | 'ready' | 'failed';
 type OverallKey = 'operational' | 'outage' | 'unknown';
-
-interface PublicService {
-  key: string;
-  ok: boolean | null;
-  avgLatency24h: number | null;
-  uptime24h: number | null;
-}
-
-interface PublicStatusPayload {
-  overall?: string;
-  services?: PublicService[];
-}
-
-interface PublicProtectionPayload {
-  safeline?: { state?: string | null; blocked?: number | null };
-}
 
 /** overall 文案：未知/缺失/请求失败一律回退「检测中」，与 StatusMini 同源同文案。 */
 const OVERALL_TEXT: Record<OverallKey, string> = {
@@ -47,7 +34,7 @@ const OVERALL_TEXT: Record<OverallKey, string> = {
 };
 
 /** 雷池公开状态来自 protection_lib.js：ok / stale / unavailable。 */
-const SAFELINE_TEXT: Record<string, string> = {
+const SAFELINE_TEXT: Record<'ok' | 'stale' | 'unavailable', string> = {
   ok: '采集中',
   stale: '数据过期',
   unavailable: '未接入',
@@ -55,8 +42,6 @@ const SAFELINE_TEXT: Record<string, string> = {
 
 /** 未采集/取不到时的统一占位符（真实文本，不靠颜色表达状态）。 */
 const UNKNOWN = '—';
-
-const POLL_INTERVAL_MS = 30_000;
 
 /** 加载中的细线占位：固定宽度、无圆角跳变，不改变行高。 */
 function SkeletonBar({ width }: { width: string }) {
@@ -102,97 +87,27 @@ interface HopView {
 }
 
 export default function RequestPath() {
-  const [status, setStatus] = useState<PublicStatusPayload | null>(null);
-  const [statusPhase, setStatusPhase] = useState<SourcePhase>('loading');
-  const [protection, setProtection] = useState<{ state: string | null; blocked: number | null } | null>(null);
-  const [protectionPhase, setProtectionPhase] = useState<SourcePhase>('loading');
-  const [ping, setPing] = useState<number | null>(null);
-  const [pingPhase, setPingPhase] = useState<SourcePhase>('loading');
-
-  /** 状态 + 防护统计：与 StatusMini 相同的路径与解析，30s 轮询。 */
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch('/api/public/status', { cache: 'no-store' });
-      if (!res.ok) throw new Error('status failed');
-      setStatus((await res.json()) as PublicStatusPayload);
-      setStatusPhase('ready');
-    } catch {
-      setStatus(null);
-      setStatusPhase('failed');
-    }
-
-    try {
-      const res = await fetch('/api/public/protection', { cache: 'no-store' });
-      if (!res.ok) throw new Error('protection failed');
-      const payload = (await res.json()) as PublicProtectionPayload;
-      const state = typeof payload?.safeline?.state === 'string' ? payload.safeline.state : null;
-      // 沿用 StatusMini 的判定：只有 state === 'ok' 且 blocked 是数字才算真实拦截数，
-      // stale / unavailable 时数字不可信，一律不展示（避免把过期值当实时值）。
-      const blocked =
-        state === 'ok' && typeof payload?.safeline?.blocked === 'number' ? payload.safeline.blocked : null;
-      setProtection({ state, blocked });
-      setProtectionPhase('ready');
-    } catch {
-      setProtection(null);
-      setProtectionPhase('failed');
-    }
-  }, []);
-
-  /** 浏览器实测往返：连打 3 次取均值，单次失败跳过（与 StatusMini 一致）。 */
-  const pingServer = useCallback(async () => {
-    const samples: number[] = [];
-    for (let i = 0; i < 3; i += 1) {
-      const start = performance.now();
-      try {
-        const res = await fetch(`/api/public/ping?t=${Date.now()}`, { cache: 'no-store' });
-        // 只有真正拿到 2xx 才算一次有效往返：错误页/网关 502 的往返时间不是链路时延，
-        // 记下来会把「接口挂了」渲染成一个看着正常的毫秒数。
-        if (!res.ok) throw new Error('ping failed');
-        samples.push(performance.now() - start);
-      } catch {
-        // 单次失败不影响其余采样
-      }
-    }
-    if (samples.length) {
-      setPing(Math.round(samples.reduce((a, b) => a + b, 0) / samples.length));
-      setPingPhase('ready');
-    } else {
-      setPing(null);
-      setPingPhase('failed');
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-    void pingServer();
-    const a = window.setInterval(() => void load(), POLL_INTERVAL_MS);
-    const b = window.setInterval(() => void pingServer(), POLL_INTERVAL_MS);
-    return () => {
-      window.clearInterval(a);
-      window.clearInterval(b);
-    };
-  }, [load, pingServer]);
-
-  const overallKey: OverallKey =
-    status?.overall === 'operational' || status?.overall === 'outage' ? status.overall : 'unknown';
-
-  const services = status?.services ?? [];
-  const siteService = services.find((s) => s.key === 'site') ?? undefined;
-  // 线上的 /api/public/status 实际以 'api' 作为 PocketBase 采集目标的 key
-  // （见 pb_hooks/lib/monitor_lib.js 的 PUBLIC_TARGETS），这里同时接受 'pb' 命名，
-  // 面板语义仍按「PocketBase 一跳」展示，不因为 key 命名差异编造一个数。
-  const pbService = services.find((s) => s.key === 'pb') ?? services.find((s) => s.key === 'api') ?? undefined;
-  // 线上 /api/public/status 的 'gateway' 采集目标就是 Caddy 这一跳（反代/分流层），
-  // 有真实采集值就用真实值；该目标不存在时才退回「未采集」，绝不填估算毫秒。
-  const gatewayService = services.find((s) => s.key === 'gateway') ?? undefined;
+  const { status, statusPhase, protectionPhase, pingPhase, blocked24h, pingMs, safelineState } = usePublicStatus();
 
   const statusLoading = statusPhase === 'loading';
   const protectionLoading = protectionPhase === 'loading';
   const pingLoading = pingPhase === 'loading';
   const loading = statusLoading || protectionLoading || pingLoading;
 
-  const latencyText = (value: number | null | undefined): string | null =>
-    value != null ? `${value} ms` : null;
+  const overallKey: OverallKey =
+    status?.overall === 'operational' || status?.overall === 'outage' ? status.overall : 'unknown';
+
+  const services = status?.services ?? [];
+  const siteService = services.find((service) => service.key === 'site');
+  // 线上的 /api/public/status 实际以 'api' 作为 PocketBase 采集目标的 key
+  // （见 pb_hooks/lib/monitor_lib.js 的 PUBLIC_TARGETS），这里同时接受 'pb' 命名，
+  // 面板语义仍按「PocketBase 一跳」展示，不因为 key 命名差异编造一个数。
+  const pbService = services.find((service) => service.key === 'pb') ?? services.find((service) => service.key === 'api');
+  // 线上 /api/public/status 的 'gateway' 采集目标就是 Caddy 这一跳（反代/分流层），
+  // 有真实采集值就用真实值；该目标不存在时才退回「未采集」，绝不填估算毫秒。
+  const gatewayService = services.find((service) => service.key === 'gateway');
+
+  const latencyText = (value: number | null | undefined): string | null => (value != null ? `${value} ms` : null);
 
   const hops: HopView[] = [
     {
@@ -202,7 +117,7 @@ export default function RequestPath() {
       detail: '公网入口 · CDN/WAF',
       prefix: '客户端 RTT',
       // 端到端真实测量（浏览器 → 边缘 → 源站回环），不是某一跳的估算值。
-      value: pingLoading ? null : ping != null ? `${ping} ms` : UNKNOWN,
+      value: pingLoading ? null : pingMs != null ? `${pingMs} ms` : UNKNOWN,
       notes: [{ label: '端到端实测' }],
       branch: false,
     },
@@ -211,15 +126,11 @@ export default function RequestPath() {
       index: '02',
       name: '雷池 SafeLine',
       detail: 'WAF',
-      value: protectionLoading
-        ? null
-        : protection?.state
-          ? (SAFELINE_TEXT[protection.state] ?? protection.state)
-          : UNKNOWN,
+      value: protectionLoading ? null : safelineState ? SAFELINE_TEXT[safelineState] : UNKNOWN,
       notes: [
         {
           label: '24h 拦截',
-          value: protectionLoading ? null : protection?.blocked != null ? String(protection.blocked) : UNKNOWN,
+          value: protectionLoading ? null : blocked24h != null ? String(blocked24h) : UNKNOWN,
         },
       ],
       branch: false,
@@ -230,12 +141,8 @@ export default function RequestPath() {
       name: 'Caddy',
       detail: '反代 · 分流',
       // gateway 采集目标存在时展示真实 24h 均值；不存在才写「未采集」。
-      value: statusLoading
-        ? null
-        : latencyText(gatewayService?.avgLatency24h) ?? '未采集',
-      notes: gatewayService
-        ? [{ label: '24h 平均响应' }]
-        : [{ label: '无逐跳探测', value: UNKNOWN }],
+      value: statusLoading ? null : latencyText(gatewayService?.avgLatency24h) ?? '未采集',
+      notes: gatewayService ? [{ label: '24h 平均响应' }] : [{ label: '无逐跳探测', value: UNKNOWN }],
       branch: false,
     },
     {
@@ -248,11 +155,7 @@ export default function RequestPath() {
         { label: '24h 平均响应' },
         {
           label: '可用率',
-          value: statusLoading
-            ? null
-            : siteService?.uptime24h != null
-              ? `${siteService.uptime24h}%`
-              : UNKNOWN,
+          value: statusLoading ? null : siteService?.uptime24h != null ? `${siteService.uptime24h}%` : UNKNOWN,
         },
       ],
       branch: true,
@@ -262,13 +165,7 @@ export default function RequestPath() {
       index: '05',
       name: 'PocketBase',
       detail: '接口 · /api/*',
-      value: statusLoading
-        ? null
-        : pbService?.ok === true
-          ? '正常'
-          : pbService?.ok === false
-            ? '异常'
-            : UNKNOWN,
+      value: statusLoading ? null : pbService?.ok === true ? '正常' : pbService?.ok === false ? '异常' : UNKNOWN,
       notes: [
         {
           label: '24h 平均',
@@ -281,23 +178,49 @@ export default function RequestPath() {
 
   const overallDot =
     overallKey === 'operational'
-      ? 'bg-[var(--sf-accent)]'
+      ? 'bg-[var(--sf-success)]'
       : overallKey === 'outage'
         ? 'bg-[var(--sf-danger)]'
         : 'bg-[var(--sf-ink-3)]';
 
   return (
-    <div className="relative w-full border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5 sm:p-6">
-      <span aria-hidden="true" className="pointer-events-none absolute -left-px -top-px h-3 w-3 border-l border-t border-[var(--sf-line-strong)]" />
-      <span aria-hidden="true" className="pointer-events-none absolute -right-px -top-px h-3 w-3 border-r border-t border-[var(--sf-line-strong)]" />
-      <span aria-hidden="true" className="pointer-events-none absolute -bottom-px -left-px h-3 w-3 border-b border-l border-[var(--sf-line-strong)]" />
-      <span aria-hidden="true" className="pointer-events-none absolute -bottom-px -right-px h-3 w-3 border-b border-r border-[var(--sf-line-strong)]" />
+    <div
+      className={cn(orbitalClasses.panel, 'relative flex w-full flex-col')}
+      data-request-path="true"
+      data-request-overall={overallKey}
+    >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-px -top-px h-3 w-3 border-l border-t border-[var(--sf-line-strong)]"
+      />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-px -top-px h-3 w-3 border-r border-t border-[var(--sf-line-strong)]"
+      />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-px -left-px h-3 w-3 border-b border-l border-[var(--sf-line-strong)]"
+      />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-px -right-px h-3 w-3 border-b border-r border-[var(--sf-line-strong)]"
+      />
 
-      <div className="mb-4 flex items-baseline justify-between gap-3 border-b border-[var(--sf-line-soft)] pb-2">
-        <span className="font-mono text-[0.625rem] uppercase leading-none tracking-[0.2em] text-[var(--sf-ink-3)]">
-          REQUEST PATH / 01
-        </span>
-        <span className="inline-flex items-center gap-1.5 rounded-[3px] border border-[var(--sf-line-soft)] px-1.5 py-1">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-[var(--sf-line-soft)] pb-3">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <span className="font-mono text-[0.625rem] uppercase leading-none tracking-[0.2em] text-[var(--sf-ink-3)]">
+            REQUEST PATH / 01
+          </span>
+          <span aria-hidden="true" className="h-px w-4 shrink-0 bg-[var(--sf-orbit)]" />
+          <span className="font-mono text-[0.625rem] uppercase leading-none tracking-[0.14em] text-[var(--sf-ink-3)]">
+            真实链路
+          </span>
+        </div>
+        <span
+          role="status"
+          aria-live="polite"
+          className="inline-flex items-center gap-1.5 rounded-[3px] border border-[var(--sf-line-soft)] px-2 py-1"
+        >
           <span aria-hidden="true" className={cn('h-1.5 w-1.5 shrink-0 rounded-full', overallDot)} />
           <span className="font-mono text-[0.625rem] leading-none tracking-[0.06em] text-[var(--sf-ink)]">
             {OVERALL_TEXT[overallKey]}
@@ -320,10 +243,8 @@ export default function RequestPath() {
           return (
             <li
               key={hop.key}
-              className={cn(
-                'relative flex min-w-0 flex-col',
-                afterCaddy ? 'col-span-1 pt-2' : 'col-span-full',
-              )}
+              data-request-hop={hop.key}
+              className={cn('relative flex min-w-0 flex-col', afterCaddy ? 'col-span-1 pt-2' : 'col-span-full')}
             >
               {connector === 'line' && <VerticalLink />}
 
@@ -380,9 +301,9 @@ export default function RequestPath() {
 
               {afterCaddy ? (
                 /* 分叉终点：半宽卡片改成「序号 + 名称 + 指标」上下排，detail 在半宽时隐藏。 */
-                <div className="ml-4 flex min-h-[44px] flex-1 flex-col justify-center gap-1 rounded-[3px] border border-[var(--sf-line)] px-2 py-2 min-[380px]:ml-0">
+                <div className="ml-4 flex min-h-[48px] flex-1 flex-col justify-center gap-1.5 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] px-2.5 py-2 min-[380px]:ml-0">
                   <p className="flex min-w-0 items-baseline gap-1.5">
-                    <span className="font-mono text-[0.625rem] leading-none tabular-nums text-[var(--sf-ink-3)]">
+                    <span className="font-mono text-[0.625rem] leading-none tabular-nums text-[var(--sf-accent)]">
                       {hop.index}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium leading-tight text-[var(--sf-ink)]">
@@ -421,16 +342,17 @@ export default function RequestPath() {
                   </div>
                 </div>
               ) : (
-                /* 主干节点：整行宽度，保持原来的「左名称 / 右指标」两列。 */
-                <div className="grid min-h-[44px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-[3px] border border-[var(--sf-line)] px-2.5 py-2">
-                  <div className="min-w-0">
-                    <p className="flex min-w-0 items-baseline gap-1.5">
-                      <span className="font-mono text-[0.625rem] leading-none tabular-nums text-[var(--sf-ink-3)]">
-                        {hop.index}
-                      </span>
-                      <span className="truncate text-[0.8125rem] font-medium leading-tight text-[var(--sf-ink)]">
-                        {hop.name}
-                      </span>
+                /* 主干节点：整行宽度，保持「左名称 / 右指标」两列。 */
+                <div className="grid min-h-[52px] grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-2.5 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] px-2.5 py-2">
+                  <span
+                    aria-hidden="true"
+                    className="font-mono text-[0.625rem] leading-none tabular-nums tracking-[0.08em] text-[var(--sf-accent)]"
+                  >
+                    {hop.index}
+                  </span>
+                  <div className="min-w-0 border-l border-[var(--sf-line-soft)] pl-2.5">
+                    <p className="truncate text-[0.8125rem] font-medium leading-tight text-[var(--sf-ink)]">
+                      {hop.name}
                     </p>
                     <p className="mt-1 truncate font-mono text-[0.625rem] leading-none tracking-[0.04em] text-[var(--sf-ink-3)]">
                       {hop.detail}
