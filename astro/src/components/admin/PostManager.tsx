@@ -1,9 +1,8 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { useAdminPosts } from '../../hooks/domains/useAdminPosts';
 import { useAiAssist } from '../../hooks/domains/useAiAssist';
 import { cn } from '../../lib/utils';
-import { sanitizeHtml } from '../../lib/security';
 import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import MediaLibrary from './MediaLibrary';
@@ -78,10 +77,224 @@ function formatDate(value?: string) {
   return new Date(value).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
 }
 
+// ---------- 弹窗焦点 / 滚动锁 ----------
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
+
+function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (element) =>
+      !element.hasAttribute('hidden') &&
+      !element.classList.contains('hidden') &&
+      element.getAttribute('aria-hidden') !== 'true',
+  );
+}
+
+/** Tab / Shift+Tab 在弹窗内首尾循环；焦点逃逸时拉回弹窗内。 */
+function trapTabKey(container: HTMLElement, event: KeyboardEvent) {
+  const focusables = getFocusableElements(container);
+  if (focusables.length === 0) {
+    event.preventDefault();
+    container.focus();
+    return;
+  }
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  const active = document.activeElement as HTMLElement | null;
+
+  if (!active || !container.contains(active)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+    return;
+  }
+
+  if (event.shiftKey) {
+    if (active === first) {
+      event.preventDefault();
+      last.focus();
+    }
+  } else if (active === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+/** 元素是否仍参与可见布局（display:none / visibility:hidden / 完全透明 / hidden 属性都算不可见）。 */
+function isElementVisible(element: HTMLElement): boolean {
+  if (element.hasAttribute('hidden')) return false;
+  const view = element.ownerDocument.defaultView;
+  const style = view ? view.getComputedStyle(element) : null;
+  if (style && (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0')) {
+    return false;
+  }
+  return true;
+}
+
+/** 有效层级：行内 z-index 优先，其次计算样式；无法解析按 0 处理。 */
+function effectiveZIndex(element: HTMLElement | null): number {
+  if (!element) return 0;
+  const inline = Number.parseInt(element.style.zIndex, 10);
+  if (Number.isFinite(inline)) return inline;
+  const view = element.ownerDocument.defaultView;
+  const computed = view ? Number.parseInt(view.getComputedStyle(element).zIndex, 10) : Number.NaN;
+  return Number.isFinite(computed) ? computed : 0;
+}
+
+/**
+ * 元素所在的层叠高度：取自身与祖先里最大的 z-index。
+ * dialog 的层级往往挂在外层遮罩上（例如 step-up 的 `z-[80]` 在 role=dialog 的父层），
+ * 只看 dialog 自身会得到 0，误判成「比编辑器低」。
+ */
+function stackingZIndex(element: HTMLElement | null): number {
+  let max = 0;
+  let node: HTMLElement | null = element;
+  while (node) {
+    const z = effectiveZIndex(node);
+    if (z > max) max = z;
+    node = node.parentElement;
+  }
+  return max;
+}
+
+type ModalKeyboardOwner = 'self' | 'confirm' | 'other';
+
+/**
+ * 判断键盘事件该由谁处理，只有 PostManager 的弹窗在最顶层时才抢 Esc/Tab：
+ * - 'confirm'：自己的 ConfirmDialog 打开中，由它处理（关闭、Tab 循环）；
+ * - 'other'：另一层 aria-modal dialog 位于编辑器之上（如 StepUpRecoveryModal），
+ *   必须让行——不 preventDefault、不抢焦点、不关闭编辑器；
+ * - 'self'：编辑弹窗/媒体库是当前最顶层，由 PostManager 处理。
+ *
+ * 不能只看 `[role="alertdialog"]` 是否在 DOM 里：ConfirmDialog 关闭后
+ * AnimatePresence 的退出动画仍会保留节点，那段时间必须重新由 PostManager 接管，
+ * 否则退出动画期间按下的 Esc 会被「吞掉」。外部弹窗则按焦点归属 + 层级判断。
+ */
+function resolveModalKeyboardOwner(params: {
+  ownPanels: HTMLElement[];
+  topPanel: HTMLElement | null;
+  confirmOpen: boolean;
+}): ModalKeyboardOwner {
+  if (params.confirmOpen) return 'confirm';
+  const { ownPanels } = params;
+  if (ownPanels.length === 0) return 'self';
+  const topPanel = params.topPanel ?? ownPanels[ownPanels.length - 1];
+  const topOverlay = topPanel.parentElement ?? topPanel;
+  const ownZ = stackingZIndex(topPanel);
+  const active = document.activeElement as HTMLElement | null;
+
+  const externalDialogs = Array.from(
+    document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]'),
+  ).filter(
+    (element) =>
+      !ownPanels.some(
+        (panel) => element === panel || element.contains(panel) || panel.contains(element),
+      ) && isElementVisible(element),
+  );
+
+  for (const element of externalDialogs) {
+    // 焦点已经进入外部 dialog：用户正在操作那一层，无条件让行
+    if (active && element.contains(active)) return 'other';
+    const externalZ = stackingZIndex(element);
+    if (externalZ > ownZ) return 'other';
+    // 层级相同或都无法解析时按文档顺序：后挂载的弹窗视为上层
+    if (
+      externalZ === ownZ &&
+      (topOverlay.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+    ) {
+      return 'other';
+    }
+  }
+
+  return 'self';
+}
+
+// 背景滚动锁：编辑弹窗与媒体库弹窗可能叠加，按引用计数恢复原 overflow
+let bodyScrollLocks = 0;let bodyOverflowBeforeLock = '';
+
+function lockBodyScroll(): () => void {
+  if (typeof document === 'undefined') return () => {};
+  if (bodyScrollLocks === 0) {
+    bodyOverflowBeforeLock = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+  }
+  bodyScrollLocks += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    bodyScrollLocks = Math.max(0, bodyScrollLocks - 1);
+    if (bodyScrollLocks === 0) document.body.style.overflow = bodyOverflowBeforeLock;
+  };
+}
+
+/** 打开时把焦点送进弹窗并锁滚动，关闭时归还焦点并恢复滚动。 */
+function useModalBehavior(open: boolean, getContainer: () => HTMLElement | null) {
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+    const unlock = lockBodyScroll();
+
+    const container = getContainer();
+    if (container) {
+      const target =
+        container.querySelector<HTMLElement>('[data-dialog-autofocus]') ??
+        getFocusableElements(container)[0] ??
+        container;
+      target.focus();
+    }
+
+    return () => {
+      unlock();
+      const previous = previouslyFocusedRef.current;
+      previouslyFocusedRef.current = null;
+      if (previous && document.contains(previous)) previous.focus();
+    };
+  }, [open, getContainer]);
+}
+
+// 判断草稿是否已有「实质内容」：决定关闭时要不要弹确认
+const SUBSTANTIVE_FIELDS = [
+  'title',
+  'slug',
+  'excerpt',
+  'content',
+  'cover',
+  'seo_title',
+  'seo_description',
+  'seo_keywords',
+] as const;
+
+function draftHasSubstance(draft: Post | PostDraft): boolean {
+  const record = draft as unknown as Record<string, unknown>;
+  if (SUBSTANTIVE_FIELDS.some((field) => String(record[field] ?? '').trim() !== '')) return true;
+  if (draft.status && draft.status !== 'draft') return true;
+  if (draft.is_pinned || draft.is_featured) return true;
+  return false;
+}
+
+type ConfirmState = {
+  open: boolean;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+};
+
 export default function PostManager() {
   const {
     posts,
     loading,
+    error,
     filter,
     setFilter,
     query,
@@ -98,18 +311,107 @@ export default function PostManager() {
     selectedTagIds,
     setSelectedTagIds,
     fetchPosts,
-    updateStatus,
     deletePost,
     savePost,
   } = useAdminPosts();
 
-  const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
+  const [confirmState, setConfirmState] = useState<ConfirmState>({ open: false, title: '', message: '', onConfirm: () => {} });
   const [showMediaLibrary, setShowMediaLibrary] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const [showAiGenerator, setShowAiGenerator] = useState(false);
   const [metaResult, setMetaResult] = useState<AssistMetaResult | null>(null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
+  const editorPanelRef = useRef<HTMLDivElement>(null);
+  const mediaPanelRef = useRef<HTMLDivElement>(null);
+  const getEditorPanel = useCallback(() => editorPanelRef.current, []);
+  const getMediaPanel = useCallback(() => mediaPanelRef.current, []);
+  // 供键盘监听/确认回调读取的「最新保存中」状态（state 在闭包里可能过期）
+  const savingRef = useRef(saving);
+  // ConfirmDialog 是否真的处于打开状态：用它而不是查 DOM，退出动画期间不吞键盘
+  const confirmOpenRef = useRef(confirmState.open);
   const { assisting, runMeta, runPolish, runContinue } = useAiAssist();
+
+  useEffect(() => {
+    savingRef.current = saving;
+  }, [saving]);
+
+  useEffect(() => {
+    confirmOpenRef.current = confirmState.open;
+  }, [confirmState.open]);
+
+  const closeEditor = useCallback(() => {
+    setEditing(null);
+    setDirty(false);
+  }, [setEditing, setDirty]);
+
+  const closeMediaLibrary = useCallback(() => setShowMediaLibrary(false), []);
+
+  // 统一关闭入口：有未保存的实质内容时先确认，空草稿/无改动直接关。
+  // 取消、遮罩点击、Esc 全部走这里，保证三处行为一致。
+  const requestCloseEditing = useCallback(() => {
+    if (!editing) return;
+    // 保存进行中禁止关闭：保存完成时会回写结果，提前关闭（或再开新文）会被误关
+    if (saving) {
+      showToast('文章保存中，完成后才能关闭', 'warning');
+      return;
+    }
+    const needsConfirm = editing.id
+      ? dirty
+      : (dirty && draftHasSubstance(editing)) || selectedTagIds.length > 0;
+    if (!needsConfirm) {
+      closeEditor();
+      return;
+    }
+    setConfirmState({
+      open: true,
+      title: '放弃未保存的修改？',
+      message: '当前编辑有未保存的内容，关闭后这些修改会丢失。',
+      confirmLabel: '放弃修改',
+      danger: true,
+      // 确认框打开期间保存也可能开始：真正关闭前再查一次保存锁
+      onConfirm: () => {
+        if (savingRef.current) {
+          showToast('文章保存中，完成后才能关闭', 'warning');
+          return;
+        }
+        closeEditor();
+      },
+    });
+  }, [editing, saving, dirty, selectedTagIds, closeEditor]);
+
+  // 编辑弹窗与媒体库弹窗各自把焦点送进去、锁滚动；关闭时按层归还焦点/恢复滚动
+  useModalBehavior(editing !== null, getEditorPanel);
+  useModalBehavior(showMediaLibrary, getMediaPanel);
+
+  // 弹窗打开期间的 Esc / Tab 统一在 document 上处理（焦点在弹窗外也生效）。
+  // 只有 PostManager 的弹窗是顶层 dialog 时才抢键盘：顶层是 ConfirmDialog 或外部
+  // step-up 重验弹窗时一律让行，避免一次 Esc 同时关掉两层/覆盖上层 dialog 的语义。
+  const anyModalOpen = editing !== null || showMediaLibrary;
+  useEffect(() => {
+    if (!anyModalOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      const owner = resolveModalKeyboardOwner({
+        ownPanels: [editorPanelRef.current, mediaPanelRef.current].filter(
+          (panel): panel is HTMLDivElement => panel !== null,
+        ),
+        topPanel: showMediaLibrary ? mediaPanelRef.current : editorPanelRef.current,
+        confirmOpen: confirmOpenRef.current,
+      });
+      if (owner !== 'self') return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (showMediaLibrary) closeMediaLibrary();
+        else requestCloseEditing();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const container = showMediaLibrary ? mediaPanelRef.current : editorPanelRef.current;
+      if (container) trapTabKey(container, event);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [anyModalOpen, showMediaLibrary, closeMediaLibrary, requestCloseEditing]);
 
   // 粘贴/拖拽图片到正文：上传到媒体库后在光标处插入 Markdown 图片语法。
   // 插入 1024x0 缩略图（白名单见 pb_migrations/20260912000000），原图不直接进正文。
@@ -146,6 +448,8 @@ export default function PostManager() {
       open: true,
       title: '确认删除',
       message: '确定要删除这篇文章吗？此操作不可撤销。',
+      confirmLabel: '删除',
+      danger: true,
       onConfirm: () => deletePost(id),
     });
   };
@@ -168,7 +472,9 @@ export default function PostManager() {
   };
 
   const handleSave = () => {
-    savePost();
+    // 提交中防重入：按钮禁用 + hook 内部同步锁双保险
+    if (saving) return;
+    void savePost();
   };
 
   const handleCoverSelect = (url: string) => {
@@ -397,6 +703,39 @@ export default function PostManager() {
         </div>
       </div>
 
+      {/* 列表错误：显式展示 + 可重试，绝不把请求失败伪装成「暂无文章」 */}
+      {error && (
+        <div
+          role="alert"
+          className="flex flex-col gap-2 rounded-[3px] border border-[var(--sf-danger)] bg-[var(--sf-surface)] px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p className="break-words text-[13px] leading-relaxed text-[var(--sf-danger)] [overflow-wrap:anywhere]">
+            文章列表加载失败：{error}
+          </p>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {/* 翻页失败的安全出口：旧页数据已清空时，一键回到第 1 页重新取数 */}
+              {page > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setPage(1)}
+                  disabled={loading}
+                  className={cn(BTN_BASE, BTN_QUIET, BTN_SM)}
+                >
+                  返回第 1 页
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => { void fetchPosts(); }}
+                disabled={loading}
+                className={cn(BTN_BASE, BTN_QUIET, BTN_SM)}
+              >
+                重试
+              </button>
+            </div>
+          </div>
+      )}
+
       {/* 文章列表 */}
       {loading ? (
         <div className="space-y-2">
@@ -405,10 +744,12 @@ export default function PostManager() {
           ))}
         </div>
       ) : filteredPosts.length === 0 ? (
-        <div className="flex flex-col items-center gap-1.5 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-10 text-center">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">EMPTY / 0</p>
-          <p className="text-[13px] text-[var(--sf-ink-2)]">暂无文章</p>
-        </div>
+        error ? null : (
+          <div className="flex flex-col items-center gap-1.5 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-10 text-center">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">EMPTY / 0</p>
+            <p className="text-[13px] text-[var(--sf-ink-2)]">暂无文章</p>
+          </div>
+        )
       ) : (
         <div className="min-w-0 overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">
           <div className="flex items-center justify-between gap-2 border-b border-[var(--sf-line)] bg-[var(--sf-canvas)] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--sf-ink-3)]">
@@ -530,9 +871,10 @@ export default function PostManager() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-stretch justify-center overflow-y-auto bg-[var(--sf-scrim)] p-0 sm:items-center sm:p-4"
-            onClick={() => setEditing(null)}
+            onClick={requestCloseEditing}
           >
             <motion.div
+              ref={editorPanelRef}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
@@ -540,6 +882,7 @@ export default function PostManager() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="post-manager-title"
+              tabIndex={-1}
               className="flex min-h-[var(--vvh,100dvh)] w-full max-w-4xl flex-col overflow-hidden rounded-none border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4 sm:min-h-0 sm:rounded-[3px] sm:p-6"
             >
               <h2 id="post-manager-title" className="mb-4 break-words border-b border-[var(--sf-line)] pb-3 text-base font-bold tracking-tight text-[var(--sf-ink)] [overflow-wrap:anywhere]">
@@ -658,6 +1001,7 @@ export default function PostManager() {
                     <input
                       id="post-manager-title-field"
                       type="text"
+                      data-dialog-autofocus
                       value={editing.title}
                       onChange={(e) => { setEditing({ ...editing, title: e.target.value }); setDirty(true); }}
                       className={FIELD_CLS}
@@ -797,10 +1141,10 @@ export default function PostManager() {
               </div>
               
               <div className="mt-4 flex flex-col-reverse gap-2 border-t border-[var(--sf-line)] pt-3 sm:flex-row sm:justify-end">
-                <button onClick={() => setEditing(null)} className={cn(BTN_BASE, BTN_QUIET, BTN_SM)}>
+                <button type="button" onClick={requestCloseEditing} className={cn(BTN_BASE, BTN_QUIET, BTN_SM)}>
                   取消
                 </button>
-                <button onClick={handleSave} disabled={saving} className={cn(BTN_BASE, BTN_PRIMARY, BTN_SM)}>
+                <button type="button" onClick={handleSave} disabled={saving} className={cn(BTN_BASE, BTN_PRIMARY, BTN_SM)}>
                   {saving ? '保存中...' : '保存文章'}
                 </button>
               </div>
@@ -811,17 +1155,25 @@ export default function PostManager() {
 
       {/* 媒体库选择器 */}
       {showMediaLibrary && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sf-scrim)] p-3 sm:p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--sf-scrim)] p-3 sm:p-4"
+          onClick={closeMediaLibrary}
+        >
           <div
+            ref={mediaPanelRef}
             role="dialog"
             aria-modal="true"
             aria-label="选择封面图片"
+            tabIndex={-1}
+            onClick={(e) => e.stopPropagation()}
             className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]"
           >
             <div className="flex items-center justify-between gap-2 border-b border-[var(--sf-line)] px-3 py-2.5 sm:px-4">
               <h3 className="break-words text-sm font-bold tracking-tight text-[var(--sf-ink)]">选择封面图片</h3>
               <button
-                onClick={() => setShowMediaLibrary(false)}
+                type="button"
+                data-dialog-autofocus
+                onClick={closeMediaLibrary}
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[3px] border border-[var(--sf-line)] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]"
                 title="关闭"
                 aria-label="关闭"
@@ -832,7 +1184,7 @@ export default function PostManager() {
               </button>
             </div>
             <div className="max-h-[calc(90vh-60px)] min-h-0 overflow-auto p-3 sm:p-4">
-              <MediaLibrary onSelect={handleCoverSelect} onClose={() => setShowMediaLibrary(false)} />
+              <MediaLibrary onSelect={handleCoverSelect} onClose={closeMediaLibrary} />
             </div>
           </div>
         </div>
@@ -842,8 +1194,13 @@ export default function PostManager() {
         open={confirmState.open}
         title={confirmState.title}
         message={confirmState.message}
-        danger
-        onConfirm={() => { confirmState.onConfirm(); setConfirmState(s => ({ ...s, open: false })); }}
+        confirmLabel={confirmState.confirmLabel}
+        danger={confirmState.danger}
+        onConfirm={() => {
+          const action = confirmState.onConfirm;
+          setConfirmState(s => ({ ...s, open: false }));
+          action();
+        }}
         onCancel={() => setConfirmState(s => ({ ...s, open: false }))}
       />
 
