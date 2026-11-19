@@ -127,6 +127,16 @@ describe('WelcomeOverlay · 出现场景与焦点契约', () => {
     expect(screen.queryByRole('dialog', { name: '欢迎引导' })).toBeNull();
     expect(document.body.style.overflow).not.toBe('hidden');
   });
+
+  it('/index/（实际是 404 页）不出现引导：与 BaseLayout 共用判断，只认规范首页 `/`', async () => {
+    window.history.replaceState({}, '', '/index/');
+
+    render(<WelcomeOverlay />);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(screen.queryByRole('dialog', { name: '欢迎引导' })).toBeNull();
+    expect(document.body.style.overflow).not.toBe('hidden');
+  });
 });
 
 describe('WelcomeOverlay · 认证流程不可退化', () => {

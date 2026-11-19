@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouse
 import { motion } from 'framer-motion';
 import { useUser } from '../../hooks/domains/useUser';
 import { RateLimiter } from '../../lib/security';
+import { isShowcasePathname } from '../../lib/showcase-path';
 import useBreakpoint from '../../hooks/useBreakpoint';
 
 /**
@@ -13,8 +14,8 @@ import useBreakpoint from '../../hooks/useBreakpoint';
  * - 仍然以 `blog-welcomed` 作为「已看过」标记。
  *
  * 新增约束：
- * - 只在展示页（`/`）出现；其它页面不渲染，也绝不阻断正文（由 BaseLayout 只在该页挂载 +
- *   组件内的 pathname 守卫双重保证）；
+ * - 只在展示页出现（与 BaseLayout 共用 `isShowcasePathname()`，只认规范首页 `/`）；
+ *   其它页面不渲染，也绝不阻断正文（BaseLayout 只在该页挂载 + 组件内 pathname 守卫双重保证）；
  * - 改成单面板轻场景，不再叠加 Stepper / SplitText / SpotlightCard 等多层动画；
  * - 打开时把焦点移入 dialog，Tab 在内部循环，Esc 关闭，关闭后把焦点归还给打开前的元素。
  *
@@ -22,7 +23,6 @@ import useBreakpoint from '../../hooks/useBreakpoint';
  */
 
 const STORAGE_KEY = 'blog-welcomed';
-const SHOWCASE_PATH = '/';
 /** 重发成功后的按钮复位时间（与旧实现一致的 5s，避免一直停在「已重新发送」）。 */
 const RESEND_RESET_MS = 5000;
 
@@ -33,8 +33,9 @@ const registerLimiter = new RateLimiter(5, 0.2);
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/** 展示页判定与 BaseLayout 共用 `isShowcasePathname()`，避免两边各写一套。 */
 function isShowcasePath(): boolean {
-  return window.location.pathname === SHOWCASE_PATH;
+  return isShowcasePathname(window.location.pathname);
 }
 
 function hasBeenWelcomed(): boolean {

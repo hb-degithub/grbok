@@ -9,6 +9,10 @@ import { cleanup, render, screen, within } from '@testing-library/react';
  * fetch / setInterval。这样测试只验证「快照 → 真实链路文案」的映射：
  *   - ok / outage / unknown 三态文案；
  *   - 无 services、gateway 有/无、safeline 的 ok/stale/unavailable/失败；
+ *   - Caddy 这一跳没有独立采集目标，永远「未采集」+「无逐跳探测」，且 /status 失败时
+ *     改说「采集失败」而不是把失败伪装成未采集；
+ *   - gateway 采集目标是 admin-auth（认证与邮件网关），只出现在拓扑之外的独立标注里，
+ *     不能被算成 Caddy 的 24h 平均响应；
  *   - 未采集就显示「未采集」或「—」，绝不出现估算毫秒数；
  *   - 接口失败不显示「运行正常」；
  *   - RequestPath 自己不再发请求、不再建轮询。
@@ -67,6 +71,11 @@ function renderWith(snapshot: TestSnapshot): HTMLElement {
   return container as HTMLElement;
 }
 
+/** `gateway`（admin-auth 认证与邮件网关）的独立标注块；它不属于 5 跳拓扑。 */
+function gatewaySidecar(container: HTMLElement): HTMLElement | null {
+  return container.querySelector<HTMLElement>('[data-request-sidecar="gateway"]');
+}
+
 beforeEach(() => {
   store.snapshot = loadingSnapshot();
   // 组件若绕过共享 store 自己请求，测试必须立刻暴露，而不是静默走网络。
@@ -92,6 +101,9 @@ describe('RequestPath · 加载与失败', () => {
     expect(container.textContent).not.toContain('运行正常');
     expect(container.textContent).not.toContain('部分异常');
     expect(screen.getAllByText('指标读取中').length).toBeGreaterThan(0);
+    // 未加载完就下结论（未采集 / 采集失败）等于伪造状态。
+    expect(hop(container, 'Caddy').textContent).not.toContain('未采集');
+    expect(hop(container, 'Caddy').textContent).not.toContain('采集失败');
   });
 
   it('三个来源全部失败：回退「检测中」，不显示运行正常与任何毫秒估算', () => {
@@ -105,9 +117,18 @@ describe('RequestPath · 加载与失败', () => {
     expect(container.textContent).toContain('检测中');
     expect(container.textContent).not.toContain('运行正常');
     expect(container.textContent).not.toContain('部分异常');
-    // 接口失败时只能出现「未采集」/「—」，不能把失败渲染成正常毫秒数。
+    // 接口失败时只能出现「采集失败」/「—」，不能把失败渲染成正常毫秒数。
     expect(container.textContent).not.toMatch(/\d+\s*ms/);
-    expect(container.textContent).toContain('未采集');
+
+    // 失败 ≠ 未采集：Caddy 这一行必须说清是 /status 接口挂了。
+    const caddy = hop(container, 'Caddy');
+    expect(caddy.textContent).toContain('采集失败');
+    expect(caddy.textContent).toContain('状态接口失败');
+    expect(caddy.textContent).not.toContain('未采集');
+    expect(caddy.textContent).not.toContain('无逐跳探测');
+    expect(container.textContent).not.toContain('未采集');
+    // 没有 services 就没有 gateway 数据，独立标注块不该凭空出现。
+    expect(gatewaySidecar(container)).toBeNull();
     expect(screen.getByRole('list', { name: '真实请求链路' }).getAttribute('aria-busy')).toBe('false');
   });
 
@@ -141,7 +162,12 @@ describe('RequestPath · overall 三态', () => {
     expect(hop(container, 'ESA 边缘').textContent).toContain('37 ms');
     expect(hop(container, '雷池 SafeLine').textContent).toContain('采集中');
     expect(hop(container, '雷池 SafeLine').textContent).toContain('42');
-    expect(hop(container, 'Caddy').textContent).toContain('58 ms');
+    // gateway=58 是 admin-auth 的 24h 均值，不能被当成 Caddy 的响应时间。
+    expect(hop(container, 'Caddy').textContent).toContain('未采集');
+    expect(hop(container, 'Caddy').textContent).toContain('无逐跳探测');
+    expect(hop(container, 'Caddy').textContent).not.toContain('58 ms');
+    expect(gatewaySidecar(container)?.textContent).toContain('认证与邮件网关');
+    expect(gatewaySidecar(container)?.textContent).toContain('58 ms');
     expect(hop(container, 'Astro SSR').textContent).toContain('128 ms');
     expect(hop(container, 'Astro SSR').textContent).toContain('99.94%');
     expect(hop(container, 'PocketBase').textContent).toContain('正常');
@@ -182,10 +208,11 @@ describe('RequestPath · 无 services 与 gateway 有无', () => {
     expect(hop(container, 'Caddy').textContent).toContain('无逐跳探测');
     expect(hop(container, 'Astro SSR').textContent).toContain('—');
     expect(hop(container, 'PocketBase').textContent).toContain('—');
+    expect(gatewaySidecar(container)).toBeNull();
     expect(container.textContent).not.toMatch(/\d+\s*ms/);
   });
 
-  it('有 gateway 采集目标：Caddy 展示真实 24h 均值，不再显示未采集', () => {
+  it('有 gateway 采集目标：Caddy 仍是「未采集」，数值归到独立的「认证与邮件网关」标注', () => {
     const container = renderWith(
       readySnapshot({
         status: {
@@ -196,12 +223,43 @@ describe('RequestPath · 无 services 与 gateway 有无', () => {
     );
 
     const caddy = hop(container, 'Caddy');
-    expect(caddy.textContent).toContain('58 ms');
-    expect(caddy.textContent).toContain('24h 平均响应');
-    expect(caddy.textContent).not.toContain('未采集');
+    expect(caddy.textContent).toContain('未采集');
+    expect(caddy.textContent).toContain('无逐跳探测');
+    expect(caddy.textContent).not.toContain('58 ms');
+    expect(caddy.textContent).not.toContain('24h 平均响应');
+
+    const gateway = gatewaySidecar(container);
+    expect(gateway, 'gateway 数据必须单独标注，不能塞进 Caddy 节点').not.toBeNull();
+    expect(gateway?.textContent).toContain('认证与邮件网关');
+    expect(gateway?.textContent).toContain('admin-auth');
+    expect(gateway?.textContent).toContain('24h 平均响应');
+    expect(gateway?.textContent).toContain('58 ms');
+    expect(gateway?.textContent).not.toContain('采集异常');
+
+    // 5 跳拓扑结构不变：gateway 不是链路节点。
+    const list = screen.getByRole('list', { name: '真实请求链路' });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(5);
+    expect(within(list).queryByText(/认证与邮件网关/)).toBeNull();
   });
 
-  it('没有 gateway 采集目标：Caddy 不写死任何毫秒字面量', () => {
+  it('gateway 采样异常：独立标注里写「采集异常」，不漏报也不冒充正常', () => {
+    const container = renderWith(
+      readySnapshot({
+        status: {
+          overall: 'outage',
+          services: [{ key: 'gateway', ok: false, avgLatency24h: null, uptime24h: null }],
+        },
+      }),
+    );
+
+    const gateway = gatewaySidecar(container);
+    expect(gateway?.textContent).toContain('采集异常');
+    expect(gateway?.textContent).toContain('—');
+    expect(gateway?.textContent).not.toMatch(/\d+\s*ms/);
+    expect(hop(container, 'Caddy').textContent).toContain('未采集');
+  });
+
+  it('没有 gateway 采集目标：Caddy 不写死任何毫秒字面量，也不渲染网关标注', () => {
     const container = renderWith(
       readySnapshot({
         status: {
@@ -215,6 +273,7 @@ describe('RequestPath · 无 services 与 gateway 有无', () => {
     const caddy = hop(container, 'Caddy');
     expect(caddy.textContent).toContain('未采集');
     expect(caddy.textContent).not.toMatch(/\d+\s*ms/);
+    expect(gatewaySidecar(container)).toBeNull();
   });
 });
 
@@ -286,9 +345,12 @@ describe('RequestPath · 单来源失败不牵连其它来源', () => {
 
     expect(container.textContent).toContain('检测中');
     expect(hop(container, 'ESA 边缘').textContent).toContain('30 ms');
-    expect(hop(container, 'Caddy').textContent).toContain('未采集');
+    // status 失败 → Caddy 行必须表达「失败」，不能混同于「未采集」这个正常读取结果。
+    expect(hop(container, 'Caddy').textContent).toContain('采集失败');
+    expect(hop(container, 'Caddy').textContent).not.toContain('未采集');
     expect(hop(container, 'Astro SSR').textContent).toContain('—');
     expect(hop(container, 'PocketBase').textContent).toContain('—');
+    expect(gatewaySidecar(container)).toBeNull();
   });
 });
 

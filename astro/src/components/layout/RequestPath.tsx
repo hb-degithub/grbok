@@ -11,8 +11,15 @@ import { orbitalClasses } from '../../styles/orbital';
  *   GET /api/public/protection  → safeline.state、safeline.blocked（24h 拦截数）
  *   GET /api/public/ping        → 客户端实测往返，取 3 次均值
  *
- * 硬约束：Caddy 这一跳**没有独立的逐跳探测**时固定显示「未采集」，
- * 生产代码里不写死任何毫秒字面量——所有数字只能来自上面三个接口或浏览器实测。
+ * 硬约束（采集目标语义必须与后端一致，见 pb_hooks/lib/monitor_lib.js 的 PUBLIC_TARGETS）：
+ * - `/api/public/status` 只采集三个目标：`site`（站点页面）、`api`（PocketBase）、
+ *   `gateway`（**admin-auth 认证与邮件网关**，`{ key: 'gateway', target: 'admin_auth' }`）；
+ * - **没有任何目标在测 Caddy 自身**，所以 Caddy 这一跳固定显示「未采集」+「无逐跳探测」，
+ *   绝不借用 `gateway` 的 24h 均值冒充 Caddy 的响应时间；`/status` 接口失败时
+ *   单独标成「采集失败」，不把失败说成「未采集」；
+ * - `gateway` 是页面请求链路之外的内网服务（PocketBase 调它做认证 / 发信），
+ *   因此不塞进 5 跳拓扑，只在拓扑下方以「认证与邮件网关」独立标注真实数值；
+ * - 生产代码里不写死任何毫秒字面量——所有数字只能来自上面三个接口或浏览器实测。
  *
  * 布局：自上而下的流向图（不是「左侧主干 + 节点挂右树状表」）。
  *   01 → 02 → 03 之间是居中的 1px 竖直连线（7px + 细小下箭头）；
@@ -103,8 +110,14 @@ export default function RequestPath() {
   // （见 pb_hooks/lib/monitor_lib.js 的 PUBLIC_TARGETS），这里同时接受 'pb' 命名，
   // 面板语义仍按「PocketBase 一跳」展示，不因为 key 命名差异编造一个数。
   const pbService = services.find((service) => service.key === 'pb') ?? services.find((service) => service.key === 'api');
-  // 线上 /api/public/status 的 'gateway' 采集目标就是 Caddy 这一跳（反代/分流层），
-  // 有真实采集值就用真实值；该目标不存在时才退回「未采集」，绝不填估算毫秒。
+  /**
+   * 线上的 `gateway` 采集目标是 **admin-auth（认证与邮件网关）**，不是 Caddy：
+   * `pb_hooks/lib/monitor_lib.js` 的 PUBLIC_TARGETS 里写的是
+   * `{ key: 'gateway', target: 'admin_auth', label: '认证与邮件网关' }`，
+   * 探针打的是 `http://admin-auth:8787/health`。它属于页面请求链路之外的内网服务
+   * （PocketBase 内部调用它做认证 / 发信），所以既不进 5 跳拓扑，也绝不能被算成
+   * Caddy 的响应时间——只单独标注，有真实值才展示，缺失就是占位符。
+   */
   const gatewayService = services.find((service) => service.key === 'gateway');
 
   const latencyText = (value: number | null | undefined): string | null => (value != null ? `${value} ms` : null);
@@ -140,9 +153,17 @@ export default function RequestPath() {
       index: '03',
       name: 'Caddy',
       detail: '反代 · 分流',
-      // gateway 采集目标存在时展示真实 24h 均值；不存在才写「未采集」。
-      value: statusLoading ? null : latencyText(gatewayService?.avgLatency24h) ?? '未采集',
-      notes: gatewayService ? [{ label: '24h 平均响应' }] : [{ label: '无逐跳探测', value: UNKNOWN }],
+      /**
+       * 三态分别表达三种不同的事实，不能互相顶替：
+       * - loading → 骨架（还不知道，不写结论）；
+       * - failed  → 「采集失败」+「状态接口失败」：是接口挂了，不是「没有这一跳的探测」；
+       * - ready   → 「未采集」+「无逐跳探测」：真实情况是没有目标在测 Caddy。
+       */
+      value: statusLoading ? null : statusPhase === 'failed' ? '采集失败' : '未采集',
+      notes:
+        statusPhase === 'failed'
+          ? [{ label: '状态接口失败', value: UNKNOWN }]
+          : [{ label: '无逐跳探测', value: statusLoading ? null : UNKNOWN }],
       branch: false,
     },
     {
@@ -400,6 +421,34 @@ export default function RequestPath() {
           );
         })}
       </ol>
+
+      {/*
+        `gateway` 采集目标 = admin-auth（认证与邮件网关），不是页面请求链路上的第 6 跳：
+        页面请求不经过它，是 PocketBase 通过内网调它做认证 / 发信。
+        所以它留在 5 跳拓扑之外单独标注，既不冒充 Caddy 的响应时间，也不编造一跳。
+        只有接口真的返回了这个目标才渲染；缺失/失败时整块不出现。
+      */}
+      {gatewayService && (
+        <div className="mt-3 border-t border-[var(--sf-line-soft)] pt-2.5" data-request-sidecar="gateway">
+          <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 font-mono text-[0.625rem] leading-none tracking-[0.02em] text-[var(--sf-ink-3)]">
+            <span className="whitespace-nowrap">认证与邮件网关</span>
+            <span aria-hidden="true" className="text-[var(--sf-line-strong)]">
+              ·
+            </span>
+            <span className="whitespace-nowrap">admin-auth</span>
+            <span className="whitespace-nowrap text-[var(--sf-ink-2)]">24h 平均响应</span>
+            <span className="whitespace-nowrap font-medium tabular-nums text-[var(--sf-ink)]">
+              {latencyText(gatewayService.avgLatency24h) ?? UNKNOWN}
+            </span>
+            {gatewayService.ok === false && (
+              <span className="whitespace-nowrap font-medium text-[var(--sf-danger)]">采集异常</span>
+            )}
+          </p>
+          <p className="mt-1 font-mono text-[0.625rem] leading-none tracking-[0.04em] text-[var(--sf-ink-3)]">
+            独立采集 · 不在页面请求链路内
+          </p>
+        </div>
+      )}
     </div>
   );
 }

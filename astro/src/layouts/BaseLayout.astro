@@ -16,6 +16,7 @@ import CursorGlow from '../components/effects/CursorGlow';
 import CursorAim from '../components/effects/CursorAim';
 import ToastContainer from '../components/ui/Toast';
 import { SITE_CONFIG } from '../config/site';
+import { isShowcasePathname } from '../lib/showcase-path';
 import { pbBaseUrl } from '../lib/pb-base-url';
 import { cachedFetchJson } from '../lib/pb-cache';
 import type { Announcement } from '../types/pocketbase';
@@ -46,8 +47,12 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
  * 结果是任何页面都在持续跟随指针，并且启动遮罩与欢迎遮罩可能同时阻断正文。
  * 现在只在首页挂载；内页不加载这些岛的 JS，也不会出现任何遮罩。
  * `DebugProtection` 是功能开关（后台可配），不属于装饰，因此继续全站挂载。
+ *
+ * 首页判定与 `WelcomeOverlay` 内部守卫共用 `isShowcasePathname()`（`lib/showcase-path.ts`）：
+ * 两处各写一套时，`/index/` 会出现「岛挂载了但引导永不出现」的不一致；而 `/index/`
+ * 实测走 404 页，本就不该挂首页特效，所以共享判断只认规范首页 `/`。
  */
-const isShowcasePage = Astro.url.pathname === '/' || Astro.url.pathname === '/index/';
+const isShowcasePage = isShowcasePathname(Astro.url.pathname);
 
 /**
  * 服务端预取公告。

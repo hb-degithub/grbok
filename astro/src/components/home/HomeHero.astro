@@ -3,6 +3,7 @@
  * 首页 Hero：轨道日志主视觉 + 真实请求链路。
  *
  * - 文案直接消费 SITE_CONFIG（name / slogan / description / since），不写死站点信息；
+ *   开始年份只在 meta 行出现一次，facts 行不重复；
  * - 保留 /posts 与 /about 两个 CTA、真实链路的 figcaption 与「未采集」说明；
  * - RequestPath 仍是同一个 React 岛（client:visible），只是换了布局位置；
  * - 统计计数与 PB 取数留在 index.astro，Hero 不接收计数 props、不发请求；
@@ -41,8 +42,6 @@ import { orbitalClasses } from '../../styles/orbital';
         </div>
 
         <p class="orbital-hero__facts">
-          <span>SINCE {SITE_CONFIG.since}</span>
-          <span aria-hidden="true" class="orbital-hero__facts-sep">/</span>
           <span>技术</span>
           <span aria-hidden="true" class="orbital-hero__facts-sep">·</span>
           <span>思考</span>
@@ -53,11 +52,12 @@ import { orbitalClasses } from '../../styles/orbital';
 
       <!-- 公网访客 → ESA 边缘 → 雷池 SafeLine → Caddy → Astro SSR / PocketBase。
            指标来自 /api/public/status、/api/public/protection、/api/public/ping 三个既有公开接口；
-           Caddy 一跳没有独立逐跳探测时显示「未采集」，不写死毫秒数。 -->
+           Caddy 一跳没有独立逐跳探测时显示「未采集」，不写死毫秒数；
+           status 的 gateway 目标是 admin-auth（认证与邮件网关），不是 Caddy，由 RequestPath 单独标注。 -->
       <figure class="orbital-hero__telemetry">
         <RequestPath client:visible />
         <figcaption class="orbital-hero__caption">
-          真实请求链路 · 公网 / ESA → 雷池 → Caddy 分叉到页面与接口 ·「未采集」= 这一跳没有独立测量，不显示估算值
+          真实请求链路 · 公网 / ESA → 雷池 → Caddy 分叉到页面与接口 ·「未采集」= 这一跳没有独立测量，不显示估算值 · 认证与邮件网关（admin-auth）为独立采集，不在页面链路上
         </figcaption>
       </figure>
     </div>
