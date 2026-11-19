@@ -92,7 +92,7 @@ export default function CommentModerator() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [savingContent, setSavingContent] = useState(false);
-  const { comments, loading, filter, setFilter, query, setQuery, page, setPage, totalPages, updateStatus, refresh, deleteComment, batchUpdateStatus, batchDelete } = useAdminComments();
+  const { comments, loading, error, filter, setFilter, query, setQuery, page, goToPage, totalPages, updateStatus, refresh, retry, deleteComment, batchUpdateStatus, batchDelete } = useAdminComments();
 
   // AI 状态条（仅 super_admin 可见；非超管/未配置时静默隐藏）
   const { role } = useAdminAuth();
@@ -205,7 +205,10 @@ export default function CommentModerator() {
     return hints;
   };
 
-  const pageLabel = `第 ${page}/${Math.max(totalPages, 1)} 页 · ${comments.length} 条`;
+  // 加载失败且没有任何数据时，不能显示「第 1/1 页 · 0 条」——那是把失败伪装成真的没有评论。
+  const pageLabel = error && comments.length === 0
+    ? '统计不可用'
+    : `第 ${page}/${Math.max(totalPages, 1)} 页 · ${comments.length} 条`;
 
   return (
     <div className="min-w-0 space-y-3">
@@ -244,12 +247,27 @@ export default function CommentModerator() {
         </div>
       </section>
 
+      {/* 取数失败必须显式可见：列表为空时也不会被空态文案盖住，且提供「重试」。 */}
+      {error && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-2 rounded-[3px] border border-[var(--sf-danger)] bg-[var(--sf-surface)] px-3 py-2.5 text-[13px] text-[var(--sf-danger)]">
+          <span className="min-w-0 break-words [overflow-wrap:anywhere]">评论列表加载失败：{error}</span>
+          <button type="button" onClick={() => void retry()} className={BTN_BASE + ' ' + BTN_DANGER + ' min-h-9 px-3 text-[12px]'}>重试</button>
+        </div>
+      )}
+
       {loading ? <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-20 animate-pulse rounded-[3px] border border-[var(--sf-line-soft)] bg-[var(--sf-canvas)]" />)}</div>
       : comments.length === 0 ? (
-        <div className="flex flex-col items-center gap-1.5 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-10 text-center">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">EMPTY / 0</p>
-          <p className="text-[13px] text-[var(--sf-ink-2)]">{query ? '没有匹配的评论。' : '没有找到评论。'}</p>
-        </div>
+        error ? (
+          <div className="flex flex-col items-center gap-1.5 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-10 text-center">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">LOAD FAILED</p>
+            <p className="text-[13px] text-[var(--sf-ink-2)]">评论列表未能加载，请重试。</p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-1.5 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-10 text-center">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">EMPTY / 0</p>
+            <p className="text-[13px] text-[var(--sf-ink-2)]">{query ? '没有匹配的评论。' : '没有找到评论。'}</p>
+          </div>
+        )
       )
       : <div className="min-w-0 overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">
           <div className="flex items-center justify-between gap-2 border-b border-[var(--sf-line)] bg-[var(--sf-canvas)] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--sf-ink-3)]">
@@ -341,16 +359,16 @@ export default function CommentModerator() {
 
       {totalPages > 1 && (
         <nav className="flex flex-wrap items-center justify-center gap-1.5" aria-label="评论分页">
-          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className={BTN_BASE + ' ' + BTN_SECONDARY + ' min-h-10 px-3 text-[12px]'}>上一页</button>
+          <button onClick={() => void goToPage(page - 1)} disabled={page <= 1} className={BTN_BASE + ' ' + BTN_SECONDARY + ' min-h-10 px-3 text-[12px]'}>上一页</button>
           {Array.from({ length: totalPages }, (_, i) => i + 1)
             .filter((p) => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
             .map((p, idx, arr) => (
               <span key={p} className="flex items-center gap-1">
                 {idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 font-mono text-[11px] text-[var(--sf-ink-3)]">…</span>}
-                <button onClick={() => setPage(p)} aria-current={page === p ? 'page' : undefined} className={cn('flex h-11 min-w-11 items-center justify-center rounded-[3px] border px-3 font-mono text-[12px] tabular-nums sm:h-9 sm:min-w-9 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]', page === p ? 'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-on-accent)]' : 'border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)]')}>{p}</button>
+                <button onClick={() => void goToPage(p)} aria-current={page === p ? 'page' : undefined} className={cn('flex h-11 min-w-11 items-center justify-center rounded-[3px] border px-3 font-mono text-[12px] tabular-nums sm:h-9 sm:min-w-9 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]', page === p ? 'border-[var(--sf-accent)] bg-[var(--sf-accent)] text-[var(--sf-on-accent)]' : 'border-[var(--sf-line)] bg-[var(--sf-surface)] text-[var(--sf-ink-2)] hover:border-[var(--sf-line-strong)] hover:text-[var(--sf-ink)]')}>{p}</button>
               </span>
             ))}
-          <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className={BTN_BASE + ' ' + BTN_SECONDARY + ' min-h-10 px-3 text-[12px]'}>下一页</button>
+          <button onClick={() => void goToPage(page + 1)} disabled={page >= totalPages} className={BTN_BASE + ' ' + BTN_SECONDARY + ' min-h-10 px-3 text-[12px]'}>下一页</button>
         </nav>
       )}
 
