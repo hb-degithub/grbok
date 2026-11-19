@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { postService } from '../lib/services/postService';
 import { commentService } from '../lib/services/commentService';
 import { runAfterAdminCredentialRevoked } from '../lib/admin-auth-lifecycle';
@@ -97,17 +97,47 @@ export function usePocketBase() {
   };
 }
 
-export function usePosts(page = 1, perPage = 10, tagSlug?: string) {
+export interface UsePostsResult {
+  posts: Post[];
+  loading: boolean;
+  error: Error | null;
+  totalPages: number;
+  /** 重新拉取当前页（不刷新整页）；成功后清除 error。 */
+  retry: () => void;
+}
+
+/**
+ * 已发布文章列表。
+ *
+ * 阅读路径的分页/重试契约：
+ * - `retry()` 走一次真实的重新取数（retryToken 自增触发 effect），不是整页 reload；
+ * - 重新取数开始时清掉上一次的 error，成功后也显式 `setError(null)`，
+ *   避免「重试已经成功、界面还停在失败态」；
+ * - 用请求序号（requestSeq）丢弃过期响应：切页码/切标签后，先发后到的旧请求
+ *   不会把新页码的数据覆盖回旧页；
+ * - 标签不存在、标签下没有关联文章都是真实空态（posts 为空、无 error），
+ *   不当成失败，也不去查文章；
+ * - 数据契约不变：仍是 tags → post_tags → posts 的既有关系查询与字段。
+ */
+export function usePosts(page = 1, perPage = 10, tagSlug?: string): UsePostsResult {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [totalPages, setTotalPages] = useState(1);
+  // retryToken 只用于触发重新取数，不参与查询参数，翻页/筛选的既有依赖保持不变。
+  const [retryToken, setRetryToken] = useState(0);
+  // 请求序号：同一 hook 实例内只有最新一次请求可以写状态。
+  const requestSeq = useRef(0);
 
   useEffect(() => {
     const pb = authService.getPocketBase();
+    const seq = ++requestSeq.current;
+    const isCurrent = () => seq === requestSeq.current;
 
     const fetchPosts = async () => {
       setLoading(true);
+      // 新请求开始即视为上一次失败已失效；失败时下面会重新写入 error。
+      setError(null);
       try {
         let filter = 'status = "published"';
 
@@ -115,20 +145,25 @@ export function usePosts(page = 1, perPage = 10, tagSlug?: string) {
           const tagRes = await pb.collection('tags').getList(1, 1, {
             filter: pb.filter('slug = {:slug}', { slug: tagSlug }),
           });
+          if (!isCurrent()) return;
           const tag = tagRes.items[0];
           if (!tag) {
+            // 标签不存在是真空态，不是请求失败。
             setPosts([]);
             setTotalPages(1);
+            setError(null);
             return;
           }
           const ptRes = await pb.collection('post_tags').getFullList({
             filter: pb.filter('tag_id = {:tagId}', { tagId: tag.id }),
             fields: 'post_id',
           });
+          if (!isCurrent()) return;
           const postIds = ptRes.map((pt) => (pt as unknown as { post_id: string }).post_id);
           if (postIds.length === 0) {
             setPosts([]);
             setTotalPages(1);
+            setError(null);
             return;
           }
           filter += pb.filter(' && id in {:postIds}', { postIds: postIds.join(',') });
@@ -139,17 +174,28 @@ export function usePosts(page = 1, perPage = 10, tagSlug?: string) {
           sort: '-published_at',
           expand: 'author',
         });
+        if (!isCurrent()) return;
+
         setPosts(result.items);
         setTotalPages(result.totalPages);
+        setError(null);
       } catch (err) {
+        if (!isCurrent()) return;
+        // 失败不能伪装成空数据：保留 error 供视图显示重试入口；
+        // 同时清掉上一页的列表，避免把旧页码的内容当成当前页展示。
         setError(err as Error);
+        setPosts([]);
+        setTotalPages(1);
       } finally {
-        setLoading(false);
+        if (isCurrent()) setLoading(false);
       }
     };
 
     fetchPosts();
-  }, [page, perPage, tagSlug]);
+  }, [page, perPage, tagSlug, retryToken]);
 
-  return { posts, loading, error, totalPages };
+  const retry = useCallback(() => setRetryToken((token) => token + 1), []);
+
+  return { posts, loading, error, totalPages, retry };
 }
+

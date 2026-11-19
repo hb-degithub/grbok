@@ -6,12 +6,13 @@ import PostCard from './PostCard';
 import type { Post, PostTag } from '../../types/pocketbase';
 
 /**
- * PostCard 回归测试：科幻简约改造后卡片收敛为「编号行 + 细线分隔」。
+ * PostCard 回归测试：阅读路径改造后卡片收敛为「编号行 + 细线分隔」。
  *
- * 设计约束（docs/superpowers/specs/2026-11-17-sci-fi-site-wide-design.md）：
+ * 设计约束（docs/superpowers/specs/2026-11-19-orbital-log-frontend-redesign.md）：
  *   - 编号索引替代卡片网格，序号两位等宽，可跨分页连续；
  *   - 保留真实标题 / 日期 / 摘要 / 阅读时长 / 封面缩略，不虚构数据；
- *   - 整行仍是单个链接，键盘可达、有可读的 aria-label。
+ *   - 整行仍是单个链接，键盘可达、有可读的 aria-label；
+ *   - 标签只来自既有的 post_tags 关系（expand.tag_id），不伪造记录里不存在的字段。
  *
  * 这里锁定的都是「改造后仍必须成立」的行为契约，而不是像素级样式。
  */
@@ -129,6 +130,47 @@ describe('PostCard（编号行）', () => {
     );
 
     expect(screen.getByText('前端工程')).toBeTruthy();
+  });
+
+  it('按 post_tags 关系展示全部关联标签（不止第一个）', () => {
+    render(
+      <PostCard
+        post={makePost({
+          expand: {
+            'post_tags(post_id)': [makeTag('前端工程'), makeTag('Astro')],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.getByText('前端工程')).toBeTruthy();
+    expect(screen.getByText('Astro')).toBeTruthy();
+  });
+
+  it('没有 post_tags 关系数据时不渲染标签（不用记录自身 name 伪造）', () => {
+    // 只有关系记录、没有 expand.tag_id：真实数据里拿不到标签名，就不能编一个。
+    const relationWithoutTag: PostTag = {
+      id: 'pt-1',
+      post_id: 'post-1',
+      tag_id: 'tag-1',
+      created: '2026-01-02T03:04:05.000Z',
+      updated: '2026-01-02T03:04:05.000Z',
+    };
+
+    render(
+      <PostCard
+        post={makePost({
+          expand: {
+            'post_tags(post_id)': [
+              { ...relationWithoutTag, name: '伪造标签' } as unknown as PostTag,
+            ],
+          },
+        })}
+      />,
+    );
+
+    expect(screen.queryByText('伪造标签')).toBeNull();
+    expect(screen.queryByText('tag-1')).toBeNull();
   });
 
   it('无摘要时不渲染摘要段落', () => {

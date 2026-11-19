@@ -1,24 +1,33 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageShell from '../../components/layout/PageShell.astro';
+import SectionHeading from '../../components/layout/SectionHeading.astro';
 import PostList from '../../components/posts/PostList';
+
+// 页码状态放在 URL 上（?page=N）：SSR 首屏、刷新、分享与「从文章返回」都从
+// 同一个来源恢复；岛内翻页再由 PostList 用 history.replaceState 写回。
+// 非法值（空串 / NaN / 非正数）由 PostList 再兜底收敛到第 1 页。
+const requestedPage = Number.parseInt(Astro.url.searchParams.get('page') ?? '', 10);
+const initialPage = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 ---
 
 <BaseLayout title="文章列表" description="浏览所有已发布的文章">
-  <section class="mx-auto w-full max-w-4xl px-5 py-16 sm:px-8 lg:px-10">
-    <header class="mb-10 border-b border-[var(--sf-line)] pb-6">
-      <p class="mb-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
-        <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
-        Index / 01
-      </p>
-      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <h1 class="text-4xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-5xl">所有文章</h1>
-        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">按发布时间倒序</p>
-      </div>
-      <p class="mt-3 max-w-xl text-[var(--sf-ink-2)]">
-        浏览所有已发布的技术文章和思考。
-      </p>
-    </header>
+  {/* 页头与列表共用同一个阅读列宽：PageShell 负责页头与 gutter，外层只收敛行宽。 */}
+  <div class="mx-auto w-full max-w-4xl">
+    <PageShell
+      eyebrow="Index / 01"
+      title="所有文章"
+      description="浏览所有已发布的技术文章和思考，按发布时间倒序。"
+    >
+      <SectionHeading
+        id="posts-feed-title"
+        eyebrow="Feed"
+        level="h2"
+        title="最新发布"
+        description="每页 12 篇；页码保存在 ?page= 中，刷新或分享都能回到同一页。"
+      />
 
-    <PostList client:visible perPage={12} />
-  </section>
+      <PostList client:visible perPage={12} initialPage={initialPage} syncPageQuery />
+    </PageShell>
+  </div>
 </BaseLayout>

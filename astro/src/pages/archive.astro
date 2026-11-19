@@ -1,5 +1,7 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
+import PageShell from "../components/layout/PageShell.astro";
+import SectionHeading from "../components/layout/SectionHeading.astro";
 import { cachedFetchJson } from '../lib/pb-cache';
 import { pbBaseUrl } from '../lib/pb-base-url';
 // SSR 取数走服务端回环地址，浏览器侧仍用公网域名（见 pb-base-url.ts）
@@ -34,68 +36,62 @@ for (const post of posts) {
 ---
 
 <BaseLayout title="文章归档" description="按时间归档">
-  <section class="mx-auto max-w-3xl px-5 py-16 sm:px-8">
-    <header class="mb-10 border-b border-[var(--sf-line)] pb-6">
-      <p class="mb-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
-        <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
-        Archive / 01
-      </p>
-      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <h1 class="text-4xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-5xl">文章归档</h1>
-        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">
-          共 {posts.length} 篇
-        </p>
-      </div>
-    </header>
+  {/* 页头与时间轴共用同一个阅读列宽：PageShell 负责页头与 gutter，外层只收敛行宽。 */}
+  <div class="mx-auto w-full max-w-3xl">
+    <PageShell
+      eyebrow="Archive / 01"
+      title="文章归档"
+      description={`共 ${posts.length} 篇已发布文章，按年份与月份分组。`}
+    >
+      {groups.length === 0 ? (
+        <div class="border-y border-[var(--sf-line)] px-1 py-16 text-center">
+          <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">Empty / 0</p>
+          <p class="mt-3 text-[var(--sf-ink-2)]">暂无归档文章</p>
+        </div>
+      ) : (
+        groups.map((yearGroup) => (
+          <section aria-labelledby={`archive-year-${yearGroup.year}`}>
+            <SectionHeading id={`archive-year-${yearGroup.year}`} level="h2" title={String(yearGroup.year)}>
+              <span
+                slot="action"
+                class="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]"
+              >
+                {yearGroup.months.length} 个月
+              </span>
+            </SectionHeading>
 
-    {groups.length === 0 ? (
-      <div class="border-y border-[var(--sf-line)] px-1 py-16 text-center">
-        <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">Empty / 0</p>
-        <p class="mt-3 text-[var(--sf-ink-2)]">暂无归档文章</p>
-      </div>
-    ) : (
-      groups.map((yearGroup) => (
-        <section class="mb-12 last:mb-0">
-          <div class="flex items-baseline justify-between gap-4 border-b border-[var(--sf-line)] pb-2">
-            <h2 class="font-mono text-2xl font-bold tabular-nums tracking-[0.06em] text-[var(--sf-ink)]">
-              {yearGroup.year}
-            </h2>
-            <span class="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">
-              {yearGroup.months.length} 个月
-            </span>
-          </div>
-
-          {yearGroup.months.map((monthGroup) => (
-            <div class="archive-month mt-5">
-              <h3 class="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">
-                {monthGroup.month} 月
-              </h3>
-              <ul class="mt-2 list-none p-0">
-                {monthGroup.posts.map((post) => (
-                  <li>
-                    <a
-                      href={"/posts/" + post.slug}
-                      class="archive-entry group flex items-baseline gap-4 py-1.5 text-sm no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
-                    >
-                      <time
-                        datetime={post.published_at}
-                        class="shrink-0 font-mono text-[11px] tabular-nums tracking-[0.08em] text-[var(--sf-ink-3)]"
+            {yearGroup.months.map((monthGroup) => (
+              <div class="archive-month mt-5">
+                <h3 class="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">
+                  {monthGroup.month} 月
+                </h3>
+                <ul class="mt-2 list-none p-0">
+                  {monthGroup.posts.map((post) => (
+                    <li>
+                      <a
+                        href={"/posts/" + post.slug}
+                        class="archive-entry group flex items-baseline gap-4 py-1.5 text-sm no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
                       >
-                        {new Date(post.published_at).toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" })}
-                      </time>
-                      <span class="min-w-0 flex-1 text-[var(--sf-ink-2)] transition-colors duration-200 [overflow-wrap:anywhere] group-hover:text-[var(--sf-accent-ink)]">
-                        {post.title}
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </section>
-      ))
-    )}
-  </section>
+                        <time
+                          datetime={post.published_at}
+                          class="shrink-0 font-mono text-[11px] tabular-nums tracking-[0.08em] text-[var(--sf-ink-3)]"
+                        >
+                          {new Date(post.published_at).toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" })}
+                        </time>
+                        <span class="min-w-0 flex-1 text-[var(--sf-ink-2)] transition-colors duration-200 [overflow-wrap:anywhere] group-hover:text-[var(--sf-accent-ink)]">
+                          {post.title}
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </section>
+        ))
+      )}
+    </PageShell>
+  </div>
 
   <style>
     /* 归档时间轴：冷灰细线 + 小色点，hover 才用强调色 */

@@ -1,18 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import React from 'react';
 
 import type { Post } from '../../types/pocketbase';
 
 /**
- * PostList 回归测试：科幻简约改造后列表为「编号行 + 细线分隔」。
+ * PostList 回归测试：阅读页的「编号行 + 细线分隔 + 可分享页码」。
  *
  * 锁定的行为契约：
  *   - 加载中 / 加载失败 / 空列表三态仍存在，且语义角色不变（status / alert）；
- *   - 失败态保留「重试」按钮，点击走整页重载；
- *   - 每篇文章仍然来自 usePosts，不本地造数据；
+ *   - 失败态的重试按钮触发 usePosts 的真实重新取数（不再整页 reload）；
+ *   - 每篇文章仍然来自 usePosts，不在本地造数据；
  *   - 序号跨分页连续（第 2 页从 perPage+1 开始），便于当索引用；
- *   - 分页按钮保留 aria-label / aria-current，点击切换页码并重新取数。
+ *   - 分页按钮保留 aria-label / aria-current，点击切换页码并重新取数；
+ *   - 阅读页开启 syncPageQuery 时，页码通过 history.replaceState 写回 ?page=；
+ *     回到第 1 页移除参数；未开启（首页嵌入列表）时不改写 URL；
+ *   - initialPage 决定首屏取数页码，非法值收敛到 1，越界页码收敛到最后一页。
  */
 
 const { mockUsePosts } = vi.hoisted(() => ({ mockUsePosts: vi.fn() }));
@@ -21,7 +24,7 @@ vi.mock('../../hooks/usePocketBase', () => ({
   usePosts: mockUsePosts,
 }));
 
-// 改造后列表不再按断点切换布局；仍 mock 掉，避免 jsdom 缺少 matchMedia 的噪声。
+// 列表不再按断点切换布局；仍 mock 掉，避免 jsdom 缺少 matchMedia 的噪声。
 vi.mock('../../hooks/useBreakpoint', () => ({
   default: () => ({
     isMobile: false,
@@ -62,12 +65,14 @@ function mockState(state: {
   loading?: boolean;
   error?: Error | null;
   totalPages?: number;
+  retry?: () => void;
 }) {
   usePostsMock.mockReturnValue({
     posts: state.posts ?? [],
     loading: state.loading ?? false,
     error: state.error ?? null,
     totalPages: state.totalPages ?? 1,
+    retry: state.retry ?? vi.fn(),
   } as unknown as ReturnType<typeof mockUsePosts>);
 }
 
@@ -75,10 +80,12 @@ describe('PostList（编号行列表）', () => {
   beforeEach(() => {
     cleanup();
     usePostsMock.mockReset();
+    window.history.replaceState(null, '', '/');
   });
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
   });
 
   it('加载中：保留 status 语义与加载提示', () => {
@@ -90,23 +97,31 @@ describe('PostList（编号行列表）', () => {
     expect(status.textContent).toContain('正在加载文章');
   });
 
-  it('加载失败：保留 alert 语义与重试按钮，点击重载页面', () => {
-    mockState({ error: new Error('boom') });
-
+  it('加载失败：保留 alert 语义；重试按钮触发真实重新取数而不是整页 reload', () => {
+    const retry = vi.fn();
     const reload = vi.fn();
+    const originalLocation = window.location;
     Object.defineProperty(window, 'location', {
       configurable: true,
       writable: true,
-      value: { reload },
+      value: { href: 'http://localhost:3000/posts', reload },
     });
 
+    mockState({ error: new Error('boom'), retry });
     render(<PostList perPage={12} />);
 
     expect(screen.getByRole('alert')).toBeTruthy();
     expect(screen.getByText('加载失败，请稍后重试')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: '重试' }));
-    expect(reload).toHaveBeenCalledTimes(1);
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(reload).not.toHaveBeenCalled();
+
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      writable: true,
+      value: originalLocation,
+    });
   });
 
   it('空列表：保留空态文案', () => {
@@ -145,6 +160,7 @@ describe('PostList（编号行列表）', () => {
       loading: false,
       error: null,
       totalPages: 3,
+      retry: vi.fn(),
     })) as unknown as typeof mockUsePosts);
 
     render(<PostList perPage={12} />);
@@ -155,6 +171,73 @@ describe('PostList（编号行列表）', () => {
     expect(usePostsMock).toHaveBeenLastCalledWith(2, 12, undefined);
     expect(screen.getByText('13')).toBeTruthy();
     expect(screen.getByRole('button', { name: '第 2 页' }).getAttribute('aria-current')).toBe('page');
+  });
+
+  it('initialPage 决定首屏取数页码（?page= 由页面 SSR 传入）', () => {
+    mockState({ posts: postsForPage(3, 1), totalPages: 3 });
+    render(<PostList perPage={12} initialPage={3} />);
+
+    expect(usePostsMock).toHaveBeenCalledWith(3, 12, undefined);
+    expect(screen.getByRole('button', { name: '第 3 页' }).getAttribute('aria-current')).toBe('page');
+  });
+
+  it('initialPage 非法值（0 / NaN / 负数）收敛到第 1 页', () => {
+    mockState({ posts: postsForPage(1, 1) });
+
+    const { unmount } = render(<PostList perPage={12} initialPage={0} />);
+    expect(usePostsMock).toHaveBeenLastCalledWith(1, 12, undefined);
+    unmount();
+
+    render(<PostList perPage={12} initialPage={Number.NaN} />);
+    expect(usePostsMock).toHaveBeenLastCalledWith(1, 12, undefined);
+  });
+
+  it('syncPageQuery：翻页用 replaceState 写回 ?page=，不新增历史条目', () => {
+    mockState({ posts: postsForPage(1), totalPages: 3 });
+    const replaceState = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
+
+    render(<PostList perPage={12} syncPageQuery />);
+    fireEvent.click(screen.getByRole('button', { name: '第 3 页' }));
+
+    expect(replaceState).toHaveBeenCalledTimes(1);
+    expect(String(replaceState.mock.calls[0]?.[2] ?? '')).toContain('page=3');
+  });
+
+  it('syncPageQuery：回到第 1 页时移除 ?page=，URL 保持干净', () => {
+    window.history.replaceState(null, '', '/posts?page=3');
+    mockState({ posts: postsForPage(1), totalPages: 3 });
+    const replaceState = vi.spyOn(window.history, 'replaceState').mockImplementation(() => {});
+
+    render(<PostList perPage={12} initialPage={3} syncPageQuery />);
+    fireEvent.click(screen.getByRole('button', { name: '第 1 页' }));
+
+    const target = String(replaceState.mock.calls[0]?.[2] ?? '');
+    expect(target).not.toContain('page=');
+    expect(target).toContain('/posts');
+  });
+
+  it('未开启 syncPageQuery 的嵌入列表（首页）不改写 URL', () => {
+    mockState({ posts: postsForPage(1), totalPages: 3 });
+    const replaceState = vi.spyOn(window.history, 'replaceState');
+
+    render(<PostList perPage={6} />);
+    fireEvent.click(screen.getByRole('button', { name: '第 2 页' }));
+
+    expect(replaceState).not.toHaveBeenCalled();
+  });
+
+  it('URL 页码越界时收敛到最后一页，避免把「有数据」显示成「暂无文章」', async () => {
+    usePostsMock.mockImplementation(((page: number) => ({
+      posts: page <= 3 ? postsForPage(page, 1) : [],
+      loading: false,
+      error: null,
+      totalPages: 3,
+      retry: vi.fn(),
+    })) as unknown as typeof mockUsePosts);
+
+    render(<PostList perPage={12} initialPage={99} />);
+
+    await waitFor(() => expect(usePostsMock).toHaveBeenLastCalledWith(3, 12, undefined));
   });
 
   it('tagSlug 透传给 usePosts（标签筛选不被改造丢弃）', () => {

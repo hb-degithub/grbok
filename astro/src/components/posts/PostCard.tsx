@@ -49,11 +49,15 @@ export default function PostCard({ post, index = 0, ordinal }: PostCardProps) {
 
   const readingTime = Math.max(1, Math.ceil((post.content?.length || 0) / 300));
 
-  // 标签徽标：兼容两种历史数据形态（关联记录的 expand.tag_id 或记录自身 name）。
-  const firstPostTag = post.expand?.['post_tags(post_id)']?.[0];
-  const tagName =
-    firstPostTag?.expand?.tag_id?.name ??
-    (firstPostTag as unknown as { name?: string } | undefined)?.name;
+  // 标签只来自既有的 post_tags 关系：post → post_tags(post_id) → expand.tag_id。
+  // 关系记录本身没有 name 字段；expand 拿不到就不展示，不伪造标签数据。
+  const tagNames = Array.from(
+    new Set(
+      (post.expand?.['post_tags(post_id)'] ?? [])
+        .map((relation) => relation.expand?.tag_id?.name)
+        .filter((name): name is string => Boolean(name)),
+    ),
+  );
 
   const ordinalLabel = formatOrdinal(ordinal ?? index + 1);
   const rowVariants = makeRowVariants(index);
@@ -101,11 +105,11 @@ export default function PostCard({ post, index = 0, ordinal }: PostCardProps) {
               )}
 
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-3)]">
-                {tagName && (
-                  <span className="border border-[var(--sf-line)] px-1.5 py-0.5 text-[var(--sf-ink-2)]">
-                    {tagName}
+                {tagNames.map((name) => (
+                  <span key={name} className="border border-[var(--sf-line)] px-1.5 py-0.5 text-[var(--sf-ink-2)]">
+                    {name}
                   </span>
-                )}
+                ))}
                 <time dateTime={post.published_at}>{formattedDate}</time>
                 <span aria-hidden="true" className="text-[var(--sf-line-strong)]">
                   /

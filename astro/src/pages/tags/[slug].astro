@@ -1,5 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageShell from '../../components/layout/PageShell.astro';
+import SectionHeading from '../../components/layout/SectionHeading.astro';
 import PostList from '../../components/posts/PostList';
 import { cachedFetchJson } from '../../lib/pb-cache';
 import { pbBaseUrl } from '../../lib/pb-base-url';
@@ -33,42 +35,51 @@ async function fetchTag(tagSlug: string): Promise<Tag | null> {
 }
 
 const tag = await fetchTag(slug ?? '');
+
+// 标签不存在时返回真正的 404（此前是 200 + 「标签不存在」文案，属软 404，
+// 既会被搜索引擎收录，也让调用方无法区分「没有这个标签」和「标签下没有文章」）。
+if (!tag) {
+  Astro.response.status = 404;
+}
+
+// 页码状态放在 URL 上（?page=N）：SSR 首屏与岛内翻页共用同一个来源。
+const requestedPage = Number.parseInt(Astro.url.searchParams.get('page') ?? '', 10);
+const initialPage = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
 ---
 
-<BaseLayout title={tag ? `标签: ${tag.name}` : '标签'} description={tag?.description || '按标签筛选文章'}>
-  <section class="mx-auto w-full max-w-5xl px-5 py-16 sm:px-8 lg:px-10">
-    <header class="mb-10 border-b border-[var(--sf-line)] pb-6">
-      <p class="mb-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
-        <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
-        Taxonomy / Tag
-      </p>
-      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <h1 class="text-4xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-5xl">
-          {tag ? tag.name : '标签'}
-        </h1>
-        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">标签归档</p>
-      </div>
-      {tag?.description && (
-        <p class="mt-3 max-w-xl text-[var(--sf-ink-2)]">
-          {tag.description}
-        </p>
-      )}
-    </header>
+<BaseLayout
+  title={tag ? `标签: ${tag.name}` : '标签不存在'}
+  description={tag?.description || '按标签筛选文章'}
+>
+  {/* 页头与列表共用同一个阅读列宽：PageShell 负责页头与 gutter，外层只收敛行宽。 */}
+  <div class="mx-auto w-full max-w-4xl">
+    <PageShell
+      eyebrow="Taxonomy / Tag"
+      title={tag ? tag.name : '标签不存在'}
+      description={tag
+        ? tag.description || '按发布时间倒序浏览该标签下的文章。'
+        : '该标签不存在或已被删除，请回到标签列表重新选择。'}
+    >
+      {tag ? (
+        <>
+          <SectionHeading
+            id="tag-posts-title"
+            eyebrow="Posts"
+            level="h2"
+            title="该标签下的文章"
+            description="每页 12 篇；页码保存在 ?page= 中。"
+          />
 
-    {tag ? (
-      <PostList client:visible perPage={12} tagSlug={slug} />
-    ) : (
-      <div class="border-y border-[var(--sf-line)] px-1 py-16 text-center">
-        <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">Empty / 0</p>
-        <p class="mt-3 text-[var(--sf-ink-2)]">暂无标签</p>
-        <p class="mt-2 text-sm text-[var(--sf-ink-3)]">标签不存在</p>
-        <a
-          href="/tags"
-          class="mt-5 inline-flex min-h-[44px] items-center rounded-[3px] border border-[var(--sf-line-control)] px-4 font-mono text-xs uppercase tracking-[0.14em] text-[var(--sf-ink-2)] no-underline transition-colors duration-200 hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
-        >
-          返回标签列表
-        </a>
-      </div>
-    )}
-  </section>
+          <PostList client:visible perPage={12} tagSlug={slug} initialPage={initialPage} syncPageQuery />
+        </>
+      ) : (
+        <div class="border-y border-[var(--sf-line)] px-1 py-16 text-center">
+          <p class="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">Error / 404</p>
+          <p class="mt-3 text-[var(--sf-ink-2)]">标签不存在</p>
+          <p class="mt-2 text-sm text-[var(--sf-ink-3)]">该标签可能已被删除，或链接拼写有误。</p>
+          <a href="/tags" class="orbital-action mt-5 inline-flex">返回标签列表</a>
+        </div>
+      )}
+    </PageShell>
+  </div>
 </BaseLayout>

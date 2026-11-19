@@ -48,8 +48,11 @@ const FORBIDDEN_VISUALS: { reason: string; pattern: RegExp }[] = [
 
 describe('内容页科幻简约改造（静态断言）', () => {
   describe.each(CONTENT_PAGES)('%s', (file) => {
-    it('使用共享设计令牌 var(--sf-*)', () => {
-      expect(readSource(file)).toContain('var(--sf-');
+    it('使用共享设计令牌 var(--sf-*) 或共享 PageShell 原语', () => {
+      const src = readSource(file);
+      // 阅读页把页头与配色收敛到 PageShell + global.css 的 --sf-* 令牌；
+      // 其余内容页仍直接使用 var(--sf-*) 类。两条路径都只有一个颜色来源。
+      expect(src.includes('var(--sf-') || src.includes('<PageShell')).toBe(true);
     });
 
     it('不再使用旧调色板（zinc/teal/indigo…）', () => {
@@ -62,9 +65,13 @@ describe('内容页科幻简约改造（静态断言）', () => {
       expect(readSource(file)).not.toMatch(pattern);
     });
 
-    it('保留唯一的 h1 标题', () => {
+    it('保留唯一的 h1 标题（可来自共享 PageShell）', () => {
       const src = readSource(file);
-      expect(src.match(/<h1\b/g)).toHaveLength(1);
+      // PageShell 自己输出唯一 h1；迁移到 PageShell 的页面不再手写 h1。
+      // 两者之和仍必须恰好是 1，避免出现两个 h1 或没有 h1。
+      const h1Count = src.match(/<h1\b/g)?.length ?? 0;
+      const shellCount = src.match(/<PageShell\b/g)?.length ?? 0;
+      expect(h1Count + shellCount, `${file} 的 h1 数量`).toBe(1);
     });
   });
 
