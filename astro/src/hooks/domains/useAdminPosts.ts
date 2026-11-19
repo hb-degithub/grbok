@@ -10,6 +10,7 @@ type PostStatusFilter = 'all' | 'published' | 'draft' | 'archived';
 export function useAdminPosts() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<PostStatusFilter>('all');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -29,8 +30,15 @@ export function useAdminPosts() {
       });
       setPosts(result.items);
       setTotalPages(result.totalPages);
+      setError(null);
     } catch (err) {
-      console.error('获取文章失败:', err);
+      // 失败时保留上一次成功的数据与分页（不清空成「没有文章」），
+      // 并把错误显式提示给用户，避免把请求失败伪装成空数据。
+      const message = notifyStepUpExpired(err)
+        ? '管理会话已过期，请重新验证动态口令'
+        : describePbError(err, '文章列表加载失败');
+      setError(message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -188,6 +196,7 @@ export function useAdminPosts() {
   return {
     posts,
     loading,
+    error,
     filter,
     setFilter,
     query,

@@ -47,6 +47,8 @@ export default function SettingsForm() {
   const {
     settings,
     loading,
+    error,
+    retry,
     saving,
     saved,
     saveSettings,
@@ -58,6 +60,28 @@ export default function SettingsForm() {
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="h-16 animate-pulse rounded-[3px] border border-[var(--sf-line-soft)] bg-[var(--sf-canvas)]" />
       ))}
+    </div>
+  );
+
+  /* 加载失败：只显示错误与重试，不渲染表单（默认值不可保存，避免覆盖线上配置）。 */
+  if (error) return (
+    <div role="alert" className={PANEL}>
+      <div className={PANEL_HEAD}>
+        <h2 className="break-words text-sm font-semibold tracking-tight text-[var(--sf-ink)] [overflow-wrap:anywhere]">设置加载失败</h2>
+        <p className="mt-1 break-words text-xs leading-5 text-[var(--sf-ink-3)] [overflow-wrap:anywhere]">未能读取站点设置，当前不可保存，避免默认值覆盖线上配置。重试成功后才能编辑。</p>
+      </div>
+      <div className={PANEL_BODY}>
+        <p className="break-words text-sm text-[var(--sf-danger)] [overflow-wrap:anywhere]">{error}</p>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            onClick={retry}
+            className="inline-flex min-h-10 w-full items-center justify-center rounded-[3px] border border-[var(--sf-accent)] bg-[var(--sf-accent)] px-3 text-xs font-medium text-[var(--sf-on-accent)] transition-colors hover:border-[var(--sf-accent-ink)] hover:bg-[var(--sf-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] sm:w-auto"
+          >
+            重试
+          </button>
+        </div>
+      </div>
     </div>
   );
 

@@ -8,6 +8,13 @@ function avatarUrlOf(user: AdminUser): string {
   return user.avatar.startsWith('http') ? user.avatar : buildFileUrl('users', user.id, user.avatar);
 }
 
+/** 与 adminUserService.getUsers 的默认 perPage 保持一致，分页 UI 也复用它。 */
+export const USERS_PER_PAGE = 20;
+
+function lastPageOf(totalItems: number): number {
+  return Math.max(1, Math.ceil(totalItems / USERS_PER_PAGE));
+}
+
 export function useAdminUsers() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,11 +28,26 @@ export function useAdminUsers() {
     setLoading(true);
     setError(null);
     try {
-      const result = await adminUserService.getUsers(pageNum);
+      const requestedPage = Math.max(1, pageNum);
+      let result = await adminUserService.getUsers(requestedPage, USERS_PER_PAGE);
+      let effectivePage = requestedPage;
+
+      // 删除末页最后一个用户后，请求页会越界：PB 返回空 items 且 totalItems 已经缩小。
+      // 这里按真实总数把页码 clamp 到实际最后一页并重新请求，避免停留在空白页。
+      if (result.items.length === 0 && requestedPage > 1) {
+        const lastPage = lastPageOf(result.totalItems);
+        if (lastPage < requestedPage) {
+          effectivePage = lastPage;
+          result = await adminUserService.getUsers(effectivePage, USERS_PER_PAGE);
+        }
+      }
+
       setUsers(result.items);
       setTotalItems(result.totalItems);
-      setPage(pageNum);
+      setPage(effectivePage);
     } catch (err) {
+      // 失败只记录错误：保留已有的 users/totalItems/page，重试时仍停留在当前页，
+      // 也不会因为一次失败把统计伪造成「共 0 个用户」。
       setError(err instanceof Error ? err.message : '加载失败');
     } finally {
       setLoading(false);
@@ -38,7 +60,9 @@ export function useAdminUsers() {
 
   const getAvatarUrl = useCallback((user: AdminUser) => avatarUrlOf(user), []);
 
-  const updateRole = useCallback(async (targetUser: AdminUser, role: AdminRole, _superAdminCount: number) => {
+  // 页内 super_admin 数量（_superAdminCount）只是当前页统计，不是权限依据；
+  // 是否允许降级/删除最后一个超级管理员由服务端规则判定，前端不做安全拦截。
+  const updateRole = useCallback(async (targetUser: AdminUser, role: AdminRole, _superAdminCount?: number) => {
     setUpdatingId(targetUser.id);
     setError(null);
     try {
@@ -53,7 +77,7 @@ export function useAdminUsers() {
     }
   }, [page, loadUsers]);
 
-  const deleteUser = useCallback(async (targetUser: AdminUser, _superAdminCount: number, _currentUserId?: string) => {
+  const deleteUser = useCallback(async (targetUser: AdminUser, _superAdminCount?: number, _currentUserId?: string) => {
     setDeletingId(targetUser.id);
     setError(null);
     try {

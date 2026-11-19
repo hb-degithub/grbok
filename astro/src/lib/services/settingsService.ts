@@ -37,14 +37,16 @@ class SettingsService extends BaseService<SettingRecordModel> {
     super('settings');
   }
 
+  /**
+   * 加载全部站点设置。
+   *
+   * 失败时必须向上抛出：调用方（后台设置页）需要区分「真实设置」与「默认值」，
+   * 否则会拿 DEFAULT_SITE_SETTINGS 渲染表单，用户一点保存就把默认值写回线上。
+   * 签名/返回类型保持不变（Promise<SiteSettings>），成功路径仍然合并默认值。
+   */
   async getAllSettings(): Promise<SiteSettings> {
-    try {
-      const result = await this.getFullList();
-      return this.mergeSettings(result);
-    } catch (err) {
-      console.error('加载设置失败：', err);
-      return DEFAULT_SITE_SETTINGS;
-    }
+    const result = await this.getFullList();
+    return this.mergeSettings(result);
   }
 
   private mergeSettings(records: SettingRecord[]): SiteSettings {
