@@ -27,19 +27,19 @@ test('@route B1 首页：品牌/Hero/主 CTA/最新文章三态/统计整数', a
 
   await expect(page.locator('section#latest')).toBeVisible();
 
-  // 统计数字为整数（空 PB 下 SSR 计数为 0，不断言具体值）
-  const stats = page.locator('main .text-2xl.font-bold');
-  await expect(stats.first()).toBeVisible();
-  const texts = await stats.allInnerTexts();
-  expect(texts.length).toBeGreaterThanOrEqual(2);
-  for (const text of texts.slice(0, 2)) {
-    expect(text.trim()).toMatch(/^\d+$/);
+  // 统计数字为整数（空 PB 下 SSR 计数为 0，不断言具体值）。
+  // 用语义标签定位，不依赖 Tailwind 工具类名。
+  for (const label of ['已发布文章', '内容标签']) {
+    const block = page.getByText(label, { exact: true }).locator('..');
+    await expect(block).toBeVisible();
+    await expect(block).toContainText(/\d+/);
+    const value = (await block.innerText()).match(/\d+/)?.[0] ?? '';
+    expect(value, `${label} 应为整数`).toMatch(/^\d+$/);
   }
 
   // client:visible 水合后：#latest 出现空态（mock 空数据）
   await scrollThrough(page);
-  await expect(page.locator('section#latest')).toContainText('EMPTY / 0', { timeout: 15_000 });
-  await expect(page.locator('section#latest')).toContainText('暂无文章');
+  await expect(page.locator('section#latest')).toContainText('暂无文章', { timeout: 15_000 });
 
   expectCleanErrors(errors, 'B1 首页');
 });
@@ -51,8 +51,7 @@ test('@route B2 /posts：所有文章 + 空态', async ({ page }, testInfo) => {
 
   await expect(page.locator('h1:visible')).toHaveText('所有文章');
   await scrollThrough(page);
-  await expect(page.locator('main')).toContainText('EMPTY / 0', { timeout: 15_000 });
-  await expect(page.locator('main')).toContainText('暂无文章');
+  await expect(page.locator('main')).toContainText('暂无文章', { timeout: 15_000 });
 
   expectCleanErrors(errors, 'B2 /posts');
 });

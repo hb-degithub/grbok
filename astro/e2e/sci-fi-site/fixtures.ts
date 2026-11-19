@@ -16,35 +16,34 @@ export const SHOTS = fileURLToPath(new URL('../../../tmp/sci-fi-visual/shots/', 
 /** 验收路由（/admin 单独在 authz 中断言，这里只列公开页）。 */
 export const PUBLIC_ROUTES = ['/', '/posts', '/tags', '/archive', '/about', '/links', '/guestbook', '/gallery', '/login'] as const;
 
-export const TOKENS = {
-  light: {
-    '--sf-canvas': '#f1f3f5',
-    '--sf-surface': '#ffffff',
-    '--sf-ink': '#16191d',
-    '--sf-ink-2': '#454f59',
-    '--sf-ink-3': '#5f6a75',
-    '--sf-line-control': '#7f8b97',
-    '--sf-accent': '#0b6d76',
-    '--sf-accent-ink': '#085159',
-    '--sf-on-accent': '#ffffff',
-  },
-  dark: {
-    '--sf-canvas': '#0e1114',
-    '--sf-surface': '#161a1e',
-    '--sf-ink': '#e8ecf0',
-    '--sf-ink-2': '#a8b4bd',
-    '--sf-ink-3': '#7a8791',
-    '--sf-line-control': '#5a6a77',
-    '--sf-accent': '#3fa8b2',
-    '--sf-accent-ink': '#6bc4cc',
-    '--sf-on-accent': '#16191d',
-  },
-} as const;
-
-export const CANVAS_RGB = {
-  light: 'rgb(241, 243, 245)',
-  dark: 'rgb(14, 17, 20)',
-} as const;
+/**
+ * 令牌名称契约（不是色值真值）。
+ *
+ * 色值真值只有 `astro/src/styles/global.css` 一处；E2E 只断言这些令牌在
+ * 渲染后的根元素上存在且非空，具体颜色 / 对比度由 contrast.spec 在浏览器里算。
+ */
+export const REQUIRED_TOKENS = [
+  '--sf-canvas',
+  '--sf-surface',
+  '--sf-ink',
+  '--sf-ink-2',
+  '--sf-ink-3',
+  '--sf-line',
+  '--sf-line-strong',
+  '--sf-line-soft',
+  '--sf-line-control',
+  '--sf-accent',
+  '--sf-accent-ink',
+  '--sf-on-accent',
+  '--sf-danger',
+  '--sf-success',
+  '--sf-warning',
+  '--sf-info',
+  '--sf-focus-ring',
+  '--sf-scrim',
+  '--sf-glow',
+  '--sf-orbit',
+] as const;
 
 export function themeOf(projectName: string): 'light' | 'dark' {
   return projectName.endsWith('dark') ? 'dark' : 'light';
@@ -274,21 +273,110 @@ export interface ColorTokenSnapshot {
   htmlClasses: string;
 }
 
-export function tokenSnapshot(page: Page): Promise<ColorTokenSnapshot> {
-  return page.evaluate(() => {
-    const cs = getComputedStyle(document.documentElement);
-    const names = Object.keys({
-      '--sf-canvas': 1, '--sf-surface': 1, '--sf-ink': 1, '--sf-ink-2': 1, '--sf-ink-3': 1,
-      '--sf-line-control': 1, '--sf-accent': 1, '--sf-accent-ink': 1, '--sf-on-accent': 1,
-    });
+/**
+ * 从渲染后的根元素采样令牌，不再比对仓库里另存的色值表。
+ * 返回值结构（htmlClasses / tokens / bodyBackground）供 invariants 与 contrast 共用。
+ */
+export function tokenSnapshot(
+  page: Page,
+  names: readonly string[] = REQUIRED_TOKENS,
+): Promise<ColorTokenSnapshot> {
+  return page.evaluate((tokenNames) => {
+    const styles = getComputedStyle(document.documentElement);
     const tokens: Record<string, string> = {};
-    for (const name of names) tokens[name] = cs.getPropertyValue(name).trim().toLowerCase();
+    for (const name of tokenNames) tokens[name] = styles.getPropertyValue(name).trim();
     return {
       tokens,
       bodyBackground: getComputedStyle(document.body).backgroundColor,
       htmlClasses: document.documentElement.className,
     };
-  });
+  }, names);
+}
+
+/* ------------------------------------------------------------------ */
+/* 隔离后台会话：已登录 author（仅测试替身，不连接真实账号）             */
+/* ------------------------------------------------------------------ */
+
+/** 后台工作台采样的登录用户；只用于隔离的浏览器测试上下文。 */
+export const ADMIN_SESSION_RECORD = {
+  collectionId: 'pbc_users',
+  collectionName: 'users',
+  id: 'e2e-author-0001',
+  email: 'e2e-author@example.invalid',
+  name: 'E2E Author',
+  role: 'author',
+  verified: true,
+  created: '2026-01-01 00:00:00.000Z',
+  updated: '2026-01-01 00:00:00.000Z',
+} as const;
+
+function base64Url(value: object): string {
+  return Buffer.from(JSON.stringify(value)).toString('base64url');
+}
+
+/** 生成仅供 PB SDK 解析 exp 的假 JWT；签名不参与本地 isValid 判定。 */
+function fakeAuthToken(expiresInSeconds = 3600): string {
+  const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
+  return [
+    base64Url({ alg: 'HS256', typ: 'JWT' }),
+    base64Url({ exp, type: 'auth', id: ADMIN_SESSION_RECORD.id, collectionId: ADMIN_SESSION_RECORD.collectionId }),
+    'e2e-signature',
+  ].join('.');
+}
+
+/**
+ * 写入隔离后台登录态（localStorage）并固定主题。
+ * 与 `mockAdminSession` 搭配使用；导航前调用即可。
+ */
+export async function installAdminSession(page: Page, theme: 'light' | 'dark') {
+  await installStorage(page, theme);
+  const token = fakeAuthToken();
+  await page.addInitScript(({ authToken, record }) => {
+    try {
+      localStorage.setItem('pocketbase_auth', JSON.stringify({ token: authToken, record }));
+    } catch {
+      /* ignore */
+    }
+  }, { authToken: token, record: ADMIN_SESSION_RECORD });
+}
+
+/**
+ * mock 已登录后台的最小数据面：auth-refresh 返回 author 记录，step-up 状态返回已验证。
+ *
+ * 必须在 `mockPocketBase` 之后调用：Playwright 后注册的路由优先匹配，
+ * 否则通用 PB mock 会把 auth-refresh 当普通集合请求返回空列表。
+ */
+export async function mockAdminSession(page: Page) {
+  const token = fakeAuthToken();
+  await page.route(/\/api\/collections\/users\/auth-refresh(\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { ...CORS_HEADERS, 'content-type': 'application/json' },
+      body: JSON.stringify({ token, record: ADMIN_SESSION_RECORD }),
+    }));
+  await page.route(/\/api\/blog-admin\/step-up\/status(\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { ...CORS_HEADERS, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        status: 'verified',
+        verified: true,
+        expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+      }),
+    }));
+}
+
+/**
+ * 打开隔离的后台工作台：已登录 author + mock 数据面。
+ * 未登录时 AdminGuard 会跳回 /login，因此先断言后台壳真实出现，
+ * 避免把「被重定向后的登录页」当成后台样式采样。
+ */
+export async function openAdminWorkPage(page: Page, theme: 'light' | 'dark', path = '/admin') {
+  await installAdminSession(page, theme);
+  const response = await page.goto(path, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.admin-shell')).toBeVisible({ timeout: 20_000 });
+  await page.waitForFunction(() => !!document.querySelector('main#main-content'));
+  return response;
 }
 
 export interface ContrastSample {

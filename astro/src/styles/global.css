@@ -7,47 +7,61 @@
    =========================== */
 
 :root {
-  --sf-canvas: #f1f3f5;
-  --sf-surface: #ffffff;
-  --sf-ink: #16191d;
-  --sf-ink-2: #454f59;
-  --sf-ink-3: #5f6a75;
-  --sf-line: #d3d9df;
-  --sf-line-strong: #b3bcc5;
-  --sf-line-soft: #e3e7eb;
-  --sf-line-control: #7f8b97;
-  --sf-accent: #0b6d76;
-  --sf-accent-ink: #085159;
-  /* 强调色背景上的文字色：浅色主题白字，暗色主题改用近石墨深字（浅青底上更好读）。 */
+  /* 轨道日志 · 浅色：雾白画布 + 蓝灰分层 + 青蓝强调。
+     对比度由 E2E contrast.spec 在真实浏览器中把关，不在这里承诺数值。 */
+  --sf-canvas: #edf1f4;
+  --sf-surface: #f9fbfc;
+  --sf-ink: #0f1720;
+  --sf-ink-2: #3c4a55;
+  --sf-ink-3: #56646f;
+  --sf-line: #ccd6dd;
+  --sf-line-strong: #a6b3bd;
+  --sf-line-soft: #dde4e9;
+  --sf-line-control: #657684;
+  --sf-accent: #0b6382;
+  --sf-accent-ink: #084a61;
+  /* 强调色背景上的文字色：浅色主题白字，暗色主题改用深空近黑（亮青底上更好读）。 */
   --sf-on-accent: #fff;
-  /* 语义红：危险/破坏性操作与安全拦截计数的前景/描边色。 */
-  --sf-danger: #b91c1c;
+  /* 语义色：危险 / 成功 / 警告 / 信息。文本用法均按 4.5:1 选取。 */
+  --sf-danger: #b42318;
+  --sf-success: #0d6b46;
+  --sf-warning: #7a5200;
+  --sf-info: #0a607f;
   /* 键盘焦点环：强调色的半透明版本。单独定义成令牌，避免在 .focus-ring 里
      使用 color-mix() —— 不支持该函数的老浏览器会整条丢弃 box-shadow，
      导致键盘焦点完全不可见。 */
-  --sf-focus-ring: rgb(11 109 118 / 0.32);
+  --sf-focus-ring: rgb(11 99 130 / 0.32);
   /* 弹层遮罩：浅色主题用石墨半透明，暗色主题用更深的黑，避免暗色下变成浅纱幕。 */
-  --sf-scrim: rgb(22 25 29 / 0.55);
+  --sf-scrim: rgb(15 23 32 / 0.55);
+  /* 装饰光晕 / 轨道线：只用于 aria-hidden 的静态场景，不承载信息。 */
+  --sf-glow: rgb(11 99 130 / 0.18);
+  --sf-orbit: rgb(11 99 130 / 0.22);
   --sf-pad: max(clamp(1.25rem, 4vw, 3.5rem), env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
 }
 
 .dark {
-  --sf-canvas: #0e1114;
-  --sf-surface: #161a1e;
-  --sf-ink: #e8ecf0;
-  --sf-ink-2: #a8b4bd;
-  --sf-ink-3: #7a8791;
-  --sf-line: #2a3239;
-  --sf-line-strong: #3f4b55;
-  --sf-line-soft: #1e252c;
-  --sf-line-control: #5a6a77;
-  --sf-accent: #3fa8b2;
-  --sf-accent-ink: #6bc4cc;
+  /* 轨道日志 · 暗色：深空蓝灰 + 亮青蓝强调。 */
+  --sf-canvas: #080f15;
+  --sf-surface: #111b23;
+  --sf-ink: #e7eef4;
+  --sf-ink-2: #a9b8c4;
+  --sf-ink-3: #7f919e;
+  --sf-line: #27353f;
+  --sf-line-strong: #3b4d5a;
+  --sf-line-soft: #1b2731;
+  --sf-line-control: #667a88;
+  --sf-accent: #4cc3e0;
+  --sf-accent-ink: #7ed7ed;
   --sf-on-accent: #16191d;
-  /* 暗色主题的语义红更亮以保证对比度。 */
-  --sf-danger: #f87171;
-  --sf-focus-ring: rgb(63 168 178 / 0.4);
-  --sf-scrim: rgb(0 0 0 / 0.72);
+  /* 暗色主题的语义色整体提亮，保证深色底上的文本对比度。 */
+  --sf-danger: #ff8f86;
+  --sf-success: #5fd6a4;
+  --sf-warning: #f0c76a;
+  --sf-info: #78d2ee;
+  --sf-focus-ring: rgb(76 195 224 / 0.4);
+  --sf-scrim: rgb(0 0 0 / 0.74);
+  --sf-glow: rgb(76 195 224 / 0.28);
+  --sf-orbit: rgb(76 195 224 / 0.34);
 }
 
 /* 共享区块包装：首页热门/评论等子组件复用（子组件内部继续使用 --sf-* 令牌）。
@@ -58,6 +72,150 @@
   border-radius: 4px;
   background-color: var(--sf-surface);
   padding: 1.25rem;
+}
+
+/* ===========================
+   轨道日志 · 跨框架视觉原语
+   Astro 静态原语（PageShell / SectionHeading）与 React 岛屿只共享这里的
+   class/token，不跨框架互相导入组件。颜色一律走 --sf-*，不写死色值。
+   =========================== */
+
+.orbital-shell {
+  width: 100%;
+  max-width: 76rem;
+  margin-inline: auto;
+  padding-inline: var(--sf-pad);
+  padding-block: clamp(2rem, 5vw, 4.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.orbital-shell__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 46rem;
+}
+
+.orbital-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--sf-ink-3);
+}
+
+/* 眉标前的轨道短线：使用 --sf-orbit 装饰色，不承载信息。 */
+.orbital-eyebrow::before {
+  content: '';
+  display: block;
+  width: 1.75rem;
+  height: 1px;
+  flex: none;
+  background: var(--sf-orbit);
+}
+
+.orbital-title {
+  margin: 0;
+  font-size: clamp(1.875rem, 4vw, 3rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  color: var(--sf-ink);
+  overflow-wrap: anywhere;
+}
+
+.orbital-lede {
+  margin: 0;
+  max-width: 42rem;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--sf-ink-2);
+}
+
+.orbital-panel {
+  min-width: 0;
+  border: 1px solid var(--sf-line-soft);
+  border-radius: var(--radius-lg);
+  background: var(--sf-surface);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+  padding: clamp(1rem, 2.5vw, 1.5rem);
+}
+
+.orbital-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--tap, 2.5rem);
+  border: 1px solid var(--sf-line-control);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding-inline: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sf-ink-2);
+  text-decoration: none;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.orbital-action:hover {
+  border-color: var(--sf-accent);
+  color: var(--sf-accent-ink);
+}
+
+.orbital-action:focus-visible {
+  outline: 2px solid var(--sf-accent);
+  outline-offset: 2px;
+}
+
+.orbital-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--sf-line);
+  padding-bottom: 1rem;
+}
+
+.orbital-heading__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.orbital-heading__title {
+  margin: 0;
+  font-size: clamp(1.375rem, 2.6vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  font-weight: 700;
+  color: var(--sf-ink);
+  overflow-wrap: anywhere;
+}
+
+.orbital-heading__desc {
+  margin: 0;
+  max-width: 40rem;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--sf-ink-2);
+}
+
+.orbital-heading__action {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 /* ===========================

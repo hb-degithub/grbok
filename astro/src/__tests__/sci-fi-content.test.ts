@@ -131,16 +131,19 @@ describe('内容页科幻简约改造（静态断言）', () => {
 describe('共享设计令牌（内容页依赖的全局前提）', () => {
   // 内容页的结构色全部改成 var(--sf-*)；这些令牌由 global.css 提供，
   // 若被移除，页面会静默失去配色。这里把依赖显式锁住。
-  it('global.css 定义浅色与暗色令牌', () => {
+  //
+  // 只断言「浅色 + 暗色两个主题都定义」，不复制具体色值：令牌真值只在
+  // global.css 一处维护，E2E 由浏览器计算样式与对比度把关。
+  it('global.css 在 :root 与 .dark 都定义内容页依赖的令牌', () => {
     const src = readSource('styles/global.css');
+    const rootBlock = src.match(/(?:^|\n)\s*:root\s*\{([^}]*)\}/)?.[1] ?? '';
+    const darkBlock = src.match(/(?:^|\n)\s*\.dark\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(rootBlock, 'global.css 应有 :root 令牌块').not.toBe('');
+    expect(darkBlock, 'global.css 应有 .dark 令牌块').not.toBe('');
     for (const token of ['--sf-canvas', '--sf-surface', '--sf-ink', '--sf-line', '--sf-accent']) {
-      expect(src).toContain(`${token}:`);
+      expect(rootBlock, `:root 缺少 ${token}`).toContain(`${token}:`);
+      expect(darkBlock, `.dark 缺少 ${token}`).toContain(`${token}:`);
     }
-    // 规格值：浅色画布 #f1f3f5 / 暗色 #0e1114 / 唯一强调色 #0b6d76 · #3fa8b2
-    expect(src).toContain('#f1f3f5');
-    expect(src).toContain('#0e1114');
-    expect(src).toContain('#0b6d76');
-    expect(src).toContain('#3fa8b2');
   });
 });
 

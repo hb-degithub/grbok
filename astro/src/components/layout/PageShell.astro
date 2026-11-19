@@ -1,0 +1,31 @@
+---
+/**
+ * 静态内容页外壳：眉标 + 唯一 h1 + 说明 + 内容槽位。
+ *
+ * 纯 Astro：不包含 React、不发请求、不做水合。颜色与间距全部来自
+ * global.css 的 --sf-* 令牌和 orbital.ts 的共享 class。
+ */
+import { orbitalClasses } from '../../styles/orbital';
+
+interface Props {
+  /** 页面主标题，输出为唯一的 h1。 */
+  title: string;
+  /** 标题上方的短眉标（内容索引 / 归档等）。 */
+  eyebrow?: string;
+  /** 标题下方的说明文字。 */
+  description?: string;
+  /** h1 的 id，便于 aria-labelledby / 锚点引用。 */
+  id?: string;
+}
+
+const { title, eyebrow, description, id = 'page-title' } = Astro.props;
+---
+
+<div class={orbitalClasses.shell} aria-labelledby={id}>
+  <header class="orbital-shell__header">
+    {eyebrow && <p class={orbitalClasses.eyebrow}>{eyebrow}</p>}
+    <h1 id={id} class="orbital-title">{title}</h1>
+    {description && <p class="orbital-lede">{description}</p>}
+  </header>
+  <slot />
+</div>

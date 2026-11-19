@@ -1,12 +1,14 @@
 /**
  * A 组：全站不变量（每条公开路由 × 4 project）。
- * A1 响应 / A2 可见 h1 / A3 控制台 / A4 三段溢出 / A6 令牌生效 / A8 画布色。
+ * A1 响应 / A2 可见 h1 / A3 控制台 / A4 三段溢出 / A6 令牌存在 / A8 真实 body 画布。
+ *
+ * 令牌只断言「存在且非空」，色值与对比度真值由 global.css 单一来源 +
+ * contrast.spec 在浏览器里计算，不再维护第二份色值常量。
  */
 import { test, expect } from '@playwright/test';
 import {
-  CANVAS_RGB,
   PUBLIC_ROUTES,
-  TOKENS,
+  REQUIRED_TOKENS,
   collectErrors,
   expectCleanErrors,
   expectNoHorizontalOverflow,
@@ -34,14 +36,19 @@ for (const route of PUBLIC_ROUTES) {
     // 滚动一遍，触发 client:visible 水合后再做布局/错误断言（避免漏掉水合后溢出）
     await scrollThrough(page);
 
-    // A8：页面画布色 = 规格 canvas
     const snapshot = await tokenSnapshot(page);
-    expect(snapshot.bodyBackground, `${tag} body 画布色`).toBe(CANVAS_RGB[theme]);
+
+    // A8：body 画布是真实不透明色，且与 --sf-canvas 令牌一致（不比对硬编码 RGB）
+    expect(snapshot.bodyBackground, `${tag} body 画布色`).not.toBe('rgba(0, 0, 0, 0)');
+    expect(normalizedHex(snapshot.bodyBackground), `${tag} body 画布应等于 --sf-canvas`)
+      .toBe(normalizedHex(snapshot.tokens['--sf-canvas'] ?? ''));
+
+    // 主题 class 与当前 project 一致
     expect(snapshot.htmlClasses.includes('dark'), `${tag} html.dark 与主题`).toBe(theme === 'dark');
 
-    // A6：关键令牌取值与规格一致
-    for (const [name, expected] of Object.entries(TOKENS[theme])) {
-      expect(normalizedHex(snapshot.tokens[name] ?? ''), `${tag} 令牌 ${name}`).toBe(expected);
+    // A6：所需令牌存在且非空（含新增 success/warning/info/glow/orbit）
+    for (const name of REQUIRED_TOKENS) {
+      expect(snapshot.tokens[name] ?? '', `${tag} 令牌 ${name} 缺失或为空`).not.toBe('');
     }
 
     // A4 三段溢出

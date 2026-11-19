@@ -1,0 +1,38 @@
+---
+/**
+ * 静态区块标题：眉标 + h2/h3 + 说明 + 右侧操作槽位。
+ *
+ * 纯 Astro：不包含 React、不发请求、不做水合；标题层级由 level 决定，
+ * 保证页面只有一个 h1（由 PageShell 输出），区块从 h2 起。
+ */
+import { orbitalClasses } from '../../styles/orbital';
+
+interface Props {
+  /** 区块标题。 */
+  title: string;
+  /** 标题上方的短眉标。 */
+  eyebrow?: string;
+  /** 标题下方的说明文字。 */
+  description?: string;
+  /** 标题的 id，便于 aria-labelledby / 锚点引用。 */
+  id?: string;
+  /** 标题层级，默认 h2；嵌套区块可用 h3。 */
+  level?: 'h2' | 'h3';
+}
+
+const { title, eyebrow, description, id = 'section-title', level = 'h2' } = Astro.props;
+const Heading = level;
+---
+
+<div class="orbital-heading">
+  <div class="orbital-heading__copy">
+    {eyebrow && <p class={orbitalClasses.eyebrow}>{eyebrow}</p>}
+    <Heading id={id} class="orbital-heading__title">{title}</Heading>
+    {description && <p class="orbital-heading__desc">{description}</p>}
+  </div>
+  {Astro.slots.has('action') && (
+    <div class="orbital-heading__action">
+      <slot name="action" />
+    </div>
+  )}
+</div>

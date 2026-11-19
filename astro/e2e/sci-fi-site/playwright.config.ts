@@ -60,6 +60,10 @@ export default defineConfig({
       PUBLIC_POCKETBASE_URL: 'http://127.0.0.1:8199',
     },
   },
+  // 固定 4 个 project（桌面/移动 × 浅/深色），保持各 spec 的用例矩阵稳定。
+  // 320/768/1024 等截图证据视口只在 screenshots.spec.ts 内用
+  // test.describe('@shots') + test.use({ viewport }) 局部覆盖，不在这里新增 project，
+  // 避免所有功能/对比度 spec 的用例数成倍膨胀。
   projects: [
     { name: 'desktop-light', use: { viewport: { width: 1440, height: 900 }, colorScheme: 'light' } },
     { name: 'desktop-dark', use: { viewport: { width: 1440, height: 900 }, colorScheme: 'dark' } },
