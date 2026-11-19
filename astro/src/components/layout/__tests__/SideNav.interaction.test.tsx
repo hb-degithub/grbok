@@ -27,9 +27,21 @@ describe('SideNav（移动端抽屉）', () => {
     const dialog = screen.getByRole('dialog', { name: '移动端侧边导航' });
     expect(dialog.getAttribute('aria-modal')).toBe('true');
 
-    for (const label of ['首页', '文章', '标签', '关于', '访问统计', '友情链接', '留言板', '相册', '项目', '订阅', '登录']) {
+    for (const label of ['首页', '文章', '标签', '归档', '关于', '访问统计', '运行状态', '友情链接', '留言板', '相册', '项目', '订阅', '登录']) {
       expect(screen.getByRole('link', { name: label }), `菜单项丢失：${label}`).toBeTruthy();
     }
+  });
+
+  it('补齐归档/状态入口，并沿用焦点与键盘机制', () => {
+    const { container } = render(<SideNav id="mobile-side-nav" isOpen onClose={() => {}} currentPath="/" />);
+    const dialog = screen.getByRole('dialog', { name: '移动端侧边导航' });
+
+    expect(screen.getByRole('link', { name: '归档' }).getAttribute('href')).toBe('/archive');
+    expect(screen.getByRole('link', { name: '运行状态' }).getAttribute('href')).toBe('/status');
+
+    // 焦点循环的键盘处理与焦点归还点仍在源码契约里。
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(container.querySelector('aside')?.getAttribute('tabindex')).toBe('-1');
   });
 
   it('Esc 触发 onClose（键盘可达）', () => {

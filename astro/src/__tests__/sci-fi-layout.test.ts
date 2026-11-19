@@ -342,15 +342,15 @@ describe('共享布局科幻改造 · 首页嵌套旧组件', () => {
     expect(src).toMatch(/export default function HomeSideNav/);
   });
 
-  it('StatusMini 保留真实状态接口与三态文案，去掉发光阴影', () => {
+  it('StatusMini 消费共享公开状态，保留三态文案与 /status 入口', () => {
     const src = files.statusMini;
+    const srcCode = stripComments(src);
     expect(src).toContain('var(--sf-');
     expect(src).not.toMatch(LEGACY_PALETTE);
     for (const token of [
-      "'/api/public/status'",
-      'api/public/ping',
-      'setInterval',
-      '30_000',
+      "import { usePublicStatus } from '../../hooks/usePublicStatus'",
+      'usePublicStatus()',
+      'href="/status"',
       'aria-label="查看完整运行状态页"',
       '运行正常',
       '部分异常',
@@ -362,6 +362,9 @@ describe('共享布局科幻改造 · 首页嵌套旧组件', () => {
     ]) {
       expect(src, `StatusMini 契约丢失：${token}`).toContain(token);
     }
+    // 与 Hero 的 RequestPath 共享同一份快照：组件内不得再自行请求或轮询。
+    expect(srcCode, 'StatusMini 不应自行 fetch').not.toContain('fetch(');
+    expect(srcCode, 'StatusMini 不应自行建轮询').not.toContain('setInterval');
     expect(src).not.toMatch(/shadow-\[/);
     expect(src).toMatch(/export default function StatusMini/);
   });

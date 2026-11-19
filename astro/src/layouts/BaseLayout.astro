@@ -40,6 +40,16 @@ const {
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 
 /**
+ * 展示页场景：首页是唯一需要「轨道日志」氛围特效的页面。
+ *
+ * 旧实现把 SplashOverlay / WelcomeOverlay / CursorGlow / CursorAim 全站挂载，
+ * 结果是任何页面都在持续跟随指针，并且启动遮罩与欢迎遮罩可能同时阻断正文。
+ * 现在只在首页挂载；内页不加载这些岛的 JS，也不会出现任何遮罩。
+ * `DebugProtection` 是功能开关（后台可配），不属于装饰，因此继续全站挂载。
+ */
+const isShowcasePage = Astro.url.pathname === '/' || Astro.url.pathname === '/index/';
+
+/**
  * 服务端预取公告。
  *
  * 为什么在布局里取：公告条此前是纯客户端渲染，水合完成后才出现，
@@ -219,10 +229,10 @@ if (showChrome) {
 
     {showChrome && <Footer transition:persist="footer" />}
     <DebugProtection client:idle />
-    <SplashOverlay client:idle />
-    <WelcomeOverlay client:idle />
-    <CursorGlow client:only="react" transition:persist="cursor-glow" />
-    <CursorAim client:only="react" transition:persist="cursor-aim" />
+    {isShowcasePage && <SplashOverlay client:idle />}
+    {isShowcasePage && <WelcomeOverlay client:idle />}
+    {isShowcasePage && <CursorGlow client:only="react" />}
+    {isShowcasePage && <CursorAim client:only="react" />}
   <ToastContainer client:idle />
     <script define:vars={{ pbBase: import.meta.env.PUBLIC_POCKETBASE_URL || '' }}>
   // 访问统计探针：页面浏览（含客户端导航）通过 sendBeacon 上报。

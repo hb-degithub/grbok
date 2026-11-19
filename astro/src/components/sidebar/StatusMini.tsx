@@ -1,75 +1,53 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { usePublicStatus } from '../../hooks/usePublicStatus';
 import { cn } from '../../lib/utils';
 
-interface StatusMiniData {
-  overall: 'operational' | 'outage' | 'unknown';
-  services: { key: string; ok: boolean | null; avgLatency24h: number | null; uptime24h: number | null }[];
+/**
+ * 首页迷你运行状态卡：站点状态 + 24h 延迟均值 + 访客实测延迟。
+ *
+ * 数据全部来自共享 `usePublicStatus()`（与 Hero 的 RequestPath 共用同一份快照与
+ * 30s 轮询），组件自身不再 fetch、不再持有 timer：
+ *
+ *   GET /api/public/status      → overall、services[].avgLatency24h / uptime24h
+ *   GET /api/public/protection  → safeline.state / safeline.blocked（仅 ok 可信）
+ *   GET /api/public/ping        → 浏览器实测往返（3 次均值）
+ *
+ * 硬约束：
+ * - `/api/public/status` 生产上可能只返回 `{ overall: 'unknown' }` 或完全没有
+ *   services，因此 services 一律可选访问；
+ * - 未知 overall / 接口失败 / 未落地一律回退「检测中」，不把失败显示成「运行正常」；
+ * - 24h 攻击拦截只在 `safeline.state === 'ok'` 时展示真实数字，其余不显示；
+ * - 保留指向 `/status` 的完整状态页链接与三块指标文案。
+ */
+
+interface OverallText {
+  operational: string;
+  outage: string;
+  unknown: string;
 }
 
-const OVERALL_TEXT: Record<string, string> = {
+const OVERALL_TEXT: OverallText = {
   operational: '运行正常',
   outage: '部分异常',
   unknown: '检测中',
 };
 
-/** 首页迷你运行状态卡:服务状态 + 24h 延迟均值 + 访客实测延迟,每 30s 刷新 */
+/** 未采集/加载中/失败时的统一占位符（真实文本，不靠颜色表达状态）。 */
+const UNKNOWN = '—';
+
 export default function StatusMini() {
-  const [status, setStatus] = useState<StatusMiniData | null>(null);
-  const [userPing, setUserPing] = useState<number | null>(null);
-  const [blocked24h, setBlocked24h] = useState<number | null>(null);
+  const { status, pingMs, blocked24h } = usePublicStatus();
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch('/api/public/status', { cache: 'no-store' });
-      if (!res.ok) throw new Error('status failed');
-      setStatus(await res.json());
-    } catch {
-      setStatus(null);
-    }
-    // 防护统计为可选增强:失败/未接入时静默不显示,不影响主状态
-    try {
-      const res = await fetch('/api/public/protection', { cache: 'no-store' });
-      if (res.ok) {
-        const p = await res.json();
-        setBlocked24h(p?.safeline?.state === 'ok' && typeof p.safeline.blocked === 'number' ? p.safeline.blocked : null);
-      }
-    } catch {
-      /* 防护统计不可用时忽略 */
-    }
-  }, []);
-
-  const ping = useCallback(async () => {
-    const samples: number[] = [];
-    for (let i = 0; i < 3; i++) {
-      const start = performance.now();
-      try {
-        await fetch(`/api/public/ping?t=${Date.now()}`, { cache: 'no-store' });
-        samples.push(performance.now() - start);
-      } catch {
-        // 忽略单次失败
-      }
-    }
-    if (samples.length) setUserPing(Math.round(samples.reduce((a, b) => a + b, 0) / samples.length));
-  }, []);
-
-  useEffect(() => {
-    void load();
-    void ping();
-    const a = window.setInterval(() => void load(), 30_000);
-    const b = window.setInterval(() => void ping(), 30_000);
-    return () => {
-      window.clearInterval(a);
-      window.clearInterval(b);
-    };
-  }, [load, ping]);
-
-  // /api/public/status 在生产上可能返回 {overall:'unknown'} 或干脆不带 services，
-  // 因此 services 必须可选访问；未知 overall 值统一回退 unknown 的检测中文案，
-  // 不让标签渲染成空白（接口与文案本身不变）。
-  const overall = status?.overall ?? 'unknown';
-  const overallKey = overall === 'operational' || overall === 'outage' ? overall : 'unknown';
+  // overall 只接受两个已知值，其余（缺失、未知字符串、请求失败）回退 unknown。
+  const overallKey =
+    status?.overall === 'operational' || status?.overall === 'outage' ? status.overall : 'unknown';
   const overallText = OVERALL_TEXT[overallKey];
-  const site = status?.services?.find((s) => s.key === 'site') ?? undefined;
+
+  // 生产接口以 'site' 作为 Astro SSR 采集目标；services 缺失时就是 undefined。
+  const site = status?.services?.find((service) => service.key === 'site');
+
+  const latencyText = site?.avgLatency24h != null ? `${site.avgLatency24h}` : UNKNOWN;
+  const uptimeText = site?.uptime24h != null ? `${site.uptime24h}` : UNKNOWN;
+  const pingText = pingMs != null ? `${pingMs}` : UNKNOWN;
 
   return (
     <a
@@ -96,21 +74,21 @@ export default function StatusMini() {
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
         <div className="rounded-[2px] border border-[var(--sf-line-soft)] px-1 py-2">
           <p className="font-mono text-sm font-bold tabular-nums text-[var(--sf-ink)]">
-            {site?.avgLatency24h != null ? `${site.avgLatency24h}` : '—'}
+            {latencyText}
             <span className="text-[10px] font-normal text-[var(--sf-ink-3)]">ms</span>
           </p>
           <p className="mt-0.5 text-[10px] text-[var(--sf-ink-3)]">24h 延迟</p>
         </div>
         <div className="rounded-[2px] border border-[var(--sf-line-soft)] px-1 py-2">
           <p className="font-mono text-sm font-bold tabular-nums text-[var(--sf-ink)]">
-            {site?.uptime24h != null ? `${site.uptime24h}` : '—'}
+            {uptimeText}
             <span className="text-[10px] font-normal text-[var(--sf-ink-3)]">%</span>
           </p>
           <p className="mt-0.5 text-[10px] text-[var(--sf-ink-3)]">24h 可用率</p>
         </div>
         <div className="rounded-[2px] border border-[var(--sf-line-soft)] px-1 py-2">
           <p className="font-mono text-sm font-bold tabular-nums text-[var(--sf-accent)]">
-            {userPing != null ? `${userPing}` : '—'}
+            {pingText}
             <span className="text-[10px] font-normal text-[var(--sf-ink-3)]">ms</span>
           </p>
           <p className="mt-0.5 text-[10px] text-[var(--sf-ink-3)]">你的延迟</p>

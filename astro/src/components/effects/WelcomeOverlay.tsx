@@ -1,43 +1,41 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Stepper, { Step } from '../reactbits/Stepper';
-import SplitText from '../reactbits/SplitText';
-import SpotlightCard from '../reactbits/SpotlightCard';
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { motion } from 'framer-motion';
 import { useUser } from '../../hooks/domains/useUser';
 import { RateLimiter } from '../../lib/security';
 import useBreakpoint from '../../hooks/useBreakpoint';
 
+/**
+ * 展示页首次访问引导（首页专用）。
+ *
+ * 与旧实现相比只改「视觉 / 出现场景 / 焦点与键盘体验」，认证流程保持原样：
+ * - 仍然通过 `useUser()` 的 `registerReader` / `requestVerification` 发起真实请求；
+ * - 仍然用模块级 `RateLimiter(5, 0.2)` 做提交频率保护，不绕过、不放宽；
+ * - 仍然以 `blog-welcomed` 作为「已看过」标记。
+ *
+ * 新增约束：
+ * - 只在展示页（`/`）出现；其它页面不渲染，也绝不阻断正文（由 BaseLayout 只在该页挂载 +
+ *   组件内的 pathname 守卫双重保证）；
+ * - 改成单面板轻场景，不再叠加 Stepper / SplitText / SpotlightCard 等多层动画；
+ * - 打开时把焦点移入 dialog，Tab 在内部循环，Esc 关闭，关闭后把焦点归还给打开前的元素。
+ *
+ * 这里不是另一个认证入口：注册成功后的验证步骤、限流与失败提示都属于同一条既有流程。
+ */
+
 const STORAGE_KEY = 'blog-welcomed';
+const SHOWCASE_PATH = '/';
+/** 重发成功后的按钮复位时间（与旧实现一致的 5s，避免一直停在「已重新发送」）。 */
+const RESEND_RESET_MS = 5000;
 
-// Stepper 为 JSX forwardRef 组件，TS 无法推断其 props，这里显式标注以通过 astro check
-interface StepperImperative {
-  next: () => void;
-  back: () => void;
-  complete: () => void;
-  goTo: (step: number) => void;
-}
-interface StepperProps {
-  ref?: React.Ref<StepperImperative>;
-  initialStep?: number;
-  onStepChange?: (step: number) => void;
-  onFinalStepCompleted?: () => void;
-  stepCircleContainerClassName?: string;
-  stepContainerClassName?: string;
-  contentClassName?: string;
-  footerClassName?: string;
-  backButtonProps?: Record<string, unknown>;
-  nextButtonProps?: Record<string, unknown>;
-  backButtonText?: string;
-  nextButtonText?: string;
-  completeButtonText?: string;
-  disableStepIndicators?: boolean;
-  hideFooterNext?: (step: number) => boolean;
-  renderStepIndicator?: (props: unknown) => React.ReactNode;
-  children?: React.ReactNode;
-}
-const StepperTyped = Stepper as unknown as React.ComponentType<StepperProps>;
-
+/** 单次注册的提交频率保护（与旧实现一致的 5 次 / 0.2 token/s）。 */
 const registerLimiter = new RateLimiter(5, 0.2);
+
+/** 焦点循环的候选元素；`:not([tabindex="-1"])` 排除 dialog 容器本身。 */
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function isShowcasePath(): boolean {
+  return window.location.pathname === SHOWCASE_PATH;
+}
 
 function hasBeenWelcomed(): boolean {
   try {
@@ -50,14 +48,27 @@ function hasBeenWelcomed(): boolean {
 function markWelcomed(): void {
   try {
     window.localStorage.setItem(STORAGE_KEY, Date.now().toString());
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
+}
+
+function getFocusable(root: HTMLElement | null): HTMLElement[] {
+  if (!root) return [];
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (element) => !element.hasAttribute('disabled') && element.tabIndex !== -1,
+  );
+}
+
+/** 简单邮箱格式校验；邮箱本身可选，只在填写时校验。 */
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 export default function WelcomeOverlay() {
   const [visible, setVisible] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Registration state
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
@@ -65,62 +76,52 @@ export default function WelcomeOverlay() {
   const [regError, setRegError] = useState('');
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [resendStatus, setResendStatus] = useState<'idle' | 'loading' | 'sent'>('idle');
-  const [showSkipConfirm, setShowSkipConfirm] = useState(false);
 
   const { registerReader, requestVerification, isLoggedIn: checkLoggedIn } = useUser();
-  const { isMobile } = useBreakpoint();
-  const spotlightSize = isMobile ? 120 : 180;
-  const [isLandscapePhone, setIsLandscapePhone] = useState(false);
+  const { isMobile, prefersReducedMotion } = useBreakpoint();
 
-  // Imperative handle into the Stepper so we can advance it after async
-  // registration succeeds — the registration step has no footer "next" button,
-  // so the only way forward is a successful register (auto-advances) or the
-  // explicit "skip registration" confirmation.
-  const stepperRef = useRef<StepperImperative | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousActiveElement = useRef<HTMLElement | null>(null);
+  const successHeadingRef = useRef<HTMLHeadingElement>(null);
+  const resendResetTimer = useRef<number | null>(null);
 
-  // Track all pending timeouts so they can be cancelled on unmount — otherwise
-  // they fire setState on a torn-down component (dev-mode warning, stepper
-  // advance on an unmounted Stepper).
-  const timersRef = useRef<number[]>([]);
+  /* 卸载时清掉重发复位定时器，避免在已卸载组件上 setState。 */
+  useEffect(
+    () => () => {
+      if (resendResetTimer.current !== null) {
+        window.clearTimeout(resendResetTimer.current);
+        resendResetTimer.current = null;
+      }
+    },
+    [],
+  );
+
+  /* 出现场景：只在展示页、且本机尚未看过引导时出现。 */
   useEffect(() => {
-    const timers = timersRef.current;
-    return () => timers.forEach((t) => window.clearTimeout(t));
-  }, []);
-  const scheduleTimeout = useCallback((fn: () => void, ms: number) => {
-    const id = window.setTimeout(fn, ms);
-    timersRef.current.push(id);
-  }, []);
-
-  // Step 4 is the registration step (only present for logged-out users).
-  // The email-verification step that follows only renders after regStatus ===
-  // 'success', so the registration step number stays 4 regardless.
-  const registrationStepNumber = 4;
-
-  useEffect(() => {
-    const checkLandscape = () => {
-      setIsLandscapePhone(isMobile && window.innerHeight < 520);
-    };
-    checkLandscape();
-    window.addEventListener('resize', checkLandscape, { passive: true });
-    return () => window.removeEventListener('resize', checkLandscape);
-  }, [isMobile]);
-
-  useEffect(() => {
-    // Never show the welcome guide on auth/admin pages - it would block login.
-    const path = window.location.pathname;
-    const skipOverlay = path.startsWith('/login') || path.startsWith('/admin');
-    if (!hasBeenWelcomed() && !skipOverlay) {
-      setIsLoggedIn(checkLoggedIn());
-      setVisible(true);
-    }
+    if (!isShowcasePath() || hasBeenWelcomed()) return;
+    setIsLoggedIn(checkLoggedIn());
+    setVisible(true);
   }, [checkLoggedIn]);
 
-  // Scroll lock
+  /* 打开期间锁定背景滚动；关闭时把焦点归还给打开前的元素。 */
   useEffect(() => {
     if (!visible) return;
-    const prev = document.body.style.overflow;
+
+    previousActiveElement.current = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+
+    // 等 dialog 完成首次绘制后再移入焦点，避免焦点落到即将被替换的节点上。
+    const timer = window.setTimeout(() => {
+      const [first] = getFocusable(dialogRef.current);
+      (first ?? dialogRef.current)?.focus({ preventScroll: true });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+      document.body.style.overflow = previousOverflow;
+      previousActiveElement.current?.focus?.({ preventScroll: true });
+    };
   }, [visible]);
 
   const dismiss = useCallback(() => {
@@ -129,26 +130,63 @@ export default function WelcomeOverlay() {
     setVisible(false);
   }, [regStatus]);
 
-  // ESC dismiss（注册提交中禁止关闭）
+  /*
+   * 注册成功后表单被成功面板替换，原先聚焦的提交按钮会随表单卸载，
+   * 浏览器的默认行为会把焦点丢给 <body>（屏幕阅读器与键盘用户失去位置）。
+   * 这里主动把焦点移到成功面板标题（tabIndex=-1），保证焦点留在 dialog 内。
+   */
+  useEffect(() => {
+    if (regStatus !== 'success') return;
+    successHeadingRef.current?.focus({ preventScroll: true });
+  }, [regStatus]);
+
+  /* Esc 关闭 + Tab 焦点循环（焦点若跑到 dialog 外，拉回第一个）。 */
   useEffect(() => {
     if (!visible) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') dismiss();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        dismiss();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+
+      const root = dialogRef.current;
+      if (!root) return;
+      const focusables = getFocusable(root);
+      if (focusables.length === 0) {
+        event.preventDefault();
+        root.focus({ preventScroll: true });
+        return;
+      }
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+
+      if (!active || !root.contains(active)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [visible, dismiss]);
 
-  const handleFinalStep = useCallback(() => {
-    markWelcomed();
-    setVisible(false);
-  }, []);
-
-  const handleBackdropClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) dismiss();
-  }, [dismiss]);
-
-  const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  const handleBackdropClick = useCallback(
+    (event: ReactMouseEvent<HTMLDivElement>) => {
+      if (event.target === event.currentTarget) dismiss();
+    },
+    [dismiss],
+  );
 
   const handleRegister = useCallback(async () => {
     const trimmedName = regName.trim();
@@ -159,7 +197,6 @@ export default function WelcomeOverlay() {
       setRegError('请填写昵称和密码');
       return;
     }
-    // 邮箱可选：仅在填写时校验格式
     if (trimmedEmail && !isValidEmail(trimmedEmail)) {
       setRegStatus('error');
       setRegError('邮箱格式不正确');
@@ -179,9 +216,9 @@ export default function WelcomeOverlay() {
     setRegStatus('loading');
     setRegError('');
 
-    // 提交前清空明文密码 state（不论成功失败），避免驻留 React 状态
+    // 不论成功失败都立刻清空明文密码 state，避免驻留。
     const passwordToSubmit = regPassword;
-    setRegPassword(''); // 立即清空
+    setRegPassword('');
 
     const { success } = await registerReader({
       email: trimmedEmail || undefined,
@@ -193,327 +230,256 @@ export default function WelcomeOverlay() {
     if (success) {
       setRegisteredEmail(trimmedEmail);
       setRegStatus('success');
-      // Auto-advance to the email-verification step now that the registration
-      // step's success UI has rendered. Deferred so the success state paints
-      // before the slide transition kicks in.
-      scheduleTimeout(() => {
-        stepperRef.current?.next();
-      }, 600);
     } else {
       setRegStatus('error');
       setRegError('提交失败，请检查信息后重试');
     }
-  }, [regName, regEmail, regPassword, registerReader, scheduleTimeout]);
+  }, [regName, regEmail, regPassword, registerReader]);
 
   const handleResendVerification = useCallback(async () => {
     if (!registeredEmail) return;
+    if (resendResetTimer.current !== null) {
+      window.clearTimeout(resendResetTimer.current);
+      resendResetTimer.current = null;
+    }
     setResendStatus('loading');
     const { success } = await requestVerification(registeredEmail);
     setResendStatus(success ? 'sent' : 'idle');
     if (success) {
-      scheduleTimeout(() => setResendStatus('idle'), 5000);
+      // 恢复旧行为：5s 后复位，允许再次请求；期间按钮保持禁用。
+      resendResetTimer.current = window.setTimeout(() => {
+        resendResetTimer.current = null;
+        setResendStatus('idle');
+      }, RESEND_RESET_MS);
     }
-  }, [registeredEmail, requestVerification, scheduleTimeout]);
+  }, [registeredEmail, requestVerification]);
 
   if (!visible) return null;
 
+  const reduced = prefersReducedMotion;
+  const panelMaxHeight = isMobile ? 'max-h-[calc(100dvh-1.5rem)]' : 'max-h-[calc(100dvh-3rem)]';
+
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          key="welcome-backdrop"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
-          onClick={handleBackdropClick}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--sf-scrim)] px-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="欢迎引导"
-        >
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className={isLandscapePhone ? 'w-full max-w-lg max-h-[90dvh] overflow-y-auto p-4' : 'w-full max-w-lg'}
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-[var(--sf-scrim)] px-3 py-3 sm:px-4"
+      onClick={handleBackdropClick}
+      role="presentation"
+      data-welcome-overlay="true"
+    >
+      <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="欢迎引导"
+        tabIndex={-1}
+        initial={reduced ? false : { opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={reduced ? { duration: 0 } : { duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+        className={`relative w-full max-w-lg overflow-y-auto rounded-[3px] border border-[var(--sf-line-strong)] bg-[var(--sf-canvas)] outline-none ${panelMaxHeight}`}
+      >
+        {/* 顶部：日志式标头 + 关闭按钮（第一个可聚焦元素）。 */}
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--sf-line)] px-4 py-3 sm:px-5">
+          <div className="min-w-0">
+            <p className="font-mono text-[0.625rem] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
+              FIRST VISIT / 首次访问
+            </p>
+            <h2 className="mt-1.5 text-lg font-semibold leading-tight tracking-tight text-[var(--sf-ink)] sm:text-xl">
+              欢迎来到胡巴的博客
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={dismiss}
+            className="focus-ring flex h-9 w-9 shrink-0 items-center justify-center rounded-[2px] border border-[var(--sf-line-control)] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
+            aria-label="关闭欢迎引导"
           >
-            <StepperTyped
-              ref={stepperRef}
-              initialStep={1}
-              onFinalStepCompleted={handleFinalStep}
-              backButtonText="上一步"
-              nextButtonText="下一步"
-              completeButtonText="开始探索"
-              hideFooterNext={(step: number) => !isLoggedIn && step === registrationStepNumber}
-              stepCircleContainerClassName={isLandscapePhone ? 'landscape-compact' : ''}
-              footerClassName={isLandscapePhone ? 'landscape-compact' : ''}
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-4 py-4 sm:px-5">
+          <p className="text-sm leading-relaxed text-[var(--sf-ink-2)]">
+            一个关于技术、思考与生活的个人空间。注册后可以参与评论互动，也可以先随便看看。
+          </p>
+
+          {/* 功能说明保持轻量：纯文本行，不再叠 SpotlightCard / SplitText。 */}
+          <ul className="mt-3 grid gap-1.5 border-y border-[var(--sf-line-soft)] py-3">
+            {[
+              '技术文章：前端、后端与开发实践',
+              '评论互动：与作者和其他读者交流',
+              '全文搜索：快速找到感兴趣的内容',
+            ].map((item) => (
+              <li key={item} className="flex items-start gap-2 font-mono text-[11px] leading-relaxed text-[var(--sf-ink-2)]">
+                <span aria-hidden="true" className="mt-[0.45rem] h-1 w-1 shrink-0 bg-[var(--sf-accent)]" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+
+          {isLoggedIn ? (
+            <p className="mt-4 font-mono text-[11px] leading-relaxed tracking-[0.04em] text-[var(--sf-ink-3)]">
+              已登录 · 可以直接开始浏览，或前往账户页管理资料。
+            </p>
+          ) : regStatus === 'success' ? (
+            /*
+             * 注册成功分支：只有填写了邮箱才进入「验证邮件」流程。
+             * 未填写邮箱时注册请求本身不会带 email，也就不会发送验证邮件——
+             * 此时既不能显示「验证邮件已发送至」，也不能留一个点了没反应的重发按钮。
+             */
+            <div className="mt-4 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-3">
+              <h3
+                ref={successHeadingRef}
+                tabIndex={-1}
+                className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--sf-ink-3)] outline-none"
+              >
+                {registeredEmail ? '验证邮箱' : '注册成功'}
+              </h3>
+              {registeredEmail ? (
+                <>
+                  <p className="mt-2 text-sm leading-relaxed text-[var(--sf-ink-2)]">
+                    验证邮件已发送至
+                    <span className="mx-1 font-medium text-[var(--sf-ink)]">{registeredEmail}</span>
+                    。点击邮件中的链接完成验证，之后即可发表评论。
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={resendStatus === 'loading' || resendStatus === 'sent'}
+                    className="focus-ring mt-3 rounded-[2px] border border-[var(--sf-line-control)] px-3 py-1.5 font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50"
+                  >
+                    {resendStatus === 'loading'
+                      ? '发送中...'
+                      : resendStatus === 'sent'
+                        ? '已重新发送 ✓'
+                        : '重新发送验证邮件'}
+                  </button>
+                  <p className="mt-2 text-xs text-[var(--sf-ink-3)]">也可以稍后再验证，不影响浏览。</p>
+                </>
+              ) : (
+                <p className="mt-2 text-sm leading-relaxed text-[var(--sf-ink-2)]">
+                  注册成功，可直接评论。本次未填写邮箱，因此不会收到验证邮件；之后可以在账户页补充邮箱并完成验证。
+                </p>
+              )}
+            </div>
+          ) : (
+            /* 注册表单：字段名/标签与旧流程一致，只是换成单面板布局。 */
+            <form
+              className="mt-4 space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleRegister();
+              }}
             >
-              {/* Step 1: Welcome with SplitText */}
-              <Step>
-                <div className="flex flex-col items-center py-4 text-center">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">
-                    <svg className="h-7 w-7 text-[var(--sf-accent-ink)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
-                    </svg>
-                  </div>
-                  <h2 className="text-xl font-semibold tracking-tight text-[var(--sf-ink)]">
-                    <SplitText text="欢迎来到胡巴的博客" />
-                  </h2>
-                  <p className="mt-2 text-sm leading-relaxed text-[var(--sf-ink-2)]">
-                    一个关于技术、思考与生活的个人空间。<br />
-                    在这里记录所学所想，也期待与你交流。
-                  </p>
-                </div>
-              </Step>
+              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">
+                创建读者账户（可选）
+              </p>
 
-              {/* Step 2: Features with SpotlightCard */}
-              <Step>
-                <div className="py-4">
-                  <h2 className="mb-4 text-center text-xl font-semibold tracking-tight text-[var(--sf-ink)]">
-                    <SplitText text="探索功能" delay={0.1} />
-                  </h2>
-                  <div className="space-y-3">
-                    {[
-                      { icon: 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z', title: '技术文章', desc: '涵盖前端、后端与开发实践' },
-                      { icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z', title: '评论互动', desc: '分享你的想法，与作者和其他读者交流' },
-                      { icon: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z', title: '全文搜索', desc: '快速找到你感兴趣的内容' },
-                    ].map((item) => (
-                      <SpotlightCard key={item.title} className="px-3 py-2.5" spotlightSize={spotlightSize}>
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">
-                            <svg className="h-4 w-4 text-[var(--sf-accent-ink)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-                            </svg>
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-[var(--sf-ink)]">{item.title}</p>
-                            <p className="text-xs text-[var(--sf-ink-2)]">{item.desc}</p>
-                          </div>
-                        </div>
-                      </SpotlightCard>
-                    ))}
-                  </div>
-                </div>
-              </Step>
+              <div>
+                <label htmlFor="welcome-name" className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">
+                  昵称
+                </label>
+                <input
+                  id="welcome-name"
+                  type="text"
+                  value={regName}
+                  onChange={(event) => {
+                    setRegName(event.target.value);
+                    if (regStatus === 'error') {
+                      setRegStatus('idle');
+                      setRegError('');
+                    }
+                  }}
+                  placeholder="你的昵称"
+                  autoComplete="name"
+                  className="w-full rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2 text-sm text-[var(--sf-ink)] outline-none transition-colors placeholder:text-[var(--sf-ink-3)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-1 focus-visible:ring-[var(--sf-accent)]"
+                />
+              </div>
 
-              {/* Step 3: Community with social links */}
-              <Step>
-                <div className="py-4">
-                  <h2 className="mb-4 text-center text-xl font-semibold tracking-tight text-[var(--sf-ink)]">
-                    <SplitText text="加入社区" delay={0.1} />
-                  </h2>
-                  <p className="mb-4 text-center text-sm text-[var(--sf-ink-2)]">
-                    关注我的动态，在评论区与我交流
-                  </p>
-                  <div className="flex justify-center gap-3">
-                    <a
-                      href="https://github.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="focus-ring flex items-center gap-2 rounded-[2px] border border-[var(--sf-line-control)] px-4 py-2.5 font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-2)] no-underline transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
-                    >
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" /></svg>
-                      GitHub
-                    </a>
-                    <a
-                      href="https://space.bilibili.com/691237475"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="focus-ring flex items-center gap-2 rounded-[2px] border border-[var(--sf-line-control)] px-4 py-2.5 font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-2)] no-underline transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
-                    >
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.813 4.653h.354c.729 0 1.333.6 1.333 1.333v9.6c0 .734-.604 1.334-1.333 1.334h-.354a1.334 1.334 0 01-1.334-1.334v-9.6c0-.733.605-1.333 1.334-1.333zm-10.48 0h.354c.733 0 1.333.6 1.333 1.333v9.6c0 .734-.6 1.334-1.333 1.334h-.354A1.334 1.334 0 016 15.586v-9.6c0-.733.6-1.333 1.333-1.333zm5.667-2.626h-.354c-.734 0-1.334.6-1.334 1.333v.44H8.187a2.667 2.667 0 00-2.667 2.667v9.6a2.667 2.667 0 002.667 2.666h7.626a2.667 2.667 0 002.667-2.666v-9.6a2.667 2.667 0 00-2.667-2.667h-3.12v-.44c0-.733-.6-1.333-1.334-1.333h-.18z" /></svg>
-                      Bilibili
-                    </a>
-                  </div>
-                </div>
-              </Step>
+              <div>
+                <label htmlFor="welcome-email" className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">
+                  邮箱（可选）
+                </label>
+                <input
+                  id="welcome-email"
+                  type="email"
+                  value={regEmail}
+                  onChange={(event) => {
+                    setRegEmail(event.target.value);
+                    if (regStatus === 'error') {
+                      setRegStatus('idle');
+                      setRegError('');
+                    }
+                  }}
+                  placeholder="your@email.com"
+                  autoComplete="email"
+                  className="w-full rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2 text-sm text-[var(--sf-ink)] outline-none transition-colors placeholder:text-[var(--sf-ink-3)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-1 focus-visible:ring-[var(--sf-accent)]"
+                />
+              </div>
 
-              {/* Step 4: Mini registration form (only for non-logged-in users) */}
-              {!isLoggedIn && (
-                <Step>
-                  <div className="py-4">
-                    <h2 className="mb-3 text-center text-xl font-semibold tracking-tight text-[var(--sf-ink)]">
-                      <SplitText text="创建账户" delay={0.1} />
-                    </h2>
-                    <p className="mb-4 text-center text-xs text-[var(--sf-ink-2)]">
-                      注册后即可发表评论，参与社区互动
-                    </p>
+              <div>
+                <label htmlFor="welcome-password" className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">
+                  密码
+                </label>
+                <input
+                  id="welcome-password"
+                  type="password"
+                  value={regPassword}
+                  onChange={(event) => {
+                    setRegPassword(event.target.value);
+                    if (regStatus === 'error') {
+                      setRegStatus('idle');
+                      setRegError('');
+                    }
+                  }}
+                  placeholder="至少 8 个字符"
+                  autoComplete="new-password"
+                  className="w-full rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2 text-sm text-[var(--sf-ink)] outline-none transition-colors placeholder:text-[var(--sf-ink-3)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-1 focus-visible:ring-[var(--sf-accent)]"
+                />
+              </div>
 
-                    {regStatus === 'success' ? (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="flex flex-col items-center py-4 text-center"
-                      >
-                        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-[2px] border border-emerald-600 text-emerald-600 dark:border-emerald-500 dark:text-emerald-400">
-                          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">{registeredEmail ? '提交后请验证邮箱，验证完成后可评论' : '注册成功！'}</p>
-                        <button
-                          type="button"
-                          onClick={() => stepperRef.current?.next()}
-                          className="focus-ring mt-3 rounded-[2px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
-                        >
-                          继续
-                        </button>
-                      </motion.div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div>
-                          <label className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">昵称</label>
-                          <input
-                            type="text"
-                            value={regName}
-                            onChange={(e) => { setRegName(e.target.value); if (regStatus === 'error') { setRegStatus('idle'); setRegError(''); } }}
-                            placeholder="你的昵称"
-                            className="w-full rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-sm text-[var(--sf-ink)] outline-none transition-colors placeholder:text-[var(--sf-ink-3)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-1 focus-visible:ring-[var(--sf-accent)]"
-                            autoComplete="name"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">邮箱（可选）</label>
-                          <input
-                            type="email"
-                            value={regEmail}
-                            onChange={(e) => { setRegEmail(e.target.value); if (regStatus === 'error') { setRegStatus('idle'); setRegError(''); } }}
-                            placeholder="your@email.com"
-                            className="w-full rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-sm text-[var(--sf-ink)] outline-none transition-colors placeholder:text-[var(--sf-ink-3)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-1 focus-visible:ring-[var(--sf-accent)]"
-                            autoComplete="email"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="mb-1 block font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">密码</label>
-                          <input
-                            type="password"
-                            value={regPassword}
-                            onChange={(e) => { setRegPassword(e.target.value); if (regStatus === 'error') { setRegStatus('idle'); setRegError(''); } }}
-                            placeholder="至少 8 个字符"
-                            className="w-full rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-sm text-[var(--sf-ink)] outline-none transition-colors placeholder:text-[var(--sf-ink-3)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-1 focus-visible:ring-[var(--sf-accent)]"
-                            autoComplete="new-password"
-                          />
-                        </div>
-
-                        {regStatus === 'error' && regError && (
-                          <p className="border-l-2 border-[var(--sf-danger)] pl-2 font-mono text-[11px] tracking-[0.06em] text-[var(--sf-danger)]">{regError}</p>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={handleRegister}
-                          disabled={regStatus === 'loading'}
-                          className="focus-ring w-full rounded-[2px] bg-[var(--sf-accent)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-on-accent)] transition-colors hover:bg-[var(--sf-accent-ink)] disabled:opacity-50"
-                        >
-                          {regStatus === 'loading' ? '提交中...' : '提交注册'}
-                        </button>
-
-                        <p className="text-center font-mono text-[11px] tracking-[0.06em] text-[var(--sf-ink-3)]">
-                          已有账户？<a href="/login" onClick={dismiss} className="text-[var(--sf-accent-ink)] no-underline hover:underline">登录</a>
-                          <span className="mx-1.5">·</span>
-                          <button type="button" onClick={() => setShowSkipConfirm(true)} className="text-[var(--sf-accent-ink)] no-underline hover:underline">跳过注册</button>
-                        </p>
-
-                        {showSkipConfirm && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="mt-3 rounded-[3px] border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950/40"
-                          >
-                            <p className="mb-2 text-xs text-amber-800 dark:text-amber-200">
-                              未注册/登录将无法发表评论和参与互动，确定跳过吗？
-                            </p>
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setShowSkipConfirm(false)}
-                                className="focus-ring rounded-[2px] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors hover:bg-[var(--sf-line-soft)] hover:text-[var(--sf-ink)]"
-                              >
-                                返回注册
-                              </button>
-                              <button
-                                type="button"
-                                onClick={dismiss}
-                                className="focus-ring rounded-[2px] border border-amber-600 bg-amber-500 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-amber-950 transition-colors hover:bg-amber-400"
-                              >
-                                确定跳过
-                              </button>
-                            </div>
-                          </motion.div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </Step>
+              {regStatus === 'error' && regError && (
+                <p className="border-l-2 border-[var(--sf-danger)] pl-2 font-mono text-[11px] tracking-[0.06em] text-[var(--sf-danger)]">
+                  {regError}
+                </p>
               )}
 
-              {/* Step 5: Email verification prompt (only after successful registration with email) */}
-              {!isLoggedIn && regStatus === 'success' && registeredEmail && (
-                <Step>
-                  <div className="py-4">
-                    <h2 className="mb-3 text-center text-xl font-semibold tracking-tight text-[var(--sf-ink)]">
-                      <SplitText text="验证邮箱" delay={0.1} />
-                    </h2>
-                    <div className="flex flex-col items-center text-center">
-                      <motion.div
-                        className="mb-4 flex h-14 w-14 items-center justify-center rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)]"
-                        animate={{ scale: [1, 1.05, 1] }}
-                        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                      >
-                        <svg className="h-7 w-7 text-[var(--sf-accent-ink)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                        </svg>
-                      </motion.div>
-                      <p className="mb-1 text-sm text-[var(--sf-ink-2)]">
-                        验证邮件已发送至
-                      </p>
-                      <p className="mb-3 text-sm font-medium text-[var(--sf-ink)]">
-                        {registeredEmail || regEmail.trim() || '你的邮箱'}
-                      </p>
-                      <p className="mb-4 text-xs text-[var(--sf-ink-2)]">
-                        请检查收件箱（含垃圾邮件），点击验证链接。<br />
-                        验证后即可发表评论。
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleResendVerification}
-                        disabled={resendStatus === 'loading' || resendStatus === 'sent'}
-                        className="focus-ring rounded-[2px] border border-[var(--sf-line-control)] px-4 py-1.5 font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50"
-                      >
-                        {resendStatus === 'loading' ? '发送中...' : resendStatus === 'sent' ? '已重新发送 ✓' : '重新发送验证邮件'}
-                      </button>
-                      <p className="mt-3 text-xs text-[var(--sf-ink-3)]">
-                        也可以稍后再验证，不影响浏览
-                      </p>
-                    </div>
-                  </div>
-                </Step>
-              )}
+              <button
+                type="submit"
+                disabled={regStatus === 'loading'}
+                className="focus-ring w-full rounded-[2px] bg-[var(--sf-accent)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-on-accent)] transition-colors hover:bg-[var(--sf-accent-ink)] disabled:opacity-50"
+              >
+                {regStatus === 'loading' ? '提交中...' : '提交注册'}
+              </button>
 
-              {/* Step 6 (or Step 4 for logged-in): Ready to explore */}
-              <Step>
-                <div className="flex flex-col items-center py-4 text-center">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">
-                    <svg className="h-7 w-7 text-[var(--sf-accent-ink)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
-                    </svg>
-                  </div>
-                  <h2 className="text-xl font-semibold tracking-tight text-[var(--sf-ink)]">
-                    <SplitText text="准备就绪" delay={0.1} />
-                  </h2>
-                  <p className="mt-2 text-sm leading-relaxed text-[var(--sf-ink-2)]">
-                    点击下方按钮完成引导，开始探索博客内容。
-                  </p>
-                </div>
-              </Step>
-            </StepperTyped>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+              <p className="text-center font-mono text-[11px] tracking-[0.06em] text-[var(--sf-ink-3)]">
+                已有账户？
+                <a
+                  href="/login"
+                  onClick={dismiss}
+                  className="text-[var(--sf-accent-ink)] no-underline hover:underline"
+                >
+                  登录
+                </a>
+              </p>
+            </form>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--sf-line-soft)] pt-3">
+            <p className="font-mono text-[10px] leading-relaxed tracking-[0.04em] text-[var(--sf-ink-3)]">
+              注册即可浏览；验证只影响发表评论
+            </p>
+            <button
+              type="button"
+              onClick={dismiss}
+              className="focus-ring rounded-[2px] border border-[var(--sf-line-control)] px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
+            >
+              开始浏览
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </div>
   );
 }

@@ -1,8 +1,9 @@
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, waitFor } from '@testing-library/react';
 
 import StatusMini from './StatusMini';
+import RequestPath from '../layout/RequestPath';
 
 /**
  * StatusMini 生产缺陷回归（浏览器验收发现的两处）。
@@ -131,6 +132,52 @@ describe('StatusMini · 状态接口容错', () => {
 
     render(<StatusMini />);
     expect(await screen.findByText('检测中')).toBeTruthy();
+  });
+});
+
+/* ===========================
+   共享快照：StatusMini 与 RequestPath 同页
+   =========================== */
+
+describe('StatusMini · 与 RequestPath 共享公开状态快照', () => {
+  it('同页两个消费者只发一次 status / 一轮 3 次 ping，且都拿到同一份数据', async () => {
+    const fetchMock = stubFetch({
+      overall: 'operational',
+      services: [
+        { key: 'site', ok: true, avgLatency24h: 128, uptime24h: 99.94 },
+        { key: 'api', ok: true, avgLatency24h: 45, uptime24h: 100 },
+      ],
+    });
+
+    render(
+      <>
+        <StatusMini />
+        <RequestPath />
+      </>,
+    );
+
+    // 两个组件都会渲染 overall 文案；真正到位后应同时存在。
+    await waitFor(() => {
+      expect(screen.getAllByText('运行正常').length).toBeGreaterThanOrEqual(2);
+    });
+
+    const statusCalls = fetchMock.mock.calls.filter(([input]) =>
+      String(input).startsWith('/api/public/status'),
+    );
+    const protectionCalls = fetchMock.mock.calls.filter(([input]) =>
+      String(input).startsWith('/api/public/protection'),
+    );
+    const pingCalls = fetchMock.mock.calls.filter(([input]) =>
+      String(input).startsWith('/api/public/ping'),
+    );
+
+    expect(statusCalls, 'status 应共享一次请求').toHaveLength(1);
+    expect(protectionCalls, 'protection 应共享一次请求').toHaveLength(1);
+    expect(pingCalls, '一次「你的延迟」采样 3 次，不按组件数翻倍').toHaveLength(3);
+
+    // 两边读的是同一份真实数值（StatusMini 的 site 指标 + RequestPath 的链路文本）。
+    expect(screen.getAllByText(/128/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/99\.94/).length).toBeGreaterThanOrEqual(1);
   });
 });
 
