@@ -18,6 +18,7 @@ import ToastContainer from '../components/ui/Toast';
 import { SITE_CONFIG } from '../config/site';
 import { pbBaseUrl } from '../lib/pb-base-url';
 import { cachedFetchJson } from '../lib/pb-cache';
+import type { Announcement } from '../types/pocketbase';
 
 interface Props {
   title: string;
@@ -49,7 +50,9 @@ const canonicalURL = new URL(Astro.url.pathname, Astro.site);
  * 取数：走与浏览器相同的公开访问规则（匿名），800ms 超时 + 30s 进程内缓存；
  * 失败就当作没有公告（与之前客户端静默失败的表现一致），不影响页面渲染。
  */
-let announcementsSeed: { id: string; title?: string; content?: string; type?: string }[] = [];
+// 与 AnnouncementBar 的 props（Announcement[] | null）保持同一类型：
+// PB 记录本身就带 created/updated，无需在布局层重新声明一个更窄的结构。
+let announcementsSeed: Announcement[] = [];
 if (showChrome) {
   try {
     const data = await cachedFetchJson<{ items?: typeof announcementsSeed }>(

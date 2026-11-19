@@ -104,9 +104,13 @@ export default function InsightsDashboard() {
   const uaCategories = stats.detail?.uaCategories ?? [];
   const hasReferrers = stats.topReferrers.length > 0;
   const hasDevices = uaCategories.length > 0;
-  let nextIndex = 3;
-  const referrerIndex = hasReferrers ? String(nextIndex++).padStart(2, '0') : '';
-  const deviceIndex = hasDevices ? String(nextIndex++).padStart(2, '0') : '';
+  // 序号由「前面已渲染的区块数」直接算出，不用自增游标：
+  // 来源存在时占 03、设备顺延 04；来源为空时设备直接是 03；都不渲染则不占号。
+  const SECTION_START = 3;
+  const referrerIndex = hasReferrers ? String(SECTION_START).padStart(2, '0') : '';
+  const deviceIndex = hasDevices
+    ? String(SECTION_START + (hasReferrers ? 1 : 0)).padStart(2, '0')
+    : '';
 
   return (
     <div className="space-y-4">
