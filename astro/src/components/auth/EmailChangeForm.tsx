@@ -10,6 +10,8 @@ function maskEmailLocal(email: string): string {
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Input from '../ui/Input';
+import FormStatus from './FormStatus';
+import AccountLoginPrompt from './AccountLoginPrompt';
 import PixelButton from '../ui/PixelButton';
 import { requestEmailChange, isAccountMailRateLimited, type AccountMailResponse } from '../../lib/blog-auth-client';
 import { RateLimiter } from '../../lib/security';
@@ -20,10 +22,11 @@ const emailChangeLimiter = new RateLimiter(3, 0.15);
 type EmailChangeStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export default function EmailChangeForm() {
-  const { user } = useAuthStatus();
+  const { user, isLoading } = useAuthStatus();
   const [newEmail, setNewEmail] = useState('');
   const [status, setStatus] = useState<EmailChangeStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [formError, setFormError] = useState('');
   const [referenceId, setReferenceId] = useState('');
 
   const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -34,6 +37,7 @@ export default function EmailChangeForm() {
     if (status === 'error') {
       setStatus('idle');
       setErrorMessage('');
+      setFormError('');
     }
   };
 
@@ -44,26 +48,31 @@ export default function EmailChangeForm() {
     if (!trimmedEmail) {
       setStatus('error');
       setErrorMessage('请输入新邮箱地址');
+      setFormError('');
       return;
     }
     if (!isValidEmail(trimmedEmail)) {
       setStatus('error');
       setErrorMessage('邮箱格式不正确');
+      setFormError('');
       return;
     }
     if (trimmedEmail.toLowerCase() === currentEmail.toLowerCase()) {
       setStatus('error');
       setErrorMessage('新邮箱不能与当前邮箱相同');
+      setFormError('');
       return;
     }
     if (!emailChangeLimiter.tryConsume()) {
       setStatus('error');
-      setErrorMessage('操作太频繁，请稍后再试');
+      setErrorMessage('');
+      setFormError('操作太频繁，请稍后再试');
       return;
     }
 
     setStatus('loading');
     setErrorMessage('');
+    setFormError('');
     setReferenceId('');
 
     try {
@@ -71,7 +80,7 @@ export default function EmailChangeForm() {
       if (isAccountMailRateLimited(response)) {
         setStatus('error');
         const retry = response.retryAfterSeconds ? `，请 ${response.retryAfterSeconds} 秒后重试` : '';
-        setErrorMessage(`请求过于频繁${retry}`);
+        setFormError(`请求过于频繁${retry}`);
         if (response.referenceId) setReferenceId(response.referenceId);
         return;
       }
@@ -79,7 +88,7 @@ export default function EmailChangeForm() {
       if (response.referenceId) setReferenceId(response.referenceId);
     } catch {
       setStatus('error');
-      setErrorMessage('请求失败，请稍后重试');
+      setFormError('请求失败，请稍后重试');
     }
   };
 
@@ -94,14 +103,18 @@ export default function EmailChangeForm() {
     visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] as const } },
   };
 
+  if (isLoading) {
+    return (
+      <p role="status" aria-live="polite" className="py-4 text-sm leading-snug text-[var(--sf-ink-3)]">
+        正在确认登录状态…
+      </p>
+    );
+  }
+
   if (!user) {
     return (
-      <motion.div variants={containerVariants} initial="hidden" animate="visible" className="flex flex-col items-center gap-3 py-6 text-center">
-        <h2 className="text-lg font-semibold text-[var(--sf-ink)]">请先登录</h2>
-        <p className="text-sm text-[var(--sf-ink-3)]">邮箱变更需要先登录账户。</p>
-        <a href="/login" className="mt-2 inline-block rounded-[3px] border border-[var(--sf-accent)] bg-[var(--sf-accent)] px-4 py-2 text-sm font-medium text-[var(--sf-on-accent)] no-underline transition-colors hover:bg-[var(--sf-accent-ink)]">
-          前往登录
-        </a>
+      <motion.div variants={containerVariants} initial="hidden" animate="visible">
+        <AccountLoginPrompt description="邮箱变更需要先登录账户。登录后即可向新邮箱发送确认链接。" />
       </motion.div>
     );
   }
@@ -149,10 +162,13 @@ export default function EmailChangeForm() {
           placeholder="new@email.com"
           value={newEmail}
           onChange={(e) => { setNewEmail(e.target.value); clearError(); }}
-          error={status === 'error' ? errorMessage : undefined}
+          error={errorMessage || undefined}
           required
           autoComplete="email"
         />
+      </motion.div>
+      <motion.div variants={itemVariants}>
+        <FormStatus message={formError} />
       </motion.div>
       {status === 'error' && referenceId && (
         <motion.p variants={itemVariants} className="font-mono text-xs text-[var(--sf-ink-3)]">

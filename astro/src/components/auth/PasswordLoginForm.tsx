@@ -1,9 +1,10 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { runAfterAdminCredentialRevoked } from '../../lib/admin-auth-lifecycle';
 import { clearAdminStepUp } from '../../lib/admin-step-up';
 import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
+import FormStatus from './FormStatus';
 import TotpStepGate from './TotpStepGate';
 import { useAuth } from '../../hooks/domains/useAuth';
 import {
@@ -178,11 +179,15 @@ export default function PasswordLoginForm() {
         <motion.div key="form" initial={false} exit={{ opacity: 0, scale: 0.95 }}>
           <motion.form key="password-form" variants={containerVariants} initial="hidden" animate="visible" exit="exit" onSubmit={handleSubmit} className="space-y-3 sm:space-y-4" noValidate>
             <motion.div variants={itemVariants}>
-              <Input label="邮箱" type="email" placeholder="your@email.com" value={email} onChange={(e) => { setEmail(e.target.value); if (status === 'error') setStatus('idle'); }} error={status === 'error' ? errorMessage : undefined} required autoComplete="email" />
+              <Input label="邮箱" type="email" placeholder="your@email.com" value={email} onChange={(e) => { setEmail(e.target.value); if (status === 'error') setStatus('idle'); }} required autoComplete="email" />
             </motion.div>
 
             <motion.div variants={itemVariants}>
               <Input label="密码" type="password" placeholder="输入密码" value={password} onChange={(e) => { setPassword(e.target.value); if (status === 'error') setStatus('idle'); }} required autoComplete="current-password" />
+            </motion.div>
+
+            <motion.div variants={itemVariants}>
+              <FormStatus message={status === 'error' ? errorMessage : ''} />
             </motion.div>
 
             <motion.div variants={itemVariants}>

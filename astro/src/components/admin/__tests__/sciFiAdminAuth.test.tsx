@@ -26,6 +26,7 @@ const files = {
   'AdminSidebar.tsx': read('components/admin/AdminSidebar.tsx'),
   'StatsCard.tsx': read('components/admin/StatsCard.tsx'),
   'AuthPage.tsx': read('components/auth/AuthPage.tsx'),
+  'AuthTabs.tsx': read('components/auth/AuthTabs.tsx'),
 } as const;
 
 const ALL = Object.values(files).join('\n');
@@ -172,10 +173,9 @@ describe('科幻简约 · 后台组件与登录页设计契约', () => {
       'type AuthMode',
       "'otp'",
       "'register'",
-      'role="tablist"',
-      'role="tab"',
-      'aria-selected={mode ===',
       'aria-labelledby="auth-heading"',
+      'aria-labelledby={tabLabelId}',
+      "from './AuthTabs'",
       "from './MagicLinkForm'",
       "from './PasswordLoginForm'",
       "from './RegisterForm'",
@@ -195,7 +195,24 @@ describe('科幻简约 · 后台组件与登录页设计契约', () => {
       expect(src, `AuthPage 契约丢失：${token}`).toContain(token);
     }
 
+    // tablist/tab 语义已抽到共享 AuthTabs：断言随组件迁移，不削弱契约。
+    const tabs = files['AuthTabs.tsx'];
+    for (const token of [
+      'role="tablist"',
+      'role="tab"',
+      'aria-selected={selected}',
+      'aria-controls={authPanelId(item.id, idPrefix)}',
+      'tabIndex={selected ? 0 : -1}',
+      "case 'ArrowRight'",
+      "case 'ArrowLeft'",
+      "case 'Home'",
+      "case 'End'",
+    ]) {
+      expect(tabs, `AuthTabs 契约丢失：${token}`).toContain(token);
+    }
+
     expect(src, 'AuthPage 必须默认导出').toMatch(/export default function AuthPage/);
+    expect(tabs, 'AuthTabs 必须默认导出').toMatch(/export default function AuthTabs/);
   });
 
   it('登录页改用冷灰细网格背景，不再挂载 3D 扫描装饰', () => {

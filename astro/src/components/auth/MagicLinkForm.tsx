@@ -3,6 +3,7 @@ import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { usePocketBase } from '../../hooks/usePocketBase';
 import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
+import FormStatus from './FormStatus';
 
 type OTPStatus = 'idle' | 'requesting' | 'verifying' | 'error';
 type OTPStep = 'email' | 'code';
@@ -20,6 +21,7 @@ export default function MagicLinkForm() {
   const [step, setStep] = useState<OTPStep>('email');
   const [status, setStatus] = useState<OTPStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [formError, setFormError] = useState('');
   const [success, setSuccess] = useState(false);
   const [successRedirect, setSuccessRedirect] = useState('/');
   const { requestOTP, authWithOTP } = usePocketBase();
@@ -36,6 +38,7 @@ export default function MagicLinkForm() {
     if (status === 'error') {
       setStatus('idle');
       setErrorMessage('');
+      setFormError('');
     }
   };
 
@@ -43,17 +46,20 @@ export default function MagicLinkForm() {
     if (!email) {
       setStatus('error');
       setErrorMessage('请输入邮箱地址');
+      setFormError('');
       return;
     }
 
     if (!isValidEmail(email)) {
       setStatus('error');
       setErrorMessage('邮箱格式不正确');
+      setFormError('');
       return;
     }
 
     setStatus('requesting');
     setErrorMessage('');
+    setFormError('');
 
     const { data, error } = await requestOTP(email);
 
@@ -64,7 +70,7 @@ export default function MagicLinkForm() {
       setStatus('idle');
     } else {
       setStatus('error');
-      setErrorMessage(getErrorMessage(error, '验证码发送失败，请稍后重试'));
+      setFormError(getErrorMessage(error, '验证码发送失败，请稍后重试'));
     }
   };
 
@@ -74,18 +80,20 @@ export default function MagicLinkForm() {
     if (!otpId) {
       setStep('email');
       setStatus('error');
-      setErrorMessage('请先获取验证码');
+      setFormError('请先获取验证码');
       return;
     }
 
     if (!normalizedCode) {
       setStatus('error');
       setErrorMessage('请输入验证码');
+      setFormError('');
       return;
     }
 
     setStatus('verifying');
     setErrorMessage('');
+    setFormError('');
 
     const { success: authSuccess, data, error } = await authWithOTP(otpId, normalizedCode);
 
@@ -96,7 +104,7 @@ export default function MagicLinkForm() {
     }
 
     setStatus('error');
-    setErrorMessage(getErrorMessage(error, '验证码无效或已过期'));
+    setFormError(getErrorMessage(error, '验证码无效或已过期'));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -111,6 +119,7 @@ export default function MagicLinkForm() {
     setCode('');
     setStatus('idle');
     setErrorMessage('');
+    setFormError('');
   };
 
   const containerVariants: Variants = {
@@ -166,7 +175,7 @@ export default function MagicLinkForm() {
                       setEmail(e.target.value);
                       resetError();
                     }}
-                    error={status === 'error' ? errorMessage : undefined}
+                    error={errorMessage || undefined}
                     required
                     autoComplete="email"
                   />
@@ -187,13 +196,17 @@ export default function MagicLinkForm() {
                       setCode(e.target.value);
                       resetError();
                     }}
-                    error={status === 'error' ? errorMessage : undefined}
+                    error={errorMessage || undefined}
                     required
                     autoComplete="one-time-code"
                   />
                 </motion.div>
               )}
             </AnimatePresence>
+
+            <motion.div variants={itemVariants}>
+              <FormStatus message={formError} />
+            </motion.div>
 
             <motion.div variants={itemVariants} className="space-y-3">
               <PixelButton type="submit" loading={isBusy} variant="primary">

@@ -1,22 +1,37 @@
 ---
 import BaseLayout from './BaseLayout.astro';
+import AuthShell from '../components/auth/AuthShell.astro';
 
 interface Props {
   title: string;
   description?: string;
   noindex?: boolean;
+  /** 页面标题上方的眉标，默认沿用认证工作台的统一标签。 */
+  eyebrow?: string;
+  /** 标题的 DOM id，默认为 auth-heading（登录页由 AuthPage 使用同一 id）。 */
+  headingId?: string;
+  /** 登录页把 h1 交给 AuthPage 岛屿渲染，避免出现两个一级标题。 */
+  showHeading?: boolean;
 }
 
-const { title, description, noindex } = Astro.props;
+const {
+  title,
+  description,
+  noindex,
+  eyebrow,
+  headingId = 'auth-heading',
+  showHeading = true,
+} = Astro.props;
 ---
 
 <BaseLayout title={title} description={description} noindex={noindex}>
-  <div class="flex min-h-[60vh] items-center justify-center">
-    <div class="w-full max-w-md">
-      <div class="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-8">
-        <h1 class="mb-6 text-center text-2xl font-bold text-[var(--sf-ink)]">{title}</h1>
-        <slot />
-      </div>
-    </div>
-  </div>
+  <AuthShell
+    title={title}
+    description={description}
+    eyebrow={eyebrow}
+    headingId={headingId}
+    showHeading={showHeading}
+  >
+    <slot />
+  </AuthShell>
 </BaseLayout>

@@ -230,6 +230,102 @@ test('@interaction C6 登录三 tab 切换（不提交）', async ({ page }, tes
   expectCleanErrors(errors, 'C6 登录 tab');
 });
 
+test('@interaction C15 登录 tab：roving tabindex / aria-controls / 方向键 Home End', async ({ page }, testInfo) => {
+  const errors = collectErrors(page);
+  await mockPocketBase(page);
+  await openRoute(page, themeOf(testInfo.project.name), '/login');
+
+  const tabs = page.getByRole('tab');
+  await expect(tabs).toHaveCount(3);
+  const tabIndexes = () => tabs.evaluateAll((els) => els.map((el) => (el as HTMLElement).tabIndex));
+  expect(await tabIndexes()).toEqual([0, -1, -1]);
+
+  for (let i = 0; i < 3; i += 1) {
+    const tab = tabs.nth(i);
+    const controls = await tab.getAttribute('aria-controls');
+    const id = await tab.getAttribute('id');
+    expect(controls, `tab ${i} 缺少 aria-controls`).toBeTruthy();
+    expect(id, `tab ${i} 缺少 id`).toBeTruthy();
+    const panel = page.locator(`#${controls}`);
+    await expect(panel).toHaveAttribute('role', 'tabpanel');
+    await expect(panel).toHaveAttribute('aria-labelledby', id as string);
+  }
+
+  await tabs.nth(0).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(tabs.nth(1)).toBeFocused();
+  await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+  expect(await tabIndexes()).toEqual([-1, 0, -1]);
+  const controls = await tabs.nth(1).getAttribute('aria-controls');
+  await expect(page.locator(`#${controls}`)).toBeVisible();
+
+  await page.keyboard.press('ArrowRight');
+  await expect(tabs.nth(2)).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(tabs.nth(0)).toBeFocused();
+  await page.keyboard.press('ArrowLeft');
+  await expect(tabs.nth(2)).toBeFocused();
+
+  await page.keyboard.press('Home');
+  await expect(tabs.nth(0)).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(tabs.nth(2)).toBeFocused();
+
+  await expectNoHorizontalOverflow(page, `登录 tab 键盘 @ ${testInfo.project.name}`);
+  expectCleanErrors(errors, 'C15 登录 tab 键盘');
+});
+
+test('@interaction C16 注册表单：字段错误就近关联（密码/确认密码）', async ({ page }, testInfo) => {
+  const errors = collectErrors(page);
+  await mockPocketBase(page);
+  await openRoute(page, themeOf(testInfo.project.name), '/login');
+
+  await page.getByRole('tab', { name: '注册' }).click();
+  const password = page.getByLabel('密码', { exact: true });
+  const confirm = page.getByLabel('确认密码');
+
+  await page.getByLabel('昵称').fill('HB');
+  await page.getByLabel('邮箱', { exact: true }).fill('hb@example.com');
+  await password.fill('password123');
+  await confirm.fill('password124');
+  await page.getByRole('button', { name: '提交注册' }).click();
+
+  await expect(confirm).toHaveAttribute('aria-invalid', 'true');
+  const mismatchId = await confirm.getAttribute('aria-describedby');
+  expect(mismatchId, '确认密码缺少 aria-describedby').toBeTruthy();
+  await expect(page.locator(`#${mismatchId}`)).toContainText('两次输入的密码不一致');
+  await expect(password).toHaveAttribute('aria-invalid', 'false');
+
+  await password.fill('short');
+  await confirm.fill('short');
+  await page.getByRole('button', { name: '提交注册' }).click();
+  await expect(password).toHaveAttribute('aria-invalid', 'true');
+  const lengthId = await password.getAttribute('aria-describedby');
+  expect(lengthId, '密码缺少 aria-describedby').toBeTruthy();
+  await expect(page.locator(`#${lengthId}`)).toContainText('密码至少需要 8 个字符');
+  await expect(confirm).toHaveAttribute('aria-invalid', 'false');
+
+  await expectNoHorizontalOverflow(page, `注册字段错误 @ ${testInfo.project.name}`);
+  expectCleanErrors(errors, 'C16 注册字段错误');
+});
+
+test('@interaction C17 账号页未登录：登录引导而非空白', async ({ page }, testInfo) => {
+  const errors = collectErrors(page);
+  await mockPocketBase(page);
+
+  for (const path of ['/account/notifications', '/account/email-change'] as const) {
+    await openRoute(page, themeOf(testInfo.project.name), path);
+    await expect(page.getByText('请先登录')).toBeVisible();
+    const login = page.getByRole('link', { name: '前往登录' });
+    await expect(login).toBeVisible();
+    expect(await login.getAttribute('href')).toBe('/login');
+    await expect(page.getByRole('status').filter({ hasText: '正在确认登录状态' })).toHaveCount(0);
+    await expectNoHorizontalOverflow(page, `账号未登录 ${path} @ ${testInfo.project.name}`);
+  }
+
+  expectCleanErrors(errors, 'C17 账号未登录');
+});
+
 test('@interaction C7 关于页 Tech/Feature 按钮展开/收起', async ({ page }, testInfo) => {
   const errors = collectErrors(page);
   await mockPocketBase(page);

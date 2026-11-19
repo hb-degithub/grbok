@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Input from '../ui/Input';
+import FormStatus from './FormStatus';
 import PixelButton from '../ui/PixelButton';
 import { requestPasswordReset, isAccountMailRateLimited, type AccountMailResponse } from '../../lib/blog-auth-client';
 import { RateLimiter } from '../../lib/security';
@@ -13,6 +14,7 @@ export default function ForgotPasswordForm() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<ForgotStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [formError, setFormError] = useState('');
   const [referenceId, setReferenceId] = useState('');
 
   const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -21,6 +23,7 @@ export default function ForgotPasswordForm() {
     if (status === 'error') {
       setStatus('idle');
       setErrorMessage('');
+      setFormError('');
     }
   };
 
@@ -31,21 +34,25 @@ export default function ForgotPasswordForm() {
     if (!trimmedEmail) {
       setStatus('error');
       setErrorMessage('请输入邮箱地址');
+      setFormError('');
       return;
     }
     if (!isValidEmail(trimmedEmail)) {
       setStatus('error');
       setErrorMessage('邮箱格式不正确');
+      setFormError('');
       return;
     }
     if (!forgotLimiter.tryConsume()) {
       setStatus('error');
-      setErrorMessage('操作太频繁，请稍后再试');
+      setErrorMessage('');
+      setFormError('操作太频繁，请稍后再试');
       return;
     }
 
     setStatus('loading');
     setErrorMessage('');
+    setFormError('');
     setReferenceId('');
 
     try {
@@ -53,7 +60,7 @@ export default function ForgotPasswordForm() {
       if (isAccountMailRateLimited(response)) {
         setStatus('error');
         const retry = response.retryAfterSeconds ? `，请 ${response.retryAfterSeconds} 秒后重试` : '';
-        setErrorMessage(`请求过于频繁${retry}`);
+        setFormError(`请求过于频繁${retry}`);
         if (response.referenceId) setReferenceId(response.referenceId);
         return;
       }
@@ -61,7 +68,7 @@ export default function ForgotPasswordForm() {
       if (response.referenceId) setReferenceId(response.referenceId);
     } catch {
       setStatus('error');
-      setErrorMessage('请求失败，请稍后重试');
+      setFormError('请求失败，请稍后重试');
     }
   };
 
@@ -111,10 +118,13 @@ export default function ForgotPasswordForm() {
               placeholder="your@email.com"
               value={email}
               onChange={(e) => { setEmail(e.target.value); clearError(); }}
-              error={status === 'error' ? errorMessage : undefined}
+              error={errorMessage || undefined}
               required
               autoComplete="email"
             />
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <FormStatus message={formError} />
           </motion.div>
           {status === 'error' && referenceId && (
             <motion.p variants={itemVariants} className="font-mono text-xs text-[var(--sf-ink-3)]">

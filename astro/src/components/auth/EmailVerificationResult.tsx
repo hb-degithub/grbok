@@ -5,16 +5,10 @@ import { useAuth } from '../../hooks/domains/useAuth';
 type VerifyStatus = 'loading' | 'success' | 'error' | 'already_verified';
 
 /**
- * 状态外框：成功 emerald 细线、失败 `--sf-danger` 细线、
- * 进行中/已验证走冷灰结构线；内部图标与标题沿用同一语义色，深浅主题均有令牌兜底。
+ * 邮箱验证结果：现在嵌在 AuthShell 的右侧卡片内，因此不再自绘外框，
+ * 只用图标框与标题的颜色表达状态，避免卡片套卡片。
+ * 颜色一律走 --sf-* 语义令牌，深浅主题自动切换。
  */
-const PANEL_TONE: Record<VerifyStatus, string> = {
-  loading: 'border-[var(--sf-line)]',
-  success: 'border-emerald-300 dark:border-emerald-900/60',
-  already_verified: 'border-[var(--sf-line-strong)]',
-  error: 'border-[var(--sf-danger)]',
-};
-
 export default function EmailVerificationResult() {
   const [status, setStatus] = useState<VerifyStatus>('loading');
   const [errorMessage, setErrorMessage] = useState('');
@@ -71,13 +65,12 @@ export default function EmailVerificationResult() {
   };
 
   return (
-    <div className="flex min-h-[60svh] items-center justify-center px-4">
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        className={`w-full max-w-md rounded-[3px] border bg-[var(--sf-surface)] p-8 text-center ${PANEL_TONE[status]}`}
-      >
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="flex w-full flex-col items-center py-2 text-center"
+    >
         {status === 'loading' && (
           <>
             <div
@@ -94,13 +87,13 @@ export default function EmailVerificationResult() {
               variants={iconVariants}
               initial="hidden"
               animate="visible"
-              className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[3px] border border-emerald-300 dark:border-emerald-900/60"
+              className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[3px] border border-[var(--sf-success)]"
             >
-              <svg className="h-8 w-8 text-emerald-700 dark:text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <svg className="h-8 w-8 text-[var(--sf-success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </motion.div>
-            <h2 className="text-xl font-semibold text-emerald-800 dark:text-emerald-200">邮箱验证成功！</h2>
+            <h2 className="text-xl font-semibold text-[var(--sf-success)]">邮箱验证成功！</h2>
             <p className="mt-2 text-sm text-[var(--sf-ink-3)]">3 秒后自动跳转首页...</p>
           </>
         )}
@@ -140,6 +133,5 @@ export default function EmailVerificationResult() {
           </>
         )}
       </motion.div>
-    </div>
   );
 }

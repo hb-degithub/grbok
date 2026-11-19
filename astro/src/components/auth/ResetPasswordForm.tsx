@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Input from '../ui/Input';
+import FormStatus from './FormStatus';
 import PixelButton from '../ui/PixelButton';
 import { confirmPasswordResetToken } from '../../lib/blog-auth-client';
 
@@ -11,6 +12,8 @@ export default function ResetPasswordForm() {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [status, setStatus] = useState<ResetStatus>('form');
   const [errorMessage, setErrorMessage] = useState('');
+  const [confirmError, setConfirmError] = useState('');
+  const [formError, setFormError] = useState('');
   const [tokenError, setTokenError] = useState('');
 
   const getToken = () => {
@@ -22,6 +25,8 @@ export default function ResetPasswordForm() {
     if (status === 'error') {
       setStatus('form');
       setErrorMessage('');
+      setConfirmError('');
+      setFormError('');
     }
   };
 
@@ -38,21 +43,29 @@ export default function ResetPasswordForm() {
     if (!password) {
       setStatus('error');
       setErrorMessage('请输入新密码');
+      setConfirmError('');
+      setFormError('');
       return;
     }
     if (password.length < 8) {
       setStatus('error');
       setErrorMessage('密码至少需要 8 个字符');
+      setConfirmError('');
+      setFormError('');
       return;
     }
     if (password !== passwordConfirm) {
       setStatus('error');
-      setErrorMessage('两次输入的密码不一致');
+      setErrorMessage('');
+      setConfirmError('两次输入的密码不一致');
+      setFormError('');
       return;
     }
 
     setStatus('loading');
     setErrorMessage('');
+    setConfirmError('');
+    setFormError('');
 
     try {
       await confirmPasswordResetToken(token, password, passwordConfirm);
@@ -64,7 +77,7 @@ export default function ResetPasswordForm() {
         setTokenError('重置链接已过期或无效，请重新申请密码重置邮件');
       } else {
         setStatus('error');
-        setErrorMessage(msg || '重置失败，请稍后重试');
+        setFormError(msg || '重置失败，请稍后重试');
       }
     }
   };
@@ -128,7 +141,7 @@ export default function ResetPasswordForm() {
           placeholder="输入新密码"
           value={password}
           onChange={(e) => { setPassword(e.target.value); clearError(); }}
-          error={status === 'error' ? errorMessage : undefined}
+          error={errorMessage || undefined}
           required
           autoComplete="new-password"
         />
@@ -140,9 +153,13 @@ export default function ResetPasswordForm() {
           placeholder="再次输入新密码"
           value={passwordConfirm}
           onChange={(e) => { setPasswordConfirm(e.target.value); clearError(); }}
+          error={confirmError || undefined}
           required
           autoComplete="new-password"
         />
+      </motion.div>
+      <motion.div variants={itemVariants}>
+        <FormStatus message={formError} />
       </motion.div>
       <motion.div variants={itemVariants}>
         <PixelButton type="submit" loading={status === 'loading'} variant="primary">

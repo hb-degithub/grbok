@@ -1,0 +1,86 @@
+---
+import { SITE_CONFIG } from '../../config/site';
+
+interface Props {
+  title: string;
+  description?: string;
+  eyebrow?: string;
+  headingId?: string;
+  /** 登录页把标题交给 AuthPage 岛屿渲染，自身只提供工作台外壳。 */
+  showHeading?: boolean;
+  noindex?: boolean;
+}
+
+const {
+  title,
+  description,
+  eyebrow = 'Secure Access / 身份验证',
+  headingId = 'auth-heading',
+  showHeading = true,
+} = Astro.props;
+
+const flow = [
+  { step: '01', title: '选择认证方式', detail: '密码、验证码或注册' },
+  { step: '02', title: '完成身份校验', detail: '会话由 PocketBase 签发' },
+  { step: '03', title: '进入账户空间', detail: '管理员追加 TOTP 验证' },
+] as const;
+---
+
+<section
+  class="relative flex w-full items-center justify-center overflow-hidden bg-[var(--sf-canvas)] px-3 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-[calc(4.5rem+env(safe-area-inset-top))] sm:px-6 sm:py-10 lg:min-h-[calc(100svh-8rem)] lg:px-8"
+  aria-labelledby={showHeading ? headingId : undefined}
+>
+  <div class="relative mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:items-center lg:gap-14">
+    <aside class="min-w-0">
+      <div class="flex items-center gap-3">
+        <span
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[3px] border border-[var(--sf-line-strong)] bg-[var(--sf-accent)] font-mono text-lg font-bold text-[var(--sf-on-accent)]"
+          aria-hidden="true"
+        >
+          B
+        </span>
+        <div class="min-w-0">
+          <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">Identity Workbench</p>
+          <p class="truncate text-sm font-semibold text-[var(--sf-ink)]">{SITE_CONFIG.name}</p>
+        </div>
+      </div>
+
+      <p class="orbital-eyebrow mt-6">身份校验工作台</p>
+      <p class="mt-3 max-w-xl text-2xl font-semibold leading-tight tracking-tight text-[var(--sf-ink)] sm:text-3xl">
+        一次校验，回到你的阅读与写作空间。
+      </p>
+      <p class="mt-3 max-w-xl text-sm leading-relaxed text-[var(--sf-ink-2)]">
+        账户会话由 PocketBase 签发，密码登录带限流与锁定保护；管理员登录后还需通过 TOTP 二次验证。
+      </p>
+
+      <ol class="mt-6 hidden gap-2 sm:grid sm:grid-cols-3 lg:grid-cols-1 lg:gap-3" aria-label="身份校验流程">
+        {flow.map((item) => (
+          <li class="min-w-0 border-l border-[var(--sf-line)] pl-3">
+            <p class="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">{item.step}</p>
+            <p class="mt-1 text-sm font-medium text-[var(--sf-ink)]">{item.title}</p>
+            <p class="mt-0.5 text-xs leading-snug text-[var(--sf-ink-3)]">{item.detail}</p>
+          </li>
+        ))}
+      </ol>
+
+      <p class="mt-6 hidden font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--sf-ink-3)] lg:block">
+        Session · Rate limit · TOTP
+      </p>
+    </aside>
+
+    <div class="relative min-w-0 overflow-hidden rounded-[4px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-4 sm:p-6 md:p-8">
+      <span class="pointer-events-none absolute left-2 top-2 h-2 w-2 border-l border-t border-[var(--sf-line-strong)]" aria-hidden="true"></span>
+      <span class="pointer-events-none absolute right-2 top-2 h-2 w-2 border-r border-t border-[var(--sf-line-strong)]" aria-hidden="true"></span>
+
+      {showHeading && (
+        <header class="mb-5 sm:mb-6">
+          <p class="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--sf-ink-3)]">{eyebrow}</p>
+          <h1 id={headingId} class="mt-2 text-xl font-semibold tracking-tight text-[var(--sf-ink)] sm:text-2xl">{title}</h1>
+          {description && <p class="mt-1.5 text-sm leading-snug text-[var(--sf-ink-3)]">{description}</p>}
+        </header>
+      )}
+
+      <slot />
+    </div>
+  </div>
+</section>

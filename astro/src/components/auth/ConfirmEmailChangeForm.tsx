@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Input from '../ui/Input';
+import FormStatus from './FormStatus';
 import PixelButton from '../ui/PixelButton';
 import { confirmEmailChangeToken } from '../../lib/blog-auth-client';
 
@@ -10,6 +11,7 @@ export default function ConfirmEmailChangeForm() {
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<ConfirmStatus>('form');
   const [errorMessage, setErrorMessage] = useState('');
+  const [formError, setFormError] = useState('');
   const [tokenError, setTokenError] = useState('');
 
   const getToken = () => {
@@ -21,6 +23,7 @@ export default function ConfirmEmailChangeForm() {
     if (status === 'error') {
       setStatus('form');
       setErrorMessage('');
+      setFormError('');
     }
   };
 
@@ -37,11 +40,13 @@ export default function ConfirmEmailChangeForm() {
     if (!password) {
       setStatus('error');
       setErrorMessage('请输入当前密码以确认变更');
+      setFormError('');
       return;
     }
 
     setStatus('loading');
     setErrorMessage('');
+    setFormError('');
 
     try {
       await confirmEmailChangeToken(token, password);
@@ -53,7 +58,7 @@ export default function ConfirmEmailChangeForm() {
         setTokenError('确认链接已过期或无效，请重新发起邮箱变更');
       } else {
         setStatus('error');
-        setErrorMessage(msg || '确认失败，请稍后重试');
+        setFormError(msg || '确认失败，请稍后重试');
       }
     }
   };
@@ -117,10 +122,13 @@ export default function ConfirmEmailChangeForm() {
           placeholder="输入当前密码"
           value={password}
           onChange={(e) => { setPassword(e.target.value); clearError(); }}
-          error={status === 'error' ? errorMessage : undefined}
+          error={errorMessage || undefined}
           required
           autoComplete="current-password"
         />
+      </motion.div>
+      <motion.div variants={itemVariants}>
+        <FormStatus message={formError} />
       </motion.div>
       <motion.div variants={itemVariants}>
         <PixelButton type="submit" loading={status === 'loading'} variant="primary">

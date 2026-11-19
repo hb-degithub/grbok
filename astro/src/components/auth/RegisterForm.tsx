@@ -3,11 +3,13 @@ import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { usePocketBase } from '../../hooks/usePocketBase';
 import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
+import FormStatus from './FormStatus';
 import { RateLimiter } from '../../lib/security';
 
 const registerLimiter = new RateLimiter(5, 0.2);
 
 type RegisterStatus = 'idle' | 'loading' | 'error';
+type RegisterField = 'email' | 'password' | 'passwordConfirm';
 
 export default function RegisterForm() {
   const [name, setName] = useState('');
@@ -15,7 +17,8 @@ export default function RegisterForm() {
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [status, setStatus] = useState<RegisterStatus>('idle');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [formError, setFormError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<RegisterField, string>>>({});
   const [success, setSuccess] = useState(false);
   const { registerReader } = usePocketBase();
 
@@ -30,8 +33,15 @@ export default function RegisterForm() {
   const clearError = () => {
     if (status === 'error') {
       setStatus('idle');
-      setErrorMessage('');
+      setFormError('');
+      setFieldErrors({});
     }
+  };
+
+  const fail = (fields: Partial<Record<RegisterField, string>>, message = '') => {
+    setStatus('error');
+    setFieldErrors(fields);
+    setFormError(message);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,37 +51,33 @@ export default function RegisterForm() {
     const trimmedName = name.trim();
 
     if (!trimmedName || !trimmedEmail || !password || !passwordConfirm) {
-      setStatus('error');
-      setErrorMessage('请填写昵称、邮箱、密码和确认密码');
+      fail({}, '请填写昵称、邮箱、密码和确认密码');
       return;
     }
 
     if (!isValidEmail(trimmedEmail)) {
-      setStatus('error');
-      setErrorMessage('邮箱格式不正确');
+      fail({ email: '邮箱格式不正确' });
       return;
     }
 
     if (password.length < 8) {
-      setStatus('error');
-      setErrorMessage('密码至少需要 8 个字符');
+      fail({ password: '密码至少需要 8 个字符' });
       return;
     }
 
     if (!registerLimiter.tryConsume()) {
-      setStatus('error');
-      setErrorMessage('Too many attempts, please try again later');
+      fail({}, 'Too many attempts, please try again later');
       return;
     }
 
     if (password !== passwordConfirm) {
-      setStatus('error');
-      setErrorMessage('两次输入的密码不一致');
+      fail({ passwordConfirm: '两次输入的密码不一致' });
       return;
     }
 
     setStatus('loading');
-    setErrorMessage('');
+    setFormError('');
+    setFieldErrors({});
 
     const { success: registerSuccess } = await registerReader({
       email: trimmedEmail,
@@ -86,7 +92,7 @@ export default function RegisterForm() {
     }
 
     setStatus('error');
-    setErrorMessage('注册失败，请检查信息后重试');
+    setFormError('注册失败，请检查信息后重试');
   };
 
   const containerVariants: Variants = {
@@ -130,7 +136,6 @@ export default function RegisterForm() {
             setName(e.target.value);
             clearError();
           }}
-          error={status === 'error' && !name.trim() ? errorMessage : undefined}
           required
           autoComplete="name"
         />
@@ -146,7 +151,7 @@ export default function RegisterForm() {
             setEmail(e.target.value);
             clearError();
           }}
-          error={status === 'error' ? errorMessage : undefined}
+          error={fieldErrors.email}
           required
           autoComplete="email"
         />
@@ -162,6 +167,7 @@ export default function RegisterForm() {
             setPassword(e.target.value);
             clearError();
           }}
+          error={fieldErrors.password}
           required
           autoComplete="new-password"
         />
@@ -177,6 +183,7 @@ export default function RegisterForm() {
             setPasswordConfirm(e.target.value);
             clearError();
           }}
+          error={fieldErrors.passwordConfirm}
           required
           autoComplete="new-password"
         />
@@ -185,6 +192,10 @@ export default function RegisterForm() {
       <motion.p variants={itemVariants} className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-line-soft)] px-3 py-2.5 text-sm leading-snug text-[var(--sf-ink-2)] sm:px-4 sm:py-3">
         注册后默认获得 reader 权限，后台权限需要超级管理员另行分配。验证邮箱后即可发表评论。
       </motion.p>
+
+      <motion.div variants={itemVariants}>
+        <FormStatus message={formError} />
+      </motion.div>
 
       <motion.div variants={itemVariants}>
         <PixelButton type="submit" loading={status === 'loading'} variant="primary">
