@@ -4,6 +4,8 @@ import {
   settingsService,
   type SettingRecord,
 } from '../settingsService';
+import { DEFAULT_SITE_SETTINGS as PUBLIC_DEFAULT_SITE_SETTINGS } from '../../site-settings';
+import { DEFAULT_SITE_SETTINGS_SCALARS, SITE_SETTING_SCALAR_KEYS } from '../../settings-defaults';
 
 /**
  * Task A 行为契约：设置加载失败必须向上抛出。
@@ -70,5 +72,51 @@ describe('settingsService.getAllSettings', () => {
     mockFullList(Promise.reject({ status: 500, message: '服务器错误' }));
 
     await expect(settingsService.getAllSettings()).rejects.toMatchObject({ status: 500 });
+  });
+});
+
+describe('settingsService 默认值与公开 site-settings 合流', () => {
+  it('后台 7 个标量默认值与公开站点完全相同（单一来源 lib/settings-defaults）', () => {
+    expect(Object.keys(DEFAULT_SITE_SETTINGS).sort()).toEqual([...SITE_SETTING_SCALAR_KEYS].sort());
+    expect(Object.keys(PUBLIC_DEFAULT_SITE_SETTINGS).sort()).toEqual(
+      [...SITE_SETTING_SCALAR_KEYS, 'feature_flags'].sort(),
+    );
+    expect(DEFAULT_SITE_SETTINGS).toEqual(DEFAULT_SITE_SETTINGS_SCALARS);
+
+    for (const key of SITE_SETTING_SCALAR_KEYS) {
+      expect(PUBLIC_DEFAULT_SITE_SETTINGS[key]).toEqual(DEFAULT_SITE_SETTINGS_SCALARS[key]);
+    }
+  });
+
+  it('统一使用公开品牌文案，不再是「个人博客 / 分享技术与生活」', () => {
+    expect(DEFAULT_SITE_SETTINGS.site_title).toBe('胡巴的博客');
+    expect(DEFAULT_SITE_SETTINGS.site_description).toBe('胡巴的个人博客，记录技术、思考与生活。');
+  });
+
+  it('后台不含 feature_flags：保存只写 7 个标量键（即使调用方误传公开设置对象）', async () => {
+    const createdKeys: string[] = [];
+
+    vi.spyOn(settingsService, 'getPocketBase').mockReturnValue({
+      filter: (filter: string) => filter,
+      collection: () => ({
+        getFirstListItem: async () => {
+          throw { status: 404 };
+        },
+      }),
+    } as never);
+    vi.spyOn(settingsService, 'create').mockImplementation(async (data) => {
+      createdKeys.push(data.key as string);
+      return data as never;
+    });
+
+    const publicStyleSettings = {
+      ...DEFAULT_SITE_SETTINGS,
+      feature_flags: { newsletter: { enabled: true } },
+    };
+
+    await settingsService.saveSettings(publicStyleSettings);
+
+    expect(createdKeys).toEqual([...SITE_SETTING_SCALAR_KEYS]);
+    expect(createdKeys).not.toContain('feature_flags');
   });
 });

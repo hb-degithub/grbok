@@ -25,6 +25,15 @@ const adminRoles = new Set(['author', 'admin', 'super_admin']);
 // 强制 TOTP 二次验证的角色：仅 admin / super_admin；author 登录后直接进入后台
 const totpEnforcedRoles = new Set(['admin', 'super_admin']);
 
+/**
+ * 后端在密码登录需要额外 MFA 时返回 mfaId，本表单无法完成该验证。
+ * 错误码本身保留（契约测试 / E2E 与 data-error-code 使用），界面只显示可读中文，
+ * 不能把 'MFA_UNSUPPORTED' 这样的内部常量直接抛给用户。
+ */
+const MFA_UNSUPPORTED = 'MFA_UNSUPPORTED';
+const MFA_UNSUPPORTED_MESSAGE =
+  '该账号需要额外的多因素验证（MFA），当前登录方式暂不支持。请改用支持 MFA 的登录入口，或联系站点管理员。';
+
 const containerVariants: Variants = {
   hidden: { opacity: 0, y: 16 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, staggerChildren: 0.08, ease: [0.16, 1, 0.3, 1] } },
@@ -76,14 +85,17 @@ export default function PasswordLoginForm() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
   const [totpStep, setTotpStep] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [errorCode, setErrorCode] = useState('');
   const [success, setSuccess] = useState(false);
+  // 登录响应的真实角色：决定成功后跳 /admin 还是 /，不能在跳转时假定为 undefined。
+  const [postLoginRole, setPostLoginRole] = useState<string | null>(null);
   const { login } = useAuth();
 
   useEffect(() => {
     if (!success) return;
-    const timer = setTimeout(() => { window.location.href = getPostLoginRedirect(undefined); }, 500);
+    const timer = setTimeout(() => { window.location.href = getPostLoginRedirect(postLoginRole); }, 500);
     return () => clearTimeout(timer);
-  }, [success]);
+  }, [success, postLoginRole]);
 
   const failWithCooldown = (key: string, fallbackSeconds = 30 * 60) => {
     const seconds = setAuthLock(key, fallbackSeconds);
@@ -92,7 +104,10 @@ export default function PasswordLoginForm() {
   };
 
   const handlePostLogin = (role: unknown) => {
+    setPostLoginRole(typeof role === 'string' ? role : null);
     if (totpEnforcedRoles.has(String(role))) {
+      // TOTP 角色先走二次验证，不进入 success 分支：
+      // 否则会绕过验证直接跳到 /admin。
       setTotpStep(true);
       setStatus('idle');
       return;
@@ -102,6 +117,7 @@ export default function PasswordLoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorCode('');
 
     const normalizedEmail = normalizeAuthEmail(email);
     const attemptKey = getAuthAttemptKey(normalizedEmail);
@@ -139,7 +155,8 @@ export default function PasswordLoginForm() {
       const nextMfaId = getMfaId(err);
       if (nextMfaId) {
         setStatus('error');
-        setErrorMessage('MFA_UNSUPPORTED');
+        setErrorCode(MFA_UNSUPPORTED);
+        setErrorMessage(MFA_UNSUPPORTED_MESSAGE);
         return;
       }
 
@@ -161,6 +178,7 @@ export default function PasswordLoginForm() {
         onReturnToLogin={() => {
           setTotpStep(false);
           setStatus('idle');
+          setPostLoginRole(null);
         }}
       />
     );
@@ -177,7 +195,7 @@ export default function PasswordLoginForm() {
         </motion.div>
       ) : (
         <motion.div key="form" initial={false} exit={{ opacity: 0, scale: 0.95 }}>
-          <motion.form key="password-form" variants={containerVariants} initial="hidden" animate="visible" exit="exit" onSubmit={handleSubmit} className="space-y-3 sm:space-y-4" noValidate>
+          <motion.form key="password-form" variants={containerVariants} initial="hidden" animate="visible" exit="exit" onSubmit={handleSubmit} className="space-y-3 sm:space-y-4" noValidate data-error-code={status === 'error' && errorCode ? errorCode : undefined}>
             <motion.div variants={itemVariants}>
               <Input label="邮箱" type="email" placeholder="your@email.com" value={email} onChange={(e) => { setEmail(e.target.value); if (status === 'error') setStatus('idle'); }} required autoComplete="email" />
             </motion.div>

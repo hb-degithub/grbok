@@ -1,25 +1,18 @@
 import { getPocketBase } from './pocketbase';
 import { DEFAULT_FEATURE_FLAGS, type FeatureFlags } from '../config/feature-flags';
+import {
+  DEFAULT_SITE_SETTINGS_SCALARS,
+  type SiteSettingsScalars,
+} from './settings-defaults';
 
-export interface SiteSettings {
-  site_title: string;
-  site_description: string;
-  site_logo: string;
-  posts_per_page: number;
-  enable_comments: boolean;
-  comment_moderation: boolean;
-  debug_protection_enabled: boolean;
+// 前台设置 = 与后台共用的 7 个标量默认值 + 公开页需要的 feature_flags。
+// feature_flags 是对象且只在公开 site-settings 里合并，后台不感知它。
+export interface SiteSettings extends SiteSettingsScalars {
   feature_flags: FeatureFlags;
 }
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
-  site_title: '胡巴的博客',
-  site_description: '胡巴的个人博客，记录技术、思考与生活。',
-  site_logo: '',
-  posts_per_page: 10,
-  enable_comments: true,
-  comment_moderation: true,
-  debug_protection_enabled: false,
+  ...DEFAULT_SITE_SETTINGS_SCALARS,
   feature_flags: DEFAULT_FEATURE_FLAGS,
 };
 
@@ -27,8 +20,6 @@ type SettingRecord = {
   key: string;
   value: unknown;
 };
-
-const PUBLIC_SETTING_KEYS = Object.keys(DEFAULT_SITE_SETTINGS) as Array<keyof SiteSettings>;
 
 function normalizeValue(key: keyof SiteSettings, value: unknown): SiteSettings[keyof SiteSettings] {
   const fallback = DEFAULT_SITE_SETTINGS[key];
@@ -74,7 +65,8 @@ export function mergeSettingRecords(records: SettingRecord[]): SiteSettings {
 export async function loadSiteSettings(): Promise<SiteSettings> {
   const pb = getPocketBase();
   // 2026-11-16：不再下发 "key = ... || key = ..." 的长 OR filter。
-  // settings 集合的 listRule 已经把匿名可读范围限定为 PUBLIC_SETTING_KEYS（含 feature_flags），
+  // settings 集合的 listRule 已经把匿名可读范围限定为上面的 8 个公开键
+  // （7 个标量 + feature_flags），
   // 该 filter 完全冗余；而 SafeLine 会把带引号与 || 的 filter 判成注入并返回挑战页（浏览器 403），
   // 导致每一页的站点设置加载失败（评论开关等全部回退默认值）。
   // 这里改为不带 filter 的整表读取，服务端规则保证只返回允许的键。

@@ -1,5 +1,10 @@
 ﻿import { BaseService } from './baseService';
 import type { RecordModel } from 'pocketbase';
+import {
+  DEFAULT_SITE_SETTINGS_SCALARS,
+  SITE_SETTING_SCALAR_KEYS,
+  type SiteSettingsScalars,
+} from '../../lib/settings-defaults';
 
 export interface SettingRecord {
   id: string;
@@ -12,25 +17,11 @@ export interface SettingRecord {
 
 type SettingRecordModel = SettingRecord & RecordModel;
 
-export interface SiteSettings {
-  site_title: string;
-  site_description: string;
-  site_logo: string;
-  posts_per_page: number;
-  enable_comments: boolean;
-  comment_moderation: boolean;
-  debug_protection_enabled: boolean;
-}
+// 后台只关心 7 个标量键；feature_flags 只在公开 site-settings 里合并。
+// 类型与默认值都来自 lib/settings-defaults.ts，避免前后台出现两套标题/描述。
+export type SiteSettings = SiteSettingsScalars;
 
-export const DEFAULT_SITE_SETTINGS: SiteSettings = {
-  site_title: '个人博客',
-  site_description: '分享技术与生活',
-  site_logo: '',
-  posts_per_page: 10,
-  enable_comments: true,
-  comment_moderation: true,
-  debug_protection_enabled: false,
-};
+export const DEFAULT_SITE_SETTINGS: SiteSettings = { ...DEFAULT_SITE_SETTINGS_SCALARS };
 
 class SettingsService extends BaseService<SettingRecordModel> {
   constructor() {
@@ -70,8 +61,11 @@ class SettingsService extends BaseService<SettingRecordModel> {
   async saveSettings(settings: SiteSettings): Promise<void> {
     const pb = this.getPocketBase();
     const failed: string[] = [];
-    
-    for (const [key, value] of Object.entries(settings)) {
+
+    // 只遍历共享的 7 个标量键：调用方即使传入公开站点设置对象（含 feature_flags），
+    // 也不会把对象写进 settings 表；保存键集合与 getAllSettings 的返回保持一致。
+    for (const key of SITE_SETTING_SCALAR_KEYS) {
+      const value = settings[key];
       try {
         let existing: SettingRecordModel | null = null;
         try {
