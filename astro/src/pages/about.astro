@@ -1,5 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import PageShell from '../components/layout/PageShell.astro';
+import SectionHeading from '../components/layout/SectionHeading.astro';
 import TechCard from '../components/ui/TechCard';
 import FeatureCard from '../components/ui/FeatureCard';
 
@@ -157,86 +159,73 @@ const links = [
 ---
 
 <BaseLayout title="关于" description="关于这个博客和作者">
-  <div class="mx-auto max-w-3xl px-5 py-16 sm:px-8">
-    <header class="mb-12 border-b border-[var(--sf-line)] pb-8">
-      <p class="mb-4 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
-        <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
-        About / 01
-      </p>
-      <div class="flex items-center gap-4">
-        <div
-          class="flex h-14 w-14 shrink-0 items-center justify-center border border-[var(--sf-line-strong)] bg-[var(--sf-surface)] font-mono text-xl text-[var(--sf-ink)]"
-          aria-hidden="true"
-        >
-          B
-        </div>
-        <div class="min-w-0">
-          <h1 class="text-4xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-5xl">关于博客</h1>
-          <p class="mt-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">
-            分享技术、思考与生活
+  {/* 展示页统一外壳：页头交给 PageShell，区块标题交给 SectionHeading。 */}
+  <div class="mx-auto w-full max-w-3xl">
+    <PageShell
+      eyebrow="About / 01"
+      title="关于博客"
+      description="分享技术、思考与生活。这个站点是持续运行的观测站：技术栈、能力与联系方式都在下面。"
+    >
+      <section aria-labelledby="about-site">
+        <SectionHeading id="about-site" eyebrow="Site / 这个站点" level="h2" title="关于这个博客" />
+        <div class="mt-4 space-y-4 text-sm leading-7 text-[var(--sf-ink-2)] sm:text-base">
+          <p>
+            胡巴的博客是一个自建的全栈个人博客系统，使用 Astro 7 + React 19 + PocketBase 0.22 构建，自 2025 年运行至今。
+          </p>
+          <p>
+            前端采用 Astro SSR 服务端渲染与 React 岛屿架构，后端依托 PocketBase 0.22 提供 Auth、数据库与 API 服务，Caddy 2.8 负责反向代理与安全防护，admin-auth 内部服务承载 TOTP 二次验证与邮件、ESA 缓存刷新，Docker Compose 统一编排部署。
           </p>
         </div>
-      </div>
-    </header>
+      </section>
 
-    <!-- 介绍 -->
-    <section class="mb-12 border-t border-[var(--sf-line)] pt-6">
-      <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Site / 这个站点</p>
-      <h2 class="mt-2 text-xl font-semibold tracking-tight text-[var(--sf-ink)]">关于这个博客</h2>
-      <div class="mt-4 space-y-4 text-[var(--sf-ink-2)]">
-        <p>
-          胡巴的博客是一个自建的全栈个人博客系统，使用 Astro 7 + React 19 + PocketBase 0.22 构建，自 2025 年运行至今。
-        </p>
-        <p>
-          前端采用 Astro SSR 服务端渲染与 React 岛屿架构，后端依托 PocketBase 0.22 提供 Auth、数据库与 API 服务，Caddy 2.8 负责反向代理与安全防护，admin-auth 内部服务承载 TOTP 二次验证与邮件、ESA 缓存刷新，Docker Compose 统一编排部署。
-        </p>
-      </div>
-    </section>
+      <section aria-labelledby="about-stack">
+        <SectionHeading
+          id="about-stack"
+          eyebrow="Stack / 工具链"
+          level="h2"
+          title="技术栈"
+          description="点击行展开技术详情"
+        />
+        <div class="mt-4 grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
+          {techStack.map((tech, index) => (
+            <TechCard client:visible tech={tech} id={`tech-${index}`} />
+          ))}
+        </div>
+      </section>
 
-    <!-- 技术栈 -->
-    <section class="mb-12 border-t border-[var(--sf-line)] pt-6">
-      <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Stack / 工具链</p>
-      <h2 class="mt-2 text-xl font-semibold tracking-tight text-[var(--sf-ink)]">技术栈</h2>
-      <p class="mt-1.5 font-mono text-[11px] tracking-[0.1em] text-[var(--sf-ink-3)]">
-        点击行展开技术详情
-      </p>
-      <div class="mt-4 grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
-        {techStack.map((tech, index) => (
-          <TechCard client:visible tech={tech} id={`tech-${index}`} />
-        ))}
-      </div>
-    </section>
+      <section aria-labelledby="about-features">
+        <SectionHeading id="about-features" eyebrow="Features / 能力" level="h2" title="功能特性" />
+        <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {features.map((feature, index) => (
+            <FeatureCard client:visible feature={feature} id={`feature-${index}`} />
+          ))}
+        </div>
+      </section>
 
-    <!-- 功能特性 -->
-    <section class="mb-12 border-t border-[var(--sf-line)] pt-6">
-      <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Features / 能力</p>
-      <h2 class="mt-2 text-xl font-semibold tracking-tight text-[var(--sf-ink)]">功能特性</h2>
-      <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {features.map((feature, index) => (
-          <FeatureCard client:visible feature={feature} id={`feature-${index}`} />
-        ))}
-      </div>
-    </section>
-
-    <!-- 联系方式 -->
-    <section class="border-t border-[var(--sf-line)] pt-6">
-      <p class="font-mono text-[11px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Contact / 联系</p>
-      <h2 class="mt-2 text-xl font-semibold tracking-tight text-[var(--sf-ink)]">联系方式</h2>
-      <div class="mt-4 flex flex-wrap gap-3">
-        {links.map((link) => (
-          <a
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="inline-flex min-h-[44px] items-center gap-2 rounded-[3px] border border-[var(--sf-line)] px-4 text-sm text-[var(--sf-ink-2)] no-underline transition-colors duration-200 hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
-          >
-            <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path d={link.icon} />
-            </svg>
-            {link.name}
-          </a>
-        ))}
-      </div>
-    </section>
+      <section aria-labelledby="about-contact">
+        <SectionHeading
+          id="about-contact"
+          eyebrow="Contact / 联系"
+          level="h2"
+          title="联系方式"
+          description="欢迎交流技术、项目，或只是想打个招呼。"
+        />
+        <div class="mt-4 flex flex-wrap gap-3">
+          {links.map((link) => (
+            <a
+              href={link.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="orbital-action min-h-11 gap-2 no-underline"
+            >
+              <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path d={link.icon} />
+              </svg>
+              {link.name}
+            </a>
+          ))}
+        </div>
+      </section>
+    </PageShell>
   </div>
 </BaseLayout>

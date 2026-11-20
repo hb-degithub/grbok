@@ -97,8 +97,11 @@ describe('TableOfContents · 交互与无障碍链路（不改行为）', () => 
       'const [mobileOpen, setMobileOpen] = useState(false);',
       'setMobileOpen((prev) => !prev)',
       'const scrollToHeading = useCallback((id: string) => {',
-      'el.scrollIntoView({ behavior: \'smooth\' })',
-      'if (isMobile) setMobileOpen(false);',
+      'document.getElementById(id)?.scrollIntoView({ behavior: \'smooth\' })',
+      'if (isMobile) {',
+      'pendingScrollId.current = id;',
+      'setMobileOpen(false);',
+      'onExitComplete={handleMobilePanelExitComplete}',
       'if (headings.length === 0) return null;',
     ]) {
       expect(toc, `TOC 交互契约丢失：${token}`).toContain(token);

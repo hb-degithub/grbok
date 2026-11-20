@@ -13,6 +13,8 @@ interface GuestbookWallProps {
   messages: GuestbookMessage[];
   loading: boolean;
   error: boolean;
+  /** 「加载更多」这一次失败了：就地提示，不清空已有留言 */
+  loadMoreError: boolean;
   hasMore: boolean;
   loadingMore: boolean;
   onLoadMore: () => void;
@@ -34,20 +36,48 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-/** 细线面板：空态 / 错误态共用，保持同一套结构线与方角 */
-function Panel({ children }: { children: React.ReactNode }) {
+/** 细线面板：空态 / 首屏错误态共用，保持同一套结构线与方角 */
+function Panel({
+  state,
+  role,
+  children,
+}: {
+  state: 'empty' | 'error';
+  role?: 'alert';
+  children: React.ReactNode;
+}) {
   return (
-    <div className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-10 text-center">
+    <div
+      data-state={state}
+      role={role}
+      className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-10 text-center"
+    >
       {children}
     </div>
   );
 }
 
-/** 留言墙：方角首字母 + 昵称 + 相对时间 + 内容（保留换行），分页加载更多 */
-export default function GuestbookWall({ messages, loading, error, hasMore, loadingMore, onLoadMore, onRetry }: GuestbookWallProps) {
-  if (loading) {
+/**
+ * 留言墙：方角首字母 + 昵称 + 相对时间 + 内容（保留换行），分页加载更多。
+ *
+ * 状态语义：
+ * - 首屏加载（还没有任何留言）才显示骨架；加载更多时保留列表，只在按钮上转圈；
+ * - 首屏失败显示整块错误态与「重新加载」；
+ * - 加载更多失败在列表下方就地提示，已有留言不被替换，重试继续取下一页。
+ */
+export default function GuestbookWall({
+  messages,
+  loading,
+  error,
+  loadMoreError,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+  onRetry,
+}: GuestbookWallProps) {
+  if (loading && messages.length === 0) {
     return (
-      <div className="grid gap-4" role="status" aria-busy="true">
+      <div className="grid gap-4" role="status" aria-busy="true" data-state="loading">
         <span className="sr-only">留言加载中</span>
         {[0, 1, 2].map((i) => (
           <div key={i} className="skeleton h-24 rounded-[3px]" />
@@ -56,9 +86,9 @@ export default function GuestbookWall({ messages, loading, error, hasMore, loadi
     );
   }
 
-  if (error) {
+  if (error && messages.length === 0) {
     return (
-      <Panel>
+      <Panel state="error" role="alert">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-danger)]">Error / 留言</p>
         <p className="mt-2 text-sm text-[var(--sf-ink-2)]">留言加载失败，请稍后再试。</p>
         <button
@@ -74,7 +104,7 @@ export default function GuestbookWall({ messages, loading, error, hasMore, loadi
 
   if (messages.length === 0) {
     return (
-      <Panel>
+      <Panel state="empty">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-ink-3)]">Guestbook / 00</p>
         <p className="mt-2 text-sm text-[var(--sf-ink-3)]">还没有留言，来抢沙发～</p>
       </Panel>
@@ -82,7 +112,7 @@ export default function GuestbookWall({ messages, loading, error, hasMore, loadi
   }
 
   return (
-    <div>
+    <div data-state="ready">
       <motion.ol variants={staggerContainer(0.06)} initial="hidden" animate="visible" className="grid gap-4">
         {messages.map((msg) => (
           <motion.li
@@ -108,12 +138,32 @@ export default function GuestbookWall({ messages, loading, error, hasMore, loadi
         ))}
       </motion.ol>
 
+      {loadMoreError && (
+        <div
+          role="alert"
+          data-state="load-more-error"
+          className="mt-4 rounded-[3px] border border-[var(--sf-danger)] bg-[var(--sf-surface)] p-4 text-center"
+        >
+          <p className="text-sm font-medium text-[var(--sf-ink)]">加载更多失败，请重试。</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--sf-ink-3)]">已经显示的留言不受影响。</p>
+          <button
+            type="button"
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="focus-ring mt-3 inline-flex min-h-11 items-center rounded-[3px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50"
+          >
+            重试加载更多
+          </button>
+        </div>
+      )}
+
       {hasMore && (
         <div className="mt-6 text-center">
           <button
             type="button"
             onClick={onLoadMore}
             disabled={loadingMore}
+            aria-busy={loadingMore}
             className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-[3px] border border-[var(--sf-line-control)] px-5 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50"
           >
             {loadingMore && <span className="h-3 w-3 animate-spin rounded-[1px] border border-[var(--sf-line-strong)] border-t-[var(--sf-accent)]" aria-hidden="true" />}

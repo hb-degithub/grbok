@@ -1,24 +1,18 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import PageShell from '../components/layout/PageShell.astro';
 import GuestbookBoard from '../components/guestbook/GuestbookBoard';
 ---
 
 <BaseLayout title="留言板" description="留下你的足迹">
-  <section class="mx-auto w-full max-w-3xl px-5 py-16 sm:px-8">
-    <header class="mb-10 border-b border-[var(--sf-line)] pb-6">
-      <p class="mb-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
-        <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
-        Guestbook / 01
-      </p>
-      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <h1 class="text-4xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-5xl">留言板</h1>
-        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">Open log</p>
-      </div>
-      <p class="mt-3 max-w-xl text-[var(--sf-ink-2)]">
-        随便写点什么，证明你来过。
-      </p>
-    </header>
-
-    <GuestbookBoard client:visible />
-  </section>
+  {/* 展示页统一外壳：PageShell 负责 gutter、页头与唯一 h1，内容列宽保持阅读度量。 */}
+  <div class="mx-auto w-full max-w-3xl">
+    <PageShell
+      eyebrow="Guestbook / 01"
+      title="留言板"
+      description="随便写点什么，证明你来过。匿名留言，昵称会公开展示。"
+    >
+      <GuestbookBoard client:visible />
+    </PageShell>
+  </div>
 </BaseLayout>

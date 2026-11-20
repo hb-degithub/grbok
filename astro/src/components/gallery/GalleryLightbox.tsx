@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -18,6 +18,24 @@ interface GalleryLightboxProps {
   onNavigate: (index: number) => void;
 }
 
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
+
+function getFocusableElements(container: HTMLElement): HTMLElement[] {
+  return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+    (element) =>
+      !element.hasAttribute('hidden') &&
+      !element.classList.contains('hidden') &&
+      element.getAttribute('aria-hidden') !== 'true',
+  );
+}
+
 function getScrollbarWidth() {
   return typeof window !== 'undefined' ? window.innerWidth - document.documentElement.clientWidth : 0;
 }
@@ -33,12 +51,40 @@ const controlClass =
 /**
  * 相册灯箱：实底遮罩 + 大图淡入，左右切换、ESC/背板关闭、键盘导航、锁滚动。
  *
+ * 可访问性契约：
+ * - dialog 的名称来自当前照片标题（`aria-labelledby`），不是泛化的「查看大图」；
+ * - 打开后焦点进入灯箱、Tab/Shift+Tab 在灯箱内循环，关闭后归还给触发照片；
+ * - 方向键只在照片范围内切换（到边界不绕回），Esc 与点击遮罩关闭。
+ *
  * 遮罩固定用纯黑而不是 `--sf-ink`：`--sf-ink` 在暗色主题会翻成浅色，
  * 用作遮罩会变成浅底白字不可读；纯黑在深浅主题下都能保证图片与白字的对比。
- * 控制键的键盘焦点仍走 `.focus-ring`（由 `--sf-focus-ring` 派生自强调色）。
  */
 export default function GalleryLightbox({ items, urls, index, onClose, onNavigate }: GalleryLightboxProps) {
-  const open = index !== null && items[index];
+  const open = index !== null && Boolean(items[index]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
+
+  const current = index !== null ? items[index] : undefined;
+  const dialogTitle = current?.title ? `查看大图：${current.title}` : '查看大图：相册图片';
+
+  // 打开：记录触发元素 → 焦点进入灯箱；关闭：把焦点归还给触发元素。
+  // 触发照片可能随筛选刷新被移除，归还前先确认仍在文档中。
+  useEffect(() => {
+    if (!open) return;
+
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
+
+    const target = closeButtonRef.current ?? dialogRef.current;
+    target?.focus();
+
+    return () => {
+      const previous = previouslyFocusedRef.current;
+      previouslyFocusedRef.current = null;
+      if (previous && document.contains(previous)) previous.focus();
+    };
+  }, [open]);
 
   // 锁滚动（沿用 SideNav 的滚动条补偿模式）
   useEffect(() => {
@@ -54,13 +100,51 @@ export default function GalleryLightbox({ items, urls, index, onClose, onNavigat
     };
   }, [open]);
 
-  // 键盘导航
+  // 键盘：Esc / 方向键 / Tab 焦点循环。挂在 document 上，
+  // 即使焦点短暂逃逸到遮罩外也能拉回灯箱。
   useEffect(() => {
     if (!open || index === null) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowLeft' && index > 0) onNavigate(index - 1);
-      if (e.key === 'ArrowRight' && index < items.length - 1) onNavigate(index + 1);
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key === 'ArrowLeft') {
+        if (index > 0) onNavigate(index - 1);
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        if (index < items.length - 1) onNavigate(index + 1);
+        return;
+      }
+      if (e.key !== 'Tab') return;
+
+      const container = dialogRef.current;
+      if (!container) return;
+      const focusables = getFocusableElements(container);
+      if (focusables.length === 0) {
+        e.preventDefault();
+        container.focus();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      // 焦点在灯箱之外：按 Tab 拉回第一个（Shift+Tab 拉到最后一个）
+      if (!active || !container.contains(active)) {
+        e.preventDefault();
+        (e.shiftKey ? last : first).focus();
+        return;
+      }
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
@@ -83,6 +167,7 @@ export default function GalleryLightbox({ items, urls, index, onClose, onNavigat
     <AnimatePresence>
       {open && index !== null && (
         <motion.div
+          ref={dialogRef}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -90,9 +175,15 @@ export default function GalleryLightbox({ items, urls, index, onClose, onNavigat
           onClick={onClose}
           role="dialog"
           aria-modal="true"
-          aria-label="查看大图"
+          aria-labelledby={titleId}
+          tabIndex={-1}
         >
+          <h2 id={titleId} className="sr-only">
+            {dialogTitle}
+          </h2>
+
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
             aria-label="关闭"
@@ -145,7 +236,12 @@ export default function GalleryLightbox({ items, urls, index, onClose, onNavigat
                 {items[index].title && <span className="block truncate text-sm font-medium text-white">{items[index].title}</span>}
                 {items[index].description && <span className="mt-0.5 block truncate text-xs text-white/70">{items[index].description}</span>}
               </span>
-              <span className="shrink-0 font-mono text-[11px] uppercase tracking-[0.14em] text-white/60">{index + 1} / {items.length}</span>
+              <span
+                className="shrink-0 font-mono text-[11px] uppercase tracking-[0.14em] text-white/60"
+                aria-live="polite"
+              >
+                {index + 1} / {items.length}
+              </span>
             </figcaption>
           </motion.figure>
         </motion.div>

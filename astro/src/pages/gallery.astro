@@ -1,24 +1,26 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import PageShell from '../components/layout/PageShell.astro';
+import SectionHeading from '../components/layout/SectionHeading.astro';
 import GalleryBoard from '../components/gallery/GalleryBoard';
 ---
 
 <BaseLayout title="相册" description="照片与生活的碎片">
-  <section class="mx-auto w-full max-w-6xl px-5 py-16 sm:px-8 lg:px-10">
-    <header class="mb-10 border-b border-[var(--sf-line)] pb-6">
-      <p class="mb-3 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
-        <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
-        Gallery / 01
-      </p>
-      <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <h1 class="text-4xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-5xl">相册</h1>
-        <p class="font-mono text-[11px] uppercase tracking-[0.14em] text-[var(--sf-ink-3)]">Lightbox / 大图</p>
-      </div>
-      <p class="mt-3 max-w-xl text-[var(--sf-ink-2)]">
-        照片与生活的碎片，点击查看大图。
-      </p>
-    </header>
-
-    <GalleryBoard client:visible />
-  </section>
+  {/* 展示页统一外壳：页头交给 PageShell，照片墙按展示页节奏独立构图。 */}
+  <div class="mx-auto w-full max-w-6xl">
+    <PageShell
+      eyebrow="Gallery / 01"
+      title="相册"
+      description="照片与生活的碎片，点击查看大图。"
+    >
+      <SectionHeading
+        id="gallery-all-photos"
+        eyebrow="All photos / 全部"
+        level="h2"
+        title="全部照片"
+        description="按专辑筛选；灯箱内 ←/→ 切换、Esc 关闭，关闭后焦点回到打开的那张照片。"
+      />
+      <GalleryBoard client:visible />
+    </PageShell>
+  </div>
 </BaseLayout>

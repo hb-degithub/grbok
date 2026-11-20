@@ -53,6 +53,8 @@ function formatRelative(iso: string | null): string {
 export default function ProtectionPanel() {
   const [data, setData] = useState<ProtectionStatus | null>(null);
   const [error, setError] = useState(false);
+  // 首次请求尚未结束时为 true：加载中不能显示成「尚未接入」。
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
@@ -62,6 +64,8 @@ export default function ProtectionPanel() {
       setError(false);
     } catch {
       setError(true);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -118,19 +122,42 @@ export default function ProtectionPanel() {
         })}
       </div>
 
-      {/* 雷池近 24h 真实汇总 */}
+      {/* 雷池近 24h 真实汇总：加载 / 失败 / 空 / 数据四态可区分 */}
       <div className="mt-4">
         {error && (
-          <p className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] px-4 py-3 text-xs leading-5 text-[var(--sf-ink-3)]">
-            防护统计接口暂时不可用(不影响站点运行状态)。
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-[3px] border border-[var(--sf-danger)] bg-[var(--sf-canvas)] px-4 py-3"
+          >
+            <p className="text-xs leading-5 text-[var(--sf-ink-2)]">
+              防护统计接口暂时不可用(不影响站点运行状态)。{hasNumbers ? '下方为上一次成功获取的数据。' : ''}
+            </p>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="focus-ring inline-flex min-h-11 shrink-0 items-center rounded-[3px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
+            >
+              重试防护统计
+            </button>
+          </div>
+        )}
+        {!error && data === null && loading && (
+          <p
+            data-state="loading"
+            className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] px-4 py-3 font-mono text-[11px] leading-6 tracking-[0.04em] text-[var(--sf-ink-3)]"
+          >
+            防护统计加载中…
           </p>
         )}
-        {!error && !hasNumbers && (
-          <p className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] px-4 py-3 text-xs leading-5 text-[var(--sf-ink-3)]">
+        {!error && data !== null && !hasNumbers && (
+          <p
+            data-state="empty"
+            className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] px-4 py-3 text-xs leading-5 text-[var(--sf-ink-3)]"
+          >
             雷池拦截统计尚未接入或无数据——显示真实状态,不展示虚构数字。
           </p>
         )}
-        {!error && hasNumbers && (
+        {hasNumbers && (
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-canvas)] p-4 text-center">
               <p className="font-mono text-2xl font-semibold tabular-nums text-[var(--sf-ink)]">{detectedCount}</p>
@@ -149,7 +176,7 @@ export default function ProtectionPanel() {
             </div>
           </div>
         )}
-        {!error && hasNumbers && (
+        {hasNumbers && (
           <p className="mt-2 text-right font-mono text-[10px] tracking-[0.04em] text-[var(--sf-ink-3)]">
             统计范围 hlydwz.com / img.hlydwz.com · 更新于 {formatRelative(safeline.updatedAt)}
             {safeline.state === 'stale' && <span className="ml-1 text-amber-700 dark:text-amber-400">(数据过期)</span>}

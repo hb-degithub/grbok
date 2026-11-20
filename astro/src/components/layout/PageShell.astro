@@ -23,7 +23,7 @@ const { title, eyebrow, description, id = 'page-title' } = Astro.props;
 
 <div class={orbitalClasses.shell} aria-labelledby={id}>
   <header class="orbital-shell__header">
-    {eyebrow && <p class={orbitalClasses.eyebrow}>{eyebrow}</p>}
+    {eyebrow && <p class={`${orbitalClasses.eyebrow} pl-14 sm:pl-0`}>{eyebrow}</p>}
     <h1 id={id} class="orbital-title">{title}</h1>
     {description && <p class="orbital-lede">{description}</p>}
   </header>

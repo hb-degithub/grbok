@@ -245,7 +245,9 @@ export default function StatusPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const overall = statusError ? 'unknown' : status?.overall ?? 'unknown';
+  // 失败时若已有一份成功数据，继续按真实 overall 展示，并在下方单独提示刷新失败；
+  // 只有从未拿到状态时才落到 unknown。
+  const overall = status?.overall ?? 'unknown';
   const overallTone =
     overall === 'operational'
       ? 'bg-[var(--sf-accent)]'
@@ -279,6 +281,24 @@ export default function StatusPanel() {
           )}
         </div>
       </div>
+
+      {statusError && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-[3px] border border-[var(--sf-danger)] bg-[var(--sf-surface)] px-4 py-3"
+        >
+          <p className="text-xs leading-5 text-[var(--sf-ink-2)]">
+            {status ? '状态刷新失败，正在展示上一次成功数据。' : '状态接口请求失败，请稍后重试。'}
+          </p>
+          <button
+            type="button"
+            onClick={() => void loadStatus()}
+            className="focus-ring inline-flex min-h-11 shrink-0 items-center rounded-[3px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
+          >
+            重试状态
+          </button>
+        </div>
+      )}
 
       {/* 用户到服务器延迟(本机实测) */}
       <section className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5">
@@ -374,8 +394,16 @@ export default function StatusPanel() {
         )}
       </section>
 
-      {/* 服务状态分组 */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      {/* 服务状态分组：数据 / 空 / 失败 / 加载四态可区分 */}
+      {(status?.services ?? []).length === 0 ? (
+        <p
+          data-state={statusError ? 'error' : status ? 'empty' : 'loading'}
+          className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-4 py-5 text-center font-mono text-[11px] leading-6 tracking-[0.04em] text-[var(--sf-ink-3)]"
+        >
+          {statusError ? '服务列表加载失败，请稍后重试。' : status ? '服务列表尚未配置。' : '服务列表加载中…'}
+        </p>
+      ) : (
+      <div data-state="ready" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {(status?.services ?? []).map((s, index) => (
           <section
             key={s.key}
@@ -428,6 +456,7 @@ export default function StatusPanel() {
           </section>
         ))}
       </div>
+      )}
 
       <p className="text-center text-[11px] leading-6 text-[var(--sf-ink-3)]">
         数据来自站内探针(每分钟采样,保留 7 天)与你的浏览器实测,仅含非敏感运行指标。

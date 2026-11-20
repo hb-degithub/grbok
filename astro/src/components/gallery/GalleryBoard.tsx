@@ -7,10 +7,22 @@ import { EASE_OUT_EXPO } from '../../lib/motion';
 
 const ALL = '__all__';
 
-/** 细线面板：加载失败 / 空态 / 单专辑空态共用，保持三态视觉一致 */
-function StatePanel({ children }: { children: React.ReactNode }) {
+/**
+ * 细线面板：加载失败 / 空态 / 单专辑空态共用，保持三态视觉一致。
+ * `data-state` 是稳定的状态钩子（loading | empty | error），不依赖装饰文案。
+ */
+function StatePanel({
+  state,
+  children,
+}: {
+  state: 'empty' | 'error';
+  children: React.ReactNode;
+}) {
   return (
-    <div className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-10 text-center text-sm text-[var(--sf-ink-3)]">
+    <div
+      data-state={state}
+      className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-10 text-center text-sm text-[var(--sf-ink-3)]"
+    >
       {children}
     </div>
   );
@@ -18,7 +30,7 @@ function StatePanel({ children }: { children: React.ReactNode }) {
 
 /** 相册面板：分组筛选（layoutId 滑片）+ 瀑布流 + 灯箱 */
 export default function GalleryBoard() {
-  const { items, loading, error, setFilter, getPhotoUrl } = useGallery();
+  const { items, loading, error, setFilter, getPhotoUrl, load } = useGallery();
   const [album, setAlbum] = useState<string>(ALL);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -54,13 +66,32 @@ export default function GalleryBoard() {
     setLightboxIndex(null);
   }, [album]);
 
-  if (error) {
-    return <StatePanel>相册加载失败，请稍后再试。</StatePanel>;
+  // 首次加载失败（墙上还没有照片）才用整块错误态；刷新失败时保留已加载的照片，
+  // 只在顶部提示并提供真实重试，避免一次网络抖动把相册清空。
+  if (error && items.length === 0) {
+    return (
+      <div
+        data-state="error"
+        role="alert"
+        className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-8 text-center sm:p-10"
+      >
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-danger)]">Gallery / error</p>
+        <p className="mt-2 text-sm font-medium text-[var(--sf-ink)]">相册加载失败，请稍后再试。</p>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="focus-ring mt-5 inline-flex min-h-11 items-center justify-center rounded-[3px] border border-[var(--sf-line-control)] px-5 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
+        >
+          重新加载
+        </button>
+      </div>
+    );
   }
 
   if (loading && items.length === 0) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-state="loading" aria-busy="true" role="status">
+        <span className="sr-only">相册加载中</span>
         {[0, 1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="skeleton h-48 rounded-[3px]" />
         ))}
@@ -69,14 +100,32 @@ export default function GalleryBoard() {
   }
 
   if (items.length === 0) {
-    return <StatePanel>相册还是空的，等博主上传第一批照片。</StatePanel>;
+    return <StatePanel state="empty">相册还是空的，等博主上传第一批照片。</StatePanel>;
   }
 
   const fullUrls = filtered.map((i) => getPhotoUrl(i));
 
   return (
     <MotionConfig reducedMotion="user">
-    <div>
+    <div data-state={error ? 'error' : 'ready'}>
+      {error && (
+        <div
+          role="alert"
+          data-state="error"
+          className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[3px] border border-[var(--sf-danger)] bg-[var(--sf-surface)] px-4 py-3"
+        >
+          <p className="text-xs leading-5 text-[var(--sf-ink-2)]">
+            相册刷新失败，正在展示上一次成功加载的照片。
+          </p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="focus-ring inline-flex min-h-11 shrink-0 items-center rounded-[3px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
+          >
+            重新加载
+          </button>
+        </div>
+      )}
       {/* 分组筛选条：细线方角标签，选中态用唯一强调色实底 */}
       {albums.length > 0 && (
         <div className="mb-6 flex flex-wrap gap-2" role="tablist" aria-label="按专辑筛选">
@@ -115,7 +164,7 @@ export default function GalleryBoard() {
 
       {/* 瀑布流：列数沿用 Masonry 的 1 / 2 / 3 断点，图片容器只有细线描边与方角 */}
       {filtered.length === 0 ? (
-        <StatePanel>这个专辑还没有照片。</StatePanel>
+        <StatePanel state="empty">这个专辑还没有照片。</StatePanel>
       ) : (
         <Masonry columns={{ mobile: 1, tablet: 2, desktop: 3 }} gap={16}>
           {filtered.map((item, i) => (

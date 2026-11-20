@@ -1,27 +1,22 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import ScrollReveal from '../components/ui/ScrollReveal';
+import PageShell from '../components/layout/PageShell.astro';
 import StatusPanel from '../components/status/StatusPanel';
 import ProtectionPanel from '../components/status/ProtectionPanel';
 ---
 
 <BaseLayout title="运行状态" description="站点服务可用性、API 状态与你的访问延迟实时监测">
-  <section class="relative z-10 mx-auto w-full max-w-5xl px-5 py-16 sm:px-8 lg:px-10">
-    <div class="mb-10 border-b border-[var(--sf-line)] pb-8">
-      <ScrollReveal client:visible>
-        <p class="mb-4 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">
-          <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
-          Status / 01
-        </p>
-        <h1 class="text-4xl font-bold tracking-tight text-[var(--sf-ink)] sm:text-5xl">运行状态</h1>
-        <p class="mt-3 max-w-xl text-[var(--sf-ink-2)]">
-          站内探针每分钟对页面、API 与邮件网关做一次可达性采样，页面每 30 秒自动刷新；延迟卡片由你的浏览器实时实测。
-        </p>
-      </ScrollReveal>
-    </div>
-    <StatusPanel client:load />
-    <div class="mt-10" id="protection">
-      <ProtectionPanel client:load />
-    </div>
-  </section>
+  {/* 展示页统一外壳：页头交给 PageShell，状态场景仍由真实探针数据驱动。 */}
+  <div class="mx-auto w-full max-w-5xl">
+    <PageShell
+      eyebrow="Status / 01"
+      title="运行状态"
+      description="站内探针每分钟对页面、API 与邮件网关做一次可达性采样，页面每 30 秒自动刷新；延迟卡片由你的浏览器实时实测。"
+    >
+      <StatusPanel client:load />
+      <div id="protection">
+        <ProtectionPanel client:load />
+      </div>
+    </PageShell>
+  </div>
 </BaseLayout>
