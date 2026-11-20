@@ -3,7 +3,6 @@ import type { RecordModel } from 'pocketbase';
 import {
   DEFAULT_FEATURE_FLAGS,
   FEATURE_FLAGS_KEY,
-  type FeatureFlags,
 } from '../../config/feature-flags';
 
 export interface FeatureFlag {
@@ -211,7 +210,8 @@ class FeatureFlagService extends BaseService<FeatureFlagsSetting> {
 
   private toFlag(key: string, entry: unknown, record: FeatureFlagsSetting | null): FeatureFlag {
     const normalized = normalizeEntry(entry);
-    const label = FLAG_LABELS[key];
+    // hasOwnProperty：避免 "__proto__" / "constructor" 这类 key 命中原型上的属性
+    const label = Object.prototype.hasOwnProperty.call(FLAG_LABELS, key) ? FLAG_LABELS[key] : undefined;
     return {
       id: key,
       key,
@@ -228,14 +228,18 @@ class FeatureFlagService extends BaseService<FeatureFlagsSetting> {
    * 合并写回单个条目：
    * - settings 无记录（首次保存）→ 基线是 DEFAULT_FEATURE_FLAGS 的深拷贝；
    * - 有记录 → 基线就是库里已存的对象，其他开关原样保留；
-   * - 目标条目缺失且属于已知开关 → 先用该开关的默认字段补种（endpoint/sample_rate 等），
-   *   避免只写 { enabled } 导致前台合并后读不到领域字段。
+   * - 目标条目的基线是该开关在 Config 里的默认字段（endpoint / sample_rate / frequency /
+   *   active_experiments），库中已存值覆盖默认值，本次 patch 最后覆盖。
+   *   这样既不会把已有字段改掉，也不会因为只写 { enabled } 让前台合并后读不到领域字段。
    */
   private async writeEntry(key: string, patch: FlagEntry): Promise<FeatureFlag> {
     const { record, stored } = await this.loadFlags();
     const base = record ? stored : cloneDefaultFlags();
-    const seed = base[key] === undefined ? defaultEntry(key) : {};
-    const nextEntry: FlagEntry = { ...seed, ...normalizeEntry(base[key]), ...patch };
+    const nextEntry: FlagEntry = {
+      ...defaultEntry(key),
+      ...normalizeEntry(base[key]),
+      ...patch,
+    };
     const nextValue: StoredFlags = { ...base, [key]: nextEntry };
     const saved = await this.saveFlags(record, nextValue);
     return this.toFlag(key, nextEntry, saved);

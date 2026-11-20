@@ -277,6 +277,19 @@ describe('featureFlagService 写入：只改 enabled，保留其余条目与字�
     expect(written.rag_chatbot).toEqual({ ...DEFAULT_FEATURE_FLAGS.rag_chatbot, enabled: true });
   });
 
+  it('已落库的已知条目缺字段时按默认补齐，已有值不被覆盖', async () => {
+    const mock = mockPocketBase(storedRow({ rag_chatbot: { enabled: true, endpoint: '/custom' } }));
+
+    await featureFlagService.setFlag('rag_chatbot', false);
+
+    const written = writtenValue(mock.update.mock.calls[0]);
+    expect(written.rag_chatbot).toEqual({
+      enabled: false,
+      endpoint: '/custom',
+      faqs_json: DEFAULT_FEATURE_FLAGS.rag_chatbot.faqs_json,
+    });
+  });
+
   it('createFlag 新键为 upsert：追加条目且不影响已存条目', async () => {
     const mock = mockPocketBase(storedRow(clone(STORED_FLAGS)));
 
