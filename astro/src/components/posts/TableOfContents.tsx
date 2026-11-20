@@ -71,14 +71,27 @@ export default function TableOfContents({ headings }: TableOfContentsProps) {
     updateActiveTop();
   }, [updateActiveTop]);
 
+  // 移动端：收起面板会卸载被点击的链接并取消进行中的平滑滚动。
+  // 先记下目标，等 AnimatePresence 退出动画结束、面板节点真正移除后再滚动。
+  const pendingScrollId = useRef<string | null>(null);
+
   // Scroll to heading on click
   const scrollToHeading = useCallback((id: string) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-      if (isMobile) setMobileOpen(false);
+    if (isMobile) {
+      if (!document.getElementById(id)) return;
+      pendingScrollId.current = id;
+      setMobileOpen(false);
+      return;
     }
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   }, [isMobile]);
+
+  const handleMobilePanelExitComplete = useCallback(() => {
+    const id = pendingScrollId.current;
+    if (!id) return;
+    pendingScrollId.current = null;
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
   if (headings.length === 0) return null;
 
@@ -114,7 +127,12 @@ export default function TableOfContents({ headings }: TableOfContentsProps) {
     return (
       <div className="mb-4">
         <button
-          onClick={() => setMobileOpen((prev) => !prev)}
+          onClick={() => {
+            // 手动开合时丢弃尚未执行的目录跳转，避免收起动画被打断后
+            // 面板在下次关闭时误滚动到旧目标。
+            pendingScrollId.current = null;
+            setMobileOpen((prev) => !prev);
+          }}
           className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-[4px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 font-mono text-[11px] tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors duration-200 hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]"
           aria-expanded={mobileOpen}
           aria-controls="toc-mobile-panel"
@@ -144,7 +162,7 @@ export default function TableOfContents({ headings }: TableOfContentsProps) {
           </motion.span>
         </button>
 
-        <AnimatePresence>
+        <AnimatePresence onExitComplete={handleMobilePanelExitComplete}>
           {mobileOpen && (
             <motion.div
               id="toc-mobile-panel"

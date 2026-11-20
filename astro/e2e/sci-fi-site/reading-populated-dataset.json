@@ -1,0 +1,120 @@
+{
+  "_comment": "Task D 阅读路径验收夹具：SSR（posts / public authors / tags）与浏览器（settings / public_comments / posts 列表）共用。仅测试数据，不进入生产产物。",
+  "author": {
+    "id": "user-e2e-fixture-author",
+    "name": "胡巴",
+    "avatar": ""
+  },
+  "publishedPost": {
+    "id": "post-e2e-orbital-reading",
+    "collectionId": "pbc_posts",
+    "collectionName": "posts",
+    "title": "轨道日志：SSR 阅读链路的真实夹具",
+    "slug": "orbital-reading-fixture",
+    "excerpt": "一篇用于阅读路径验收的已发布文章：正文、作者回退、目录与评论都来自本地夹具数据。",
+    "content": "<p>这不是一张「任意 URL 都返回 404」的占位页：本页正文来自本地 PocketBase 夹具进程，SSR 在请求时真实取数并渲染。</p><h2>一、轨道与读数</h2><p>正文第二段：SSR 请求 /api/collections/posts/records，filter 同时限定 slug 与 status 等于 published。夹具只在这一条件下返回记录，因此草稿 slug 会稳定得到 404。</p><h3>1.1 观测窗口</h3><p>正文第三段：文章记录刻意只返回 author 关联 id、expand 为 null，页面必须回退到 /api/public/authors/:id 才能显示作者名——这是本页第二个真实取数分支。</p><h2>二、评论与互动</h2><p>正文第四段：评论区来自 public_comments 视图夹具，只包含 status 等于 approved 且 deleted 等于 false 的记录；pending 与已软删除的评论不得出现在 DOM 中。</p><h3>2.1 审核边界</h3><p>正文第五段：点赞、收藏与分享按钮由 SSR 首屏数据与客户端岛屿共同提供；评论表单在设置接口返回 enable_comments 为 true 后显示。</p>",
+    "cover": "",
+    "status": "published",
+    "published_at": "2026-11-01 08:30:00.000Z",
+    "views": 1372,
+    "likes": 23,
+    "author": "user-e2e-fixture-author",
+    "created": "2026-11-01 08:00:00.000Z",
+    "updated": "2026-11-01 08:30:00.000Z",
+    "expand": null
+  },
+  "draftPost": {
+    "id": "post-e2e-draft-sentinel",
+    "title": "DRAFT_TITLE_SENTINEL 草稿绝不能出现在阅读页",
+    "slug": "draft-never-readable",
+    "excerpt": "DRAFT_EXCERPT_SENTINEL",
+    "content": "<p>DRAFT_BODY_SENTINEL 草稿正文不得渲染。</p>",
+    "status": "draft",
+    "published_at": "",
+    "author": "user-e2e-fixture-author"
+  },
+  "tag": {
+    "id": "tag-e2e-orbital",
+    "name": "轨道日志",
+    "slug": "orbital-log",
+    "description": "Task D 阅读路径夹具标签。",
+    "created": "2026-10-01 00:00:00.000Z",
+    "updated": "2026-10-01 00:00:00.000Z"
+  },
+  "missingTagSlug": "tag-does-not-exist-fixture",
+  "comments": [
+    {
+      "id": "comment-approved-root",
+      "post_id": "post-e2e-orbital-reading",
+      "author_name": "轨道读者",
+      "content": "APPROVED_ROOT：已审核的主评论，公开评论区必须展示这一条。",
+      "parent_id": null,
+      "status": "approved",
+      "created": "2026-11-15 10:00:00.000Z",
+      "updated": "2026-11-15 10:00:00.000Z",
+      "likes": 4,
+      "edited": false,
+      "edited_at": "",
+      "deleted": false,
+      "author_level": 3,
+      "is_ai": false
+    },
+    {
+      "id": "comment-approved-child",
+      "post_id": "post-e2e-orbital-reading",
+      "author_name": "回环观测员",
+      "content": "APPROVED_REPLY：已审核的回复，应该嵌套显示在主评论下。",
+      "parent_id": "comment-approved-root",
+      "status": "approved",
+      "created": "2026-11-15 11:00:00.000Z",
+      "updated": "2026-11-15 11:00:00.000Z",
+      "likes": 1,
+      "edited": false,
+      "edited_at": "",
+      "deleted": false,
+      "author_level": 2,
+      "is_ai": false
+    },
+    {
+      "id": "comment-pending-sentinel",
+      "post_id": "post-e2e-orbital-reading",
+      "author_name": "待审核作者",
+      "content": "PENDING_SENTINEL：待审核评论，绝不能出现在公开评论区。",
+      "parent_id": null,
+      "status": "pending",
+      "created": "2026-11-16 09:00:00.000Z",
+      "updated": "2026-11-16 09:00:00.000Z",
+      "likes": 0,
+      "edited": false,
+      "edited_at": "",
+      "deleted": false,
+      "author_level": 0,
+      "is_ai": false
+    },
+    {
+      "id": "comment-deleted-sentinel",
+      "post_id": "post-e2e-orbital-reading",
+      "author_name": "已删除作者",
+      "content": "DELETED_SENTINEL：已软删除的评论，同样不能出现。",
+      "parent_id": null,
+      "status": "approved",
+      "created": "2026-11-14 08:00:00.000Z",
+      "updated": "2026-11-14 08:00:00.000Z",
+      "likes": 0,
+      "edited": false,
+      "edited_at": "",
+      "deleted": true,
+      "author_level": 0,
+      "is_ai": false
+    }
+  ],
+  "settings": [
+    { "key": "site_title", "value": "胡巴的博客" },
+    { "key": "site_description", "value": "胡巴的个人博客，记录技术、思考与生活。" },
+    { "key": "site_logo", "value": "" },
+    { "key": "posts_per_page", "value": 10 },
+    { "key": "enable_comments", "value": true },
+    { "key": "comment_moderation", "value": false },
+    { "key": "debug_protection_enabled", "value": false }
+  ]
+}
