@@ -51,6 +51,7 @@ backups/
 # 临时文件
 tmp/
 temp/
+astro/artifacts/
 
 # 临时调试文件 (仅根目录, 不影响 pb_hooks/*.pb.js 和 src 下的 js)
 /*.js

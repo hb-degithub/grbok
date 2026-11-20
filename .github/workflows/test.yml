@@ -82,10 +82,21 @@ jobs:
 
       # 生产构建（前端静态产物），随后上传制品
       - name: Build
+        # 浏览器 API 基地址也会内联进 client bundle；SSR 的内部回环由运行时 PB_SERVER_URL 负责，
+        # 不能把 localhost 烘焙进将要部署到生产的访客包。
         run: cd astro && npm run build
         env:
           PUBLIC_SITE_URL: https://hlydwz.com
-          PUBLIC_POCKETBASE_URL: http://localhost:8090
+          PUBLIC_POCKETBASE_URL: https://hlydwz.com
+
+      - name: Verify production client API origin
+        run: |
+          # PUBLIC_POCKETBASE_URL 缺省就是 localhost；若变量漏配或回退，宁可不发布，
+          # 也不要让访客的登录、评论、点赞与状态请求指向他们自己的电脑。
+          if grep -R -n -E 'localhost:8090|127\.0\.0\.1:8090' astro/dist/client; then
+            echo 'Production client bundle contains a loopback PocketBase URL' >&2
+            exit 1
+          fi
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
