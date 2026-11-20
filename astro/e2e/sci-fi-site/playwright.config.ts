@@ -27,6 +27,9 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
   testDir: SITE_DIR,
+  // 有数据的阅读夹具需要独立的 PB webServer 与构建参数，只能由
+  // playwright.reading-populated.config.ts 启动；主配置故意让 PB 不可达。
+  testIgnore: /reading-populated\.spec\.ts/,
   outputDir: path.join(ASTRO_DIR, 'test-results', 'sci-fi-site'),
   timeout: 90_000,
   expect: { timeout: 10_000 },
