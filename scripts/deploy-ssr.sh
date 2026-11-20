@@ -61,6 +61,49 @@ echo "=== 7. 冒烟：外网 ==="
 curl -s -o /dev/null -w '外网首页: %{http_code}\n' https://hlydwz.com/
 
 echo ""
+echo "=== 8. 清理 ESA 边缘缓存 ==="
+# 源站已换新，但边缘仍可能返回旧 HTML（其引用的旧 _astro 资源在源站已 404）。
+# 本脚本常以 `ssh ... 'bash -s' < deploy-ssr.sh` 执行，$0 不是脚本路径，
+# 因此这里内联调用容器内的 ESA 客户端，不依赖脚本文件位置。
+# 清理失败不回滚部署：服务已经起来，只是边缘可能短暂滞后；这里只告警。
+ESA_CONTAINER="${ESA_CONTAINER:-$(docker ps --format '{{.Names}}' 2>/dev/null | grep -m1 'admin-auth' || true)}"
+if [ -n "${ESA_CONTAINER}" ] && docker exec "${ESA_CONTAINER}" printenv ESA_ACCESS_KEY_ID >/dev/null 2>&1; then
+  docker exec -e PURGE_URLS="https://hlydwz.com/
+https://hlydwz.com/posts/
+https://hlydwz.com/tags/
+https://hlydwz.com/archive/
+https://hlydwz.com/about/
+https://hlydwz.com/links/
+https://hlydwz.com/guestbook/
+https://hlydwz.com/gallery/
+https://hlydwz.com/status/
+https://hlydwz.com/stats/
+https://hlydwz.com/login
+https://hlydwz.com/feed.xml
+https://hlydwz.com/sitemap-index.xml
+https://hlydwz.com/sitemap-0.xml
+https://hlydwz.com/robots.txt" "${ESA_CONTAINER}" node --input-type=module -e '
+import { purgeCaches } from "/app/src/esa/client.mjs";
+const urls = String(process.env.PURGE_URLS || "").split("\n").map((v) => v.trim()).filter(Boolean);
+const credentials = {
+  accessKeyId: process.env.ESA_ACCESS_KEY_ID,
+  accessKeySecret: process.env.ESA_ACCESS_KEY_SECRET,
+  siteId: process.env.ESA_SITE_ID,
+};
+try {
+  const result = await purgeCaches({ credentials, type: "file", urls });
+  console.log(`[purge] 已提交 ${urls.length} 条 URL，TaskId=${result.taskId}`);
+} catch (error) {
+  console.error(`[purge] ESA 清理失败：${error?.code || error?.name || "unknown"}`);
+  process.exit(1);
+}
+' || echo "WARN: ESA 缓存清理失败，请人工确认边缘是否仍返回旧版本"
+else
+  echo "WARN: 未找到可用的 admin-auth/ESA 配置，跳过边缘缓存清理"
+fi
+
+
+echo ""
 echo "=== 清理 ==="
 rm -rf /tmp/dist_pkg /tmp/dist_pkg.tar.gz
 echo "ALL DONE"

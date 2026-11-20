@@ -205,4 +205,12 @@ jobs:
             echo "SSR smoke target: http://${SSR_HOST}:4321/"
             curl -fsS -o /dev/null -w 'SSR smoke: %{http_code}\n' "http://${SSR_HOST}:4321/"
             curl -fsS -o /dev/null -w 'Web smoke: %{http_code}\n' https://hlydwz.com/
+            # 源站换新后边缘仍可能返回旧 HTML（旧 _astro 资源在源站已 404），
+            # 所以部署后必须清 ESA 缓存。清理失败只告警：服务已起来，回滚反而更糟。
+            # 脚本随首次部署安装到 $CUR/scripts/；缺失时明确提示，而不是静默跳过。
+            if [ -x "$CUR/scripts/purge-esa-cache.sh" ]; then
+              "$CUR/scripts/purge-esa-cache.sh" || echo "WARN: ESA cache purge failed; verify edge freshness manually" >&2
+            else
+              echo "WARN: $CUR/scripts/purge-esa-cache.sh missing; edge cache was NOT purged" >&2
+            fi
             rm -rf /tmp/dist_pkg "$PKG"
