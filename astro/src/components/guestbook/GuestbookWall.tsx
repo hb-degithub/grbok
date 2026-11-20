@@ -12,7 +12,10 @@ interface GuestbookMessage {
 interface GuestbookWallProps {
   messages: GuestbookMessage[];
   loading: boolean;
+  /** 首屏失败（还没有任何留言）时的整块错误态 */
   error: boolean;
+  /** 已有留言时刷新失败：保留列表，顶部提示并可重试 */
+  refreshError: boolean;
   /** 「加载更多」这一次失败了：就地提示，不清空已有留言 */
   loadMoreError: boolean;
   hasMore: boolean;
@@ -62,13 +65,17 @@ function Panel({
  *
  * 状态语义：
  * - 首屏加载（还没有任何留言）才显示骨架；加载更多时保留列表，只在按钮上转圈；
- * - 首屏失败显示整块错误态与「重新加载」；
- * - 加载更多失败在列表下方就地提示，已有留言不被替换，重试继续取下一页。
+ * - 首屏失败（没有任何留言）显示整块错误态与「重新加载」；
+ * - 有留言时刷新失败：列表保持不动，顶部出现「刷新失败」＋唯一的「重新加载」；
+ * - 加载更多失败：列表下方就地提示，失败期间只保留一个「重试加载更多」按钮，
+ *   正常的「加载更多」按钮暂时让位，避免同一个动作出现两个重试入口；
+ * - 刷新失败（列表可能已过期）优先于加载更多失败展示，保证同一时刻只有一个重试按钮。
  */
 export default function GuestbookWall({
   messages,
   loading,
   error,
+  refreshError,
   loadMoreError,
   hasMore,
   loadingMore,
@@ -94,7 +101,8 @@ export default function GuestbookWall({
         <button
           type="button"
           onClick={onRetry}
-          className="focus-ring mt-4 inline-flex min-h-11 items-center rounded-[3px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)]"
+          disabled={loading}
+          className="focus-ring mt-4 inline-flex min-h-11 items-center rounded-[3px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50"
         >
           重新加载
         </button>
@@ -112,7 +120,28 @@ export default function GuestbookWall({
   }
 
   return (
-    <div data-state="ready">
+    <div data-state={refreshError ? 'refresh-error' : 'ready'}>
+      {refreshError && (
+        <div
+          role="alert"
+          data-state="refresh-error"
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[3px] border border-[var(--sf-danger)] bg-[var(--sf-surface)] px-4 py-3"
+        >
+          <p className="min-w-0 text-sm leading-6 text-[var(--sf-ink-2)]">
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--sf-danger)]">Refresh / 失败</span>
+            <span className="ml-2">刷新失败，正在展示上一次加载的留言。</span>
+          </p>
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={loading}
+            className="focus-ring inline-flex min-h-11 shrink-0 items-center rounded-[3px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50"
+          >
+            重新加载
+          </button>
+        </div>
+      )}
+
       <motion.ol variants={staggerContainer(0.06)} initial="hidden" animate="visible" className="grid gap-4">
         {messages.map((msg) => (
           <motion.li
@@ -138,7 +167,8 @@ export default function GuestbookWall({
         ))}
       </motion.ol>
 
-      {loadMoreError && (
+      {/* 底部只留一个动作：刷新失败 > 加载更多失败 > 正常加载更多。 */}
+      {refreshError ? null : loadMoreError ? (
         <div
           role="alert"
           data-state="load-more-error"
@@ -155,14 +185,13 @@ export default function GuestbookWall({
             重试加载更多
           </button>
         </div>
-      )}
-
-      {hasMore && (
+      ) : hasMore ? (
         <div className="mt-6 text-center">
           <button
             type="button"
             onClick={onLoadMore}
-            disabled={loadingMore}
+            // 刷新进行中也不接受懒加载，避免两个请求互相覆盖分页状态。
+            disabled={loadingMore || loading}
             aria-busy={loadingMore}
             className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-[3px] border border-[var(--sf-line-control)] px-5 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50"
           >
@@ -170,7 +199,7 @@ export default function GuestbookWall({
             {loadingMore ? '加载中…' : '加载更多'}
           </button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

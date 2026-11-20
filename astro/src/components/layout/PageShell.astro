@@ -22,8 +22,10 @@ const { title, eyebrow, description, id = 'page-title' } = Astro.props;
 ---
 
 <div class={orbitalClasses.shell} aria-labelledby={id}>
-  <header class="orbital-shell__header">
-    {eyebrow && <p class={`${orbitalClasses.eyebrow} pl-14 sm:pl-0`}>{eyebrow}</p>}
+  {/* <sm 时给固定在 12–56px 的 44px 导航按钮预留顶部空间：整体下移页头，
+      而不是给眉标加左缩进，眉标与 h1 才能保持同一条左基线；≥sm 桌面端不变。 */}
+  <header class="orbital-shell__header pt-8 sm:pt-0">
+    {eyebrow && <p class={orbitalClasses.eyebrow}>{eyebrow}</p>}
     <h1 id={id} class="orbital-title">{title}</h1>
     {description && <p class="orbital-lede">{description}</p>}
   </header>
