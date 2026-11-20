@@ -1,7 +1,7 @@
 // @vitest-environment node
 // 纯源码静态断言，不需要 DOM；jsdom 环境会把 node:fs 外部化为浏览器模块。
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -14,7 +14,12 @@ import { fileURLToPath } from 'node:url';
  *   - 三个组件必须使用 global.css 的 `--sf-*` 设计令牌（浅色 #f1f3f5 画布、
  *     #16191d 石墨、唯一强调 #0b6d76；暗色由 `.dark` 令牌整体切换）；
  *   - 去掉玻璃拟态 / 大面积阴影 / 彩色渐变 / 冷暖撞色（zinc-sky-blue 系）；
- *   - 16 个后台导航项、分组、权限与交互（折叠、抽屉、Esc、退出）全部保留；
+ *   - 后台导航项、分组、权限与交互（折叠、抽屉、Esc、退出）全部保留：
+ *     原 16 项一项不删，另补齐 features / insights / versions / gallery /
+ *     guestbook 这 5 个真实页面，且每项 href 都对应真实 Astro 页面、页面
+ *     requiredRole 与侧栏门槛一致；
+ *   - 顶栏把「本页要求」（页面门槛）与真实账号角色徽标分开，徽标只读
+ *     useAdminAuth().user，不改 AdminGuard 鉴权；
  *   - StatsCard 6 个字段接口不变；
  *   - AuthPage 三个 tab 与三个表单、关键文案与 a11y 属性不变。
  */
@@ -56,6 +61,43 @@ const BANNED_PATTERNS: Array<[string, RegExp]> = [
   ['大圆角 rounded-(md|lg|xl|2xl|3xl)', /\brounded-(?:md|lg|xl|2xl|3xl)\b/],
 ];
 
+/**
+ * 侧栏导航契约：既有 16 项（顺序、文案、分组、门槛不变）+ 5 个此前有页面
+ * 却没进侧栏的真实后台页（features / insights / versions / gallery /
+ * guestbook）。role 必须与对应页面 AdminLayout 的 requiredRole 一致。
+ */
+type AdminNavEntry = {
+  href: string;
+  label: string;
+  hint: string;
+  section: string;
+  role: 'author' | 'admin' | 'super_admin';
+};
+
+const ADMIN_NAV: AdminNavEntry[] = [
+  { href: '/admin', label: '仪表盘', hint: '概览', section: '主控台', role: 'author' },
+  { href: '/admin/stats', label: '统计', hint: '访问', section: '主控台', role: 'author' },
+  { href: '/admin/insights', label: '数据洞察', hint: '洞察', section: '主控台', role: 'admin' },
+  { href: '/admin/monitor', label: '监控', hint: '运行状态', section: '主控台', role: 'admin' },
+  { href: '/admin/posts', label: '文章', hint: '撰写', section: '内容', role: 'author' },
+  { href: '/admin/comments', label: '评论', hint: '审核', section: '内容', role: 'admin' },
+  { href: '/admin/tags', label: '标签', hint: '分类', section: '内容', role: 'author' },
+  { href: '/admin/media', label: '媒体', hint: '图片', section: '内容', role: 'author' },
+  { href: '/admin/gallery', label: '相册管理', hint: '相册', section: '内容', role: 'author' },
+  { href: '/admin/friend-links', label: '友链', hint: '外链', section: '内容', role: 'super_admin' },
+  { href: '/admin/guestbook', label: '留言治理', hint: '留言', section: '内容', role: 'super_admin' },
+  { href: '/admin/users', label: '用户', hint: '权限', section: '系统', role: 'super_admin' },
+  { href: '/admin/announcements', label: '公告', hint: '广播', section: '系统', role: 'super_admin' },
+  { href: '/admin/settings', label: '设置', hint: '站点', section: '系统', role: 'super_admin' },
+  { href: '/admin/security', label: '安全', hint: '审计', section: '系统', role: 'super_admin' },
+  { href: '/admin/mail', label: '邮件中心', hint: '邮件', section: '系统', role: 'super_admin' },
+  { href: '/admin/cache', label: '缓存管理', hint: 'ESA', section: '系统', role: 'super_admin' },
+  { href: '/admin/audit', label: '审计日志', hint: '操作记录', section: '系统', role: 'super_admin' },
+  { href: '/admin/ai', label: 'AI 助手', hint: 'AI', section: '系统', role: 'super_admin' },
+  { href: '/admin/features', label: '功能开关', hint: '开关', section: '系统', role: 'admin' },
+  { href: '/admin/versions', label: '版本历史', hint: '版本', section: '系统', role: 'admin' },
+];
+
 describe('科幻简约 · 后台组件与登录页设计契约', () => {
   it('三个组件都走 --sf-* 令牌（画布/表面/石墨/冷灰线/唯一强调）', () => {
     for (const [name, src] of Object.entries(files)) {
@@ -79,47 +121,82 @@ describe('科幻简约 · 后台组件与登录页设计契约', () => {
     }
   });
 
-  it('AdminSidebar 保留全部 16 个导航项、分组与文案', () => {
-    const nav: Array<[href: string, label: string, hint: string, section: string]> = [
-      ['/admin', '仪表盘', '概览', '主控台'],
-      ['/admin/stats', '统计', '访问', '主控台'],
-      ['/admin/monitor', '监控', '运行状态', '主控台'],
-      ['/admin/posts', '文章', '撰写', '内容'],
-      ['/admin/comments', '评论', '审核', '内容'],
-      ['/admin/tags', '标签', '分类', '内容'],
-      ['/admin/media', '媒体', '图片', '内容'],
-      ['/admin/friend-links', '友链', '外链', '内容'],
-      ['/admin/users', '用户', '权限', '系统'],
-      ['/admin/announcements', '公告', '广播', '系统'],
-      ['/admin/settings', '设置', '站点', '系统'],
-      ['/admin/security', '安全', '审计', '系统'],
-      ['/admin/mail', '邮件中心', '邮件', '系统'],
-      ['/admin/cache', '缓存管理', 'ESA', '系统'],
-      ['/admin/audit', '审计日志', '操作记录', '系统'],
-      ['/admin/ai', 'AI 助手', 'AI', '系统'],
-    ];
+  it('AdminSidebar 覆盖 21 个导航项、分组与文案（原 16 项全部保留）', () => {
+    expect(ADMIN_NAV).toHaveLength(21);
 
-    expect(nav).toHaveLength(16);
+    const src = files['AdminSidebar.tsx'];
+    // navItems 每项都是单行对象字面量：先锁总数，再逐项锁字段，避免
+    // `toContain('href')` 这种跨项误判（同一 href 出现在别处也能通过）。
+    const itemLines = src.split('\n').filter((line) => /^\s*\{ href: '\/admin/.test(line));
+    expect(itemLines, '导航项数量必须与契约一致（原 16 项 + 新增 5 项）').toHaveLength(21);
 
-    for (const [href, label, hint, section] of nav) {
-      expect(files['AdminSidebar.tsx'], `导航 href 丢失：${href}`).toContain(`href: '${href}'`);
-      expect(files['AdminSidebar.tsx'], `导航 label 丢失：${label}`).toContain(`label: '${label}'`);
-      expect(files['AdminSidebar.tsx'], `导航 hint 丢失：${hint}`).toContain(`hint: '${hint}'`);
-      expect(files['AdminSidebar.tsx'], `导航分组丢失：${section}`).toContain(`section: '${section}'`);
+    for (const { href, label, hint, section, role } of ADMIN_NAV) {
+      const line = itemLines.find((item) => item.includes(`href: '${href}'`));
+      expect(line, `导航 href 丢失：${href}`).toBeTruthy();
+      expect(line, `导航 label 丢失：${label}`).toContain(`label: '${label}'`);
+      expect(line, `导航 hint 丢失：${hint}`).toContain(`hint: '${hint}'`);
+      expect(line, `导航分组丢失：${section}`).toContain(`section: '${section}'`);
+      expect(line, `${href} 权限门槛应为 ${role}，不得放宽/收紧`).toContain(`requiredRole: '${role}'`);
     }
 
-    // 权限门槛分布：author 5 项、admin 2 项、super_admin 9 项（改动不得放宽/收紧）。
-    const count = (re: RegExp) => (files['AdminSidebar.tsx'].match(re) ?? []).length;
-    expect(count(/requiredRole: 'author'/g)).toBe(5);
-    expect(count(/requiredRole: 'admin'/g)).toBe(2);
-    expect(count(/requiredRole: 'super_admin'/g)).toBe(9);
+    // 权限门槛分布：author 6 项、admin 5 项、super_admin 10 项
+    // （原 5/2/9，仅新增页面各自带来 +1/+3/+1）。
+    const count = (re: RegExp) => (src.match(re) ?? []).length;
+    expect(count(/requiredRole: 'author'/g)).toBe(6);
+    expect(count(/requiredRole: 'admin'/g)).toBe(5);
+    expect(count(/requiredRole: 'super_admin'/g)).toBe(10);
 
     // 角色标签与权限过滤保留。
     for (const roleLabel of ['普通用户', '作者', '管理员', '超级管理员']) {
-      expect(files['AdminSidebar.tsx']).toContain(roleLabel);
+      expect(src).toContain(roleLabel);
     }
-    expect(files['AdminSidebar.tsx']).toContain('hasPermission(item.requiredRole)');
-    expect(files['AdminSidebar.tsx']).toContain('aria-current={active ?');
+    expect(src).toContain('hasPermission(item.requiredRole)');
+    expect(src).toContain('aria-current={active ?');
+  });
+
+  it('每个导航项都指向真实存在的 Astro 页面，且页面门槛与导航一致', () => {
+    // 导航覆盖 ≠ 路由存在：逐项在两处候选里找真实页面文件，
+    // 再比对页面 AdminLayout 的 requiredRole（缺省即 author）。
+    for (const { href, role } of ADMIN_NAV) {
+      const candidates = [`pages${href}.astro`, `pages${href}/index.astro`];
+      const pagePath = candidates.map((rel) => resolve(SRC_ROOT, rel)).find((abs) => existsSync(abs));
+      expect(pagePath, `路由文件不存在：${href}`).toBeTruthy();
+
+      const page = readFileSync(pagePath!, 'utf8');
+      const layoutTag = page.match(/<AdminLayout[^>]*>/s)?.[0] ?? '';
+      expect(layoutTag, `${href} 未使用 AdminLayout`).toContain('<AdminLayout');
+      const declaredRole = layoutTag.match(/requiredRole="([^"]+)"/)?.[1] ?? 'author';
+      expect(declaredRole, `${href} 页面 requiredRole 与侧栏门槛不一致`).toBe(role);
+    }
+  });
+
+  it('顶栏把「本页要求」与真实账号角色分开，不再把页面门槛写成当前权限', () => {
+    const layout = read('layouts/AdminLayout.astro');
+    expect(layout).toContain('本页要求：{requiredRoleLabel[requiredRole]}');
+    expect(layout, '「当前权限」会让人误读成账号权限，已由「本页要求」+ 真实角色徽标替代').not.toContain('当前权限');
+    expect(layout).toContain("import AdminRoleBadge from '../components/admin/AdminRoleBadge';");
+    expect(layout).toContain('<AdminRoleBadge client:only="react" />');
+
+    // 徽标只读真实登录用户（useAdminAuth().user），不参与鉴权/跳转。
+    const badge = read('components/admin/AdminRoleBadge.tsx');
+    for (const token of [
+      'useAdminAuth()',
+      'user',
+      'role',
+      'data-role={role}',
+      '普通用户',
+      '作者',
+      '管理员',
+      '超级管理员',
+      '角色同步中',
+      '未识别角色',
+      'var(--sf-accent)',
+    ]) {
+      expect(badge, `AdminRoleBadge 契约丢失：${token}`).toContain(token);
+    }
+    expect(badge).toMatch(/export default function AdminRoleBadge/);
+    expect(badge, '角色徽标不得承担鉴权/跳转').not.toMatch(/window\.location|redirect|from '\.\.\/AdminGuard'/i);
+    expect(badge, '徽标不应写死色值').not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 
   it('AdminSidebar 保留折叠、抽屉、Esc 关闭、焦点与退出登录交互', () => {

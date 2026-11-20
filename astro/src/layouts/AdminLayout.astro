@@ -1,6 +1,7 @@
 ---
 import BaseLayout from './BaseLayout.astro';
 import AdminSidebar from '../components/admin/AdminSidebar';
+import AdminRoleBadge from '../components/admin/AdminRoleBadge';
 import AdminGuard from '../components/admin/AdminGuard';
 import type { AdminRole } from '../hooks/useAdminAuth';
 
@@ -43,8 +44,9 @@ const requiredRoleLabel: Record<AdminRole, string> = {
               </div>
               <div class="flex flex-wrap items-center gap-2 text-xs">
                 <span class="min-h-9 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-1.5 font-mono text-[var(--sf-ink-2)]">
-                  当前权限：{requiredRoleLabel[requiredRole]}
+                  本页要求：{requiredRoleLabel[requiredRole]}
                 </span>
+                <AdminRoleBadge client:only="react" />
                 <a
                   href="/"
                   class="inline-flex min-h-9 items-center rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-1.5 font-mono text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)]"
