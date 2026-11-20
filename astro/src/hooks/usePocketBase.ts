@@ -198,4 +198,3 @@ export function usePosts(page = 1, perPage = 10, tagSlug?: string): UsePostsResu
 
   return { posts, loading, error, totalPages, retry };
 }
-

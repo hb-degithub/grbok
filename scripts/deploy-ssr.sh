@@ -33,8 +33,24 @@ systemctl status blog-astro-ssr --no-pager | head -5
 
 echo ""
 echo "=== 5. 冒烟：SSR 首页 ==="
-curl -s -o /dev/null -w 'SSR 首页: %{http_code}\n' http://127.0.0.1:4321/
-curl -s http://127.0.0.1:4321/ | grep -o 'PostActions\.[A-Za-z0-9_-]*\.js' | head -1
+# SSR 的监听地址由 systemd 单元的 Environment 决定,并非总是 loopback:
+# 生产实测为 HOST=10.255.0.1(见 .superpowers/sdd/task-production-prep-report.md),
+# 此时按 loopback 访问 4321 会 connection refused,而本脚本是 set -e,
+# 会在「文件已同步、服务已重启」之后误判为部署失败。故从 unit 里读取真实监听地址。
+# systemctl show 失败(如 unit 名变更)不阻断脚本,退回 127.0.0.1 的保守缺省。
+SSR_ENV=$(systemctl show -p Environment blog-astro-ssr 2>/dev/null || true)
+# 输出形如 Environment=HOST=10.255.0.1 PORT=4321 ...:
+# 先去掉整行的双/单引号(systemd 输出带引号时,引号会粘在 token 上导致 ^HOST= 失配;
+# HOST 作为主机名/地址不含引号,删除引号不会损坏它),
+# 再去掉行首的 "Environment=" (否则它会和第一个赋值粘成同一个空白分隔 token),
+# 最后按空白拆词取 HOST= 的值;多行时取最后一个匹配。
+SSR_HOST=$(printf '%s\n' "$SSR_ENV" | tr -d "\"'" | sed -n 's/^Environment=//p' \
+  | tr ' ' '\n' | sed -n 's/^HOST=//p' | tail -1)
+# 空值或通配绑定(0.0.0.0/::/*)一律走 loopback 访问
+case "$SSR_HOST" in ''|0.0.0.0|::|'*') SSR_HOST=127.0.0.1 ;; esac
+echo "SSR 监听地址: ${SSR_HOST}:4321"
+curl -s -o /dev/null -w 'SSR 首页: %{http_code}\n' "http://${SSR_HOST}:4321/"
+curl -s "http://${SSR_HOST}:4321/" | grep -o 'PostActions\.[A-Za-z0-9_-]*\.js' | head -1
 
 echo ""
 echo "=== 6. 冒烟：静态资产（经 Caddy）==="

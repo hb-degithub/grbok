@@ -15,7 +15,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # astro/package.json engines 要求 node >=22.12.0（Astro 6 硬要求）:
+          # 显式钉到 22.12 而不是浮动的 22，避免解析到 22.0~22.11 的旧补丁线。
+          node-version: '22.12'
           cache: npm
           # 同时缓存 astro 与 admin-auth 两个子项目的依赖锁文件
           # 注意:必须用块标量多行写法——GitHub 工作流解析器在此位置不接受
@@ -75,14 +77,14 @@ jobs:
       - name: Check
         run: cd astro && npm run check
         env:
-          PUBLIC_SITE_URL: https://blog.example.com
+          PUBLIC_SITE_URL: https://hlydwz.com
           PUBLIC_POCKETBASE_URL: http://localhost:8090
 
       # 生产构建（前端静态产物），随后上传制品
       - name: Build
         run: cd astro && npm run build
         env:
-          PUBLIC_SITE_URL: https://blog.example.com
+          PUBLIC_SITE_URL: https://hlydwz.com
           PUBLIC_POCKETBASE_URL: http://localhost:8090
 
       - name: Upload build artifacts
@@ -115,7 +117,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # 与 test-and-build 保持同一 Node 版本线（astro engines >=22.12.0）
+          node-version: '22.12'
 
       - name: Run PocketBase security suite (${{ matrix.suite }})
         run: node scripts/test-pentest-remediation-local.mjs --suite ${{ matrix.suite }}
@@ -124,12 +127,14 @@ jobs:
           MAIL_ACCOUNT_ENABLED: "false"
           MAIL_OTP_ENABLED: "false"
 
-  # CD:仅在 main 分支推送且 CI 全绿时触发;需仓库配置 vars.DEPLOY_ENABLED=true
-  # 与 secrets.SSH_HOST/SSH_USER/SSH_PRIVATE_KEY(可选 SSH_PORT)后才会真正执行,
-  # 未配置时自动跳过而不是失败。仅部署前端 SSR 产物;pb_hooks/Caddy 变更仍需人工。
+  # CD:仅在 main 分支推送、CI 全绿、且 PocketBase 安全回归（security-regression，7 个 suite）全通过时触发。
+  # 需仓库配置 vars.DEPLOY_ENABLED=true 与 secrets.SSH_HOST/SSH_USER/SSH_PRIVATE_KEY(可选 SSH_PORT)
+  # 后才会真正执行,未配置时自动跳过而不是失败。仅部署前端 SSR 产物;pb_hooks/Caddy 变更仍需人工。
+  # 安全门禁（2026-11-20）:此前 needs 只挂 test-and-build,登录限流/关系遍历守卫等 P0 回归
+  # 处于「可失败但照样上线」状态;现改为同时依赖 security-regression,该 job 任一 suite 失败即不上线。
   deploy:
     name: Deploy to production
-    needs: test-and-build
+    needs: [test-and-build, security-regression]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -174,6 +179,19 @@ jobs:
             rsync -a /tmp/dist_pkg/client/ $CUR/dist/
             systemctl restart blog-astro-ssr
             sleep 4
-            curl -fsS -o /dev/null -w 'SSR smoke: %{http_code}\n' http://127.0.0.1:4321/
+            # SSR smoke 地址不能硬编码 loopback:生产 unit 的 Environment 是
+            # HOST=10.255.0.1 PORT=4321(systemd 绑定非 loopback),此时 127.0.0.1 会
+            # connection refused,让「已同步并重启成功」的部署在最后一步假红。
+            # 从 unit 读取真实监听地址,缺省(或通配绑定)退回 127.0.0.1。
+            # 前面是 set -e,systemctl show 失败用 || true 兜住,不允许它中断清理步骤。
+            SSR_ENV=$(systemctl show -p Environment blog-astro-ssr 2>/dev/null || true)
+            # Environment=HOST=10.255.0.1 PORT=4321 ... → 先去引号(引号会粘在 token 上,
+            # 使 ^HOST= 失配),再去行首 Environment= 前缀(否则与第一个赋值粘成同一 token),
+            # 最后拆词取 HOST= 的值
+            SSR_HOST=$(printf '%s\n' "$SSR_ENV" | tr -d "\"'" | sed -n 's/^Environment=//p' \
+              | tr ' ' '\n' | sed -n 's/^HOST=//p' | tail -1)
+            case "$SSR_HOST" in ''|0.0.0.0|::|'*') SSR_HOST=127.0.0.1 ;; esac
+            echo "SSR smoke target: http://${SSR_HOST}:4321/"
+            curl -fsS -o /dev/null -w 'SSR smoke: %{http_code}\n' "http://${SSR_HOST}:4321/"
             curl -fsS -o /dev/null -w 'Web smoke: %{http_code}\n' https://hlydwz.com/
             rm -rf /tmp/dist_pkg "$PKG"
