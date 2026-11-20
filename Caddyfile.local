@@ -59,31 +59,37 @@
         respond 403
     }
 
-    @blockedNativeAuth path \
-        /api/collections/users/records \
-        /api/collections/users/records/ \
-        /api/collections/users/request-password-reset \
-        /api/collections/users/request-password-reset/ \
-        /api/collections/users/request-verification \
-        /api/collections/users/request-verification/ \
-        /api/collections/users/request-email-change \
-        /api/collections/users/request-email-change/ \
-        /api/collections/users/request-otp \
-        /api/collections/users/request-otp/ \
-        /api/collections/users/auth-with-otp \
-        /api/collections/users/auth-with-otp/ \
-        /api/collections/_pb_users_auth_/request-otp \
-        /api/collections/_pb_users_auth_/request-otp/ \
-        /api/collections/_pb_users_auth_/auth-with-otp \
-        /api/collections/_pb_users_auth_/auth-with-otp/ \
-        /api/collections/_pb_users_auth_/records \
-        /api/collections/_pb_users_auth_/records/ \
-        /api/collections/_pb_users_auth_/request-password-reset \
-        /api/collections/_pb_users_auth_/request-password-reset/ \
-        /api/collections/_pb_users_auth_/request-verification \
-        /api/collections/_pb_users_auth_/request-verification/ \
-        /api/collections/_pb_users_auth_/request-email-change \
-        /api/collections/_pb_users_auth_/request-email-change/
+    # 与生产 Caddyfile 的 @blockedAccountMailRequests 同步：只封写方法与
+    # 一次性动作，GET/HEAD 放行给 PB（users.listRule 仍要求登录/管理员），
+    # 否则本地后台用户管理同样永久无数据。
+    @blockedNativeAuth {
+        path \
+            /api/collections/users/records \
+            /api/collections/users/records/ \
+            /api/collections/users/request-password-reset \
+            /api/collections/users/request-password-reset/ \
+            /api/collections/users/request-verification \
+            /api/collections/users/request-verification/ \
+            /api/collections/users/request-email-change \
+            /api/collections/users/request-email-change/ \
+            /api/collections/users/request-otp \
+            /api/collections/users/request-otp/ \
+            /api/collections/users/auth-with-otp \
+            /api/collections/users/auth-with-otp/ \
+            /api/collections/_pb_users_auth_/request-otp \
+            /api/collections/_pb_users_auth_/request-otp/ \
+            /api/collections/_pb_users_auth_/auth-with-otp \
+            /api/collections/_pb_users_auth_/auth-with-otp/ \
+            /api/collections/_pb_users_auth_/records \
+            /api/collections/_pb_users_auth_/records/ \
+            /api/collections/_pb_users_auth_/request-password-reset \
+            /api/collections/_pb_users_auth_/request-password-reset/ \
+            /api/collections/_pb_users_auth_/request-verification \
+            /api/collections/_pb_users_auth_/request-verification/ \
+            /api/collections/_pb_users_auth_/request-email-change \
+            /api/collections/_pb_users_auth_/request-email-change/
+        not method GET HEAD
+    }
     # 同上：必须 handle 包裹，否则这串精确路径拦不住 handle /api/* 的代理。
     handle @blockedNativeAuth {
         respond "Not Found" 404

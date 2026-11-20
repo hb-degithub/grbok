@@ -236,31 +236,39 @@ http://img.hlydwz.com {
         file_server
     }
 
-    @blockedAccountMailRequests path \
-        /api/collections/users/records \
-        /api/collections/users/records/ \
-        /api/collections/users/request-password-reset \
-        /api/collections/users/request-password-reset/ \
-        /api/collections/users/request-verification \
-        /api/collections/users/request-verification/ \
-        /api/collections/users/request-email-change \
-        /api/collections/users/request-email-change/ \
-        /api/collections/users/request-otp \
-        /api/collections/users/request-otp/ \
-        /api/collections/users/auth-with-otp \
-        /api/collections/users/auth-with-otp/ \
-        /api/collections/_pb_users_auth_/request-password-reset \
-        /api/collections/_pb_users_auth_/request-password-reset/ \
-        /api/collections/_pb_users_auth_/request-verification \
-        /api/collections/_pb_users_auth_/request-verification/ \
-        /api/collections/_pb_users_auth_/request-email-change \
-        /api/collections/_pb_users_auth_/request-email-change/ \
-        /api/collections/_pb_users_auth_/request-otp \
-        /api/collections/_pb_users_auth_/request-otp/ \
-        /api/collections/_pb_users_auth_/auth-with-otp \
-        /api/collections/_pb_users_auth_/auth-with-otp/ \
-        /api/collections/_pb_users_auth_/records \
-        /api/collections/_pb_users_auth_/records/
+    # 原生账号/邮件入口只封"写"与"一次性动作"，读方法必须放行：
+    # 后台用户管理依赖 GET /api/collections/users/records 列表
+    # （users.listRule = `id = @auth.id || ADMIN_RULE`，匿名 GET 仍 403），
+    # 此前全方法 404 使该页面永久无数据。注册、OAT/OTP、找回密码、验证重发
+    # 全部是 POST，仍会被本 matcher 拦下。
+    @blockedAccountMailRequests {
+        path \
+            /api/collections/users/records \
+            /api/collections/users/records/ \
+            /api/collections/users/request-password-reset \
+            /api/collections/users/request-password-reset/ \
+            /api/collections/users/request-verification \
+            /api/collections/users/request-verification/ \
+            /api/collections/users/request-email-change \
+            /api/collections/users/request-email-change/ \
+            /api/collections/users/request-otp \
+            /api/collections/users/request-otp/ \
+            /api/collections/users/auth-with-otp \
+            /api/collections/users/auth-with-otp/ \
+            /api/collections/_pb_users_auth_/request-password-reset \
+            /api/collections/_pb_users_auth_/request-password-reset/ \
+            /api/collections/_pb_users_auth_/request-verification \
+            /api/collections/_pb_users_auth_/request-verification/ \
+            /api/collections/_pb_users_auth_/request-email-change \
+            /api/collections/_pb_users_auth_/request-email-change/ \
+            /api/collections/_pb_users_auth_/request-otp \
+            /api/collections/_pb_users_auth_/request-otp/ \
+            /api/collections/_pb_users_auth_/auth-with-otp \
+            /api/collections/_pb_users_auth_/auth-with-otp/ \
+            /api/collections/_pb_users_auth_/records \
+            /api/collections/_pb_users_auth_/records/
+        not method GET HEAD
+    }
     # 注意：必须用 handle 包裹（参与互斥路由的特异性排序，精确路径胜过 handle /api/*）；
     # 裸 respond 指令在 Caddy 2.8 的指令排序中位于所有 handle 之后，会被 /api/* 抢先代理到
     # PB，导致本拦截静默失效（2026-08-31 实测踩坑，adapt JSON 中 respond 排在 route 17 末位）。
