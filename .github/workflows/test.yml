@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # astro/package.json engines 要求 node >=22.12.0（Astro 6 硬要求）:
           # 显式钉到 22.12 而不是浮动的 22，避免解析到 22.0~22.11 的旧补丁线。
@@ -126,7 +126,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # 与 test-and-build 保持同一 Node 版本线（astro engines >=22.12.0）
           node-version: '22.12'
