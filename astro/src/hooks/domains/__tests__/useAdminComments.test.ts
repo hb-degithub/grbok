@@ -64,6 +64,17 @@ const forbidden = {
   response: { data: { message: '没有执行该操作的权限' } },
 };
 
+/** 手工控制响应时序的 Promise（用于复现「请求已发出、响应未返回」的真实窗口）。 */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+type PageResult = { items: Comment[]; totalItems: number };
+
 afterEach(() => {
   vi.clearAllMocks();
   vi.restoreAllMocks();
@@ -152,6 +163,145 @@ describe('useAdminComments · 真正的分页取数', () => {
 
     expect(service.getComments.mock.calls.length).toBeGreaterThan(callsBefore);
     expect(service.getComments).toHaveBeenLastCalledWith('all', 2, PER_PAGE, '');
+  });
+});
+
+/**
+ * 筛选取数与页码的时序契约。
+ *
+ * 真实故障：切换筛选后，页码要等「新筛选的列表请求返回」才被改回 1。
+ * 在这段网络窗口里 `page` 还停在上一个筛选的第 3 页，于是
+ *   - 分页控件显示「第 3 页 / 共 3 页」，列表却是新筛选的第 1 页数据；
+ *   - 窗口内的 refresh()/updateStatus() 会按旧页码去请求新筛选的数据；
+ *   - 全量并行跑测试时，这个窗口会被调度延迟放大成可观测的失败
+ *     （getComments 已收到 pending page=1，但 page 仍是 3）。
+ *
+ * 所以「切筛选/改关键词 → 页码归 1」必须与状态切换同一拍发生，
+ * 而不是依赖异步响应；同时慢的旧请求晚到时不能覆盖新筛选的结果。
+ */
+describe('useAdminComments · 筛选切换与请求时序', () => {
+  it('切筛选后页码立刻归 1，不等列表响应返回', async () => {
+    servePages(45);
+    const { result } = renderHook(() => useAdminComments());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.goToPage(3);
+    });
+    expect(result.current.page).toBe(3);
+
+    // 新筛选的请求挂起：模拟真实网络尚未返回。
+    const pending = deferred<PageResult>();
+    service.getComments.mockReturnValueOnce(pending.promise);
+
+    act(() => {
+      result.current.setFilter('pending');
+    });
+
+    // 请求已经按「新筛选 + 第 1 页」发出，响应还没回来，页码就必须已经是 1。
+    expect(service.getComments).toHaveBeenLastCalledWith('pending', 1, PER_PAGE, '');
+    expect(result.current.page).toBe(1);
+
+    // 这段窗口里点刷新，取的也必须是新筛选的第 1 页，而不是上一个筛选的第 3 页。
+    const refreshPending = deferred<PageResult>();
+    service.getComments.mockReturnValueOnce(refreshPending.promise);
+    act(() => {
+      void result.current.refresh();
+    });
+    expect(service.getComments).toHaveBeenLastCalledWith('pending', 1, PER_PAGE, '');
+
+    await act(async () => {
+      refreshPending.resolve({ items: [], totalItems: 0 });
+      pending.resolve({ items: [], totalItems: 0 });
+    });
+    expect(result.current.page).toBe(1);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('改关键词后页码立刻归 1，不等列表响应返回', async () => {
+    servePages(45);
+    const { result } = renderHook(() => useAdminComments());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.goToPage(2);
+    });
+    expect(result.current.page).toBe(2);
+
+    const pending = deferred<PageResult>();
+    service.getComments.mockReturnValueOnce(pending.promise);
+
+    act(() => {
+      result.current.setQuery('huba');
+    });
+
+    expect(service.getComments).toHaveBeenLastCalledWith('all', 1, PER_PAGE, 'huba');
+    expect(result.current.page).toBe(1);
+
+    await act(async () => {
+      pending.resolve({ items: [], totalItems: 0 });
+    });
+    expect(result.current.page).toBe(1);
+  });
+
+  it('连续快速切筛选：后到的旧响应不覆盖新筛选的列表与页码', async () => {
+    const all = servePages(45);
+    const { result } = renderHook(() => useAdminComments());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // 第一次切筛选：请求慢
+    const slowPending = deferred<PageResult>();
+    service.getComments.mockReturnValueOnce(slowPending.promise);
+    act(() => {
+      result.current.setFilter('pending');
+    });
+    expect(service.getComments).toHaveBeenLastCalledWith('pending', 1, PER_PAGE, '');
+
+    // 紧接着再切一次：请求快，先返回
+    const fastApproved = deferred<PageResult>();
+    service.getComments.mockReturnValueOnce(fastApproved.promise);
+    act(() => {
+      result.current.setFilter('approved');
+    });
+    expect(service.getComments).toHaveBeenLastCalledWith('approved', 1, PER_PAGE, '');
+    expect(result.current.page).toBe(1);
+
+    await act(async () => {
+      fastApproved.resolve({ items: [makeComment('approved-1', 'approved')], totalItems: 1 });
+    });
+    expect(result.current.comments.map((c) => c.id)).toEqual(['approved-1']);
+    expect(result.current.totalItems).toBe(1);
+    expect(result.current.page).toBe(1);
+    expect(result.current.loading).toBe(false);
+
+    // 旧筛选（pending）的响应晚到：不许把 approved 的结果覆盖回去。
+    await act(async () => {
+      slowPending.resolve({ items: all.slice(0, PER_PAGE), totalItems: all.length });
+    });
+    expect(result.current.comments.map((c) => c.id)).toEqual(['approved-1']);
+    expect(result.current.totalItems).toBe(1);
+    expect(result.current.totalPages).toBe(1);
+    expect(result.current.page).toBe(1);
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('重复设置同一筛选不清空页码、不重复取数', async () => {
+    servePages(45);
+    const { result } = renderHook(() => useAdminComments());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.goToPage(2);
+    });
+    expect(result.current.page).toBe(2);
+    const callsBefore = service.getComments.mock.calls.length;
+
+    act(() => {
+      result.current.setFilter('all');
+    });
+
+    expect(service.getComments.mock.calls.length).toBe(callsBefore);
+    expect(result.current.page).toBe(2);
   });
 });
 

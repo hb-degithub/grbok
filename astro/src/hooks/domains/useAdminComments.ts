@@ -25,17 +25,30 @@ export function useAdminComments() {
   // 但重试要重试用户真正想看的那一页，而不是跳回第 1 页。
   const requestedPageRef = useRef(1);
 
+  // 请求序号：只有最新一次请求允许写状态。
+  // 切筛选/翻页会连发请求，网络返回顺序不保证；慢的旧请求晚到若照写，
+  // 就会把用户当前看到的新筛选（或新页码）覆盖回旧数据。
+  const requestSeqRef = useRef(0);
+
+  // 筛选/关键词的同步镜像：setFilter/setQuery 要在同一次更新里把页码归 1，
+  // 同时用它判断值是否真的变了（重复设置同一筛选不应清空当前页）。
+  const filterRef = useRef(filter);
+  const queryRef = useRef(query);
+
   const loadComments = useCallback(async (
     filterVal: CommentFilter = filter,
     pageNum = 1,
     queryVal: string = query,
   ) => {
     const requestedPage = Math.max(1, Math.floor(pageNum) || 1);
+    const requestSeq = ++requestSeqRef.current;
     requestedPageRef.current = requestedPage;
     setLoading(true);
     setError(null);
     try {
       let result = await adminCommentService.getComments(filterVal, requestedPage, COMMENTS_PER_PAGE, queryVal);
+      // 期间又发起了更新的请求：这次响应已过期，丢弃，不要覆盖新筛选/新页码的结果。
+      if (requestSeq !== requestSeqRef.current) return;
       let effectivePage = requestedPage;
 
       // 末页数据被删空后，PB 会返回空 items 且 totalItems 已经缩小；
@@ -45,6 +58,7 @@ export function useAdminComments() {
         if (lastPage < requestedPage) {
           effectivePage = lastPage;
           result = await adminCommentService.getComments(filterVal, effectivePage, COMMENTS_PER_PAGE, queryVal);
+          if (requestSeq !== requestSeqRef.current) return;
         }
       }
 
@@ -54,11 +68,14 @@ export function useAdminComments() {
       setPage(effectivePage);
       requestedPageRef.current = effectivePage;
     } catch (err) {
+      // 过期请求的失败同样不能改写当前状态（错误/loading 都归最新请求管）。
+      if (requestSeq !== requestSeqRef.current) return;
       // 失败只记录可读错误：保留上一次成功的 comments/totalItems/totalPages/page，
       // 既不伪装成「没有评论」，也不会让一次失败把统计清零。
       setError(describePbError(err, '评论列表加载失败'));
     } finally {
-      setLoading(false);
+      // 只有最新请求能结束 loading；过期请求收尾会把仍在加载的新请求误标成已完成。
+      if (requestSeq === requestSeqRef.current) setLoading(false);
     }
   }, [filter, query]);
 
@@ -66,6 +83,31 @@ export function useAdminComments() {
   useEffect(() => {
     void loadComments(filter, 1, query);
   }, [filter, query, loadComments]);
+
+  /**
+   * 切筛选：页码必须和筛选在同一次状态更新里归 1。
+   *
+   * 若只等列表响应回来再 setPage（旧实现），从「筛选已变」到「响应到达」之间存在一个窗口：
+   * 分页控件还显示上一个筛选的第 N 页（例如第 3 页），列表却是新筛选第 1 页的加载结果；
+   * 窗口内的 refresh()/updateStatus()/批量操作也会带着旧页码去请求新筛选的数据。
+   * 这段窗口在真实网络里是几百毫秒，在并行跑全量测试时会被调度延迟放大成可观测的竞态。
+   */
+  const changeFilter = useCallback((next: CommentFilter) => {
+    if (filterRef.current === next) return;
+    filterRef.current = next;
+    requestedPageRef.current = 1;
+    setFilter(next);
+    setPage(1);
+  }, []);
+
+  /** 改关键词：与切筛选同理，页码同步归 1，不依赖响应时序。 */
+  const changeQuery = useCallback((next: string) => {
+    if (queryRef.current === next) return;
+    queryRef.current = next;
+    requestedPageRef.current = 1;
+    setQuery(next);
+    setPage(1);
+  }, []);
 
   /** 跳页：真正按第 pageNum 页取数（此前只 setPage，页码变了却不取数）。 */
   const goToPage = useCallback((pageNum: number) => {
@@ -128,9 +170,9 @@ export function useAdminComments() {
     loading,
     error,
     filter,
-    setFilter,
+    setFilter: changeFilter,
     query,
-    setQuery,
+    setQuery: changeQuery,
     page,
     totalPages,
     totalItems,
