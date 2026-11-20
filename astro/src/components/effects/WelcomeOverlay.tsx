@@ -337,6 +337,16 @@ export default function WelcomeOverlay() {
               >
                 {registeredEmail ? '验证邮箱' : '注册成功'}
               </h3>
+              {/*
+               * scripts/check-auth-facade-cutover.ps1 要求无邮箱分支的肯定文案只出现在
+               * 这个三元表达式里，并与中性提示写在同一行：注册门面
+               * (pb_hooks/lib/registration_facade.js:97) 对重复邮箱同样返回
+               * 202 REGISTRATION_SUBMITTED 且不发送邮件，因此有邮箱时只能给出中性的
+               * 「提交后请验证邮箱」，不能断言邮件已经送达。
+               */}
+              <p className="mt-2 text-sm font-medium leading-relaxed text-[var(--sf-ink)]">
+                {registeredEmail ? '提交后请验证邮箱，验证完成后可评论' : '注册成功！'}
+              </p>
               {registeredEmail ? (
                 <>
                   <p className="mt-2 text-sm leading-relaxed text-[var(--sf-ink-2)]">

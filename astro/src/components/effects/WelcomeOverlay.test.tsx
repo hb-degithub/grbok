@@ -173,6 +173,8 @@ describe('WelcomeOverlay · 认证流程不可退化', () => {
     fireEvent.click(screen.getByRole('button', { name: /提交注册/ }));
 
     const resend = await screen.findByRole('button', { name: /重新发送验证邮件/ });
+    // 有邮箱时只给中性提示（门面无法区分重复邮箱），不得断言邮件已经送达。
+    expect(screen.getByText('提交后请验证邮箱，验证完成后可评论')).toBeTruthy();
     expect(screen.getByText(/验证邮件已发送至/)).toBeTruthy();
     expect(screen.getByText('reader@example.com')).toBeTruthy();
 
@@ -201,7 +203,10 @@ describe('WelcomeOverlay · 认证流程不可退化', () => {
     });
 
     // 没有邮箱就不可能发出验证邮件：不能显示「已发送至」或空转的重发按钮。
+    // 无邮箱分支保留肯定文案（门面 verified = !email），且不能出现中性的「请验证邮箱」。
+    expect(await screen.findByText('注册成功！')).toBeTruthy();
     expect(await screen.findByText(/注册成功，可直接评论/)).toBeTruthy();
+    expect(screen.queryByText(/提交后请验证邮箱/)).toBeNull();
     expect(screen.queryByText(/验证邮件已发送至/)).toBeNull();
     expect(screen.queryByRole('button', { name: /重新发送验证邮件/ })).toBeNull();
     expect(requestVerification).not.toHaveBeenCalled();
