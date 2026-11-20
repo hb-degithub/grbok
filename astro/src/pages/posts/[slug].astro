@@ -55,6 +55,8 @@ const post = await fetchPost(slug ?? '');
 // 文章不存在时返回真正的 404（此前 SSR 渲染 404 文案但状态码是 200，软 404 会被搜索引擎收录）。
 if (!post) {
   Astro.response.status = 404;
+  // 状态码之外补上标准状态文本，避免响应出现 "404 OK" 这类自相矛盾的措辞。
+  Astro.response.statusText = 'Not Found';
 }
 
 // 2026-11-16：users 的 viewRule 只允许本人/管理员读，匿名 expand=author 恒为空
@@ -100,20 +102,13 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
 });
 ---
 
-<BaseLayout title={post?.title || '文章'} description={post?.excerpt || ''} image={post?.cover}>
+<BaseLayout title={post?.title || '文章不存在'} description={post?.excerpt || ''} image={post?.cover}>
   {post ? (
     <>
     <ReadingProgress client:visible />
-    <article class="mx-auto w-full max-w-5xl px-[var(--sf-pad)] py-10 sm:py-14">
-      <!-- Mobile TOC -->
-      {headings.length > 0 && (
-        <div class="mb-8 lg:hidden">
-          <TableOfContents client:idle headings={headings} />
-        </div>
-      )}
-
-      <div class="flex gap-10">
-        <div class="min-w-0 flex-1">
+    <article class="mx-auto w-full max-w-6xl px-[var(--sf-pad)] py-10 sm:py-14">
+      <div class="lg:flex lg:items-start lg:justify-center lg:gap-12">
+        <div class="min-w-0 mx-auto w-full max-w-[42rem] lg:mx-0 lg:max-w-[42rem]">
           <ScrollReveal client:visible>
         <a href="/posts" class="mb-8 inline-flex min-h-11 items-center gap-2 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--sf-ink-3)] no-underline transition-colors duration-200 hover:text-[var(--sf-accent-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]">
           <span aria-hidden="true">←</span>
@@ -122,15 +117,21 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
       </ScrollReveal>
 
       <ScrollReveal delay={0.1} client:visible>
-        <header class="post-hero mb-10 border-b border-[var(--sf-line)] pb-8">
+        <header class="post-hero mb-8 border-b border-[var(--sf-line)] pb-8">
           <p class="mb-4 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--sf-ink-3)]">
             <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
             Article / 01
           </p>
 
-          <h1 class="post-title mb-5 break-words text-3xl font-bold leading-tight tracking-tight text-[var(--sf-ink)] [overflow-wrap:anywhere] sm:text-4xl md:text-5xl">
+          <h1 class="post-title mb-5 text-balance break-words text-[clamp(1.85rem,4.6vw,3rem)] font-bold leading-[1.14] tracking-[-0.025em] text-[var(--sf-ink)] [overflow-wrap:anywhere]">
             {post.title}
           </h1>
+
+          {post.excerpt && (
+            <p class="mb-6 max-w-[38rem] text-base leading-relaxed text-[var(--sf-ink-2)] sm:text-lg">
+              {post.excerpt}
+            </p>
+          )}
 
           <div class="flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[11px] tracking-[0.06em] text-[var(--sf-ink-3)]">
             {post.expand?.author && (
@@ -142,9 +143,9 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
               </span>
             )}
             {formattedDate && <time datetime={post.published_at}>{formattedDate}</time>}
-            <span aria-hidden="true" class="text-[var(--sf-line-strong)]">/</span>
+            <span aria-hidden="true" class="hidden text-[var(--sf-line-strong)] sm:inline">/</span>
             <span>{readingTime} 分钟阅读</span>
-            <span aria-hidden="true" class="text-[var(--sf-line-strong)]">/</span>
+            <span aria-hidden="true" class="hidden text-[var(--sf-line-strong)] sm:inline">/</span>
             <span>{post.views} 次浏览</span>
           </div>
 
@@ -155,6 +156,13 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
           )}
         </header>
       </ScrollReveal>
+
+      {/* 移动端目录放在标题之后：先给读者标题，再给跳转工具 */}
+      {headings.length > 0 && (
+        <div class="mb-8 lg:hidden">
+          <TableOfContents client:idle headings={headings} />
+        </div>
+      )}
 
       <p class="mb-4 flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.22em] text-[var(--sf-ink-3)]">
         <span class="h-px w-8 bg-[var(--sf-line-strong)]" aria-hidden="true"></span>
@@ -196,9 +204,9 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
       </ScrollReveal>
         </div>
 
-        <!-- Desktop TOC sidebar -->
+        {/* Desktop TOC sidebar */}
         {headings.length > 0 && (
-          <aside class="hidden max-h-[calc(100vh-8rem)] w-52 shrink-0 self-start overflow-y-auto pr-1 lg:sticky lg:top-[calc(var(--header-offset,4rem)+2rem)] lg:block">
+          <aside class="hidden w-56 shrink-0 self-start overflow-y-auto lg:sticky lg:top-[calc(var(--header-offset,4rem)+2rem)] lg:block lg:max-h-[calc(100vh-8rem)]">
             <p class="mb-3 border-b border-[var(--sf-line)] pb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">Contents / 目录</p>
             <TableOfContents client:idle headings={headings} />
           </aside>
@@ -237,9 +245,17 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
     transform: translateY(0);
   }
 
-  /* 正文色统一跟随设计令牌（global.css 的 .prose 排版保持不变） */
+  /* 正文色统一跟随设计令牌（global.css 的 .prose 排版保持不变）。
+     页面把正文宽度交给阅读列：全局 .prose 的 68ch + 居中会让标题比正文
+     左移一大截，这里改为填满阅读列，标题/导语/正文左缘对齐。 */
   .reveal-content.prose {
     color: var(--sf-ink-2);
+    max-width: 100%;
+    margin-inline: 0;
+  }
+  .reveal-content.prose p {
+    /* 避免中文段落最后一行只剩一两个字的孤行 */
+    text-wrap: pretty;
   }
   .reveal-content.prose p,
   .reveal-content.prose li {
@@ -252,6 +268,11 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
   }
   .reveal-content.prose a {
     color: var(--sf-accent-ink);
+  }
+
+  /* 目录锚点跳转时给固定页头留出空间，标题不会被压在导航下面 */
+  .reveal-content :is(h2, h3, h4) {
+    scroll-margin-top: calc(var(--header-offset, 4rem) + 1.5rem);
   }
 
   /* h2 左侧细线在揭示时自上而下展开：单一强调色细线，无渐变 */

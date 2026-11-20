@@ -6,12 +6,14 @@ import { RateLimiter } from '../../lib/security';
 import { authService } from '../../lib/services/authService';
 import { requestVerification } from '../../lib/blog-auth-client';
 import type { CommentFormData } from '../../types/pocketbase';
+import type { CommentSubmitHandler } from '../../hooks/useComments';
 
 const commentLimiter = new RateLimiter(3, 1/12); // 每分钟最多3条
 
 const NAME_MAX = 30;
 const CONTENT_MAX = 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ERROR_ID = 'comment-form-error';
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -35,8 +37,12 @@ const successVariants: Variants = {
 interface CommentFormProps {
   /** 文章 ID */
   postId: string;
-  /** 提交回调 */
-  onSubmit: (data: CommentFormData) => Promise<boolean>;
+  /**
+   * 提交回调。
+   * 推荐返回 { success, error }：失败文案随本次结果返回；
+   * 旧的 boolean 返回值仍兼容（此时回退到 serverError prop / 通用兜底）。
+   */
+  onSubmit: CommentSubmitHandler;
   /** 是否启用人工审核 */
   moderationEnabled?: boolean;
   /** 当前登录用户是否已验证邮箱（undefined = 未登录 / 不强制） */
@@ -52,11 +58,24 @@ interface CommentFormProps {
 const textareaClass =
   'w-full rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-sm text-[var(--sf-ink)] placeholder:text-[var(--sf-ink-3)] transition-colors duration-200 ease-out outline-none focus-visible:border-[var(--sf-accent)] focus-visible:ring-2 focus-visible:ring-[var(--sf-accent)]';
 
+interface FieldErrors {
+  author_name?: string;
+  author_email?: string;
+  content?: string;
+}
+
 /**
  * 主评论表单组件
  *
- * 设计决策：细线表面容器保证表单文字对比度；textarea 用 id 关联 label，
- * 支持 `aria-describedby` 错误播报；成功态保留绿色 ✓ 语义。
+ * 设计决策：
+ * 1. 提交结果写进一个**常驻**的 sr-only live region（role=status + polite），
+ *    只播报「提交中 / 成功」这类可见区不复述的内容；失败文案交给就近的
+ *    `role="alert"` 播报一次，避免 polite + alert 把同一句错误念两遍。
+ * 2. 失败文案优先取**本次** onSubmit 返回的 error，而不是 await 之前捕获的
+ *    serverError prop：首次失败时那个 prop 在闭包里仍是 null。
+ * 3. 校验失败同时落到字段：Input 的 aria-invalid / aria-describedby 指向错误文案，
+ *    textarea 用 aria-invalid + aria-describedby 关联同一个错误节点。
+ * 4. textarea 不再做 focus 缩放：输入时保持像素稳定，避免中文长文抖动。
  */
 export default function CommentForm({ postId, onSubmit, moderationEnabled = true, userEmailVerified, serverError }: CommentFormProps) {
   // SSR 期（window === undefined）getPocketBase() 每次创建新实例且 authStore 为空，
@@ -97,44 +116,64 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
   }, []);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [liveMessage, setLiveMessage] = useState('');
   const statusTimerRef = useRef<number | null>(null);
   useEffect(() => () => {
     if (statusTimerRef.current !== null) window.clearTimeout(statusTimerRef.current);
   }, []);
 
+  const fail = useCallback((message: string) => {
+    setStatus('error');
+    setErrorMessage(message);
+    // 错误由内联 role="alert" 播报；清空 polite 区，避免同一句话被念两遍
+    setLiveMessage('');
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFieldErrors({});
 
     if (!formData.author_name || !formData.content) {
-      setStatus('error');
-      setErrorMessage('请填写昵称和评论内容');
+      setFieldErrors({
+        author_name: formData.author_name ? undefined : '请填写昵称',
+        content: formData.content ? undefined : '请填写评论内容',
+      });
+      fail('请填写昵称和评论内容');
       return;
     }
 
     // 邮箱可选：仅在填写时校验格式
     if (formData.author_email && !EMAIL_RE.test(formData.author_email)) {
-      setStatus('error');
-      setErrorMessage('邮箱格式不正确');
+      setFieldErrors({ author_email: '邮箱格式不正确' });
+      fail('邮箱格式不正确');
       return;
     }
 
     if (formData.author_name.length > NAME_MAX || formData.content.length > CONTENT_MAX) {
-      setStatus('error');
-      setErrorMessage(`昵称不超过 ${NAME_MAX} 字，评论不超过 ${CONTENT_MAX} 字`);
+      setFieldErrors({
+        author_name: formData.author_name.length > NAME_MAX ? `昵称不超过 ${NAME_MAX} 字` : undefined,
+        content: formData.content.length > CONTENT_MAX ? `评论不超过 ${CONTENT_MAX} 字` : undefined,
+      });
+      fail(`昵称不超过 ${NAME_MAX} 字，评论不超过 ${CONTENT_MAX} 字`);
       return;
     }
 
     if (!commentLimiter.tryConsume()) {
-      setStatus('error');
-      setErrorMessage('操作太频繁，请稍后再试');
+      fail('操作太频繁，请稍后再试');
       return;
     }
 
     setStatus('loading');
-    const success = await onSubmit({ ...formData, parent_id: null });
+    setLiveMessage('正在提交评论…');
+    const result = await onSubmit({ ...formData, parent_id: null });
+    // 兼容旧式 boolean 回调；新式结果里的 error 是**本次**失败文案
+    const success = typeof result === 'boolean' ? result : result.success;
 
     if (success) {
       setStatus('success');
+      setFieldErrors({});
+      setLiveMessage(moderationEnabled ? '评论提交成功，审核后展示！' : '评论提交成功！');
       // 登录用户保留昵称/邮箱，仅清空内容；游客全清
       if (isLoggedIn) {
         setFormData((prev) => ({ ...prev, content: '', parent_id: null }));
@@ -144,10 +183,13 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
       if (statusTimerRef.current !== null) window.clearTimeout(statusTimerRef.current);
       statusTimerRef.current = window.setTimeout(() => setStatus('idle'), 2000);
     } else {
-      setStatus('error');
-      // Prefer the server-provided copy (e.g. "请先验证你的邮箱后再发表评论")
-      // when present; otherwise fall back to the neutral generic.
-      setErrorMessage(serverError || '提交失败，请重试');
+      // 新式结果优先用本次返回的 error；旧式 boolean 才回退到 serverError prop。
+      // 注意不能先读 serverError：它在 await 之前捕获，首次失败时仍是 null。
+      const failureCopy =
+        typeof result === 'boolean'
+          ? serverError || '提交失败，请重试'
+          : result.error || '提交失败，请重试';
+      fail(failureCopy);
     }
   };
 
@@ -205,6 +247,11 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
       animate="visible"
       className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-5 sm:p-7"
     >
+      {/* 常驻播报区：与可见状态解耦，成功态替换表单后依然存在 */}
+      <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {liveMessage}
+      </p>
+
       <AnimatePresence mode="wait">
         {status === 'success' ? (
           /* ==================== 成功状态 ==================== */
@@ -215,8 +262,6 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
             animate="visible"
             exit="hidden"
             className="flex flex-col items-center gap-3 py-8"
-            role="status"
-            aria-live="polite"
           >
             <div className="flex h-14 w-14 items-center justify-center rounded-[2px] border border-[var(--sf-line)] text-emerald-600 dark:text-emerald-400">
               <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -237,6 +282,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
             exit="hidden"
             onSubmit={handleSubmit}
             className="space-y-4"
+            aria-busy={status === 'loading'}
             noValidate
           >
             <motion.div variants={itemVariants}>
@@ -254,22 +300,38 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
             {!isLoggedIn && (
               <motion.div variants={itemVariants} className="grid gap-4 sm:grid-cols-2">
                 <Input
+                  id="comment-author-name"
                   label="昵称"
                   placeholder="你的昵称"
                   value={formData.author_name}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, author_name: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData((prev) => ({ ...prev, author_name: e.target.value }));
+                    if (status === 'error') {
+                      setStatus('idle');
+                      setFieldErrors((prev) => ({ ...prev, author_name: undefined }));
+                    }
+                  }}
                   required
                   maxLength={NAME_MAX}
                   autoComplete="name"
+                  error={fieldErrors.author_name}
                 />
                 <Input
+                  id="comment-author-email"
                   label="邮箱（可选）"
                   type="email"
                   placeholder="your@email.com"
                   value={formData.author_email}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, author_email: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData((prev) => ({ ...prev, author_email: e.target.value }));
+                    if (status === 'error') {
+                      setStatus('idle');
+                      setFieldErrors((prev) => ({ ...prev, author_email: undefined }));
+                    }
+                  }}
                   maxLength={100}
                   autoComplete="email"
+                  error={fieldErrors.author_email}
                 />
               </motion.div>
             )}
@@ -278,19 +340,22 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
               <label htmlFor="comment-content" className="mb-1.5 block text-sm font-medium text-[var(--sf-ink-2)]">
                 评论内容
               </label>
-              <motion.textarea
+              <textarea
                 id="comment-content"
                 value={formData.content}
                 onChange={(e) => {
                   setFormData((prev) => ({ ...prev, content: e.target.value }));
-                  if (status === 'error') setStatus('idle');
+                  if (status === 'error') {
+                    setStatus('idle');
+                    setFieldErrors((prev) => ({ ...prev, content: undefined }));
+                  }
                 }}
                 placeholder="写下你的想法..."
                 rows={4}
                 maxLength={CONTENT_MAX}
                 className={textareaClass}
-                whileFocus={{ scale: 1.002 }}
-                transition={{ duration: 0.15 }}
+                aria-invalid={status === 'error' && Boolean(fieldErrors.content)}
+                aria-describedby={status === 'error' ? ERROR_ID : undefined}
                 required
               />
             </motion.div>
@@ -298,6 +363,7 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
             {/* 错误提示 */}
             {status === 'error' && (
               <motion.p
+                id={ERROR_ID}
                 role="alert"
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}

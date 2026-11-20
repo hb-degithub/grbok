@@ -85,13 +85,16 @@ describe('评论区 · 数据与交互契约（视觉改造不得删）', () => 
     }
   });
 
-  it('CommentSection 仍递归收集新评论 id 并高亮 3 秒', () => {
+  it('CommentSection 仍递归收集新评论 id 并按批次高亮 3 秒', () => {
     const src = comments['CommentSection.tsx'];
     for (const token of [
       'const collectIds = (items: typeof comments) =>',
       'allIds.add(item.id);',
       'if (item.children.length > 0) collectIds(item.children);',
-      'setTimeout(() => setNewCommentIds(new Set()), 3000)',
+      'const pageIncreased = page > prevPageRef.current;',
+      'window.setTimeout(() =>',
+      'newTimersRef',
+      '3000',
       'setNewCommentIds((prev) =>',
     ]) {
       expect(src, `新评论高亮链路丢失：${token}`).toContain(token);
@@ -216,8 +219,9 @@ describe('评论区 · 数据与交互契约（视觉改造不得删）', () => 
       'postId: string;',
       'interface CommentItemProps',
       'comment: NestedComment;',
-      'onSubmitReply: (data: CommentFormData) => Promise<boolean>;',
+      'onSubmitReply: CommentSubmitHandler;',
       'currentUserEmail?: string;',
+      'newCommentIds?: Set<string>;',
       'interface CommentFormProps',
       'userEmailVerified?: boolean;',
       'serverError?: string | null;',

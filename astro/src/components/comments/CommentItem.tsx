@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, type Variants } from 'framer-motion';
-import type { NestedComment, CommentFormData } from '../../types/pocketbase';
+import type { NestedComment } from '../../types/pocketbase';
+import type { CommentSubmitHandler } from '../../hooks/useComments';
 import ReplyForm from './ReplyForm';
 import { cn } from '../../lib/utils';
 import { sanitizeText } from '../../lib/security';
@@ -17,9 +18,11 @@ interface CommentItemProps {
   /** 最大嵌套层级 */
   maxDepth?: number;
   /** 提交回复回调 */
-  onSubmitReply: (data: CommentFormData) => Promise<boolean>;
+  onSubmitReply: CommentSubmitHandler;
   /** 是否为新评论（用于高亮效果） */
   isNew?: boolean;
+  /** 当前高亮的新评论 id 集合：嵌套子评论也要传递 isNew */
+  newCommentIds?: Set<string>;
   /** 是否启用人工审核 */
   moderationEnabled?: boolean;
   /** 服务端返回的提交错误文案（来自 useComments.submitError），无文案时为 null */
@@ -64,11 +67,13 @@ export default function CommentItem({
   maxDepth = 3,
   onSubmitReply,
   isNew = false,
+  newCommentIds,
   moderationEnabled = true,
   serverError,
   currentUserEmail,
 }: CommentItemProps) {
   const [isReplyOpen, setIsReplyOpen] = useState(false);
+  const replyButtonRef = useRef<HTMLButtonElement | null>(null);
   const [likes, setLikes] = useState(comment.likes || 0);
   const [isLiked, setIsLiked] = useState(false);
   const [isLiking, setIsLiking] = useState(false);
@@ -78,6 +83,7 @@ export default function CommentItem({
   const [reportReason, setReportReason] = useState('');
   const [isReporting, setIsReporting] = useState(false);
   const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [reportError, setReportError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
   const [isSaving, setIsSaving] = useState(false);
@@ -163,6 +169,7 @@ export default function CommentItem({
   const handleReport = async () => {
     if (!reportReason.trim() || isReporting) return;
     setIsReporting(true);
+    setReportError('');
     try {
       await commentService.reportComment(comment.id, reportReason.trim());
       setReportSubmitted(true);
@@ -170,6 +177,7 @@ export default function CommentItem({
       setReportReason('');
     } catch (err) {
       console.error('举报失败:', err);
+      setReportError('举报提交失败，请稍后再试');
     } finally {
       setIsReporting(false);
     }
@@ -340,6 +348,7 @@ export default function CommentItem({
             {/* 回复 */}
             {canReply && (
               <button
+                ref={replyButtonRef}
                 onClick={() => setIsReplyOpen(!isReplyOpen)}
                 aria-expanded={isReplyOpen}
                 aria-controls={`reply-form-${comment.id}`}
@@ -404,6 +413,7 @@ export default function CommentItem({
           parentId={comment.id}
           moderationEnabled={moderationEnabled}
           serverError={serverError}
+          triggerRef={replyButtonRef}
         />
 
         {/* 举报表单 */}
@@ -450,6 +460,13 @@ export default function CommentItem({
           >
             举报已提交，感谢反馈
           </motion.p>
+        )}
+
+        {/* 举报失败提示：就近可读，不再只留在控制台 */}
+        {reportError && (
+          <p role="alert" className="mt-2 text-xs text-[var(--sf-danger)]">
+            {reportError}
+          </p>
         )}
 
         {/* 编辑表单 */}
@@ -577,8 +594,11 @@ export default function CommentItem({
               depth={depth + 1}
               maxDepth={maxDepth}
               onSubmitReply={onSubmitReply}
+              isNew={newCommentIds?.has(child.id) ?? false}
+              newCommentIds={newCommentIds}
               moderationEnabled={moderationEnabled}
               serverError={serverError}
+              currentUserEmail={currentUserEmail}
             />
           ))}
         </div>

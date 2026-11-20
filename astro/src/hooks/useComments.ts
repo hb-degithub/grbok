@@ -7,6 +7,21 @@ import type {
   CommentRealtimeEvent,
 } from '../types/pocketbase';
 
+export interface CommentSubmitResult {
+  /** 本次提交是否成功 */
+  success: boolean;
+  /** 本次提交失败时的服务端文案；成功或旧式 boolean 回调时为 null */
+  error: string | null;
+}
+
+/**
+ * 评论提交回调。历史调用方返回 boolean；新调用方返回 { success, error }，
+ * 让表单无需等下一次渲染读取 `submitError` prop 就能拿到本次失败文案。
+ */
+export type CommentSubmitHandler = (
+  data: CommentFormData
+) => Promise<boolean | CommentSubmitResult>;
+
 export function useComments(postId: string, options: { enabled?: boolean; perPage?: number } = {}) {
   const enabled = options.enabled ?? true;
   const perPage = options.perPage ?? 20;
@@ -143,15 +158,16 @@ export function useComments(postId: string, options: { enabled?: boolean; perPag
   }, [postId, enabled]);
 
   const submitComment = useCallback(
-    async (data: CommentFormData): Promise<boolean> => {
-      if (isSubmitting) return false;
-      try {
-        if (!enabled) return false;
-        setIsSubmitting(true);
-        await commentService.submitComment(postId, data);
+    async (data: CommentFormData): Promise<CommentSubmitResult> => {
+      if (isSubmitting) return { success: false, error: null };
+      if (!enabled) return { success: false, error: null };
 
-        setSubmitError(null);
-        return true;
+      setIsSubmitting(true);
+      // 每次尝试先清掉上一次的服务端错误：旧文案不能在本次失败/成功时被误用
+      setSubmitError(null);
+      try {
+        await commentService.submitComment(postId, data);
+        return { success: true, error: null };
       } catch (err) {
         console.error('Failed to submit comment:', err);
         // Surface the server-provided message to the visitor. PocketBase JS
@@ -160,9 +176,12 @@ export function useComments(postId: string, options: { enabled?: boolean; perPag
         // Backend copy is our own curated Chinese phrasing (e.g. "请先验证你的
         // 邮箱后再发表评论"), so we display it verbatim with a generic
         // fallback when no usable string is present.
+        //
+        // 关键：文案随本次返回值一起交给表单，不再依赖下一次渲染的 submitError
+        // prop —— 首次失败时那个 prop 在 await 之前捕获的闭包里永远是 null。
         const message = commentService.extractSubmitMessage(err);
         setSubmitError(message);
-        return false;
+        return { success: false, error: message };
       } finally {
         setIsSubmitting(false);
       }

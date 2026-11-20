@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useComments } from '../../hooks/useComments';
+import type { CommentSubmitHandler } from '../../hooks/useComments';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
 import { authService } from '../../lib/services/authService';
 import CommentItem from './CommentItem';
@@ -69,6 +70,21 @@ export default function CommentSection({ postId }: CommentSectionProps) {
   const commentsEnabled = !settingsLoading && settings.enable_comments;
   const { comments, loading, loadingMore, error, submitError, page, totalPages, totalItems, hasMore, submitComment, refresh, loadMore } = useComments(postId, { enabled: commentsEnabled });
   const [newCommentIds, setNewCommentIds] = useState<Set<string>>(new Set());
+  const seenCommentIdsRef = useRef<Set<string>>(new Set());
+  const hasReceivedCommentsRef = useRef(false);
+  // page 变大表示「加载更多」追加了更早的历史评论，不是实时新增
+  const prevPageRef = useRef(page);
+  // 上一帧的 loading：识别「一次取数刚刚完成」的快照。快照里的评论是基线，
+  // 只有两次取数之间由实时订阅插入的评论才算 NEW。
+  const prevLoadingRef = useRef(loading);
+  // 每个新评论批次一个计时器：comments 再变化（update/父组件重渲染）时
+  // 不能让已启动的计时器被清掉，否则 NEW 会永久粘滞。
+  const newTimersRef = useRef<number[]>([]);
+
+  const clearNewTimers = useCallback(() => {
+    newTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    newTimersRef.current = [];
+  }, []);
 
   // Track logged-in user's email verification status
   const [userEmailVerified, setUserEmailVerified] = useState<boolean | undefined>(undefined);
@@ -83,7 +99,32 @@ export default function CommentSection({ postId }: CommentSectionProps) {
     return () => { unsub?.(); };
   }, []);
 
-  /** 监听新评论，高亮 3 秒后消退 */
+  /** 切换文章时重置「已见过」基线、待清理的计时器与高亮集合。 */
+  useEffect(() => {
+    seenCommentIdsRef.current = new Set();
+    hasReceivedCommentsRef.current = false;
+    // 文章的首次取数结果一律当快照处理（不沿用上一篇文章的分页/加载状态）
+    prevPageRef.current = 0;
+    prevLoadingRef.current = false;
+    clearNewTimers();
+    setNewCommentIds(new Set());
+  }, [postId, clearNewTimers]);
+
+  /** 组件卸载时清掉所有「NEW 消退」计时器。 */
+  useEffect(() => () => clearNewTimers(), [clearNewTimers]);
+
+  /**
+   * 监听新评论，高亮 3 秒后消退。
+   *
+   * 规则：
+   * 1. 每次取数完成（loading 由 true → false）或「加载更多」追加（page 变大）
+   *    得到的都是快照：整体并入基线，不高亮——否则首次加载 / loadMore 的旧
+   *    评论会被误标 NEW。
+   * 2. 两次取数之间 comments 变化（实时订阅 create/update）才计算新 id；
+   *    空评论区落定后收到的第一条实时评论因此能正确高亮。
+   * 3. 每个新评论批次各自计时 3 秒，只移除本批 id；同批计时周期内 comments
+   *    再次变化不会清掉计时器（旧实现会清掉后不再重排，导致永久粘滞）。
+   */
   useEffect(() => {
     const allIds = new Set<string>();
     const collectIds = (items: typeof comments) => {
@@ -94,21 +135,59 @@ export default function CommentSection({ postId }: CommentSectionProps) {
     };
     collectIds(comments);
 
-    if (allIds.size > 0) {
-      setNewCommentIds((prev) => {
-        const newIds = new Set<string>();
-        allIds.forEach((id) => {
-          if (!prev.has(id)) newIds.add(id);
-        });
-        return newIds;
-      });
+    const finishedLoading = prevLoadingRef.current && !loading;
+    prevLoadingRef.current = loading;
+    const pageIncreased = page > prevPageRef.current;
+    prevPageRef.current = page;
 
-      const timer = setTimeout(() => setNewCommentIds(new Set()), 3000);
-      return () => clearTimeout(timer);
+    // 取数完成或加载更多：本次拿到的是快照，全部并入基线
+    if (finishedLoading || pageIncreased) {
+      seenCommentIdsRef.current = allIds;
+      hasReceivedCommentsRef.current = true;
+      return;
     }
-  }, [comments]);
 
-  const handleSubmit = async (data: CommentFormData): Promise<boolean> => {
+    // 初始空态：先记为基线；之后第一条实时评论才能被识别为「新」
+    if (allIds.size === 0) {
+      seenCommentIdsRef.current = allIds;
+      hasReceivedCommentsRef.current = true;
+      return;
+    }
+
+    // 首次拿到评论列表只记录基线，不做高亮
+    if (!hasReceivedCommentsRef.current) {
+      hasReceivedCommentsRef.current = true;
+      seenCommentIdsRef.current = allIds;
+      return;
+    }
+
+    const newIds = new Set<string>();
+    allIds.forEach((id) => {
+      if (!seenCommentIdsRef.current.has(id)) newIds.add(id);
+    });
+    seenCommentIdsRef.current = allIds;
+
+    if (newIds.size === 0) return;
+
+    setNewCommentIds((prev) => {
+      const next = new Set(prev);
+      newIds.forEach((id) => next.add(id));
+      return next;
+    });
+
+    // 只清理本批新增的 id；计时器存 ref，comments 再变也不会被 effect 清理
+    const timer = window.setTimeout(() => {
+      setNewCommentIds((prev) => {
+        const next = new Set(prev);
+        newIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      newTimersRef.current = newTimersRef.current.filter((t) => t !== timer);
+    }, 3000);
+    newTimersRef.current.push(timer);
+  }, [comments, page, loading]);
+
+  const handleSubmit: CommentSubmitHandler = async (data: CommentFormData) => {
     return await submitComment(data);
   };
 
@@ -193,7 +272,11 @@ export default function CommentSection({ postId }: CommentSectionProps) {
     <section className="space-y-6">
       {/* 评论区标题 */}
       <SectionHeading>
-        <span className="shrink-0 rounded-[2px] border border-[var(--sf-line)] px-2.5 py-1 font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-2)]">
+        <span
+          className="shrink-0 rounded-[2px] border border-[var(--sf-line)] px-2.5 py-1 font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-2)]"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           {totalComments} 条评论
         </span>
       </SectionHeading>
@@ -225,6 +308,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
                 comment={comment}
                 onSubmitReply={handleSubmit}
                 isNew={newCommentIds.has(comment.id)}
+                newCommentIds={newCommentIds}
                 moderationEnabled={settings.comment_moderation}
                 serverError={submitError}
                 currentUserEmail={currentUserEmail}
@@ -236,6 +320,7 @@ export default function CommentSection({ postId }: CommentSectionProps) {
                 <button
                   onClick={loadMore}
                   disabled={loadingMore}
+                  aria-busy={loadingMore}
                   className="focus-ring inline-flex min-h-11 items-center justify-center rounded-[2px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50"
                 >
                   {loadingMore ? '加载中...' : `加载更多（${totalItems - comments.length} 条）`}
