@@ -127,12 +127,25 @@ if (showChrome) {
         const applyTheme = () => {
           const mode = readMode();
           const theme = resolveTheme(mode);
-          if (document.startViewTransition) {
-            document.startViewTransition(() => {
-              document.documentElement.classList.toggle('dark', theme === 'dark');
-            });
-          } else {
+          const paint = () => {
             document.documentElement.classList.toggle('dark', theme === 'dark');
+          };
+          if (typeof document.startViewTransition === 'function') {
+            try {
+              const transition = document.startViewTransition(paint);
+              // Chromium 在预绘制布局校验失败时会以
+              // "Transition was aborted because of invalid state" reject ready/finished；
+              // 主题类已在回调里切换完成，这里只需吞掉该 rejection，
+              // 否则会冒泡成页面级 unhandled rejection（移动端实测可复现）。
+              transition.ready?.catch(() => {});
+              transition.finished?.catch(() => {});
+              transition.updateCallbackDone?.catch(() => {});
+            } catch {
+              // 浏览器不支持或调用被拒时，直接落主题类，保证切换结果一致
+              paint();
+            }
+          } else {
+            paint();
           }
           document.documentElement.dataset.theme = theme;
           document.documentElement.dataset.themeMode = mode;
