@@ -45,7 +45,25 @@ function reply(kind, messages) {
       title: 'Mock 生成：AI 辅助写作实践',
       slug_hint: 'ai-assisted-writing-mock',
       excerpt: '这是一篇由 mock LLM 生成的测试文章摘要。',
-      content: '<h2>引言</h2><p>这是 mock 生成的正文第一段。</p><h2>正文</h2><p>这是 mock 生成的正文第二段，包含 <strong>加粗</strong> 与代码：</p><pre><code>console.log("mock");</code></pre><h2>总结</h2><p>mock 生成的结尾。</p>',
+      // 前台走 Markdown 渲染管线（marked + highlight.js + katex/mermaid），mock 也返回 Markdown，
+      // 否则本地 E2E 只能覆盖旧的 HTML 直出路径。
+      content: [
+        '## 引言',
+        '',
+        '这是 mock 生成的正文第一段。',
+        '',
+        '## 正文',
+        '',
+        '这是 mock 生成的正文第二段，包含 **加粗** 与代码：',
+        '',
+        '```js',
+        'console.log("mock");',
+        '```',
+        '',
+        '## 总结',
+        '',
+        'mock 生成的结尾。',
+      ].join('\n'),
       seo_description: 'mock 生成的 SEO 描述',
       tag_names: ['AI', '测试'],
     });

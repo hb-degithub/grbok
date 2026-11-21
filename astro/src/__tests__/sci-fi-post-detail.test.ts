@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
  *
  * 这一层只锁定两类东西：
  *   1. 详情页的真实数据/安全/交互链路没有被「视觉改造」顺手删掉
- *      （fetchPost、公开作者回退、sanitizeHtml、heading id、阅读进度、
+ *      （fetchPost、公开作者回退、Markdown 渲染 + 净化、heading id、阅读进度、
  *       TOC、评论区、分享、PostActions）；
  *   2. 设计语言统一：结构色走 var(--sf-*)，去掉旧调色板、玻璃、重阴影、
  *      大面积渐变与大圆角；正文无 JS 也可读。
@@ -59,11 +59,13 @@ describe('文章详情页 · 数据与安全链路', () => {
     }
   });
 
-  it('正文仍经 sanitizeHtml 后才交给 set:html', () => {
-    expect(page).toContain("import { sanitizeHtml } from '../../lib/security'");
-    expect(page).toContain('sanitizeHtml(post.content)');
+  it('正文经 renderMarkdown（Markdown 解析 + 净化）后才交给 set:html', () => {
+    expect(page).toContain("import { renderMarkdown } from '../../lib/markdown'");
+    expect(page).toContain('renderMarkdown(post.content)');
     expect(page).toMatch(/set:html=\{safeContent\}/);
     expect(page, '不得把未净化的 post.content 直接注入').not.toMatch(/set:html=\{post\.content\}/);
+    // 正文净化已收口到 markdown.ts（sanitizePostHtml），页面不再直接调用共用净化器
+    expect(page).not.toContain('sanitizeHtml(post.content)');
   });
 
   it('仍为 h2/h3 注入 heading-N id 供 TOC 锚点使用', () => {
@@ -93,6 +95,12 @@ describe('文章详情页 · 结构与会话组件', () => {
     ]) {
       expect(page, `详情页交互岛丢失：${token}`).toContain(token);
     }
+  });
+
+  it('Mermaid 岛屿按需挂载：只有正文含图表时才渲染', () => {
+    expect(page).toContain("import MermaidRenderer from '../../components/posts/MermaidRenderer'");
+    expect(page).toContain('const hasMermaid = safeContent.includes(\'class="mermaid"\')');
+    expect(page).toMatch(/\{hasMermaid && <MermaidRenderer client:idle \/>\}/);
   });
 
   it('保留 TOC 的移动端与桌面侧栏两处渲染', () => {

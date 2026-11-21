@@ -581,6 +581,156 @@ header ul, header li { list-style: none; margin: 0; padding: 0; }
 }
 
 /* ===========================
+   Markdown 正文增强：hljs / KaTeX / Mermaid
+   渲染管线见 astro/src/lib/markdown.ts；Mermaid 客户端岛屿见
+   astro/src/components/posts/MermaidRenderer.tsx。
+   代码块底色沿用上方「常暗」#1e1e2e（不跟随主题），这里只补 token 颜色，
+   不改动既有主题令牌与其它选择器。
+   =========================== */
+
+/* highlight.js token 配色（Catppuccin Mocha，与 #1e1e2e 底匹配） */
+.prose .hljs-comment,
+.prose .hljs-quote {
+  color: #6c7086;
+  font-style: italic;
+}
+
+.prose .hljs-keyword,
+.prose .hljs-selector-tag,
+.prose .hljs-doctag,
+.prose .hljs-section {
+  color: #cba6f7;
+}
+
+.prose .hljs-string,
+.prose .hljs-regexp,
+.prose .hljs-addition,
+.prose .hljs-attribute {
+  color: #a6e3a1;
+}
+
+.prose .hljs-number,
+.prose .hljs-literal,
+.prose .hljs-bullet {
+  color: #fab387;
+}
+
+.prose .hljs-title,
+.prose .hljs-function,
+.prose .hljs-name,
+.prose .hljs-selector-id,
+.prose .hljs-selector-class {
+  color: #89b4fa;
+}
+
+.prose .hljs-built_in,
+.prose .hljs-type {
+  color: #89dceb;
+}
+
+.prose .hljs-attr,
+.prose .hljs-property,
+.prose .hljs-variable,
+.prose .hljs-template-variable,
+.prose .hljs-symbol {
+  color: #f9e2af;
+}
+
+.prose .hljs-meta,
+.prose .hljs-punctuation,
+.prose .hljs-subst {
+  color: #9399b2;
+}
+
+.prose .hljs-params {
+  color: #f5c2e7;
+}
+
+.prose .hljs-operator {
+  color: #94e2d5;
+}
+
+.prose .hljs-deletion {
+  color: #f38ba8;
+}
+
+.prose .hljs-link {
+  color: #89b4fa;
+  text-decoration: underline;
+}
+
+.prose .hljs-emphasis { font-style: italic; }
+.prose .hljs-strong { font-weight: 700; }
+
+/* KaTeX 公式：字号略大于正文、宽公式横向滚动而不撑破阅读列 */
+.prose .katex { font-size: 1.06em; }
+
+/* 正文容器带 [overflow-wrap:anywhere]，这里把公式还原为不折行，避免符号被拆开 */
+.prose .katex * {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.prose .katex-display {
+  display: block;
+  max-width: 100%;
+  margin: 1.75em 0;
+  padding: 0.25em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.prose .katex-display > .katex {
+  display: block;
+  text-align: center;
+}
+
+/* Mermaid：渲染前展示源码；渲染成功显示 SVG；失败保留源码 + 可读错误 */
+.prose .mermaid {
+  margin: 1.75em 0;
+  padding: 1rem;
+  border: 1px solid var(--sf-line);
+  border-radius: var(--radius-lg);
+  background: var(--sf-surface);
+  color: var(--sf-ink-2);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  white-space: pre;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.prose .mermaid.mermaid-rendered {
+  padding: 1.25rem 1rem;
+  line-height: normal;
+  white-space: normal;
+}
+
+.prose .mermaid svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.prose .mermaid.mermaid-error {
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.prose .mermaid .mermaid-error {
+  margin: 0.875em 0 0;
+  border-top: 1px dashed var(--sf-line);
+  padding-top: 0.625em;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--sf-ink-3);
+}
+
+/* ===========================
    Loading states
    =========================== */
 

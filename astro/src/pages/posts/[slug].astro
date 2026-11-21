@@ -5,10 +5,13 @@ import ShareButton from '../../components/ui/ShareButton';
 import CommentSection from '../../components/comments/CommentSection';
 import TableOfContents from '../../components/posts/TableOfContents';
 import PostActions from '../../components/posts/PostActions';
+import MermaidRenderer from '../../components/posts/MermaidRenderer';
 import ReadingProgress from '../../components/effects/ReadingProgress';
-import { sanitizeHtml } from '../../lib/security';
+import { renderMarkdown } from '../../lib/markdown';
 import { cachedFetchJson } from '../../lib/pb-cache';
 import { pbBaseUrl } from '../../lib/pb-base-url';
+// KaTeX 的官方样式（字体、分数线、上下标定位）只在文章页加载，其它页面不受影响。
+import 'katex/dist/katex.min.css';
 
 // SSR模式：禁用预渲染，每次请求时动态生成
 export const prerender = false;
@@ -87,7 +90,12 @@ const formattedDate = post?.published_at
   : '';
 
 const readingTime = post?.content ? Math.max(1, Math.ceil(post.content.length / 300)) : 0;
-let safeContent = post?.content ? sanitizeHtml(post.content) : '';
+// posts.content 是 Markdown；renderMarkdown 内部完成 GFM 解析、代码高亮、
+// KaTeX 公式、mermaid 源码容器与净化（详见 src/lib/markdown.ts）。
+let safeContent = post?.content ? renderMarkdown(post.content) : '';
+
+// 只有正文真的包含 mermaid 图时才挂载客户端岛屿，避免无关文章下载 mermaid。
+const hasMermaid = safeContent.includes('class="mermaid"');
 
 // Extract headings and inject IDs for TOC
 interface Heading { id: string; text: string; level: number; }
@@ -172,6 +180,8 @@ safeContent = safeContent.replace(/<(h[23])>(.*?)<\/\1>/gi, (_, tag, text) => {
       <div class="prose reveal-content mb-10 max-w-full break-words text-[var(--sf-ink-2)] [overflow-wrap:anywhere]">
         <div set:html={safeContent} />
       </div>
+
+      {hasMermaid && <MermaidRenderer client:idle />}
 
       <div class="mb-10 border-y border-[var(--sf-line)] py-4">
         <div class="flex flex-wrap items-center justify-between gap-4">
