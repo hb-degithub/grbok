@@ -269,6 +269,12 @@ markdown.use({
     code(token: Tokens.Code) {
       return renderFencedCode(token);
     },
+    // 正文不允许出现 h1（页面标题已是唯一 h1，净化白名单也会剥掉 h1 标签）。
+    // 直接把 Markdown 的 `#` 降级成 h2：否则标题会被剥成裸文本，和后面的段落混在一起。
+    heading(token: Tokens.Heading) {
+      const depth = Math.min(Math.max(token.depth, 2), 4);
+      return `<h${depth}>${this.parser.parseInline(token.tokens)}</h${depth}>`;
+    },
   },
   extensions: [blockMathExtension, inlineMathExtension],
 });

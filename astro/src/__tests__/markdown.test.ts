@@ -298,3 +298,12 @@ describe('共用 sanitizeHtml 未被放宽', () => {
     expect(html).not.toContain('class=');
   });
 });
+
+describe('renderMarkdown - 标题层级', () => {
+  it('把 Markdown 的一级标题降级为 h2，避免被净化白名单剥成裸文本', () => {
+    const html = renderMarkdown('# 一级标题\n\n## 二级标题');
+    expect(html).toContain('<h2>一级标题</h2>');
+    expect(html).toContain('<h2>二级标题</h2>');
+    expect(html).not.toContain('<h1');
+  });
+});

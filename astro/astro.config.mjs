@@ -56,6 +56,12 @@ export default defineConfig({
 
   vite: {
     plugins: [tailwindcss(), buildStampPlugin()],
+    ssr: {
+      // 生产部署只同步 dist/（服务器上没有 node_modules），因此这些运行时依赖
+      // 必须由 Vite 打进 dist/server；否则 Node 解析裸包名会 ERR_MODULE_NOT_FOUND，
+      // 文章页直接 500（2026-11-21 实测 highlight.js 触发）。
+      noExternal: ['marked', 'highlight.js', 'katex'],
+    },
     build: {
       // 字体永远不要内联成 base64：@font-face 里的 data URI 会随主 CSS 一起成为
       // render-blocking 负载（实测内联字体占主 CSS 的 16%），而独立文件既能被浏览器
