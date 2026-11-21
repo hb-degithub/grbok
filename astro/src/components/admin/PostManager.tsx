@@ -7,6 +7,7 @@ import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import MediaLibrary from './MediaLibrary';
 import AiArticleGenerator from './AiArticleGenerator';
+import MarkdownPreview from './MarkdownPreview';
 import { mediaService } from '../../lib/services/mediaService';
 import { adminPostService, type Post } from '../../lib/services/adminPostService';
 import type { AssistMetaResult } from '../../lib/services/aiAssistService';
@@ -77,6 +78,241 @@ function formatDate(value?: string) {
   return new Date(value).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
 }
 
+// ---------- Markdown 写作台：工具条 / 快捷键插入 ----------
+
+type EditorTab = 'edit' | 'preview';
+
+type MarkdownAction =
+  | 'bold'
+  | 'italic'
+  | 'inlineCode'
+  | 'codeBlock'
+  | 'link'
+  | 'table'
+  | 'quote'
+  | 'orderedList'
+  | 'unorderedList'
+  | 'heading';
+
+/** 正文里的一段字符区间（内容坐标） */
+interface TextRange {
+  start: number;
+  end: number;
+}
+
+/** 一次 Markdown 插入：替换原文 [start,end)，写入 text，并在插入文本内恢复选区 */
+interface MarkdownInsertion {
+  start: number;
+  end: number;
+  text: string;
+  /** 相对插入文本起点的选区（最终内容坐标 = start + selection.start） */
+  selection: TextRange;
+}
+
+const EDITOR_TABS: EditorTab[] = ['edit', 'preview'];
+
+/** Cmd/Ctrl + 字母 → 格式化动作；输入法组合期间不生效（见 onKeyDown 守卫） */
+const MOD_SHORTCUTS: Record<string, MarkdownAction> = {
+  b: 'bold',
+  i: 'italic',
+  k: 'link',
+  e: 'inlineCode',
+};
+
+/** 代码块语言：默认 text（纯文本围栏），其余与前台高亮语言对齐 */
+const CODE_LANGUAGES: Array<{ value: string; label: string }> = [
+  { value: 'text', label: 'text' },
+  { value: 'javascript', label: 'javascript' },
+  { value: 'typescript', label: 'typescript' },
+  { value: 'tsx', label: 'tsx' },
+  { value: 'jsx', label: 'jsx' },
+  { value: 'python', label: 'python' },
+  { value: 'bash', label: 'bash' },
+  { value: 'json', label: 'json' },
+  { value: 'html', label: 'html' },
+  { value: 'css', label: 'css' },
+  { value: 'sql', label: 'sql' },
+  { value: 'go', label: 'go' },
+  { value: 'rust', label: 'rust' },
+  { value: 'java', label: 'java' },
+  { value: 'yaml', label: 'yaml' },
+  { value: 'markdown', label: 'markdown' },
+  { value: 'diff', label: 'diff' },
+];
+
+// 正文渲染只放行 h2–h4（见 lib/markdown.ts 的净化白名单），H1 会退化成普通段落
+const HEADING_LEVELS = [2, 3, 4] as const;
+
+const TABLE_SNIPPET = '| 列 1 | 列 2 |\n| --- | --- |\n| 内容 | 内容 |';
+
+function clampIndex(value: number, max: number): number {
+  if (!Number.isFinite(value)) return max;
+  return Math.max(0, Math.min(value, max));
+}
+
+/** 行内包裹：有选区就包住选区，没有选区就插入占位文本并选中它（直接打字即可替换）。 */
+function wrapInsertion(
+  content: string,
+  range: TextRange,
+  before: string,
+  after: string,
+  placeholder: string,
+): MarkdownInsertion {
+  const selected = content.slice(range.start, range.end);
+  const inner = selected || placeholder;
+  return {
+    start: range.start,
+    end: range.end,
+    text: before + inner + after,
+    selection: { start: before.length, end: before.length + inner.length },
+  };
+}
+
+/** 按行插入前缀（引用 / 列表 / 标题）：选区跨行时逐行处理。 */
+function lineInsertion(
+  content: string,
+  range: TextRange,
+  prefix: (lineIndex: number) => string,
+): MarkdownInsertion {
+  // 选区可能落在行中间：先扩到整行，避免把前缀插进句子中间
+  const lineStart = content.lastIndexOf('\n', Math.max(0, range.start - 1)) + 1;
+  const newlineIndex = content.indexOf('\n', range.end);
+  const lineEnd = newlineIndex === -1 ? content.length : newlineIndex;
+  const text = content
+    .slice(lineStart, lineEnd)
+    .split('\n')
+    .map((line, index) => prefix(index) + line)
+    .join('\n');
+  return {
+    start: lineStart,
+    end: lineEnd,
+    text,
+    selection: { start: 0, end: text.length },
+  };
+}
+
+/**
+ * 块级插入（围栏代码块 / 表格）：前后按需补空行，
+ * 保证围栏与表格不会被上一段文字吞掉、无法解析成独立块。
+ */
+function blockInsertion(
+  content: string,
+  range: TextRange,
+  block: string,
+  caret: number = block.length,
+): MarkdownInsertion {
+  const head = content.slice(0, range.start);
+  const tail = content.slice(range.end);
+  const leading =
+    head.length > 0 && !head.endsWith('\n\n') ? (head.endsWith('\n') ? '\n' : '\n\n') : '';
+  const trailing =
+    tail.length > 0 && !tail.startsWith('\n\n') ? (tail.startsWith('\n') ? '\n' : '\n\n') : '';
+  const offset = leading.length + caret;
+  return {
+    start: range.start,
+    end: range.end,
+    text: leading + block + trailing,
+    selection: { start: offset, end: offset },
+  };
+}
+
+function codeBlockInsertion(content: string, range: TextRange, language: string): MarkdownInsertion {
+  const fence = '```' + language;
+  const selected = content.slice(range.start, range.end);
+  // 有选区：把选区整段变成代码；无选区：插入空围栏并把光标停在中间空行
+  const block = selected ? fence + '\n' + selected + '\n```' : fence + '\n\n```';
+  const caret = selected ? block.length : fence.length + 1;
+  return blockInsertion(content, range, block, caret);
+}
+
+function linkInsertion(content: string, range: TextRange): MarkdownInsertion {
+  const selected = content.slice(range.start, range.end);
+  const label = selected || '链接文字';
+  const url = 'https://';
+  return {
+    start: range.start,
+    end: range.end,
+    text: `[${label}](${url})`,
+    // 选中协议占位符：直接粘贴或输入地址即可覆盖
+    selection: { start: label.length + 3, end: label.length + 3 + url.length },
+  };
+}
+
+/** 按动作生成插入片段；返回 null 表示该动作不写正文（例如图片走媒体库） */
+function buildMarkdownInsertion(
+  action: MarkdownAction,
+  content: string,
+  range: TextRange,
+  options: { language: string; headingLevel: number },
+): MarkdownInsertion | null {
+  switch (action) {
+    case 'bold':
+      return wrapInsertion(content, range, '**', '**', '加粗文本');
+    case 'italic':
+      return wrapInsertion(content, range, '*', '*', '斜体文本');
+    case 'inlineCode':
+      return wrapInsertion(content, range, '`', '`', '代码');
+    case 'codeBlock':
+      return codeBlockInsertion(content, range, options.language || 'text');
+    case 'link':
+      return linkInsertion(content, range);
+    case 'table':
+      return blockInsertion(content, range, TABLE_SNIPPET);
+    case 'quote':
+      return lineInsertion(content, range, () => '> ');
+    case 'unorderedList':
+      return lineInsertion(content, range, () => '- ');
+    case 'orderedList':
+      return lineInsertion(content, range, (index) => `${index + 1}. `);
+    case 'heading': {
+      const level = Math.max(1, Math.min(6, options.headingLevel));
+      return lineInsertion(content, range, () => '#'.repeat(level) + ' ');
+    }
+    default:
+      return null;
+  }
+}
+
+/** 媒体库只回传 URL：alt 用文件名兜底，与拖拽上传的 alt 回退保持一致 */
+function imageAltFromUrl(url: string): string {
+  try {
+    const path = url.split('?')[0].split('#')[0];
+    const name = decodeURIComponent(path.split('/').pop() || '');
+    return name.replace(/\.[a-z0-9]+$/i, '') || '图片';
+  } catch {
+    return '图片';
+  }
+}
+
+const FORMAT_BTN_CLS =
+  'inline-flex h-8 min-w-8 items-center justify-center rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-2 font-mono text-[11px] leading-none text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-line-control)] hover:text-[var(--sf-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)] disabled:cursor-not-allowed disabled:opacity-50';
+
+interface FormatButtonProps {
+  action: MarkdownAction;
+  /** 无障碍名称（工具条按钮全部用 aria-label 暴露动作名） */
+  label: string;
+  /** 快捷键提示，写进 title */
+  shortcut?: string;
+  visible?: React.ReactNode;
+  onAction: (action: MarkdownAction) => void;
+}
+
+/** 工具条按钮：mousedown 不抢焦点，保证 textarea 的选区在点击时仍然有效 */
+function FormatButton({ action, label, shortcut, visible, onAction }: FormatButtonProps) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={shortcut ? `${label}（${shortcut}）` : label}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => onAction(action)}
+      className={FORMAT_BTN_CLS}
+    >
+      {visible ?? label}
+    </button>
+  );
+}
+
 // ---------- 弹窗焦点 / 滚动锁 ----------
 
 const FOCUSABLE_SELECTOR = [
@@ -91,6 +327,8 @@ const FOCUSABLE_SELECTOR = [
 function getFocusableElements(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
     (element) =>
+      // 隐藏的 tabpanel（编辑 / 预览）里的控件不参与 Tab 循环
+      !element.closest('[hidden]') &&
       !element.hasAttribute('hidden') &&
       !element.classList.contains('hidden') &&
       element.getAttribute('aria-hidden') !== 'true',
@@ -316,13 +554,25 @@ export default function PostManager() {
   } = useAdminPosts();
 
   const [confirmState, setConfirmState] = useState<ConfirmState>({ open: false, title: '', message: '', onConfirm: () => {} });
-  const [showMediaLibrary, setShowMediaLibrary] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const [showAiGenerator, setShowAiGenerator] = useState(false);
   const [metaResult, setMetaResult] = useState<AssistMetaResult | null>(null);
+  // 媒体库选择器有两种用途：回填封面 / 在光标处插入正文插图
+  const [mediaTarget, setMediaTarget] = useState<'cover' | 'content' | null>(null);
+  const showMediaLibrary = mediaTarget !== null;
+  // 正文「编辑 / 预览」tab：默认编辑，打开弹窗时重置
+  const [editorTab, setEditorTab] = useState<EditorTab>('edit');
+  const [codeLanguage, setCodeLanguage] = useState('text');
+  const [headingLevel, setHeadingLevel] = useState<number>(2);
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const editorPanelRef = useRef<HTMLDivElement>(null);
   const mediaPanelRef = useRef<HTMLDivElement>(null);
+  const editTabRef = useRef<HTMLButtonElement>(null);
+  const previewTabRef = useRef<HTMLButtonElement>(null);
+  // 工具条/快捷键插入与 AI 回写后要恢复的选区（内容坐标，重渲染后应用）
+  const pendingSelectionRef = useRef<TextRange | null>(null);
+  // 打开媒体库前记录的正文插入位置：弹窗会抢焦点，取不到 textarea 选区
+  const pendingInsertRangeRef = useRef<TextRange | null>(null);
   const getEditorPanel = useCallback(() => editorPanelRef.current, []);
   const getMediaPanel = useCallback(() => mediaPanelRef.current, []);
   // 供键盘监听/确认回调读取的「最新保存中」状态（state 在闭包里可能过期）
@@ -344,7 +594,21 @@ export default function PostManager() {
     setDirty(false);
   }, [setEditing, setDirty]);
 
-  const closeMediaLibrary = useCallback(() => setShowMediaLibrary(false), []);
+  const closeMediaLibrary = useCallback(() => setMediaTarget(null), []);
+
+  // 工具条 / 快捷键 / AI 回写后恢复光标或选区：
+  // 受控 textarea 的值来自 state，只能在内容重渲染之后设置选区。
+  useEffect(() => {
+    const range = pendingSelectionRef.current;
+    if (!range) return;
+    const el = contentRef.current;
+    if (!el || editorTab !== 'edit') return;
+    pendingSelectionRef.current = null;
+    const max = el.value.length;
+    const start = Math.max(0, Math.min(range.start, max));
+    const end = Math.max(start, Math.min(range.end, max));
+    el.setSelectionRange(start, end);
+  });
 
   // 统一关闭入口：有未保存的实质内容时先确认，空草稿/无改动直接关。
   // 取消、遮罩点击、Esc 全部走这里，保证三处行为一致。
@@ -421,7 +685,9 @@ export default function PostManager() {
     try {
       const asset = await mediaService.uploadAsset(file);
       const url = mediaService.getFileUrl(asset, '1024x0');
-      const snippet = `\n![${asset.alt || file.name}](${url})\n`;
+      // alt 回退文件名（媒体库上传时 alt 存的就是文件名，历史数据可能为空/空白）
+      const alt = ((asset.alt || '').trim() || file.name || '图片').replace(/[[\]]/g, '');
+      const snippet = `\n![${alt}](${url})\n`;
       // 上传期间用户可能继续输入，必须用函数式更新避免覆盖新内容
       setEditing((prev) => {
         if (!prev) return prev;
@@ -477,12 +743,40 @@ export default function PostManager() {
     void savePost();
   };
 
-  const handleCoverSelect = (url: string) => {
-    if (editing) {
-      setEditing({ ...editing, cover: url });
-      setDirty(true);
+  /**
+   * 打开媒体库：
+   * - cover：选择封面（回填 cover 字段）；
+   * - content：选择插图（在正文当前光标处插入 Markdown 图片语法）。
+   * 打开前先记下 textarea 选区：媒体库弹窗会把焦点移走，之后取不到原位置。
+   */
+  const openMediaPicker = (target: 'cover' | 'content') => {
+    if (target === 'content') {
+      const el = contentRef.current;
+      const length = (editing?.content || '').length;
+      pendingInsertRangeRef.current = {
+        start: clampIndex(el?.selectionStart ?? length, length),
+        end: clampIndex(el?.selectionEnd ?? length, length),
+      };
     }
-    setShowMediaLibrary(false);
+    setMediaTarget(target);
+  };
+
+  const handleMediaSelect = (url: string) => {
+    const target = mediaTarget;
+    setMediaTarget(null);
+    if (!editing || !target) return;
+    if (target === 'cover') {
+      setEditing((prev) => (prev ? { ...prev, cover: url } : prev));
+      setDirty(true);
+      return;
+    }
+    const anchor = pendingInsertRangeRef.current;
+    pendingInsertRangeRef.current = null;
+    const length = (editing.content || '').length;
+    const start = clampIndex(anchor?.start ?? length, length);
+    const end = clampIndex(anchor?.end ?? start, length);
+    // 与拖拽上传同一条渲染管线：GitHub 风格 ![alt](url)
+    applyContentText(start, end, `![${imageAltFromUrl(url)}](${url})`);
   };
 
   // ---------- AI 辅助写作 ----------
@@ -490,6 +784,8 @@ export default function PostManager() {
   const editingOpen = editing !== null;
   useEffect(() => {
     if (!editingOpen) setMetaResult(null);
+    // 每次打开/切换编辑对象都回到编辑 tab，避免上次停在预览态
+    if (editingOpen) setEditorTab('edit');
   }, [editingOpen]);
 
   /** 回填单个字段并标记未保存（弹窗关闭时会清空 AI 建议） */
@@ -498,8 +794,81 @@ export default function PostManager() {
     setDirty(true);
   };
 
+  /**
+   * 工具条 / 快捷键写正文：替换 [start, end) 并恢复光标（受控值只来自 editing.content）。
+   * 先走 textarea.setRangeText 的原生编辑管线，让浏览器撤销栈保留这一步；
+   * 随后 React 拿到同样的内容就不会再写 DOM，光标由上面的 selection effect 恢复。
+   */
+  const applyContentText = (start: number, end: number, text: string, selection?: TextRange) => {
+    const el = contentRef.current;
+    const base = el?.value ?? editing?.content ?? '';
+    const from = clampIndex(start, base.length);
+    const to = clampIndex(end, base.length);
+    const next = base.slice(0, from) + text + base.slice(to);
+    if (el && el.value === base) el.setRangeText(text, from, to, 'end');
+    pendingSelectionRef.current = {
+      start: from + (selection?.start ?? text.length),
+      end: from + (selection?.end ?? text.length),
+    };
+    setEditing((prev) => (prev ? { ...prev, content: next } : prev));
+    setDirty(true);
+  };
+
+  /**
+   * 工具条 / 快捷键共用的入口：读当前选区 → 生成片段 → 写回正文并保持选区。
+   * textarea 在预览 tab 里隐藏，此时工具条本身不可见，不需要额外限制。
+   */
+  const applyMarkdownAction = (action: MarkdownAction) => {
+    const el = contentRef.current;
+    if (!el) return;
+    const content = el.value;
+    const start = clampIndex(el.selectionStart ?? content.length, content.length);
+    const end = clampIndex(el.selectionEnd ?? start, content.length);
+    const insertion = buildMarkdownInsertion(action, content, { start, end }, {
+      language: codeLanguage,
+      headingLevel,
+    });
+    if (!insertion) return;
+    applyContentText(insertion.start, insertion.end, insertion.text, insertion.selection);
+    el.focus();
+  };
+
+  /** 正文快捷键：Cmd/Ctrl+B/I/K/E 与 Shift+Enter（输入法组合期间全部让行） */
+  const handleContentKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    const mod = event.metaKey || event.ctrlKey;
+    if (mod && !event.altKey) {
+      const action = MOD_SHORTCUTS[event.key.toLowerCase()];
+      if (action) {
+        event.preventDefault();
+        applyMarkdownAction(action);
+      }
+      return;
+    }
+    if (event.shiftKey && !event.altKey && event.key === 'Enter') {
+      event.preventDefault();
+      applyMarkdownAction('codeBlock');
+    }
+  };
+
+  /** tablist 方向键 / Home / End：切换 tab 并把焦点送到新 tab（roving tabindex） */
+  const handleEditorTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const current = EDITOR_TABS.indexOf(editorTab);
+    let next: number;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (current + 1) % EDITOR_TABS.length;
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (current - 1 + EDITOR_TABS.length) % EDITOR_TABS.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = EDITOR_TABS.length - 1;
+    else return;
+    event.preventDefault();
+    const target = EDITOR_TABS[next];
+    setEditorTab(target);
+    (target === 'edit' ? editTabRef : previewTabRef).current?.focus();
+  };
+
   /** 在正文 [start, end) 区间写入 text；函数式更新避免覆盖异步等待期间的新输入 */
-  const replaceContentRange = (start: number, end: number, text: string) => {
+  const replaceContentRange = (start: number, end: number, text: string, selection?: TextRange) => {
+    const length = (contentRef.current?.value ?? editing?.content ?? '').length;
     setEditing((prev) => {
       if (!prev) return prev;
       const content = prev.content || '';
@@ -507,7 +876,14 @@ export default function PostManager() {
       const to = Math.max(from, Math.min(end, content.length));
       return { ...prev, content: content.slice(0, from) + text + content.slice(to) };
     });
+    const anchor = clampIndex(start, length);
+    pendingSelectionRef.current = {
+      start: anchor + (selection?.start ?? text.length),
+      end: anchor + (selection?.end ?? text.length),
+    };
     setDirty(true);
+    // AI 结果在预览 tab 里看不到：成功后切回编辑，让用户直接确认/继续修改
+    setEditorTab('edit');
   };
 
   /** 取正文 textarea 当前选区（两个下标相等表示无选区） */
@@ -561,9 +937,11 @@ export default function PostManager() {
     }
     try {
       const { text } = await runPolish(selected);
-      replaceContentRange(start, end, text);
+      // 只替换正文选区：标题/摘要/标签等其它未保存字段保持原样；结果选中便于二次修改
+      replaceContentRange(start, end, text, { start: 0, end: text.length });
       showToast('已用 AI 润色结果替换选中文字', 'success');
     } catch (err) {
+      // service 已把 AI_* / step-up / 字段校验错误翻译成中文，这里原样透出
       showToast(err instanceof Error ? err.message : 'AI 润色失败', 'error');
     }
   };
@@ -893,22 +1271,28 @@ export default function PostManager() {
               <div className="mb-3 flex flex-wrap items-center gap-1.5">
                 <span className="mr-1 font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--sf-ink-3)]">AI</span>
                 <button
+                  type="button"
                   onClick={handleAiMeta}
                   disabled={assisting !== null}
+                  aria-busy={assisting === 'meta'}
                   className={cn(BTN_BASE, BTN_QUIET, 'min-h-8 px-2.5 text-[12px]')}
                 >
                   {assisting === 'meta' ? '生成中…' : 'AI 标题/摘要/标签'}
                 </button>
                 <button
+                  type="button"
                   onClick={handleAiPolish}
                   disabled={assisting !== null}
+                  aria-busy={assisting === 'polish'}
                   className={cn(BTN_BASE, BTN_QUIET, 'min-h-8 px-2.5 text-[12px]')}
                 >
                   {assisting === 'polish' ? '生成中…' : 'AI 润色'}
                 </button>
                 <button
+                  type="button"
                   onClick={handleAiContinue}
                   disabled={assisting !== null}
+                  aria-busy={assisting === 'continue'}
                   className={cn(BTN_BASE, BTN_QUIET, 'min-h-8 px-2.5 text-[12px]')}
                 >
                   {assisting === 'continue' ? '生成中…' : 'AI 续写'}
@@ -1039,7 +1423,7 @@ export default function PostManager() {
                         placeholder="封面图片 URL"
                       />
                       <button
-                        onClick={() => setShowMediaLibrary(true)}
+                        onClick={() => openMediaPicker('cover')}
                         className={cn(BTN_BASE, BTN_QUIET, 'min-h-[40px] shrink-0 px-3 text-[12px]')}
                       >
                         选择
@@ -1112,32 +1496,166 @@ export default function PostManager() {
               </div>
               
               <div className="mt-3">
-                <label htmlFor="post-manager-content" className={LABEL_CLS}>内容</label>
-                <textarea
-                  id="post-manager-content"
-                  ref={contentRef}
-                  value={editing.content || ''}
-                  onChange={(e) => { setEditing({ ...editing, content: e.target.value }); setDirty(true); }}
-                  onPaste={(e) => {
-                    const files = pickImageFiles(e.clipboardData?.files ?? null);
-                    if (files.length === 0) return;
-                    e.preventDefault();
-                    files.forEach((f) => { void uploadAndInsertImage(f, e.currentTarget); });
-                  }}
-                  onDrop={(e) => {
-                    const files = pickImageFiles(e.dataTransfer?.files ?? null);
-                    if (files.length === 0) return;
-                    e.preventDefault();
-                    files.forEach((f) => { void uploadAndInsertImage(f, e.currentTarget); });
-                  }}
-                  onDragOver={(e) => {
-                    // 只有拖拽文件时才拦截默认行为，避免影响文本拖选
-                    if (Array.from(e.dataTransfer?.types ?? []).includes('Files')) e.preventDefault();
-                  }}
-                  placeholder={imageUploading ? '图片上传中…' : '支持 Markdown；可直接粘贴或拖拽图片到此处上传'}
-                  rows={12}
-                  className={cn(FIELD_CLS, 'min-h-[240px] resize-y font-mono text-[12px] leading-relaxed')}
-                />
+                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                  <label htmlFor="post-manager-content" className={cn(LABEL_CLS, 'mb-0')}>内容</label>
+                  <div
+                    role="tablist"
+                    aria-label="正文视图"
+                    className="flex overflow-hidden rounded-[3px] border border-[var(--sf-line)]"
+                  >
+                    {EDITOR_TABS.map((tab) => {
+                      const selected = editorTab === tab;
+                      return (
+                        <button
+                          key={tab}
+                          ref={tab === 'edit' ? editTabRef : previewTabRef}
+                          type="button"
+                          role="tab"
+                          id={`post-manager-tab-${tab}`}
+                          aria-selected={selected}
+                          aria-controls={`post-manager-tabpanel-${tab}`}
+                          tabIndex={selected ? 0 : -1}
+                          onClick={() => setEditorTab(tab)}
+                          onKeyDown={handleEditorTabKeyDown}
+                          className={cn(
+                            'min-h-8 px-2.5 font-mono text-[11px] tracking-[0.06em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]',
+                            selected
+                              ? 'bg-[var(--sf-accent)] text-[var(--sf-on-accent)]'
+                              : 'bg-[var(--sf-surface)] text-[var(--sf-ink-2)] hover:text-[var(--sf-ink)]',
+                          )}
+                        >
+                          {tab === 'edit' ? '编辑' : '预览'}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div
+                  role="tabpanel"
+                  id="post-manager-tabpanel-edit"
+                  aria-labelledby="post-manager-tab-edit"
+                  hidden={editorTab !== 'edit'}
+                  className="min-w-0"
+                >
+                  {/* Markdown 格式化工具条：按钮统一用 aria-label 暴露动作名 */}
+                  <div role="toolbar" aria-label="Markdown 格式工具" className="mb-2 flex flex-wrap items-center gap-1">
+                    <FormatButton
+                      action="bold"
+                      label="加粗"
+                      shortcut="Ctrl/Cmd+B"
+                      visible={<strong>B</strong>}
+                      onAction={applyMarkdownAction}
+                    />
+                    <FormatButton
+                      action="italic"
+                      label="斜体"
+                      shortcut="Ctrl/Cmd+I"
+                      visible={<em>I</em>}
+                      onAction={applyMarkdownAction}
+                    />
+                    <FormatButton
+                      action="inlineCode"
+                      label="行内代码"
+                      shortcut="Ctrl/Cmd+E"
+                      visible="code"
+                      onAction={applyMarkdownAction}
+                    />
+                    <FormatButton
+                      action="codeBlock"
+                      label="代码块"
+                      shortcut="Shift+Enter"
+                      visible="```"
+                      onAction={applyMarkdownAction}
+                    />
+                    <select
+                      aria-label="代码块语言"
+                      title="代码块语言"
+                      value={codeLanguage}
+                      onChange={(event) => setCodeLanguage(event.target.value)}
+                      className="h-8 rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-1 font-mono text-[11px] text-[var(--sf-ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
+                    >
+                      {CODE_LANGUAGES.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                    <FormatButton
+                      action="link"
+                      label="链接"
+                      shortcut="Ctrl/Cmd+K"
+                      visible="link"
+                      onAction={applyMarkdownAction}
+                    />
+                    <button
+                      type="button"
+                      aria-label="图片"
+                      title="图片（复用媒体库）"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => openMediaPicker('content')}
+                      className={FORMAT_BTN_CLS}
+                    >
+                      img
+                    </button>
+                    <FormatButton action="table" label="表格" visible="table" onAction={applyMarkdownAction} />
+                    <FormatButton action="quote" label="引用" visible="quote" onAction={applyMarkdownAction} />
+                    <FormatButton action="unorderedList" label="无序列表" visible="ul" onAction={applyMarkdownAction} />
+                    <FormatButton action="orderedList" label="有序列表" visible="ol" onAction={applyMarkdownAction} />
+                    {/* aria-label 用「插入标题」而不是「标题」：后者会与文章标题输入框的
+                        label 撞名，令 getByLabelText('标题') 出现歧义（无障碍名称也更容易区分） */}
+                    <FormatButton action="heading" label="插入标题" visible="h" onAction={applyMarkdownAction} />
+                    <select
+                      aria-label="标题级别"
+                      title="标题级别"
+                      value={headingLevel}
+                      onChange={(event) => setHeadingLevel(Number(event.target.value) || 2)}
+                      className="h-8 rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-1 font-mono text-[11px] text-[var(--sf-ink-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
+                    >
+                      {HEADING_LEVELS.map((level) => (
+                        <option key={level} value={level}>H{level}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <textarea
+                    id="post-manager-content"
+                    ref={contentRef}
+                    value={editing.content || ''}
+                    onChange={(e) => { setEditing({ ...editing, content: e.target.value }); setDirty(true); }}
+                    onKeyDown={handleContentKeyDown}
+                    onPaste={(e) => {
+                      const files = pickImageFiles(e.clipboardData?.files ?? null);
+                      if (files.length === 0) return;
+                      e.preventDefault();
+                      files.forEach((f) => { void uploadAndInsertImage(f, e.currentTarget); });
+                    }}
+                    onDrop={(e) => {
+                      const files = pickImageFiles(e.dataTransfer?.files ?? null);
+                      if (files.length === 0) return;
+                      e.preventDefault();
+                      files.forEach((f) => { void uploadAndInsertImage(f, e.currentTarget); });
+                    }}
+                    onDragOver={(e) => {
+                      // 只有拖拽文件时才拦截默认行为，避免影响文本拖选
+                      if (Array.from(e.dataTransfer?.types ?? []).includes('Files')) e.preventDefault();
+                    }}
+                    placeholder={imageUploading ? '图片上传中…' : '支持 Markdown；可直接粘贴或拖拽图片到此处上传'}
+                    rows={12}
+                    className={cn(FIELD_CLS, 'min-h-[240px] resize-y font-mono text-[12px] leading-relaxed')}
+                  />
+                </div>
+
+                <div
+                  role="tabpanel"
+                  id="post-manager-tabpanel-preview"
+                  aria-labelledby="post-manager-tab-preview"
+                  hidden={editorTab !== 'preview'}
+                  tabIndex={0}
+                  className="max-h-[50vh] min-h-[240px] min-w-0 overflow-auto rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] px-3 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sf-accent)]"
+                >
+                  {editorTab === 'preview' ? (
+                    <MarkdownPreview content={editing.content || ''} />
+                  ) : null}
+                </div>
               </div>
               
               <div className="mt-4 flex flex-col-reverse gap-2 border-t border-[var(--sf-line)] pt-3 sm:flex-row sm:justify-end">
@@ -1163,13 +1681,15 @@ export default function PostManager() {
             ref={mediaPanelRef}
             role="dialog"
             aria-modal="true"
-            aria-label="选择封面图片"
+            aria-label={mediaTarget === 'content' ? '选择正文图片' : '选择封面图片'}
             tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
             className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]"
           >
             <div className="flex items-center justify-between gap-2 border-b border-[var(--sf-line)] px-3 py-2.5 sm:px-4">
-              <h3 className="break-words text-sm font-bold tracking-tight text-[var(--sf-ink)]">选择封面图片</h3>
+              <h3 className="break-words text-sm font-bold tracking-tight text-[var(--sf-ink)]">
+                {mediaTarget === 'content' ? '选择正文图片' : '选择封面图片'}
+              </h3>
               <button
                 type="button"
                 data-dialog-autofocus
@@ -1184,7 +1704,7 @@ export default function PostManager() {
               </button>
             </div>
             <div className="max-h-[calc(90vh-60px)] min-h-0 overflow-auto p-3 sm:p-4">
-              <MediaLibrary onSelect={handleCoverSelect} onClose={closeMediaLibrary} />
+              <MediaLibrary onSelect={handleMediaSelect} onClose={closeMediaLibrary} />
             </div>
           </div>
         </div>

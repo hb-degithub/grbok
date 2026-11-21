@@ -10,8 +10,9 @@
 //   POST /api/blog-admin/ai/article    generateArticle  author/admin/super_admin
 //   POST /api/blog-admin/ai/assist     assist           author/admin/super_admin
 //
-// 前台正文用 set:html 渲染（无 Markdown 渲染器），因此 article 的 content 必须是
-// HTML 片段，且标签集在系统提示里被严格白名单约束（见 ARTICLE_SYSTEM_PROMPT）。
+// 前台正文由 Markdown 渲染管线渲染（marked + highlight.js，并接入 katex / mermaid），再经
+// set:html 注入；因此 article 的 content 是 Markdown 正文，JSON 外层结构保持不变
+// （见 ARTICLE_SYSTEM_PROMPT）。
 
 var aiConfig = require('./ai_config.js');
 var aiClient = require('./ai_client.js');
@@ -282,12 +283,19 @@ function uniqueSlug(dao, baseSlug) {
 }
 
 var ARTICLE_SYSTEM_PROMPT = [
-  '你是一名中文技术博客作者助手。严格输出一个 JSON 对象，不要 Markdown 围栏、不要任何解释文字。',
-  'JSON 结构：{"title":"≤60字","slug_hint":"小写英文连字符","excerpt":"≤120字","content":"HTML 正文","seo_description":"≤150字","tag_names":["≤5个"]}',
-  'content 必须是可直接嵌入页面的 HTML 片段（本站前台用 set:html 渲染，没有 Markdown 渲染器）：',
-  '只允许这些标签：h2、h3、p、ul、ol、li、pre、code、strong、em、blockquote、a、img；',
-  '用 h2 分节；代码必须放在 <pre><code> 里；不要出现 html/head/body 标签（会破坏页面结构）；',
-  '不要在 content 里重复 h1 标题；content 里不要写 Markdown 语法（如 ##、**、```）。',
+  '你是一名中文技术博客作者助手。严格输出一个 JSON 对象，不要用 ``` 围栏包裹整个 JSON，也不要输出任何解释文字。',
+  'JSON 结构：{"title":"≤60字","slug_hint":"小写英文连字符","excerpt":"≤120字","content":"Markdown 正文","seo_description":"≤150字","tag_names":["≤5个"]}',
+  'content 必须是 Markdown 正文（本站前台按 Markdown 渲染，支持代码高亮、表格、公式与图表）。只有外层 JSON 不要围栏，content 内部的 Markdown 语法要原样保留。',
+  '除 content 外，title/excerpt/seo_description/tag_names 一律纯文本，不要带 Markdown 标记或 HTML 标签；',
+  'content 写作要求：',
+  '- 标题层级：页面已渲染文章标题，正文不要重复 h1，从 ## 开始，按需使用 ###；',
+  '- 代码：用 ``` 加语言围栏（如 ```python、```bash、```json、```ts），代码放在围栏内，不要转义成 HTML 实体；',
+  '- 表格：用标准 Markdown 管道表格（含表头分隔行）；',
+  '- 公式：行内用 $...$，独立公式用 $$...$$（LaTeX 语法）；',
+  '- 图表：流程图/时序图用 ```mermaid 围栏；',
+  '- 图片：用 ![说明](URL)；链接用 [文字](URL)；不要用 <img>/<a> 等 HTML 标签。',
+  '安全：不要输出 <script>、内联事件属性（onclick 等）、<iframe>，也不要输出 html/head/body 标签。',
+  '整个响应必须是合法 JSON：content 等字符串内的换行按 JSON 语法写成 \\n 转义（不要出现裸换行），双引号写成 \\"；不要在 JSON 外层加围栏。',
   '语言与主题保持一致；tag_names 只给已有技术标签候选名，不要自造长句。',
 ].join('\n');
 
@@ -299,7 +307,7 @@ function buildArticleUserPrompt(topic, outline, style, length) {
   ];
   if (outline) lines.push('大纲（按要求组织正文）：\n' + outline);
   if (style) lines.push('风格要求：' + style);
-  lines.push('请输出 JSON。');
+  lines.push('请输出 JSON：content 用 Markdown 正文（可用 ``` 代码围栏、Markdown 表格、$...$ 与 $$...$$ 公式、```mermaid 图表和 ![说明](URL) 图片）；整个响应不要加围栏。');
   return lines.join('\n');
 }
 
@@ -381,15 +389,20 @@ var META_SYSTEM_PROMPT = [
 
 var POLISH_SYSTEM_PROMPT = [
   '你是一名中文博文润色助手。',
-  '只输出润色后的结果本体，不要解释、不要前后缀、不要复述要求、不要加代码围栏。',
-  '保持输入的格式：输入是 HTML 就输出 HTML 片段，输入是纯文本就输出纯文本。',
-  '不要改变原意，不要新增事实，不要输出 Markdown。',
+  '只输出润色后的 Markdown 正文，不要解释、不要前后缀、不要复述要求。',
+  '不要用 ``` 围栏包裹整段输出；正文内部的 Markdown 语法（标题、列表、表格、链接、图片、公式）保持有效。',
+  '代码块必须原样保留：``` 语言围栏、围栏内的代码与缩进一个字都不要改，不要重新格式化或"优化"代码。',
+  '行内代码、$...$ 与 $$...$$ 公式、```mermaid 图表同样原样保留。',
+  '不要输出 HTML 标签；图片用 ![说明](URL)。',
+  '不要改变原意，不要新增事实。',
 ].join('\n');
 
 var CONTINUE_SYSTEM_PROMPT = [
   '你是一名中文博文续写助手。',
-  '只输出续写的正文本体，不要解释、不要前后缀、不要复述要求、不要加代码围栏。',
-  '与上文保持同一语言、语气与格式（上文是 HTML 就续写 HTML 片段），输出 200-400 字。',
+  '只输出续写的 Markdown 正文本体，不要解释、不要前后缀、不要复述要求，也不要用 ``` 围栏包裹整段输出。',
+  '与上文保持同一语言、语气与 Markdown 结构（标题层级、列表、表格、代码围栏风格一致），输出 200-400 字。',
+  '续写位置若在代码块内部，只补全代码正文，不要重新开围栏；否则需要展示代码时用 ``` 加语言围栏。',
+  '不要输出 <script>、内联事件属性或 <iframe>；不要输出 html/head/body 标签。',
 ].join('\n');
 
 function assist(c) {
@@ -435,7 +448,7 @@ function assist(c) {
     if (!tail && !cursor) apiError(400, 'INVALID_REQUEST');
     var continued = aiClient.chat({
       system: CONTINUE_SYSTEM_PROMPT,
-      user: '上文：\n' + tail + (cursor ? '\n\n光标处上下文：\n' + cursor : '') + '\n\n请续写 200-400 字。',
+      user: '上文：\n' + tail + (cursor ? '\n\n光标处上下文：\n' + cursor : '') + '\n\n请续写 200-400 字 Markdown 正文。',
       maxTokens: 2000,
       temperature: 0.7,
       config: cfg,

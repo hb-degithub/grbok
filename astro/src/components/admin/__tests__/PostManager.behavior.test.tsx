@@ -586,3 +586,221 @@ describe('PostManager · 翻页失败可恢复', () => {
     expect(screen.getByText('PAGE / 1 / 3')).toBeTruthy();
   });
 });
+
+/**
+ * Markdown 写作台契约：编辑/预览 tab、格式化工具条、快捷键、AI 写入、
+ * 媒体库插图。预览走真实的 `lib/markdown.ts` 渲染管线（marked + hljs + 净化），
+ * 因此这里同时验证「预览产物与新渲染管线一致」。
+ */
+describe('PostManager · Markdown 写作台', () => {
+  const contentBox = () => screen.getByLabelText('内容') as HTMLTextAreaElement;
+
+  const openEditor = async () => {
+    await waitFor(() => expect(adminPostService.getPosts).toHaveBeenCalled());
+    return openNewDraft();
+  };
+
+  /** 用 fireEvent.change 设定正文，并把光标放到末尾（等价于用户输入完） */
+  const typeContent = (value: string) => {
+    fireEvent.change(contentBox(), { target: { value } });
+    contentBox().setSelectionRange(0, value.length);
+  };
+
+  it('预览 tab 使用同一渲染管线输出代码块（pre > code）与标题', async () => {
+    render(<PostManager />);
+    await openEditor();
+
+    const markdown = '## 预览标题\n\n```js\nconst answer = 42;\n```';
+    fireEvent.change(contentBox(), { target: { value: markdown } });
+
+    // 默认编辑 tab：预览不渲染，也不产生额外网络/保存行为
+    expect(screen.getByRole('tab', { name: '编辑' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.queryByTestId('markdown-preview')).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: '预览' }));
+
+    const preview = await screen.findByTestId('markdown-preview');
+    expect(screen.getByRole('tab', { name: '预览' }).getAttribute('aria-selected')).toBe('true');
+    expect(preview.querySelector('pre')).not.toBeNull();
+    const code = preview.querySelector('pre code');
+    expect(code).not.toBeNull();
+    expect(code?.textContent).toContain('const answer = 42;');
+    expect(preview.querySelector('h2')?.textContent).toBe('预览标题');
+    expect(adminPostService.createPost).not.toHaveBeenCalled();
+
+    // 切回编辑：正文完全没被预览改动
+    fireEvent.click(screen.getByRole('tab', { name: '编辑' }));
+    expect(contentBox().value).toBe(markdown);
+  });
+
+  it('tablist 支持方向键切换：aria-selected 与焦点同步到新 tab', async () => {
+    render(<PostManager />);
+    await openEditor();
+
+    fireEvent.change(contentBox(), { target: { value: '## 方向键切换' } });
+
+    const editTab = screen.getByRole('tab', { name: '编辑' });
+    editTab.focus();
+    fireEvent.keyDown(editTab, { key: 'ArrowRight' });
+
+    const previewTab = screen.getByRole('tab', { name: '预览' });
+    expect(previewTab.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(previewTab);
+    expect(screen.getByTestId('markdown-preview').querySelector('h2')?.textContent).toBe('方向键切换');
+
+    fireEvent.keyDown(previewTab, { key: 'ArrowLeft' });
+    expect(screen.getByRole('tab', { name: '编辑' }).getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(screen.getByRole('tab', { name: '编辑' }));
+  });
+
+  it('预览不改变 dirty：无改动文章切到预览后直接关闭，不弹放弃确认', async () => {
+    adminPostService.getPosts.mockResolvedValueOnce(
+      listResult([post('preview-1', { content: '```js\nconst a = 1;\n```' })], 1),
+    );
+
+    render(<PostManager />);
+    await waitFor(() => expect(screen.getByText('标题 preview-1')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }));
+    await screen.findByRole('dialog');
+
+    fireEvent.click(screen.getByRole('tab', { name: '预览' }));
+    const preview = await screen.findByTestId('markdown-preview');
+    expect(preview.querySelector('pre code')?.textContent).toContain('const a = 1;');
+
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    await waitFor(() => expect(editorDialog()).toBeNull());
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+  });
+
+  it('工具条：加粗包裹选区，代码块按所选语言插入围栏', async () => {
+    render(<PostManager />);
+    await openEditor();
+
+    fireEvent.change(contentBox(), { target: { value: 'hello world' } });
+    contentBox().setSelectionRange(6, 11);
+    fireEvent.click(screen.getByRole('button', { name: '加粗' }));
+    expect(contentBox().value).toBe('hello **world**');
+    // 选区落在包裹内部，继续输入可替换原文
+    expect(contentBox().selectionStart).toBe(8);
+    expect(contentBox().selectionEnd).toBe(13);
+
+    // 代码块：默认语言 text，切换语言后写进围栏
+    fireEvent.change(contentBox(), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('代码块语言'), { target: { value: 'python' } });
+    fireEvent.click(screen.getByRole('button', { name: '代码块' }));
+    expect(contentBox().value).toBe('```python\n\n```');
+  });
+
+  it('快捷键 Ctrl/Cmd+B/I/K/E 与 Shift+Enter 按选区插入 Markdown', async () => {
+    render(<PostManager />);
+    await openEditor();
+
+    typeContent('abc');
+    fireEvent.keyDown(contentBox(), { key: 'b', ctrlKey: true });
+    expect(contentBox().value).toBe('**abc**');
+
+    typeContent('abc');
+    fireEvent.keyDown(contentBox(), { key: 'i', ctrlKey: true });
+    expect(contentBox().value).toBe('*abc*');
+
+    typeContent('abc');
+    fireEvent.keyDown(contentBox(), { key: 'k', ctrlKey: true });
+    expect(contentBox().value).toBe('[abc](https://)');
+
+    typeContent('abc');
+    fireEvent.keyDown(contentBox(), { key: 'e', metaKey: true });
+    expect(contentBox().value).toBe('`abc`');
+
+    typeContent('');
+    fireEvent.keyDown(contentBox(), { key: 'Enter', shiftKey: true });
+    expect(contentBox().value).toBe('```text\n\n```');
+  });
+
+  it('输入法组合期间不触发格式化快捷键', async () => {
+    render(<PostManager />);
+    await openEditor();
+
+    typeContent('中文输入中');
+    fireEvent.keyDown(contentBox(), { key: 'b', ctrlKey: true, isComposing: true });
+    expect(contentBox().value).toBe('中文输入中');
+
+    // 组合结束后的同一快捷键恢复正常
+    fireEvent.keyDown(contentBox(), { key: 'b', ctrlKey: true });
+    expect(contentBox().value).toBe('**中文输入中**');
+  });
+
+  it('AI 润色成功：只替换正文选区、结果选中，其它未保存字段不受影响', async () => {
+    aiAssist.runPolish.mockResolvedValue({ text: '润色后的文字' });
+
+    render(<PostManager />);
+    await openEditor();
+
+    fireEvent.change(contentBox(), { target: { value: '原始文字 保留结尾' } });
+    fireEvent.change(screen.getByLabelText('标题'), { target: { value: '未保存的标题' } });
+    contentBox().setSelectionRange(0, 4);
+
+    fireEvent.click(screen.getByRole('button', { name: 'AI 润色' }));
+
+    await waitFor(() => expect(contentBox().value).toBe('润色后的文字 保留结尾'));
+    expect(aiAssist.runPolish).toHaveBeenCalledWith('原始文字');
+    expect((screen.getByLabelText('标题') as HTMLInputElement).value).toBe('未保存的标题');
+    expect(contentBox().selectionStart).toBe(0);
+    expect(contentBox().selectionEnd).toBe('润色后的文字'.length);
+
+    // 已标记 dirty：关闭时需要确认（不会被 AI 写入重置为「干净」）
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    await screen.findByRole('alertdialog');
+  });
+
+  it('AI 失败：toast 显示服务端错误（含 step-up 过期），正文保持原样', async () => {
+    aiAssist.runPolish.mockRejectedValueOnce(new Error('AI 服务暂时不可用，请稍后重试'));
+
+    render(<PostManager />);
+    await openEditor();
+    typeContent('保持原样的正文');
+    contentBox().setSelectionRange(0, 5);
+
+    fireEvent.click(screen.getByRole('button', { name: 'AI 润色' }));
+
+    await waitFor(() =>
+      expect(mockedShowToast).toHaveBeenCalledWith('AI 服务暂时不可用，请稍后重试', 'error'),
+    );
+    expect(contentBox().value).toBe('保持原样的正文');
+
+    // step-up 过期由 service 翻译成中文提示，组件原样透出
+    aiAssist.runPolish.mockRejectedValueOnce(
+      new Error('管理会话已过期，请在弹出的验证框中重新输入动态口令'),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'AI 润色' }));
+
+    await waitFor(() =>
+      expect(mockedShowToast).toHaveBeenCalledWith(
+        '管理会话已过期，请在弹出的验证框中重新输入动态口令',
+        'error',
+      ),
+    );
+    expect(contentBox().value).toBe('保持原样的正文');
+  });
+
+  it('工具条图片按钮复用媒体库，按打开前的光标位置插入 Markdown 图片', async () => {
+    render(<PostManager />);
+    await openEditor();
+
+    fireEvent.change(contentBox(), { target: { value: '开头\n\n结尾' } });
+    // '开头' 是 2 个字符：光标放在它后面（第一个换行之前）
+    contentBox().setSelectionRange(2, 2);
+    fireEvent.click(screen.getByRole('button', { name: '图片' }));
+
+    const picker = await screen.findByRole('dialog', { name: '选择正文图片' });
+    fireEvent.click(within(picker).getByRole('button', { name: '选择这个封面' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: '选择正文图片' })).toBeNull(),
+    );
+    // alt 从文件名回退（媒体库只回传 URL），语法与新渲染管线一致
+    expect(contentBox().value).toBe('开头![picked](/covers/picked.png)\n\n结尾');
+
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    await screen.findByRole('alertdialog');
+  });
+});
