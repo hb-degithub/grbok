@@ -7,7 +7,7 @@ import TableOfContents from '../../components/posts/TableOfContents';
 import PostActions from '../../components/posts/PostActions';
 import MermaidRenderer from '../../components/posts/MermaidRenderer';
 import ReadingProgress from '../../components/effects/ReadingProgress';
-import { renderMarkdown } from '../../lib/markdown';
+import { renderMarkdown, stripDuplicateTitleHeading } from '../../lib/markdown';
 import { cachedFetchJson } from '../../lib/pb-cache';
 import { pbBaseUrl } from '../../lib/pb-base-url';
 // KaTeX 的官方样式（字体、分数线、上下标定位）只在文章页加载，其它页面不受影响。
@@ -93,6 +93,11 @@ const readingTime = post?.content ? Math.max(1, Math.ceil(post.content.length / 
 // posts.content 是 Markdown；renderMarkdown 内部完成 GFM 解析、代码高亮、
 // KaTeX 公式、mermaid 源码容器与净化（详见 src/lib/markdown.ts）。
 let safeContent = post?.content ? renderMarkdown(post.content) : '';
+
+// 文章正文常以 `# 标题` 开头（渲染器已把 h1 降级为 h2），与页面 h1 重复时删掉这一处。
+if (post?.title && safeContent) {
+  safeContent = stripDuplicateTitleHeading(safeContent, post.title);
+}
 
 // 只有正文真的包含 mermaid 图时才挂载客户端岛屿，避免无关文章下载 mermaid。
 const hasMermaid = safeContent.includes('class="mermaid"');

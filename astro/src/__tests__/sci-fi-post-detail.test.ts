@@ -60,7 +60,8 @@ describe('文章详情页 · 数据与安全链路', () => {
   });
 
   it('正文经 renderMarkdown（Markdown 解析 + 净化）后才交给 set:html', () => {
-    expect(page).toContain("import { renderMarkdown } from '../../lib/markdown'");
+    // 渲染入口来自 lib/markdown（可能同时导入 stripDuplicateTitleHeading 等辅助函数）
+    expect(page).toMatch(/import \{[^}]*\brenderMarkdown\b[^}]*\} from '\.\.\/\.\.\/lib\/markdown'/);
     expect(page).toContain('renderMarkdown(post.content)');
     expect(page).toMatch(/set:html=\{safeContent\}/);
     expect(page, '不得把未净化的 post.content 直接注入').not.toMatch(/set:html=\{post\.content\}/);

@@ -16,7 +16,7 @@
  *  11. 共用 `sanitizeHtml`（评论等）没有被放宽。
  */
 import { describe, it, expect } from 'vitest';
-import { renderMarkdown, sanitizePostHtml } from '../lib/markdown';
+import { renderMarkdown, sanitizePostHtml, stripDuplicateTitleHeading } from '../lib/markdown';
 import { sanitizeHtml } from '../lib/security';
 
 describe('renderMarkdown - 代码块', () => {
@@ -305,5 +305,18 @@ describe('renderMarkdown - 标题层级', () => {
     expect(html).toContain('<h2>一级标题</h2>');
     expect(html).toContain('<h2>二级标题</h2>');
     expect(html).not.toContain('<h1');
+  });
+});
+
+describe('stripDuplicateTitleHeading', () => {
+  it('删除与文章标题相同的第一处 h2，并保留其余标题', () => {
+    const html = '<h2>标题</h2><p>正文</p><h2>小节</h2>';
+    expect(stripDuplicateTitleHeading(html, '标题')).toBe('<p>正文</p><h2>小节</h2>');
+  });
+
+  it('标题不同或没有标题时保持原样', () => {
+    const html = '<h2>别的标题</h2><p>正文</p>';
+    expect(stripDuplicateTitleHeading(html, '标题')).toBe(html);
+    expect(stripDuplicateTitleHeading('<p>正文</p>', '标题')).toBe('<p>正文</p>');
   });
 });

@@ -535,3 +535,30 @@ export function renderMarkdown(source: string): string {
 
   return sanitizePostHtml(html);
 }
+
+/**
+ * 删除正文开头与文章标题重复的一级标题。
+ *
+ * 渲染器会把 Markdown 的 `#` 降级成 h2；很多文章第一行就是 `# 标题`，
+ * 而详情页顶部已经有唯一 h1 显示同一个标题，正文再出现一次会和页面标题重复。
+ * 只处理「第一处标题且文本与标题完全相同」的情况，其它 h2 保持不动。
+ */
+export function stripDuplicateTitleHeading(html: string, title: string): string {
+  const expected = decodeBasicEntities(String(title ?? '')).trim();
+  if (!expected) return html;
+  const match = /^\s*<h2>([\s\S]*?)<\/h2>\s*/.exec(html);
+  if (!match) return html;
+  const actual = decodeBasicEntities(match[1].replace(/<[^>]+>/g, '')).trim();
+  if (actual !== expected) return html;
+  return html.slice(match[0].length);
+}
+
+/** 解码标题比较所需的常见实体（marked 会转义 & < > " '）。 */
+function decodeBasicEntities(value: string): string {
+  return value
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
