@@ -68,6 +68,16 @@ var DEFAULTS = {
   // 且迁移必须与本次代码同批上线：getRatePolicySet 要求行数 === DEFAULTS 键数，
   // 缺行会让整组限流 fail-closed 降级。
   view_ip: { limit: 60, windowSeconds: 60 },
+  // 2026-11-23 ALTCHA 人机校验：GET /api/captcha/challenge 的签发配额（按客户端 IP）。
+  // 默认 60 次/60 秒 —— challenge 是纯内存 + 两次 SHA/HMAC 操作，60/min/IP 足够
+  // 正常用户（每次提交发信请求前取一次），同时限制攻击者免费拿 challenge 刷 PoW 负载。
+  // 键名/阈值必须与 pb_migrations/20261123150000_add_captcha_rate_policy.pb.js 一致，
+  // 且迁移必须与 pb_hooks 改动同批上线，否则整组策略 fail-closed 降级。
+  captcha_challenge_ip: { limit: 60, windowSeconds: 60 },
+  // 一次性 challenge 去重（防重放）：subject = challenge hex，每个 challenge 只允许
+  // 消耗 1 次；窗口 600s == challenge 有效期（altcha.js DEFAULT_TTL_SECONDS），
+  // 覆盖 challenge 可用的整个时间窗。bucket 行由 security_rate_cleanup.pb.js 清理。
+  captcha_challenge_use: { limit: 1, windowSeconds: 600 },
 };
 
 var BOUNDS = {
@@ -112,6 +122,10 @@ var BOUNDS = {
   post_bookmark_user: { minLimit: 10, maxLimit: 60, minWindow: 60, maxWindow: 300 },
   comment_like_user: { minLimit: 20, maxLimit: 120, minWindow: 60, maxWindow: 300 },
   view_ip: { minLimit: 10, maxLimit: 120, minWindow: 60, maxWindow: 300 },
+  // 与 view_ip 同量级：60/min 默认值落在 10..120 次 / 60..300 秒区间内。
+  captcha_challenge_ip: { minLimit: 10, maxLimit: 120, minWindow: 60, maxWindow: 300 },
+  // 一次性标记必须恒为 1 次，窗口恒为 600s（= challenge TTL），不允许后台调松。
+  captcha_challenge_use: { minLimit: 1, maxLimit: 1, minWindow: 600, maxWindow: 600 },
 };
 
 function coded(code, message) {

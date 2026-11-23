@@ -15,6 +15,7 @@ var rateLimit = require('./security_rate_limit.js');
 var verification = require('./comment_verification.js');
 var actionAuth = require('./action_auth_lib.js');
 var requestBody = require('./request_body.js');
+var altchaPoW = require('./altcha.js');
 
 function detailedError(status, code, retryAfter) {
   var data = {
@@ -423,6 +424,17 @@ function sendVerification(e) {
 
   if (!email) throw new BadRequestError('Email is required');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new BadRequestError('Invalid email format');
+
+  // ALTCHA 人机校验：读的是 readBody(e) 已解析出的 body（不二次消费 request().body），
+  // 在 comment_verification_email/ip 配额与发信之前拦截。失败直接写 4xx + code；
+  // 未配置 ALTCHA_HMAC_KEY 时记一次警告并放行（本地开发/回滚安全）。
+  try {
+    altchaPoW.requireCaptcha(e, body);
+  } catch (error) {
+    // requireCaptcha 内部已按 reason 做 10s 节流告警，这里不再重复刷日志。
+    var captcha = altchaPoW.captchaFailure(error);
+    return e.json(captcha ? captcha.status : 503, { code: captcha ? captcha.code : altchaPoW.CAPTCHA_UNAVAILABLE });
+  }
 
   var ip = getClientIP(e);
   var result = verification.sendVerificationCode(email, ip);

@@ -5,6 +5,7 @@ var templates = require('./mail_templates.js');
 var gateway = require('./mail_gateway.js');
 var logs = require('./mail_logs.js');
 var rateLimit = require('./security_rate_limit.js');
+var altchaPoW = require('./altcha.js');
 
 var PATH_BY_CATEGORY = {
   account_verification: '/verify-email?token=',
@@ -166,13 +167,17 @@ function isValidEmail(email) {
   return true;
 }
 
+// 解析一次 body，同时取出邮箱与 ALTCHA 人机校验 payload。
+// 注意：绝不能在别处再读 request().body —— 同一请求的 body reader 只能消费一次。
+// 返回 { email, altcha }；解析/格式错误仍然抛 INVALID_REQUEST（保持既有失败语义）。
 function parseEmailBody(e, field) {
   var body;
   try { body = JSON.parse(readerToString(e.request().body, 4097) || '{}'); } catch (_) { throw invalidRequestError(); }
   if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body[field] !== 'string') throw invalidRequestError();
   var email = String(body[field]).trim().toLowerCase();
   if (!isValidEmail(email)) throw invalidRequestError();
-  return email;
+  var altcha = typeof body.altcha === 'string' ? body.altcha : '';
+  return { email: email, altcha: altcha };
 }
 
 function getClientIP(e) {
@@ -208,7 +213,14 @@ function forwardToLoopback(path, body, authHeader) {
 function processAccountRequest(e, kind) {
   var config = REQUEST_CONFIG[kind];
   if (!config) throw new Error('Unsupported account request kind');
-  var email = parseEmailBody(e, config.field);
+  var input = parseEmailBody(e, config.field);
+  var email = input.email;
+  // ALTCHA 人机校验（本轮覆盖 password-reset 这一条发信链）：在限流与发信之前拦截，
+  // 避免自动化刷信消耗 account_mail_* 配额。失败抛 CaptchaError（由 blog_auth.pb.js
+  // 映射成 400 + code）；未配置 ALTCHA_HMAC_KEY 时记一次警告并放行。
+  // 说明：verification / email-change 两条链本轮保持原行为（不在 4 个受保护端点内），
+  // 前端未同步携带 altcha 时不会因缺少 payload 被误拒。
+  if (kind === 'passwordReset') altchaPoW.requireCaptcha(e, input);
   var ip = getClientIP(e);
   if (!ip) return;
   var authHeader = (kind === 'emailChange' || kind === 'verification') ? getAuthorization(e) : '';
@@ -257,4 +269,6 @@ module.exports = {
   requestEmailChange: requestEmailChange,
   isInvalidRequest: isInvalidRequest,
   isDetailedRateLimit: isDetailedRateLimit,
+  // ALTCHA：供 blog_auth.pb.js 把 CaptchaError 映射成 4xx + code
+  isCaptchaError: altchaPoW.isCaptchaError,
 };

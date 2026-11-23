@@ -5,6 +5,7 @@ var templates = require('./mail_templates.js');
 var gateway = require('./mail_gateway.js');
 var logs = require('./mail_logs.js');
 var rateLimit = require('./security_rate_limit.js');
+var altchaPoW = require('./altcha.js');
 
 var CHALLENGE_ALPHABET = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-';
 var CODE_ALPHABET = '0123456789';
@@ -46,11 +47,14 @@ function parseObjectBody(e) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw invalidRequestError();
   return body;
 }
+// 解析一次 body，返回 { email, altcha }：ALTCHA payload 与邮箱共用同一次解析，
+// 绝不二次消费 request().body。邮箱格式错误仍抛 INVALID_REQUEST（既有语义不变）。
 function parseRequest(e) {
   var body = parseObjectBody(e);
   var email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   if (!isValidEmail(email)) throw invalidRequestError();
-  return email;
+  var altcha = typeof body.altcha === 'string' ? body.altcha : '';
+  return { email: email, altcha: altcha };
 }
 function parseVerification(e) {
   var body;
@@ -172,7 +176,12 @@ function sendReservedChallenge(reservation) {
   } catch (_) {}
 }
 function requestOtp(e) {
-  var reservation = reserveChallenge(e, parseRequest(e));
+  var input = parseRequest(e);
+  // ALTCHA 人机校验：在限流与写 auth_otp_challenges 之前拦截，
+  // 避免自动化枚举已验证邮箱/刷信。失败抛 CaptchaError（hook 映射为 400 + code）；
+  // 未配置 ALTCHA_HMAC_KEY 时记一次警告并放行。
+  altchaPoW.requireCaptcha(e, input);
+  var reservation = reserveChallenge(e, input.email);
   if (reservation.send) sendReservedChallenge(reservation);
   return { challengeId: reservation.challengeId, expiresIn: EXPIRES_SECONDS };
 }
@@ -227,4 +236,4 @@ function cleanupExpired() {
   }
 }
 
-module.exports = { requestOtp: requestOtp, verifyOtp: verifyOtp, cleanupExpired: cleanupExpired, isInvalidRequest: isInvalidRequest, isInvalidCode: isInvalidCode, isRateLimited: isRateLimited };
+module.exports = { requestOtp: requestOtp, verifyOtp: verifyOtp, cleanupExpired: cleanupExpired, isInvalidRequest: isInvalidRequest, isInvalidCode: isInvalidCode, isRateLimited: isRateLimited, isCaptchaError: altchaPoW.isCaptchaError };

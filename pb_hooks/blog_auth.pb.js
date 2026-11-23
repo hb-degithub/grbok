@@ -9,6 +9,8 @@
     try { facade.requestPasswordReset(e); }
     catch (error) {
       if (facade.isInvalidRequest(error)) return e.json(400, { code: 'INVALID_REQUEST' });
+      // ALTCHA 人机校验失败：400 + CAPTCHA_*（未配置 ALTCHA_HMAC_KEY 时不会抛）。
+      if (facade.isCaptchaError(error)) return e.json(error.status, { code: error.code });
       console.error('[blog-auth] operation=password-reset result=INTERNAL_ERROR');
     }
     return e.json(202, publicErrors.accepted(startedAt, referenceId));
@@ -52,6 +54,8 @@
       result = otp.requestOtp(e);
     } catch (error) {
       if (otp.isInvalidRequest(error)) return e.json(400, { code: 'INVALID_REQUEST' });
+      // ALTCHA 人机校验失败：400 + CAPTCHA_*（未配置 ALTCHA_HMAC_KEY 时不会抛）。
+      if (otp.isCaptchaError(error)) return e.json(error.status, { code: error.code });
       result = { challengeId: $security.randomStringWithAlphabet(32, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-'), expiresIn: 600 };
       console.error('[blog-auth] operation=otp-request result=INTERNAL_ERROR');
     }

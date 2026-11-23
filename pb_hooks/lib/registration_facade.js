@@ -3,6 +3,7 @@
 var rateLimit = require('./security_rate_limit.js');
 var registrationMode = require('./registration_mode.js');
 var publicErrors = require('./public_errors.js');
+var altchaPoW = require('./altcha.js');
 
 function coded(code) {
   var error = new Error(code);
@@ -35,7 +36,9 @@ function parse(c) {
   if (!name || name.length > 80 || password.length < 8 || password.length > 72 || password !== passwordConfirm) {
     throw coded('INVALID_REGISTRATION');
   }
-  return { email: email, name: name, password: password, passwordConfirm: passwordConfirm, inviteCode: inviteCode };
+  // ALTCHA PoW payload：与其它字段取自**同一次** body 解析，绝不二次消费 request().body。
+  var altcha = typeof body.altcha === 'string' ? body.altcha : '';
+  return { email: email, name: name, password: password, passwordConfirm: passwordConfirm, inviteCode: inviteCode, altcha: altcha };
 }
 
 function consumeRegistrationLimits(txDao, ipValue, nowMs) {
@@ -143,6 +146,16 @@ function handle(c, deps) {
   var referenceId = publicErrors.referenceId();
   var input;
   try { input = parse(c); } catch (_) { return response(c, 400, 'INVALID_REGISTRATION', referenceId); }
+  // ALTCHA 人机校验：必须在任何发信/写库之前，并且用的是 parse() 已解析出的 body。
+  // 未配置 ALTCHA_HMAC_KEY 时 requireCaptcha 记一次警告后放行（本地开发/回滚安全）。
+  try {
+    altchaPoW.requireCaptcha(c, input);
+  } catch (error) {
+    var captcha = altchaPoW.captchaFailure(error);
+    if (captcha) return response(c, captcha.status, captcha.code, referenceId);
+    console.error('[captcha] operation=register result=UNAVAILABLE detail=' + String(error && error.message || error).slice(0, 200));
+    return response(c, 503, altchaPoW.CAPTCHA_UNAVAILABLE, referenceId);
+  }
   var nowMs = Date.now();
   var ipValue = deps && deps.ip ? deps.ip : require('./client_ip.js').clientIp(c);
   var outcome = null;

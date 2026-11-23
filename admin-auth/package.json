@@ -12,6 +12,9 @@
     "maxmind": "^5.0.7",
     "nodemailer": "^10.1.1"
   },
+  "devDependencies": {
+    "altcha-lib": "^2.10.0"
+  },
   "engines": {
     "node": ">=22.0.0"
   }
