@@ -67,7 +67,7 @@ export default function GalleryBoard() {
     setLightboxIndex(null);
   }, [album]);
 
-  // 灯箱用 1600x0 的缩略图（PB 白名单尺寸），不再请求原图：
+  // 灯箱用 1024x0 的缩略图（PB 白名单尺寸），不再请求原图：
   // 单张原图实测 9.25MB，首屏/灯箱直接用原图会把流量和等待时间打爆。
   // 用 useMemo 固定引用：灯箱的「预加载相邻一张」effect 依赖 urls，
   // 每次渲染都给新数组会让它反复预加载同一批图片。
@@ -187,7 +187,9 @@ export default function GalleryBoard() {
               <img
                 src={getPhotoUrl(item, GALLERY_LIST_THUMB)}
                 alt={item.title || '相册图片'}
-                loading="lazy"
+                // 首图是 LCP，抓紧加载；其余保持懒加载，避免一次拉全部缩略图
+                loading={i === 0 ? 'eager' : 'lazy'}
+                fetchPriority={i === 0 ? 'high' : 'auto'}
                 decoding="async"
                 className="w-full object-cover transition-opacity duration-200 group-hover:opacity-95"
               />

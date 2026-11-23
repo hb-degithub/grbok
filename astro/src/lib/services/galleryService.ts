@@ -25,7 +25,7 @@ export interface GalleryItem extends RecordModel {
  * 否则单张 9MB 的照片会把首屏流量打爆。
  */
 export const GALLERY_LIST_THUMB = '300x300';
-export const GALLERY_LIGHTBOX_THUMB = '1600x0';
+export const GALLERY_LIGHTBOX_THUMB = '1024x0';
 
 export interface GalleryUploadProgress {
   /** 0-100 的整数百分比 */

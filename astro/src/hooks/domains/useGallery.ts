@@ -142,13 +142,22 @@ export function useGallery(options: UseGalleryOptions = {}): UseGalleryReturn {
       });
 
       // 2) XHR 直传：进度来自 xhr.upload.onprogress
-      await galleryService.uploadWithProgress(prepared, {
+      const record = await galleryService.uploadWithProgress(prepared, {
         title,
         album,
         onProgress: ({ percent }) => {
           setUploadState((prev) => (prev.stage === 'uploading' ? { ...prev, percent } : prev));
         },
       });
+
+      // 预热缩略图：PocketBase 在首次请求某个缩略图尺寸时才生成（实测 300–900ms）。
+      // 上传成功后立刻生成列表与灯箱要用的两档，访客首屏就不用等生成。
+      // 失败不影响上传结果，也不阻塞 UI。
+      void Promise.allSettled(
+        ['300x300', '1024x0'].map((thumb) =>
+          fetch(galleryService.getPhotoUrl(record, thumb), { cache: 'no-store' }),
+        ),
+      );
 
       const saved = file.size - prepared.size;
       setStatus(
