@@ -3,6 +3,7 @@ import { motion, MotionConfig } from 'framer-motion';
 import Masonry from '../reactbits/Masonry';
 import GalleryLightbox from './GalleryLightbox';
 import { useGallery } from '../../hooks/domains/useGallery';
+import { GALLERY_LIST_THUMB, GALLERY_LIGHTBOX_THUMB } from '../../lib/services/galleryService';
 import { EASE_OUT_EXPO } from '../../lib/motion';
 
 const ALL = '__all__';
@@ -66,6 +67,15 @@ export default function GalleryBoard() {
     setLightboxIndex(null);
   }, [album]);
 
+  // 灯箱用 1600x0 的缩略图（PB 白名单尺寸），不再请求原图：
+  // 单张原图实测 9.25MB，首屏/灯箱直接用原图会把流量和等待时间打爆。
+  // 用 useMemo 固定引用：灯箱的「预加载相邻一张」effect 依赖 urls，
+  // 每次渲染都给新数组会让它反复预加载同一批图片。
+  const lightboxUrls = useMemo(
+    () => filtered.map((i) => getPhotoUrl(i, GALLERY_LIGHTBOX_THUMB)),
+    [filtered, getPhotoUrl]
+  );
+
   // 首次加载失败（墙上还没有照片）才用整块错误态；刷新失败时保留已加载的照片，
   // 只在顶部提示并提供真实重试，避免一次网络抖动把相册清空。
   if (error && items.length === 0) {
@@ -102,8 +112,6 @@ export default function GalleryBoard() {
   if (items.length === 0) {
     return <StatePanel state="empty">相册还是空的，等博主上传第一批照片。</StatePanel>;
   }
-
-  const fullUrls = filtered.map((i) => getPhotoUrl(i));
 
   return (
     <MotionConfig reducedMotion="user">
@@ -177,9 +185,10 @@ export default function GalleryBoard() {
               aria-label={item.title ? `查看大图：${item.title}` : '查看大图'}
             >
               <img
-                src={getPhotoUrl(item, '300x300')}
+                src={getPhotoUrl(item, GALLERY_LIST_THUMB)}
                 alt={item.title || '相册图片'}
                 loading="lazy"
+                decoding="async"
                 className="w-full object-cover transition-opacity duration-200 group-hover:opacity-95"
               />
               {item.title && (
@@ -192,7 +201,7 @@ export default function GalleryBoard() {
         </Masonry>
       )}
 
-      <GalleryLightbox items={filtered} urls={fullUrls} index={lightboxIndex} onClose={() => setLightboxIndex(null)} onNavigate={setLightboxIndex} />
+      <GalleryLightbox items={filtered} urls={lightboxUrls} index={lightboxIndex} onClose={() => setLightboxIndex(null)} onNavigate={setLightboxIndex} />
     </div>
     </MotionConfig>
   );

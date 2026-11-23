@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAdminAuth } from '../../hooks/useAdminAuth';
 import { useGallery } from '../../hooks/domains/useGallery';
+import { GALLERY_LIST_THUMB } from '../../lib/services/galleryService';
+import { formatBytes } from '../../lib/image-compress';
 import type { GalleryItem } from '../../lib/services/galleryService';
 
 /* ===========================
@@ -60,6 +62,7 @@ export default function GalleryManager() {
     status,
     filter,
     uploading,
+    uploadState,
     setFilter,
     setError,
     load,
@@ -169,8 +172,48 @@ export default function GalleryManager() {
               <button type="submit" disabled={uploading} className={cx(BTN_BASE, BTN_PRIMARY, BTN_MD)}>
                 {uploading ? '上传中…' : '上传'}
               </button>
-              <p className="text-[11px] leading-relaxed text-[var(--sf-ink-3)]">仅允许 JPEG/PNG/WebP/GIF，单文件最大 10MB。</p>
+              <p className="text-[11px] leading-relaxed text-[var(--sf-ink-3)]">仅允许 JPEG/PNG/WebP/GIF，单文件最大 10MB；上传前会自动压缩到长边 2560px。</p>
             </div>
+
+            {/* 上传进度：压缩阶段没有可量化进度，传输阶段用 xhr.upload.onprogress 的百分比 */}
+            {uploading && (
+              <div data-state={uploadState.stage} className="space-y-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 font-mono text-[11px] text-[var(--sf-ink-2)]">
+                  <span className="min-w-0 break-words [overflow-wrap:anywhere]" title={uploadState.fileName}>
+                    {uploadState.stage === 'compressing'
+                      ? `正在压缩 ${uploadState.fileName}…`
+                      : `正在上传 ${uploadState.fileName}`}
+                  </span>
+                  <span className="shrink-0 tabular-nums text-[var(--sf-ink-3)]">
+                    {uploadState.stage === 'compressing' ? '压缩中' : `${uploadState.percent}%`}
+                  </span>
+                </div>
+                <div
+                  role="progressbar"
+                  aria-label="上传进度"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={uploadState.stage === 'uploading' ? uploadState.percent : undefined}
+                  aria-valuetext={uploadState.stage === 'compressing' ? '正在压缩图片' : `${uploadState.percent}%`}
+                  className="h-1.5 w-full overflow-hidden rounded-[2px] border border-[var(--sf-line)] bg-[var(--sf-canvas)]"
+                >
+                  <div
+                    className={cx(
+                      'h-full bg-[var(--sf-accent)] transition-[width] duration-200 ease-out',
+                      uploadState.stage === 'compressing' && 'animate-pulse'
+                    )}
+                    style={{ width: uploadState.stage === 'compressing' ? '100%' : `${uploadState.percent}%` }}
+                  />
+                </div>
+                {uploadState.stage === 'uploading' && uploadState.compressedBytes > 0 && (
+                  <p className="font-mono text-[10px] tracking-[0.04em] text-[var(--sf-ink-3)]">
+                    {uploadState.compressedBytes < uploadState.originalBytes
+                      ? `已压缩 ${formatBytes(uploadState.originalBytes)} → ${formatBytes(uploadState.compressedBytes)}`
+                      : `${formatBytes(uploadState.compressedBytes)} 原图上传`}
+                  </p>
+                )}
+              </div>
+            )}
           </form>
         </section>
       )}
@@ -231,7 +274,7 @@ export default function GalleryManager() {
             </thead>
             <tbody>
               {items.map((item) => {
-                const thumb = photoUrl(item, '300x300');
+                const thumb = photoUrl(item, GALLERY_LIST_THUMB);
                 return (
                   <tr key={item.id} className={TABLE_ROW}>
                     <td className={cx(TD, 'w-16')}>

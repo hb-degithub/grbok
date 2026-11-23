@@ -150,14 +150,17 @@ export default function GalleryLightbox({ items, urls, index, onClose, onNavigat
     return () => document.removeEventListener('keydown', handleKey);
   }, [open, index, items.length, onClose, onNavigate]);
 
-  // 预加载相邻图片
+  // 预加载**仅当前 ±1 张**：之前传入的是原图 URL，等于一开灯箱就把相邻几 MB 拉下来；
+  // 现在 urls 由 GalleryBoard 用 1600x0 缩略图生成，预加载成本可控。
   useEffect(() => {
     if (!open || index === null) return;
     [index - 1, index + 1].forEach((i) => {
-      if (i >= 0 && i < urls.length) {
-        const img = new Image();
-        img.src = urls[i];
-      }
+      if (i < 0 || i >= urls.length) return;
+      const url = urls[i];
+      if (!url) return;
+      const img = new Image();
+      img.decoding = 'async';
+      img.src = url;
     });
   }, [open, index, urls]);
 
@@ -226,9 +229,12 @@ export default function GalleryLightbox({ items, urls, index, onClose, onNavigat
             className="max-h-[90dvh] max-w-5xl"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* 当前图是交互焦点：不懒加载，但用 async 解码避免阻塞主线程 */}
             <img
               src={urls[index]}
               alt={items[index].title || '相册图片'}
+              decoding="async"
+              fetchPriority="high"
               className="max-h-[76dvh] w-auto max-w-full rounded-[3px] border border-white/15 object-contain"
             />
             <figcaption className="mt-3 flex items-baseline justify-between gap-4">
