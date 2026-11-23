@@ -1,0 +1,282 @@
+openapi: 3.0.3
+info:
+  title: 胡巴的博客 · API 架构校验规范
+  version: 1.0.0
+  description: |
+    供阿里云 ESA「API 安全 > 架构验证」使用的 OpenAPI 3.0 规范。
+    - 只覆盖站点的关键写接口与搜索接口；
+    - 校验偏宽松（未列出的字段通过 additionalProperties: true 放行），
+      建议先以「观察」动作上线，确认无误报后再考虑「拦截」。
+servers:
+  - url: https://hlydwz.com
+    description: 生产站点
+tags:
+  - name: auth
+    description: 登录注册与账号邮件
+  - name: content
+    description: 评论、留言、搜索、埋点
+paths:
+  /api/collections/users/auth-with-password:
+    post:
+      tags: [auth]
+      summary: 密码登录（PocketBase 原生）
+      operationId: userPasswordLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [identity, password]
+              properties:
+                identity:
+                  type: string
+                  description: 登录邮箱
+                  maxLength: 254
+                password:
+                  type: string
+                  minLength: 1
+                  maxLength: 72
+      responses:
+        '200': { description: 登录成功 }
+        '400': { description: 凭据错误或请求不合法 }
+
+  /api/blog-auth/register:
+    post:
+      tags: [auth]
+      summary: 注册（自定义门面）
+      operationId: userRegister
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [name, password, passwordConfirm]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 254
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+                passwordConfirm:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+                inviteCode:
+                  type: string
+                  maxLength: 128
+      responses:
+        '202': { description: 已受理 }
+        '400': { description: 参数不合法 }
+
+  /api/blog-auth/password-reset/request:
+    post:
+      tags: [auth]
+      summary: 请求找回密码邮件
+      operationId: requestPasswordReset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 254
+      responses:
+        '202': { description: 已受理 }
+        '400': { description: 参数不合法 }
+
+  /api/blog-auth/verification/request:
+    post:
+      tags: [auth]
+      summary: 重发邮箱验证邮件
+      operationId: requestEmailVerification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 254
+      responses:
+        '202': { description: 已受理 }
+        '400': { description: 参数不合法 }
+
+  /api/blog-auth/otp/request:
+    post:
+      tags: [auth]
+      summary: 请求邮箱验证码
+      operationId: requestLoginOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  maxLength: 254
+      responses:
+        '200': { description: 已发送 }
+        '400': { description: 参数不合法 }
+
+  /api/blog-auth/otp/verify:
+    post:
+      tags: [auth]
+      summary: 校验邮箱验证码
+      operationId: verifyLoginOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [challengeId, code]
+              properties:
+                challengeId:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                code:
+                  type: string
+                  minLength: 4
+                  maxLength: 8
+                  pattern: '^[0-9]+$'
+      responses:
+        '200': { description: 校验通过 }
+        '400': { description: 验证码错误或过期 }
+
+  /api/collections/comments/records:
+    post:
+      tags: [content]
+      summary: 发表评论
+      operationId: createComment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [post_id, content]
+              properties:
+                post_id:
+                  type: string
+                  minLength: 1
+                  maxLength: 32
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 5000
+                author_name:
+                  type: string
+                  maxLength: 64
+                author_email:
+                  type: string
+                  format: email
+                  maxLength: 254
+                parent_id:
+                  type: string
+                  maxLength: 32
+                  nullable: true
+      responses:
+        '200': { description: 创建成功 }
+        '400': { description: 参数或内容不合规 }
+
+  /api/collections/guestbook_messages/records:
+    post:
+      tags: [content]
+      summary: 发布留言
+      operationId: createGuestbookMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [nickname, content]
+              properties:
+                nickname:
+                  type: string
+                  minLength: 1
+                  maxLength: 40
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+      responses:
+        '200': { description: 创建成功 }
+        '400': { description: 参数不合法 }
+
+  /api/search:
+    get:
+      tags: [content]
+      summary: 站内搜索
+      operationId: searchSite
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+      responses:
+        '200': { description: 搜索结果 }
+        '400': { description: 参数不合法 }
+
+  /api/track-view:
+    post:
+      tags: [content]
+      summary: 访问统计上报
+      operationId: trackView
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [path]
+              properties:
+                path:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                  pattern: '^/[^\\]*$'
+      responses:
+        '204': { description: 无需返回内容 }
+        '400': { description: 参数不合法 }
