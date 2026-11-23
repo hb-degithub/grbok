@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "maxmind": "^5.0.7",
-    "nodemailer": "^10.1.1"
+    "nodemailer": "^10.6.0"
   },
   "devDependencies": {
     "altcha-lib": "^2.10.0"
