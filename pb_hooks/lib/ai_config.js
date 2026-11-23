@@ -169,15 +169,26 @@ function invalid(message) {
   throw new ApiError(400, 'INVALID_AI_CONFIG: ' + message);
 }
 
-// base_url 只允许 AI_ALLOWED_ORIGINS 中显式配置的精确 origin。
-// 自建 new-api / one-api 网关须显式加入白名单；空配置默认拒绝。
-// 该校验不代替受信上游的重定向/DNS 管理与容器出口网络控制。
-function validateBaseUrl(raw) {
+// 把 base_url 解析成 { origin, path }。
+// - 只允许 http/https；
+// - origin（scheme+host+port）沿用历史校验：拒绝凭证 user@、查询串、hash、空白，
+//   IPv6 方括号与端口范围检查保持不变；
+// - 允许携带路径（自建 new-api / one-api 网关常见 .../v1、.../openai/v1），
+//   但拒绝 .. 段（含百分号编码形态），并去掉尾部斜杠后保留内部路径。
+function parseBaseUrl(raw) {
   var value = String(raw || '').trim();
-  if (!value || value.length > 500 || !/^https?:\/\/[^\s]+$/i.test(value)) invalid('base_url');
-  var match = /^https?:\/\/([^\/?#\s]+)(?:\/)?$/i.exec(value);
-  if (!match || match[1].indexOf('@') !== -1) invalid('base_url');
-  var authority = match[1];
+  if (!value || value.length > 500) invalid('base_url');
+  // 反斜杠一并拒绝：WHATWG URL 解析器会把特殊 scheme 里的 \ 归一成 /
+  // （https://host/a\..\b 等价于 /a/../b），会绕过下面的 .. 段检查。
+  if (/[\s?#\\]/.test(value)) invalid('base_url');
+  var schemeMatch = /^(https?):\/\//i.exec(value);
+  if (!schemeMatch) invalid('base_url');
+  var rest = value.slice(schemeMatch[0].length);
+  var slash = rest.indexOf('/');
+  var authority = slash === -1 ? rest : rest.slice(0, slash);
+  var path = slash === -1 ? '' : rest.slice(slash);
+  if (!authority || authority.indexOf('@') !== -1) invalid('base_url');
+
   var host = '';
   var port = '';
   if (authority.charAt(0) === '[') {
@@ -196,12 +207,39 @@ function validateBaseUrl(raw) {
   }
   if (!host || !/^[a-z0-9._-]+$|^\[[0-9a-f:]+\]$/.test(host)) invalid('base_url');
   if (port && (Number(port.slice(1)) < 1 || Number(port.slice(1)) > 65535)) invalid('base_url');
+
+  if (path) {
+    var segments = path.split('/');
+    for (var i = 0; i < segments.length; i++) {
+      var decoded = segments[i];
+      // 非法 % 序列无法解码时按原样比较（URL 解析器本身也容忍这种路径）
+      try { decoded = decodeURIComponent(decoded); } catch (_) { decoded = segments[i]; }
+      var parts = decoded.split('/');
+      for (var j = 0; j < parts.length; j++) {
+        if (parts[j] === '..') invalid('base_url');
+      }
+    }
+    while (path.length > 1 && path.charAt(path.length - 1) === '/') path = path.slice(0, -1);
+    if (path === '/') path = '';
+  }
+
+  return {
+    origin: schemeMatch[1].toLowerCase() + '://' + host + port,
+    path: path,
+  };
+}
+
+// base_url 的 origin 必须与 AI_ALLOWED_ORIGINS 中显式配置的 origin 精确匹配
+// （大小写不敏感、忽略尾斜杠）；路径不参与白名单比对，仅规范化后随 origin 一起保存。
+// 自建 new-api / one-api 网关须显式加入白名单；空配置默认拒绝（fail-closed）。
+// 该校验不代替受信上游的重定向/DNS 管理与容器出口网络控制。
+function validateBaseUrl(raw) {
+  var parsed = parseBaseUrl(raw);
   var configured = envValue('AI_ALLOWED_ORIGINS').split(',');
   for (var i = 0; i < configured.length; i++) {
-    var allowed = configured[i].trim().toLowerCase().replace(/\/$/, '');
-    if (allowed && /^https?:\/\/[^\/?#\s]+$/.test(allowed) && allowed === value.toLowerCase().replace(/\/$/, '')) {
-      return allowed;
-    }
+    var allowed = configured[i].trim().toLowerCase().replace(/\/+$/, '');
+    if (!allowed || !/^https?:\/\/[^\/?#\s]+$/.test(allowed)) continue;
+    if (allowed === parsed.origin) return parsed.origin + parsed.path;
   }
   invalid('base_url');
 }

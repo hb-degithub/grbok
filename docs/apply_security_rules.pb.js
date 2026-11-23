@@ -65,7 +65,7 @@ migrate((db) => {
   if (comments) {
     comments.listRule = COMMENT_STAFF_RULE;
     comments.viewRule = COMMENT_STAFF_RULE;
-    comments.createRule = 'post_id.status = "published"';
+    comments.createRule = '@request.auth.id != "" && post_id.status = "published"';
     comments.updateRule = ADMIN_RULE;
     comments.deleteRule = ADMIN_RULE;
     save(comments);

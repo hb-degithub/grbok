@@ -9,10 +9,13 @@ const aiConfig = require('../../pb_hooks/lib/ai_config.js');
 
 test('AI upstream accepts only an exact configured origin', () => {
   assert.equal(aiConfig.validateBaseUrl('https://api.example.test'), 'https://api.example.test');
+  // 2026-11-23：允许 base_url 带路径（new-api/one-api 网关通常是 /v1），origin 仍严格比对
+  assert.equal(aiConfig.validateBaseUrl('https://api.example.test/v1'), 'https://api.example.test/v1');
+  assert.equal(aiConfig.validateBaseUrl('https://api.example.test/v1/'), 'https://api.example.test/v1');
   assert.equal(aiConfig.validateBaseUrl('http://127.0.0.1:8317/'), 'http://127.0.0.1:8317');
   const denied = [
     'https://api.example.test.evil.test', 'https://api.example.test:443',
-    'https://user:pass@api.example.test', 'https://api.example.test/v1',
+    'https://user:pass@api.example.test', 'https://api.example.test/v1/../x',
     'https://api.example.test/?next=x', 'file:///etc/passwd', 'http://169.254.169.254/',
     'http://10.0.0.1', 'not a url', '',
   ];

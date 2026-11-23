@@ -119,7 +119,7 @@ require('SELECT id, post_id, author_name, content, parent_id, status, created, u
 
 require('status = "approved"' not in (comments['listRule'] or ''), 'comments listRule still allows anonymous approved reads')
 require('status = "approved"' not in (comments['viewRule'] or ''), 'comments viewRule still allows anonymous approved reads')
-require(comments['createRule'] == 'post_id.status = "published"', 'comments createRule mismatch')
+require(comments['createRule'] == '@request.auth.id != "" && post_id.status = "published"', 'comments createRule mismatch')
 
 require('debug_protection_enabled' in (settings['listRule'] or ''), 'settings public allowlist missing debug_protection_enabled')
 require(settings['updateRule'] == '@request.auth.role = "super_admin"', 'settings updateRule must be super_admin only')
