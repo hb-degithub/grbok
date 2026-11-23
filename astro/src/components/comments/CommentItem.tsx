@@ -9,6 +9,9 @@ import { commentService } from '../../lib/services/commentService';
 import { isAuthRequiredError, isRateLimitedError } from '../../lib/services/actionRequest';
 import { getPocketBase } from '../../lib/pocketbase';
 import LevelBadge from '../ui/LevelBadge';
+import AltchaField from '../auth/AltchaField';
+import { useAltchaGate } from '../../hooks/useAltchaGate';
+import { captchaErrorMessage, isCaptchaError } from '../../lib/captcha';
 
 interface CommentItemProps {
   /** 评论数据（含嵌套子评论） */
@@ -97,6 +100,9 @@ export default function CommentItem({
   const [deleteEmail, setDeleteEmail] = useState('');
   const [deleteVerificationCode, setDeleteVerificationCode] = useState('');
   const [deleteCodeSent, setDeleteCodeSent] = useState(false);
+  // ALTCHA 人机验证：编辑/删除验证码都会触发邮件，各自独立一个闸门。
+  const editCaptcha = useAltchaGate();
+  const deleteCaptcha = useAltchaGate();
   const [isSendingDeleteCode, setIsSendingDeleteCode] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
@@ -231,14 +237,23 @@ export default function CommentItem({
   /** 发送编辑验证码 */
   const handleSendEditCode = async () => {
     if (!editEmail.trim() || isSendingCode) return;
+    if (editCaptcha.blocked) {
+      setEditError('请先完成人机验证后再提交');
+      return;
+    }
     setIsSendingCode(true);
     setEditError('');
     try {
-      await commentService.sendVerificationCode(editEmail.trim());
+      await commentService.sendVerificationCode(editEmail.trim(), editCaptcha.payload ?? undefined);
       setCodeSent(true);
     } catch (err) {
       console.error('发送验证码失败:', err);
-      setEditError('发送验证码失败，请稍后重试');
+      if (isCaptchaError(err)) {
+        setEditError(captchaErrorMessage(err) ?? '人机验证未通过，请重试');
+        editCaptcha.reset();
+      } else {
+        setEditError('发送验证码失败，请稍后重试');
+      }
     } finally {
       setIsSendingCode(false);
     }
@@ -247,14 +262,23 @@ export default function CommentItem({
   /** 发送删除验证码 */
   const handleSendDeleteCode = async () => {
     if (!deleteEmail.trim() || isSendingDeleteCode) return;
+    if (deleteCaptcha.blocked) {
+      setDeleteError('请先完成人机验证后再提交');
+      return;
+    }
     setIsSendingDeleteCode(true);
     setDeleteError('');
     try {
-      await commentService.sendVerificationCode(deleteEmail.trim());
+      await commentService.sendVerificationCode(deleteEmail.trim(), deleteCaptcha.payload ?? undefined);
       setDeleteCodeSent(true);
     } catch (err) {
       console.error('发送验证码失败:', err);
-      setDeleteError('发送验证码失败，请稍后重试');
+      if (isCaptchaError(err)) {
+        setDeleteError(captchaErrorMessage(err) ?? '人机验证未通过，请重试');
+        deleteCaptcha.reset();
+      } else {
+        setDeleteError('发送验证码失败，请稍后重试');
+      }
     } finally {
       setIsSendingDeleteCode(false);
     }
@@ -495,12 +519,18 @@ export default function CommentItem({
                 />
                 <button
                   onClick={handleSendEditCode}
-                  disabled={!editEmail.trim() || isSendingCode || codeSent}
+                  disabled={!editEmail.trim() || isSendingCode || codeSent || editCaptcha.blocked}
                   className={secondarySmallButtonClass}
                 >
                   {isSendingCode ? '发送中...' : codeSent ? '已发送' : '发送验证码'}
                 </button>
               </div>
+              <AltchaField
+                ref={editCaptcha.ref}
+                id="comment-edit-altcha"
+                onVerified={editCaptcha.onVerified}
+                onStatusChange={editCaptcha.onStatusChange}
+              />
               <input
                 type="text"
                 value={verificationCode}
@@ -549,12 +579,18 @@ export default function CommentItem({
                 />
                 <button
                   onClick={handleSendDeleteCode}
-                  disabled={!deleteEmail.trim() || isSendingDeleteCode || deleteCodeSent}
+                  disabled={!deleteEmail.trim() || isSendingDeleteCode || deleteCodeSent || deleteCaptcha.blocked}
                   className={secondarySmallButtonClass}
                 >
                   {isSendingDeleteCode ? '发送中...' : deleteCodeSent ? '已发送' : '发送验证码'}
                 </button>
               </div>
+              <AltchaField
+                ref={deleteCaptcha.ref}
+                id="comment-delete-altcha"
+                onVerified={deleteCaptcha.onVerified}
+                onStatusChange={deleteCaptcha.onStatusChange}
+              />
               <input
                 type="text"
                 value={deleteVerificationCode}

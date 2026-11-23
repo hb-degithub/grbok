@@ -111,8 +111,9 @@ describe('评论区 · 数据与交互契约（视觉改造不得删）', () => 
       'commentService.reportComment(comment.id, reportReason.trim())',
       'commentService.editComment(comment.id, editContent.trim(), editEmail, verificationCode.trim())',
       'commentService.deleteComment(comment.id, deleteEmail, deleteVerificationCode.trim())',
-      'commentService.sendVerificationCode(editEmail.trim())',
-      'commentService.sendVerificationCode(deleteEmail.trim())',
+      // 传入 ALTCHA payload：静态契约要求「验证码邮件必须带人机验证凭证」
+      'commentService.sendVerificationCode(editEmail.trim(), editCaptcha.payload',
+      'commentService.sendVerificationCode(deleteEmail.trim(), deleteCaptcha.payload',
       'aria-pressed={isLiked}',
       '请先登录后再点赞',
       '操作过于频繁，请稍后再试',
@@ -173,7 +174,9 @@ describe('评论区 · 数据与交互契约（视觉改造不得删）', () => 
       'formData.content.length > CONTENT_MAX',
       'onSubmit({ ...formData, parent_id: null })',
       'userEmailVerified === false',
-      'requestVerification(email)',
+      // 人机验证改造后调用点带上 altcha payload（新增可选参数），
+      // 断言随之收紧到新的完整调用形态，避免「调用被删掉」不被发现。
+      'requestVerification(email, captcha.payload ?? undefined)',
       'autoComplete="name"',
       'autoComplete="email"',
       'role="alert"',

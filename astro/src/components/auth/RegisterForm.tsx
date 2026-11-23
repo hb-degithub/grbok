@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { usePocketBase } from '../../hooks/usePocketBase';
+import { useAltchaGate } from '../../hooks/useAltchaGate';
 import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
 import FormStatus from './FormStatus';
+import AltchaField from './AltchaField';
+import { captchaErrorMessage } from '../../lib/captcha';
 import { RateLimiter } from '../../lib/security';
 
 const registerLimiter = new RateLimiter(5, 0.2);
@@ -21,6 +24,8 @@ export default function RegisterForm() {
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<RegisterField, string>>>({});
   const [success, setSuccess] = useState(false);
   const { registerReader } = usePocketBase();
+  // ALTCHA 人机验证：blocked 时禁用提交，payload 随注册请求一起提交。
+  const captcha = useAltchaGate();
 
   useEffect(() => {
     if (!success) return;
@@ -75,19 +80,39 @@ export default function RegisterForm() {
       return;
     }
 
+    // 人机验证闸门：widget 明确处于未验证状态时不允许提交。
+    // 放在既有校验之后，保持原有校验顺序与文案不变。
+    if (captcha.blocked) {
+      fail({}, '请先完成人机验证后再提交');
+      return;
+    }
+
     setStatus('loading');
     setFormError('');
     setFieldErrors({});
 
-    const { success: registerSuccess } = await registerReader({
+    const { success: registerSuccess, error } = await registerReader({
       email: trimmedEmail,
       name: trimmedName,
       password,
       passwordConfirm,
+      // payload 只在拿到验证结果时出现；undefined 字段不会被序列化
+      ...captcha.field,
     });
 
     if (registerSuccess) {
+      // 成功即重置：旧 challenge 已被服务端消费。
+      captcha.reset();
       setSuccess(true);
+      return;
+    }
+
+    const captchaFailure = captchaErrorMessage(error);
+    if (captchaFailure) {
+      // 服务端拒绝（REQUIRED/INVALID/EXPIRED/REPLAY/UNCONFIGURED）：
+      // 重新取挑战，并给出可读提示。
+      captcha.reset();
+      fail({}, captchaFailure);
       return;
     }
 
@@ -194,11 +219,20 @@ export default function RegisterForm() {
       </motion.p>
 
       <motion.div variants={itemVariants}>
+        <AltchaField
+          ref={captcha.ref}
+          id="register-altcha"
+          onVerified={captcha.onVerified}
+          onStatusChange={captcha.onStatusChange}
+        />
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
         <FormStatus message={formError} />
       </motion.div>
 
       <motion.div variants={itemVariants}>
-        <PixelButton type="submit" loading={status === 'loading'} variant="primary">
+        <PixelButton type="submit" loading={status === 'loading'} disabled={captcha.blocked} variant="primary">
           {status === 'loading' ? '提交中...' : '提交注册'}
         </PixelButton>
       </motion.div>

@@ -50,9 +50,9 @@ export function usePocketBase() {
       }
     }, []),
 
-    requestOTP: useCallback(async (email: string) => {
+    requestOTP: useCallback(async (email: string, altcha?: string) => {
       try {
-        const result = await requestReaderOtp(email);
+        const result = await requestReaderOtp(email, altcha);
         return { data: { otpId: result.challengeId }, error: null };
       } catch (err) {
         console.error('发送 OTP 验证码失败:', err);
@@ -85,9 +85,9 @@ export function usePocketBase() {
       }
     }, []),
 
-    requestVerification: useCallback(async (email: string) => {
+    requestVerification: useCallback(async (email: string, altcha?: string) => {
       try {
-        await requestVerificationRequest(email);
+        await requestVerificationRequest(email, altcha);
         return { success: true, error: null };
       } catch (err) {
         console.error('发送验证邮件失败:', err);

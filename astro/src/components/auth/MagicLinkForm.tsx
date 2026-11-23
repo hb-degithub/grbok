@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { usePocketBase } from '../../hooks/usePocketBase';
+import { useAltchaGate } from '../../hooks/useAltchaGate';
 import PixelButton from '../ui/PixelButton';
 import Input from '../ui/Input';
 import FormStatus from './FormStatus';
+import AltchaField from './AltchaField';
+import { captchaErrorMessage } from '../../lib/captcha';
 
 type OTPStatus = 'idle' | 'requesting' | 'verifying' | 'error';
 type OTPStep = 'email' | 'code';
@@ -25,6 +28,9 @@ export default function MagicLinkForm() {
   const [success, setSuccess] = useState(false);
   const [successRedirect, setSuccessRedirect] = useState('/');
   const { requestOTP, authWithOTP } = usePocketBase();
+  // ALTCHA 人机验证：只拦截「发送验证码」这类会触发邮件的动作，
+  // 校验验证码（authWithOTP）不发邮件，不被人机验证阻塞。
+  const captcha = useAltchaGate();
 
   useEffect(() => {
     if (!success) return;
@@ -57,18 +63,35 @@ export default function MagicLinkForm() {
       return;
     }
 
+    // 人机验证闸门：发送验证码会触发邮件，必须先通过验证。
+    if (captcha.blocked) {
+      setStatus('error');
+      setErrorMessage('');
+      setFormError('请先完成人机验证后再提交');
+      return;
+    }
+
     setStatus('requesting');
     setErrorMessage('');
     setFormError('');
 
-    const { data, error } = await requestOTP(email);
+    const { data, error } = await requestOTP(email, captcha.payload ?? undefined);
 
     if (data?.otpId) {
+      // 发送成功：旧 challenge 已被消费，重新取一个新挑战备用。
+      captcha.reset();
       setOtpId(data.otpId);
       setCode('');
       setStep('code');
       setStatus('idle');
     } else {
+      const captchaFailure = captchaErrorMessage(error);
+      if (captchaFailure) {
+        captcha.reset();
+        setStatus('error');
+        setFormError(captchaFailure);
+        return;
+      }
       setStatus('error');
       setFormError(getErrorMessage(error, '验证码发送失败，请稍后重试'));
     }
@@ -205,11 +228,25 @@ export default function MagicLinkForm() {
             </AnimatePresence>
 
             <motion.div variants={itemVariants}>
+              <AltchaField
+                ref={captcha.ref}
+                id="otp-altcha"
+                onVerified={captcha.onVerified}
+                onStatusChange={captcha.onStatusChange}
+              />
+            </motion.div>
+
+            <motion.div variants={itemVariants}>
               <FormStatus message={formError} />
             </motion.div>
 
             <motion.div variants={itemVariants} className="space-y-3">
-              <PixelButton type="submit" loading={isBusy} variant="primary">
+              <PixelButton
+                type="submit"
+                loading={isBusy}
+                disabled={step === 'email' && captcha.blocked}
+                variant="primary"
+              >
                 {step === 'email'
                   ? status === 'requesting' ? '发送中...' : '发送验证码'
                   : status === 'verifying' ? '验证中...' : '验证并登录'}

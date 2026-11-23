@@ -12,7 +12,7 @@ test('supported browser login entry points revoke old admin state and never rest
   assert.doesNotMatch(password, /requestOTP|authWithOTP/);
   assert.match(pocketbase, /runAfterAdminCredentialRevoked\([\s\S]{0,500}verifyReaderOtp/);
   assert.match(pocketbase, /registerReaderRequest\(data\)/);
-  assert.match(pocketbase, /requestVerificationRequest\(email\)/);
+  assert.match(pocketbase, /requestVerificationRequest\(email(?:,\s*altcha)?\)/);
   assert.doesNotMatch(pocketbase, /collection\('users'\)\.(?:create|requestVerification|requestOTP|authWithOTP)/);
 });
 

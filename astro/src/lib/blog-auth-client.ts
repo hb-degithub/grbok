@@ -11,7 +11,11 @@ export interface AcceptedResponse {
   message?: string;
 }
 
-export type RegisterInput = Omit<ReaderRegisterData, 'role'> & { inviteCode?: string };
+/**
+ * `altcha` 是可选的 ALTCHA PoW payload（base64）。只有前端拿到验证结果时才带，
+ * 未带时服务端会返回 CAPTCHA_REQUIRED 等错误码；字段可选保证既有调用与测试不变。
+ */
+export type RegisterInput = Omit<ReaderRegisterData, 'role'> & { inviteCode?: string; altcha?: string };
 
 export async function registerReader(input: RegisterInput): Promise<AcceptedResponse> {
   const pb = getPocketBase();
@@ -21,20 +25,24 @@ export async function registerReader(input: RegisterInput): Promise<AcceptedResp
   }));
 }
 
-export async function requestVerification(email: string): Promise<AcceptedResponse> {
+export async function requestVerification(email: string, altcha?: string): Promise<AcceptedResponse> {
   const pb = getPocketBase();
   return withAuthRequestHeaders(pb, () => pb.send<AcceptedResponse>('/api/blog-auth/verification/request', {
     method: 'POST',
-    body: { email: normalizeAuthEmail(email) },
+    // altcha 为 undefined 时 JSON 序列化会省略该字段
+    body: { email: normalizeAuthEmail(email), altcha },
   }));
 }
 
 export interface ReaderOtpResponse extends AcceptedResponse { challengeId: string; expiresIn: number }
 export interface AuthResponse { token: string; record: User }
 
-export async function requestReaderOtp(email: string): Promise<ReaderOtpResponse> {
+export async function requestReaderOtp(email: string, altcha?: string): Promise<ReaderOtpResponse> {
   const pb = getPocketBase();
-  return withAuthRequestHeaders(pb, () => pb.send<ReaderOtpResponse>('/api/blog-auth/otp/request', { method: 'POST', body: { email: normalizeAuthEmail(email) } }));
+  return withAuthRequestHeaders(pb, () => pb.send<ReaderOtpResponse>('/api/blog-auth/otp/request', {
+    method: 'POST',
+    body: { email: normalizeAuthEmail(email), altcha },
+  }));
 }
 
 export async function verifyReaderOtp(challengeId: string, code: string): Promise<AuthResponse> {
@@ -66,11 +74,11 @@ export function isAccountMailRateLimited(response: AccountMailResponse): respons
   return response.accepted === false;
 }
 
-export async function requestPasswordReset(email: string): Promise<AccountMailResponse> {
+export async function requestPasswordReset(email: string, altcha?: string): Promise<AccountMailResponse> {
   const pb = getPocketBase();
   return withAuthRequestHeaders(pb, () => pb.send<AccountMailResponse>('/api/blog-auth/password-reset/request', {
     method: 'POST',
-    body: { email: normalizeAuthEmail(email) },
+    body: { email: normalizeAuthEmail(email), altcha },
   }));
 }
 

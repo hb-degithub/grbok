@@ -62,7 +62,7 @@ http://img.hlydwz.com {
         Cross-Origin-Opener-Policy "same-origin"
         Cross-Origin-Resource-Policy "same-site"
         Permissions-Policy "camera=(), microphone=(), geolocation=()"
-        Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://hlydwz.com wss://hlydwz.com https://www.beian.gov.cn"
+        Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; worker-src 'self' blob: data:; connect-src 'self' https://hlydwz.com wss://hlydwz.com https://www.beian.gov.cn"
         -Server
         -X-Powered-By
     }
@@ -203,7 +203,7 @@ http://img.hlydwz.com {
         # without it, all JS-set styles are blocked and islands render broken (stacked/hidden).
         # script-src retains 'unsafe-inline' - Astro islands (client:load/visible) and is:inline scripts require it;
         # removing it would break React hydration and theme/viewport init scripts.
-        Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://hlydwz.com wss://hlydwz.com https://www.beian.gov.cn"
+        Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; worker-src 'self' blob: data:; connect-src 'self' https://hlydwz.com wss://hlydwz.com https://www.beian.gov.cn"
         -Server
         -X-Powered-By
     }

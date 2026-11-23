@@ -137,12 +137,14 @@ class CommentService extends BaseService<CommentRecord> {
 
   /**
    * 发送编辑/删除验证码
+   *
+   * `altcha` 为可选的 ALTCHA PoW payload：老调用方不传即保持原有行为。
    */
-  async sendVerificationCode(email: string): Promise<{ ok: boolean; expiresAt: string }> {
+  async sendVerificationCode(email: string, altcha?: string): Promise<{ ok: boolean; expiresAt: string }> {
     const pb = this.getPocketBase();
     return pb.send('/api/comments/verification/send', {
       method: 'POST',
-      body: { email },
+      body: { email, altcha },
     });
   }
 

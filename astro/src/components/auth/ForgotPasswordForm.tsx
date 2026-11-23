@@ -3,6 +3,9 @@ import { motion } from 'framer-motion';
 import Input from '../ui/Input';
 import FormStatus from './FormStatus';
 import PixelButton from '../ui/PixelButton';
+import AltchaField from './AltchaField';
+import { useAltchaGate } from '../../hooks/useAltchaGate';
+import { captchaErrorMessage } from '../../lib/captcha';
 import { requestPasswordReset, isAccountMailRateLimited, type AccountMailResponse } from '../../lib/blog-auth-client';
 import { RateLimiter } from '../../lib/security';
 
@@ -16,6 +19,8 @@ export default function ForgotPasswordForm() {
   const [errorMessage, setErrorMessage] = useState('');
   const [formError, setFormError] = useState('');
   const [referenceId, setReferenceId] = useState('');
+  // ALTCHA 人机验证：发送重置邮件前必须通过（服务端仍会独立校验）。
+  const captcha = useAltchaGate();
 
   const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -50,13 +55,21 @@ export default function ForgotPasswordForm() {
       return;
     }
 
+    // 人机验证闸门：widget 明确未验证时不发送请求（放在既有校验之后，顺序不变）。
+    if (captcha.blocked) {
+      setStatus('error');
+      setErrorMessage('');
+      setFormError('请先完成人机验证后再提交');
+      return;
+    }
+
     setStatus('loading');
     setErrorMessage('');
     setFormError('');
     setReferenceId('');
 
     try {
-      const response: AccountMailResponse = await requestPasswordReset(trimmedEmail);
+      const response: AccountMailResponse = await requestPasswordReset(trimmedEmail, captcha.payload ?? undefined);
       if (isAccountMailRateLimited(response)) {
         setStatus('error');
         const retry = response.retryAfterSeconds ? `，请 ${response.retryAfterSeconds} 秒后重试` : '';
@@ -64,9 +77,19 @@ export default function ForgotPasswordForm() {
         if (response.referenceId) setReferenceId(response.referenceId);
         return;
       }
+      // 发送成功：旧 challenge 已被消费，重新取一个新的挑战。
+      captcha.reset();
       setStatus('success');
       if (response.referenceId) setReferenceId(response.referenceId);
-    } catch {
+    } catch (err) {
+      const captchaFailure = captchaErrorMessage(err);
+      if (captchaFailure) {
+        // 服务端拒绝人机验证：重置 widget（重新取挑战）并提示。
+        captcha.reset();
+        setStatus('error');
+        setFormError(captchaFailure);
+        return;
+      }
       setStatus('error');
       setFormError('请求失败，请稍后重试');
     }
@@ -124,6 +147,14 @@ export default function ForgotPasswordForm() {
             />
           </motion.div>
           <motion.div variants={itemVariants}>
+            <AltchaField
+              ref={captcha.ref}
+              id="forgot-password-altcha"
+              onVerified={captcha.onVerified}
+              onStatusChange={captcha.onStatusChange}
+            />
+          </motion.div>
+          <motion.div variants={itemVariants}>
             <FormStatus message={formError} />
           </motion.div>
           {status === 'error' && referenceId && (
@@ -132,7 +163,7 @@ export default function ForgotPasswordForm() {
             </motion.p>
           )}
           <motion.div variants={itemVariants}>
-            <PixelButton type="submit" loading={status === 'loading'} variant="primary">
+            <PixelButton type="submit" loading={status === 'loading'} disabled={captcha.blocked} variant="primary">
               {status === 'loading' ? '发送中...' : '发送重置邮件'}
             </PixelButton>
           </motion.div>

@@ -2,6 +2,9 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
+import AltchaField from '../auth/AltchaField';
+import { useAltchaGate } from '../../hooks/useAltchaGate';
+import { captchaErrorMessage } from '../../lib/captcha';
 import { RateLimiter } from '../../lib/security';
 import { authService } from '../../lib/services/authService';
 import { requestVerification } from '../../lib/blog-auth-client';
@@ -194,18 +197,39 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
   };
 
   const [verifyResendStatus, setVerifyResendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [verifyResendMessage, setVerifyResendMessage] = useState('');
+  // ALTCHA 人机验证：只拦截「重新发送验证邮件」这个会触发邮件的动作，
+  // 评论区普通提交（onSubmit）不经过这里。
+  const captcha = useAltchaGate();
 
   const handleResendVerification = useCallback(async () => {
     const email = authService.getUserEmail();
     if (!email) return;
-    setVerifyResendStatus('sending');
-    try {
-      await requestVerification(email);
-      setVerifyResendStatus('sent');
-    } catch {
-      setVerifyResendStatus('error');
+    // 人机验证闸门：widget 明确未验证时不发邮件。
+    if (captcha.blocked) {
+      setVerifyResendStatus('idle');
+      setVerifyResendMessage('请先完成人机验证后再提交');
+      return;
     }
-  }, []);
+    setVerifyResendStatus('sending');
+    setVerifyResendMessage('');
+    try {
+      await requestVerification(email, captcha.payload ?? undefined);
+      // 邮件已发出：旧 challenge 已被服务端消费，重新取一个挑战。
+      captcha.reset();
+      setVerifyResendStatus('sent');
+    } catch (err) {
+      const captchaFailure = captchaErrorMessage(err);
+      if (captchaFailure) {
+        captcha.reset();
+        setVerifyResendStatus('error');
+        setVerifyResendMessage(captchaFailure);
+        return;
+      }
+      setVerifyResendStatus('error');
+      setVerifyResendMessage('发送失败，请稍后重试');
+    }
+  }, [captcha]);
 
   // Logged-in user with unverified email — show prompt instead of form
   if (userEmailVerified === false) {
@@ -222,19 +246,29 @@ export default function CommentForm({ postId, onSubmit, moderationEnabled = true
         </div>
         <h4 className="text-base font-semibold text-[var(--sf-ink)]">请先验证邮箱</h4>
         <p className="text-sm text-[var(--sf-ink-3)]">验证邮箱后即可发表评论</p>
+        {/* 发送验证邮件会触发邮件，走 ALTCHA 人机验证；未验证时禁用按钮。 */}
+        <AltchaField
+          ref={captcha.ref}
+          id="comment-verify-altcha"
+          onVerified={captcha.onVerified}
+          onStatusChange={captcha.onStatusChange}
+        />
         {verifyResendStatus === 'sent' ? (
           <p role="status" className="text-sm font-medium text-emerald-600 dark:text-emerald-400">验证邮件已发送，请检查收件箱</p>
-        ) : verifyResendStatus === 'error' ? (
-          <p role="alert" className="text-sm text-[var(--sf-danger)]">发送失败，请稍后重试</p>
         ) : (
-          <button
-            type="button"
-            onClick={handleResendVerification}
-            disabled={verifyResendStatus === 'sending'}
-            className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-[2px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50"
-          >
-            {verifyResendStatus === 'sending' ? '发送中...' : '重新发送验证邮件'}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={verifyResendStatus === 'sending' || captcha.blocked}
+              className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-[2px] border border-[var(--sf-line-control)] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--sf-ink-2)] transition-colors hover:border-[var(--sf-accent)] hover:text-[var(--sf-accent-ink)] disabled:opacity-50"
+            >
+              {verifyResendStatus === 'sending' ? '发送中...' : '重新发送验证邮件'}
+            </button>
+            {verifyResendStatus === 'error' && verifyResendMessage && (
+              <p role="alert" className="text-sm text-[var(--sf-danger)]">{verifyResendMessage}</p>
+            )}
+          </>
         )}
       </motion.div>
     );

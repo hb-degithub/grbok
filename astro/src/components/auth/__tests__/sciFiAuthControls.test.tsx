@@ -303,7 +303,9 @@ describe('科幻简约 · 登录控件与后台外壳设计契约', () => {
   it('验证码登录保留 OTP 请求/校验与重发、换邮箱交互', () => {
     const src = authForms['MagicLinkForm.tsx'];
     for (const token of [
-      'requestOTP(email)',
+      // 人机验证改造后，发送验证码的请求带上 ALTCHA payload（可选第二参数）。
+      // 断言同步收紧到新的完整调用形态，调用被删仍然会红。
+      'requestOTP(email, captcha.payload ?? undefined)',
       'authWithOTP(otpId, normalizedCode)',
       'const isValidEmail = (value: string)',
       'getPostLoginRedirect(data?.record?.role)',
@@ -343,7 +345,8 @@ describe('科幻简约 · 登录控件与后台外壳设计契约', () => {
   it('找回/重置密码表单保留请求、限流与令牌错误分支', () => {
     const forgot = authForms['ForgotPasswordForm.tsx'];
     for (const token of [
-      'requestPasswordReset(trimmedEmail)',
+      // 人机验证改造后，重置邮件请求带上 ALTCHA payload（可选第二参数）。
+      'requestPasswordReset(trimmedEmail, captcha.payload ?? undefined)',
       'isAccountMailRateLimited(response)',
       'forgotLimiter.tryConsume()',
       "'请输入邮箱地址'",
