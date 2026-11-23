@@ -177,8 +177,10 @@ describe('评论区 · 数据与交互契约（视觉改造不得删）', () => 
       // 人机验证改造后调用点带上 altcha payload（新增可选参数），
       // 断言随之收紧到新的完整调用形态，避免「调用被删掉」不被发现。
       'requestVerification(email, captcha.payload ?? undefined)',
-      'autoComplete="name"',
-      'autoComplete="email"',
+      // 2026-11：评论改为「必须登录」后昵称/邮箱输入框不再渲染，
+      // 契约改为校验「以账号身份评论」的只读展示，避免被空实现悄悄回退。
+      'data-testid="comment-identity"',
+      '以 ${formData.author_name || formData.author_email} 的身份评论',
       'role="alert"',
       'role="status"',
     ]) {

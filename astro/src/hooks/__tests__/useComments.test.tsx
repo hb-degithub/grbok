@@ -55,7 +55,7 @@ describe('useComments · submitComment', () => {
       returned = await result.current.submitComment(formData);
     });
 
-    expect(returned).toEqual({ success: false, error: '请先验证你的邮箱后再发表评论' });
+    expect(returned).toEqual({ success: false, error: '请先验证你的邮箱后再发表评论', authRequired: false });
     expect(result.current.submitError).toBe('请先验证你的邮箱后再发表评论');
   });
 

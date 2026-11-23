@@ -22,10 +22,11 @@ vi.mock('../../../lib/security', () => ({
 }));
 
 const auth = vi.hoisted(() => ({
-  isAuthenticated: vi.fn(() => false),
-  getCurrentUser: vi.fn(() => null),
+  // 后端评论规则改为必须登录后，表单只在登录态渲染输入框；这里模拟已登录读者
+  isAuthenticated: vi.fn(() => true),
+  getCurrentUser: vi.fn(() => ({ id: 'reader1', name: '读者', email: 'reader@example.com' })),
   onAuthChange: vi.fn(() => () => {}),
-  getUserEmail: vi.fn(() => null as string | null),
+  getUserEmail: vi.fn(() => 'reader@example.com' as string | null),
 }));
 
 vi.mock('../../../lib/services/authService', () => ({ authService: auth }));
@@ -53,7 +54,7 @@ function Harness() {
 }
 
 function fillAndSubmit() {
-  fireEvent.change(screen.getByLabelText('昵称'), { target: { value: '读者' } });
+  // 登录态下昵称/邮箱由账号提供且不再渲染输入框，只需填写内容
   fireEvent.change(screen.getByLabelText('评论内容'), { target: { value: '第一条评论' } });
   fireEvent.click(screen.getByRole('button', { name: '发表评论' }));
 }

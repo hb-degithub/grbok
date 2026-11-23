@@ -12,6 +12,12 @@ export interface CommentSubmitResult {
   success: boolean;
   /** 本次提交失败时的服务端文案；成功或旧式 boolean 回调时为 null */
   error: string | null;
+  /**
+   * 服务端要求登录（401/403）。
+   * 后端评论规则改为「必须登录」后，token 在提交瞬间失效也会走到这里；
+   * 表单据此展示「请先登录」+ /login 入口，而不是一句笼统的提交失败。
+   */
+  authRequired?: boolean;
 }
 
 /**
@@ -181,7 +187,8 @@ export function useComments(postId: string, options: { enabled?: boolean; perPag
         // prop —— 首次失败时那个 prop 在 await 之前捕获的闭包里永远是 null。
         const message = commentService.extractSubmitMessage(err);
         setSubmitError(message);
-        return { success: false, error: message };
+        const status = (err as { status?: number } | null | undefined)?.status ?? 0;
+        return { success: false, error: message, authRequired: status === 401 || status === 403 };
       } finally {
         setIsSubmitting(false);
       }
