@@ -211,8 +211,8 @@ describe('galleryService · 缩略图 URL', () => {
     updated: '',
   } as unknown as Parameters<typeof galleryService.getListThumbUrl>[0];
 
-  it('列表缩略图固定 300x300，灯箱固定 1600x0', () => {
+  it('列表缩略图固定 300x300，灯箱固定 1024x0', () => {
     expect(galleryService.getListThumbUrl(item)).toBe('/files/gallery_items/rec1/photo.jpg?thumb=300x300');
-    expect(galleryService.getLightboxUrl(item)).toBe('/files/gallery_items/rec1/photo.jpg?thumb=1600x0');
+    expect(galleryService.getLightboxUrl(item)).toBe('/files/gallery_items/rec1/photo.jpg?thumb=1024x0');
   });
 });
