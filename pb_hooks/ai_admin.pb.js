@@ -17,6 +17,11 @@ routerAdd('GET', '/api/blog-admin/ai/settings', function (c) {
   return require(__hooks + '/lib/ai_admin.js').settingsRead(c);
 });
 
+// GET /api/blog-admin/ai/diagnostics — 用当前表单输入（无输入则库内配置）跑字段级校验，不写库
+routerAdd('GET', '/api/blog-admin/ai/diagnostics', function (c) {
+  return require(__hooks + '/lib/ai_admin.js').diagnostics(c);
+});
+
 // PUT /api/blog-admin/ai/settings — 保存 AI 配置（api_key 留空 = 保留原值）
 routerAdd('PUT', '/api/blog-admin/ai/settings', function (c) {
   return require(__hooks + '/lib/ai_admin.js').settingsSave(c);
@@ -45,6 +50,11 @@ routerAdd('POST', '/api/blog-admin/ai/comments/moderate', function (c) {
 // POST /api/blog-admin/ai/comments/reply — 评论审核页手动触发单条 AI 回复
 routerAdd('POST', '/api/blog-admin/ai/comments/reply', function (c) {
   return require(__hooks + '/lib/ai_admin.js').replyComment(c);
+}, $apis.bodyLimit(8192));
+
+// POST /api/blog-admin/ai/guestbook/moderate — 留言审核单条 AI 判定（author/admin/super_admin）
+routerAdd('POST', '/api/blog-admin/ai/guestbook/moderate', function (c) {
+  return require(__hooks + '/lib/ai_admin.js').moderateGuestbook(c);
 }, $apis.bodyLimit(8192));
 
 })();

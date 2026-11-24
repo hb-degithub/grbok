@@ -16,11 +16,22 @@
 
 var aiConfig = require('./ai_config.js');
 var aiClient = require('./ai_client.js');
+var aiModeration = require('./ai_moderation.js');
 var stepUp = require('./admin_step_up.js');
 var rateLimit = require('./security_rate_limit.js');
 var commentWorker = require('./ai_comment_worker.js');
 
 var ADMIN_ROLES = ['author', 'admin', 'super_admin'];
+
+var GUESTBOOK_COLLECTION = 'guestbook_messages';
+// 留言 AI 审核回写字段（迁移 20261124120000_add_guestbook_ai_fields 引入）。
+// 迁移未应用时这三个字段可能不存在，落库前用 schema 探测并在缺失时跳过写入。
+var GUESTBOOK_AI_FIELDS = ['ai_verdict', 'ai_reason', 'ai_moderated'];
+// guestbook_messages.status 的枚举是 show / hidden（见 20260718101000_create_guestbook_messages），
+// 垃圾判定隐藏留言用 'hidden'，正常则回到 'show'；unsure 保持原状态交人工复核。
+var GUESTBOOK_STATUS_VISIBLE = 'show';
+var GUESTBOOK_STATUS_HIDDEN = 'hidden';
+var GUESTBOOK_REASON_MAX = 480;
 
 // 生成/辅助的字数档 -> (目标字数, maxTokens)
 var LENGTH_PRESETS = {
@@ -141,17 +152,235 @@ function requireAdminSecure(c) {
   return secure;
 }
 
+// ---------- AI 配置诊断（字段级错误定位） ----------
+
+// 集合尚未创建/读取失败时的兜底视图，形状与 ai_config.readPublic() 一致。
+function emptySettingsView() {
+  return {
+    configured: false,
+    enabled: false,
+    base_url: '',
+    model: '',
+    timeout_seconds: 60,
+    article_publish_mode: 'draft',
+    comment_mode: 'off',
+    banned_words_enabled: false,
+    banned_words: [],
+    reply_name: 'AI 助手',
+    reply_persona: '',
+    has_key: false,
+    updated_at: '',
+  };
+}
+
+function settingsView() {
+  try { return aiConfig.readPublic($app.dao()); } catch (_) { return emptySettingsView(); }
+}
+
+// 诊断可接受的标量字段（表单与 query string 共用）。
+// api_key 只允许走 JSON body，绝不进 URL —— 避免明文 key 落进访问日志。
+var DIAGNOSTICS_SCALAR_FIELDS = [
+  'base_url', 'model', 'timeout_seconds', 'article_publish_mode',
+  'comment_mode', 'reply_name', 'reply_persona',
+];
+
+function toBool(value) {
+  return value === true || value === 1 || value === 'true' || value === '1' ||
+    value === 'yes' || value === 'on';
+}
+
+function hasOwn(object, key) {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+// GET 查询参数形态：?base_url=...&model=...&enabled=1&banned_words=a,b
+function diagnosticsQueryInput(c) {
+  var out = {};
+  var any = false;
+  var i;
+  for (i = 0; i < DIAGNOSTICS_SCALAR_FIELDS.length; i++) {
+    var name = DIAGNOSTICS_SCALAR_FIELDS[i];
+    var value = '';
+    try { value = String(c.queryParam(name) == null ? '' : c.queryParam(name)); } catch (_) { value = ''; }
+    if (value !== '') { out[name] = value; any = true; }
+  }
+  try {
+    if (String(c.queryParam('enabled') || '') !== '') { out.enabled = toBool(c.queryParam('enabled')); any = true; }
+    if (String(c.queryParam('banned_words_enabled') || '') !== '') {
+      out.banned_words_enabled = toBool(c.queryParam('banned_words_enabled'));
+      any = true;
+    }
+    var words = String(c.queryParam('banned_words') || '');
+    if (words) {
+      var parts = words.split(',');
+      var list = [];
+      for (var w = 0; w < parts.length; w++) {
+        var item = String(parts[w]).trim();
+        if (item) list.push(item);
+      }
+      out.banned_words = list;
+      any = true;
+    }
+  } catch (_) {}
+  return any ? out : null;
+}
+
+// 输入优先级：JSON body（任何非空对象）> query string > 库内配置。
+// 纯读：不写库、不解密 api_key。
+function readDiagnosticsInput(c) {
+  var body = null;
+  try {
+    var raw = readerToString(c.request().body, 8193) || '';
+    if (raw.trim()) {
+      var parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Object.keys(parsed).length > 0) {
+        body = parsed;
+      }
+    }
+  } catch (_) { body = null; }
+  if (body) return body;
+  return diagnosticsQueryInput(c);
+}
+
+// 把「当前表单输入」与库内脱敏配置合并成诊断用的完整表单：
+// - 表单里出现的字段以表单为准，缺省字段回落到库内值；
+// - api_key 只从 body 取（明文绝不回显），has_key 表示「本次新填了」或「库里/env 已有」。
+function diagnosticsForm(input, stored) {
+  var form = {};
+  var provided = input && typeof input === 'object' ? input : {};
+  for (var i = 0; i < DIAGNOSTICS_SCALAR_FIELDS.length; i++) {
+    var key = DIAGNOSTICS_SCALAR_FIELDS[i];
+    form[key] = hasOwn(provided, key) ? provided[key] : stored[key];
+  }
+  form.banned_words_enabled = hasOwn(provided, 'banned_words_enabled')
+    ? toBool(provided.banned_words_enabled)
+    : stored.banned_words_enabled === true;
+  form.banned_words = hasOwn(provided, 'banned_words') ? provided.banned_words : stored.banned_words;
+  form.enabled = hasOwn(provided, 'enabled') ? toBool(provided.enabled) : stored.enabled === true;
+  form.api_key = hasOwn(provided, 'api_key') && provided.api_key != null ? String(provided.api_key) : '';
+  form.has_key = form.api_key.length > 0 || stored.has_key === true;
+  return form;
+}
+
+// 回显给前端的「生效视图」—— 绝不包含明文 api_key。
+function effectiveView(form) {
+  var baseUrlCheck = aiConfig.diagnoseBaseUrl(form.base_url);
+  var rawBaseUrl = String(form.base_url == null ? '' : form.base_url).trim();
+  return {
+    base_url: baseUrlCheck.ok ? baseUrlCheck.value : rawBaseUrl,
+    origin_allowed: baseUrlCheck.origin_allowed === true,
+    model: String(form.model == null ? '' : form.model).trim(),
+    has_key: form.has_key === true,
+    enabled: form.enabled === true,
+  };
+}
+
+function diagnosticsPayload(form) {
+  var report = aiConfig.diagnostics(form);
+  return { ok: report.ok, errors: report.errors, effective: effectiveView(form) };
+}
+
+// INVALID_AI_CONFIG 判定 / 字段提取。
+// 注意（PB 0.22 实证）：ApiError 在请求 runtime 里被重新读出时，error.data 的值可能被
+// PB 包装成 Go 对象（String() 得到 "[object Object]"），因此字段名以 message 前缀为准
+// （invalid() 生成的 message 恒为 'INVALID_AI_CONFIG: <field> (...)'），error.data 仅作兜底。
+function isInvalidAiConfig(error) {
+  try {
+    if (/^INVALID_AI_CONFIG\b/.test(String(error && error.message || ''))) return true;
+  } catch (_) {}
+  try {
+    if (error && error.data && String(error.data.code || '') === 'INVALID_AI_CONFIG') return true;
+  } catch (_) {}
+  return false;
+}
+
+function invalidAiConfigField(error) {
+  try {
+    var match = /INVALID_AI_CONFIG:\s*([A-Za-z0-9_]+)/.exec(String(error && error.message || ''));
+    if (match) return match[1];
+  } catch (_) {}
+  try {
+    var field = error && error.data && error.data.field;
+    if (typeof field === 'string' && field) return field;
+  } catch (_) {}
+  return 'config';
+}
+
+// 保存失败时的 400 响应：保留 PB 惯例的 { code, message }，把字段级诊断放进 data，
+// 前端可据 data.field 精确定位输入项，data.errors 可一次展示全部问题。
+// 同时把 field/reason/errors/effective 平铺到响应体顶层 —— 前端
+// astro/src/lib/services/aiSettingsService.ts 的 aiConfigField() 是按
+// `err.response.data.field ?? err.data.field`（即响应体本身）读取的，
+// 两层都提供可同时兼容「读顶层」与「读 data」两种写法。
+function respondInvalidAiConfig(c, error, input, stored) {
+  var payload = diagnosticsPayload(diagnosticsForm(input, stored));
+  var field = invalidAiConfigField(error);
+  var errors = payload.errors && payload.errors.length ? payload.errors : [];
+  if (!errors.length) {
+    var message = String(error && error.message || '');
+    var open = message.indexOf('(');
+    var detail = open !== -1 ? message.slice(open + 1).replace(/\)\s*$/, '') : message;
+    errors = [{ field: field, reason: detail || '配置值不合法' }];
+  }
+  var reason = '';
+  for (var i = 0; i < errors.length; i++) {
+    if (errors[i].field === field) { reason = String(errors[i].reason || ''); break; }
+  }
+  if (!reason) reason = String(errors[0].reason || '');
+  var details = {
+    code: 'INVALID_AI_CONFIG',
+    field: field,
+    reason: reason,
+    ok: false,
+    errors: errors,
+    effective: payload.effective,
+  };
+  try { c.response().header().set('Cache-Control', 'no-store'); } catch (_) {}
+  return c.json(400, {
+    code: 400,
+    message: String(error && error.message || 'INVALID_AI_CONFIG: ' + field),
+    // 顶层平铺（前端 aiConfigField / readFieldReason 直接读响应体）
+    field: field,
+    reason: reason,
+    ok: false,
+    errors: errors,
+    effective: payload.effective,
+    // PB 惯例的 data 包装（任务契约 data:{ code:'INVALID_AI_CONFIG', field } 也满足）
+    data: details,
+  });
+}
+
 // ---------- GET /api/blog-admin/ai/settings ----------
 function settingsRead(c) {
   requireSuperAdminSecure(c);
   return c.json(200, aiConfig.readPublic($app.dao()));
 }
 
+// ---------- GET /api/blog-admin/ai/diagnostics ----------
+// 用当前表单输入（无输入则用库内配置）跑 aiConfig.diagnostics，返回
+//   { ok, errors:[{field, reason}], effective:{ base_url, origin_allowed, model, has_key, enabled } }
+// 纯读，不写库、不回显明文 key；鉴权与 /ai/settings 相同（可信 IP + super_admin + step-up）。
+function diagnostics(c) {
+  requireSuperAdminSecure(c);
+  try { c.response().header().set('Cache-Control', 'no-store'); } catch (_) {}
+  var stored = settingsView();
+  var form = diagnosticsForm(readDiagnosticsInput(c), stored);
+  return c.json(200, diagnosticsPayload(form));
+}
+
 // ---------- PUT /api/blog-admin/ai/settings ----------
 function settingsSave(c) {
   var secure = requireSuperAdminSecure(c);
   var input = readBody(c, 8193);
-  var saved = aiConfig.save($app.dao(), input, secure.actorId);
+  var stored = settingsView();
+  var saved;
+  try {
+    saved = aiConfig.save($app.dao(), input, secure.actorId);
+  } catch (error) {
+    // 校验失败不再只回 'INVALID_AI_CONFIG: <field>' 字符串：把字段级原因一并带回（仍为 400）。
+    if (isInvalidAiConfig(error)) return respondInvalidAiConfig(c, error, input, stored);
+    throw error;
+  }
   writeAudit(
     c,
     secure.actorId,
@@ -525,12 +754,109 @@ function replyComment(c) {
   });
 }
 
+// ---------- 留言 AI 审核（POST /api/blog-admin/ai/guestbook/moderate） ----------
+// 与评论审核复用同一份 prompt / 调用参数（ai_moderation.classify），差异只在落库语义：
+// guestbook_messages 的状态枚举是 show / hidden（评论是 pending/approved/spam）。
+function loadGuestbookOr404(id) {
+  var message = null;
+  try { message = $app.dao().findRecordById(GUESTBOOK_COLLECTION, id); } catch (_) {}
+  if (!message) apiError(404, 'MESSAGE_NOT_FOUND');
+  return message;
+}
+
+// 迁移 20261124120000_add_guestbook_ai_fields 未应用时 ai_* 字段不存在：
+// 用 schema 探测决定是否回写，避免把不存在的列写进记录。
+function guestbookSupportsAiFields(dao) {
+  var collection = null;
+  try { collection = dao.findCollectionByNameOrId(GUESTBOOK_COLLECTION); } catch (_) { collection = null; }
+  if (!collection) return false;
+  for (var i = 0; i < GUESTBOOK_AI_FIELDS.length; i++) {
+    var found = false;
+    try { found = !!collection.schema.getFieldByName(GUESTBOOK_AI_FIELDS[i]); } catch (_) { found = false; }
+    if (!found) return false;
+  }
+  return true;
+}
+
+// verdict → status：
+//   spam    → hidden（集合 listRule/viewRule 只放行 status = "show"）
+//   approve → show
+//   unsure / error → 保持原状态（新建留言经 validate_guestbook 恒为 show），只记录结论交人工复核
+function applyGuestbookVerdict(dao, message, outcome) {
+  var persisted = guestbookSupportsAiFields(dao);
+  if (persisted) {
+    try {
+      message.set('ai_verdict', String(outcome.verdict || ''));
+      message.set('ai_reason', String(outcome.reason || '').slice(0, GUESTBOOK_REASON_MAX));
+      message.set('ai_moderated', true);
+    } catch (error) {
+      persisted = false;
+      console.warn('[ai-admin] guestbook ai_* write skipped: ' +
+        String((error && error.message) || error).slice(0, 120));
+    }
+  } else {
+    console.warn('[ai-admin] guestbook ai_* fields missing; apply pb_migrations/20261124120000_add_guestbook_ai_fields');
+  }
+
+  var status = '';
+  try { status = String(message.getString('status') || ''); } catch (_) { status = ''; }
+  if (outcome.verdict === 'spam') {
+    message.set('status', GUESTBOOK_STATUS_HIDDEN);
+    status = GUESTBOOK_STATUS_HIDDEN;
+  } else if (outcome.verdict === 'approve') {
+    message.set('status', GUESTBOOK_STATUS_VISIBLE);
+    status = GUESTBOOK_STATUS_VISIBLE;
+  }
+  dao.saveRecord(message);
+  return { status: status, persisted: persisted };
+}
+
+// 单条留言立即 AI 审核。鉴权同评论审核：requireAdminSecure（author/admin/super_admin + step-up）。
+function moderateGuestbook(c) {
+  var secure = requireAdminSecure(c);
+  var input = readBody(c, 8193);
+  consumeQuota('ai_assist', secure.actorId);
+
+  var id = text(input.message_id || input.messageId || input.id, 64);
+  if (!id) apiError(400, 'INVALID_REQUEST');
+  var cfg = requireAiConfigured();
+  var message = loadGuestbookOr404(id);
+
+  var nickname = '';
+  try { nickname = String(message.getString('nickname') || ''); } catch (_) { nickname = ''; }
+  var content = '';
+  try { content = String(message.getString('content') || ''); } catch (_) { content = ''; }
+
+  // 留言没有文章标题，用「留言板」定位场景；昵称与正文同属不可信用户输入，一并送审。
+  var outcome = aiModeration.classify(cfg, '留言板', '留言者：' + nickname + '\n' + content);
+  var applied = applyGuestbookVerdict($app.dao(), message, outcome);
+
+  writeAudit(
+    c,
+    secure.actorId,
+    'ai_guestbook_moderate',
+    GUESTBOOK_COLLECTION,
+    id,
+    '留言 AI 审核: verdict=' + outcome.verdict + ' status=' + applied.status +
+      (applied.persisted ? '' : ' (ai_* 字段缺失未写入)'),
+  );
+
+  // AI 调用失败同样以 200 + verdict='error' 回传（与评论审核口径一致），前端可展示原因。
+  return c.json(200, {
+    verdict: outcome.verdict,
+    reason: String(outcome.reason || '').slice(0, GUESTBOOK_REASON_MAX),
+    status: applied.status,
+  });
+}
+
 module.exports = {
   settingsRead: settingsRead,
   settingsSave: settingsSave,
+  diagnostics: diagnostics,
   testConnection: testConnection,
   generateArticle: generateArticle,
   assist: assist,
   moderateComment: moderateComment,
   replyComment: replyComment,
+  moderateGuestbook: moderateGuestbook,
 };
