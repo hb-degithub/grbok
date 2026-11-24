@@ -43,6 +43,29 @@ DEFAULT_URLS=(
   "https://hlydwz.com/sitemap-index.xml"
   "https://hlydwz.com/sitemap-0.xml"
   "https://hlydwz.com/robots.txt"
+  # 后台页面同样会被 ESA 缓存（实测 /admin/insights 为 HIT + 30 天），
+  # 不刷新会让管理员在部署后继续拿到旧 HTML/旧 chunk，页面表现为「接口 403 / 数据不可用」。
+  "https://hlydwz.com/admin"
+  "https://hlydwz.com/admin/"
+  "https://hlydwz.com/admin/insights"
+  "https://hlydwz.com/admin/ai"
+  "https://hlydwz.com/admin/comments"
+  "https://hlydwz.com/admin/gallery"
+  "https://hlydwz.com/admin/media"
+  "https://hlydwz.com/admin/guestbook"
+  "https://hlydwz.com/admin/posts"
+  "https://hlydwz.com/admin/users"
+  "https://hlydwz.com/admin/settings"
+  "https://hlydwz.com/admin/security"
+  "https://hlydwz.com/admin/mail"
+  "https://hlydwz.com/admin/monitor"
+  "https://hlydwz.com/admin/cache"
+  "https://hlydwz.com/admin/features"
+  "https://hlydwz.com/admin/stats"
+  "https://hlydwz.com/admin/audit"
+  "https://hlydwz.com/admin/tags"
+  "https://hlydwz.com/admin/announcements"
+  "https://hlydwz.com/admin/friend-links"
 )
 
 if [ "$#" -gt 0 ]; then
