@@ -28,7 +28,7 @@ export function useInsights() {
     setLoading(true);
     try {
       // 服务内部已用 Promise.allSettled 收敛两个数据源，这里拿到的一定是可渲染快照：
-      // 统计接口挂了仍有互动排行，reactions 403 只把反应计数降级为 0。
+      // 统计接口挂了仍有互动排行；互动接口挂了只把排行降级为空 + 标记不可用。
       const snapshot = await insightsService.getInsightsSnapshot(range, 10);
       setStats(snapshot.stats);
       setTopPosts(snapshot.topPosts);

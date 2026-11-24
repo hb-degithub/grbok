@@ -82,8 +82,9 @@ const ADMIN_NAV: AdminNavEntry[] = [
   { href: '/admin/posts', label: '文章', hint: '撰写', section: '内容', role: 'author' },
   { href: '/admin/comments', label: '评论', hint: '审核', section: '内容', role: 'admin' },
   { href: '/admin/tags', label: '标签', hint: '分类', section: '内容', role: 'author' },
-  { href: '/admin/media', label: '媒体', hint: '图片', section: '内容', role: 'author' },
-  { href: '/admin/gallery', label: '相册管理', hint: '相册', section: '内容', role: 'author' },
+  // 媒体库 = 素材仓库（文章封面/正文插图）；相册管理 = /gallery 对外照片墙。
+  { href: '/admin/media', label: '媒体库', hint: '素材', section: '内容', role: 'author' },
+  { href: '/admin/gallery', label: '相册管理', hint: '展示', section: '内容', role: 'author' },
   { href: '/admin/friend-links', label: '友链', hint: '外链', section: '内容', role: 'super_admin' },
   { href: '/admin/guestbook', label: '留言治理', hint: '留言', section: '内容', role: 'super_admin' },
   { href: '/admin/users', label: '用户', hint: '权限', section: '系统', role: 'super_admin' },
@@ -138,6 +139,10 @@ describe('科幻简约 · 后台组件与登录页设计契约', () => {
       expect(line, `导航分组丢失：${section}`).toContain(`section: '${section}'`);
       expect(line, `${href} 权限门槛应为 ${role}，不得放宽/收紧`).toContain(`requiredRole: '${role}'`);
     }
+
+    // 两个易混入口的说明必须写在导航项里（仅展开态展示，但文案在源码中锁定）。
+    expect(src).toContain('素材仓库：文章封面、正文插图');
+    expect(src).toContain('对外展示的照片墙');
 
     // 权限门槛分布：author 6 项、admin 5 项、super_admin 10 项
     // （原 5/2/9，仅新增页面各自带来 +1/+3/+1）。

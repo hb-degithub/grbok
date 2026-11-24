@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAiSettings } from '../../hooks/domains/useAiSettings';
-import type { AiArticlePublishMode, AiCommentMode, AiSettingsInput } from '../../lib/services/aiSettingsService';
+import {
+  AI_CONFIG_FIELD_LABELS,
+  type AiArticlePublishMode,
+  type AiCommentMode,
+  type AiConfigField,
+  type AiDiagnostics,
+  type AiSettingsInput,
+} from '../../lib/services/aiSettingsService';
 import { cn } from '../../lib/utils';
 
 /* AI 设置（科幻简约 · 批次 C5）
@@ -12,6 +19,9 @@ import { cn } from '../../lib/utils';
 const labelCls = 'mb-1.5 block font-mono text-[11px] tracking-[0.08em] text-[var(--sf-ink-3)]';
 const inputCls =
   'min-h-[40px] w-full min-w-0 rounded-[3px] border border-[var(--sf-line-control)] bg-[var(--sf-surface)] px-3 py-2.5 text-[16px] leading-snug text-[var(--sf-ink)] outline-none transition-colors placeholder:text-[var(--sf-ink-3)] focus-visible:border-[var(--sf-accent)] focus-visible:ring-2 focus-visible:ring-[var(--sf-accent)] disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm';
+/** 校验失败字段：细红线 + 红色焦点环，与错误横幅同色 */
+const inputInvalidCls =
+  'border-[var(--sf-danger)] focus-visible:border-[var(--sf-danger)] focus-visible:ring-[var(--sf-danger)]';
 
 const PANEL = 'max-w-full overflow-hidden rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]';
 const PANEL_HEAD = 'border-b border-[var(--sf-line)] px-4 py-3 sm:px-5';
@@ -107,8 +117,86 @@ function parseBannedWords(text: string): string[] {
   return text.split('\n').map((line) => line.trim()).filter(Boolean);
 }
 
+/** 诊断 errors 里的字段名 → 人话标签（未知字段原样展示） */
+function fieldLabel(field: string): string {
+  return (AI_CONFIG_FIELD_LABELS as Record<string, string>)[field] || field;
+}
+
+/** 诊断结果里的生效配置摘要：白名单 / 密钥是最常出问题的两项，单独放大展示 */
+function DiagnosticsSummary({ diagnostics }: { diagnostics: AiDiagnostics }) {
+  const { effective, errors, ok } = diagnostics;
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={cn(CHIP, ok ? TONE.success : TONE.danger)}>
+          {ok ? '配置检查通过' : `配置检查未通过（${errors.length}）`}
+        </span>
+        <span className={cn(CHIP, effective.origin_allowed ? TONE.success : TONE.danger)}>
+          来源白名单：{effective.origin_allowed ? '允许' : '不允许'}
+        </span>
+        <span className={cn(CHIP, effective.has_key ? TONE.success : TONE.danger)}>
+          API Key：{effective.has_key ? '已就绪' : '缺失'}
+        </span>
+        <span className={cn(CHIP, effective.enabled ? TONE.success : TONE.neutral)}>
+          AI 功能：{effective.enabled ? '已启用' : '未启用'}
+        </span>
+      </div>
+
+      {(!effective.origin_allowed || !effective.has_key) && (
+        <div className="space-y-1 rounded-[3px] border border-amber-600/45 px-3 py-2 text-xs leading-relaxed text-amber-700 dark:border-amber-400/45 dark:text-amber-300">
+          {!effective.origin_allowed && (
+            <p className="break-words [overflow-wrap:anywhere]">
+              当前接口地址的来源不在服务端白名单 AI_ALLOWED_ORIGINS 内，AI 调用会被拒绝。
+            </p>
+          )}
+          {!effective.has_key && (
+            <p className="break-words [overflow-wrap:anywhere]">服务端没有可用的 API Key，启用 AI 前必须先保存密钥。</p>
+          )}
+        </div>
+      )}
+
+      {errors.length > 0 && (
+        <ul className="space-y-1">
+          {errors.map((error, index) => (
+            <li
+              key={`${error.field}-${index}`}
+              className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs leading-relaxed text-[var(--sf-danger)]"
+            >
+              <span className="shrink-0 font-mono tracking-[0.06em]">{fieldLabel(error.field)}</span>
+              <span className="min-w-0 break-words [overflow-wrap:anywhere]">{error.reason || '未通过校验'}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <dl className="grid gap-x-4 gap-y-1 font-mono text-[11px] leading-relaxed sm:grid-cols-[7rem_minmax(0,1fr)]">
+        <dt className="text-[var(--sf-ink-3)]">base_url</dt>
+        <dd className="min-w-0 break-all text-[var(--sf-ink-2)]">{effective.base_url || '（未配置）'}</dd>
+        <dt className="text-[var(--sf-ink-3)]">model</dt>
+        <dd className="min-w-0 break-all text-[var(--sf-ink-2)]">{effective.model || '（未配置）'}</dd>
+      </dl>
+    </div>
+  );
+}
+
 export default function AiSettingsPanel() {
-  const { settings, loading, saving, saved, testing, testResult, error, load, save, test, dismissMessages } = useAiSettings();
+  const {
+    settings,
+    loading,
+    saving,
+    saved,
+    testing,
+    testResult,
+    error,
+    fieldError,
+    diagnosing,
+    diagnostics,
+    load,
+    save,
+    test,
+    diagnose,
+    dismissMessages,
+  } = useAiSettings();
 
   const [form, setForm] = useState<AiSettingsInput | null>(null);
   const [apiKey, setApiKey] = useState('');
@@ -136,6 +224,17 @@ export default function AiSettingsPanel() {
   const patch = <K extends keyof AiSettingsInput>(key: K, value: AiSettingsInput[K]) => {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
+
+  /** 校验失败字段：输入框描边转红 + aria-invalid，页面里一眼能找到出错的框 */
+  const isInvalid = (field: AiConfigField) => fieldError?.field === field;
+  const fieldCls = (field: AiConfigField, extra?: string) => cn(inputCls, extra, isInvalid(field) && inputInvalidCls);
+
+  const FieldErrorHint = ({ field }: { field: AiConfigField }) =>
+    isInvalid(field) ? (
+      <p role="alert" className="mt-1 break-words text-xs leading-relaxed text-[var(--sf-danger)] [overflow-wrap:anywhere]">
+        {fieldError?.reason ?? '字段取值不合法'}
+      </p>
+    ) : null;
 
   const hasKey = settings?.has_key === true;
   const configured = settings?.configured === true;
@@ -168,6 +267,16 @@ export default function AiSettingsPanel() {
       await test();
     } catch {
       // 错误信息已由 hook 呈现（含 testResult.ok === false 的上游错误码）
+    }
+  };
+
+  const handleDiagnose = async () => {
+    // 清掉上一次「测试连接」结果，避免诊断失败时被旧结果盖住错误横幅
+    dismissMessages();
+    try {
+      await diagnose();
+    } catch {
+      // 错误信息已由 hook 呈现
     }
   };
 
@@ -237,8 +346,10 @@ export default function AiSettingsPanel() {
                 onChange={(event) => patch('base_url', event.target.value)}
                 placeholder="https://api.deepseek.com/v1 或自建 new-api 地址"
                 autoComplete="off"
-                className={cn(inputCls, 'font-mono')}
+                aria-invalid={isInvalid('base_url') || undefined}
+                className={fieldCls('base_url', 'font-mono')}
               />
+              <FieldErrorHint field="base_url" />
             </div>
             <div>
               <label className={labelCls} htmlFor="ai-api-key">API Key{hasKey ? '（留空表示不修改）' : ''}</label>
@@ -249,8 +360,10 @@ export default function AiSettingsPanel() {
                 onChange={(event) => setApiKey(event.target.value)}
                 placeholder={hasKey ? '已保存，留空不修改' : '首次配置必填'}
                 autoComplete="new-password"
-                className={cn(inputCls, 'font-mono')}
+                aria-invalid={isInvalid('api_key') || undefined}
+                className={fieldCls('api_key', 'font-mono')}
               />
+              <FieldErrorHint field="api_key" />
             </div>
             <div>
               <label className={labelCls} htmlFor="ai-model">模型名称</label>
@@ -261,8 +374,10 @@ export default function AiSettingsPanel() {
                 onChange={(event) => patch('model', event.target.value)}
                 placeholder="deepseek-chat"
                 autoComplete="off"
-                className={cn(inputCls, 'font-mono')}
+                aria-invalid={isInvalid('model') || undefined}
+                className={fieldCls('model', 'font-mono')}
               />
+              <FieldErrorHint field="model" />
             </div>
             <div>
               <label className={labelCls} htmlFor="ai-timeout">超时时间（秒）</label>
@@ -304,6 +419,37 @@ export default function AiSettingsPanel() {
         </div>
       </section>
 
+
+      {/* 运行诊断 */}
+      <section className={PANEL}>
+        <div className="flex flex-col items-start justify-between gap-3 border-b border-[var(--sf-line)] px-4 py-3 sm:flex-row sm:items-center sm:gap-4 sm:px-5">
+          <div className="min-w-0">
+            <h2 className="break-words text-sm font-semibold tracking-tight text-[var(--sf-ink)] [overflow-wrap:anywhere]">运行诊断</h2>
+            <p className="mt-1 break-words text-xs leading-5 text-[var(--sf-ink-3)] [overflow-wrap:anywhere]">
+              只读检查服务端实际生效的配置：字段级错误、来源白名单与密钥是否就绪。不会改动已保存配置。
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleDiagnose()}
+            disabled={diagnosing}
+            className={cn(BTN_BASE, BTN_SECONDARY, 'min-h-10 w-full shrink-0 px-3 text-xs sm:w-auto')}
+          >
+            {diagnosing && <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-[var(--sf-line)] border-t-[var(--sf-accent)]" aria-hidden="true" />}
+            {diagnosing ? '诊断中...' : '运行诊断'}
+          </button>
+        </div>
+        <div className={PANEL_BODY} aria-live="polite">
+          {diagnostics ? (
+            <DiagnosticsSummary diagnostics={diagnostics} />
+          ) : (
+            <p className="text-xs leading-relaxed text-[var(--sf-ink-3)]">
+              {diagnosing ? '正在读取服务端生效配置…' : '尚未运行诊断。保存失败或怀疑白名单 / 密钥异常时先跑一次诊断。'}
+            </p>
+          )}
+        </div>
+      </section>
+
       {/* 文章生成 */}
       <section className={PANEL}>
         <div className={PANEL_HEAD}>
@@ -311,7 +457,12 @@ export default function AiSettingsPanel() {
           <p className="mt-1 break-words text-xs leading-5 text-[var(--sf-ink-3)] [overflow-wrap:anywhere]">AI 一键成文后的落库状态。草稿模式可在后台预览修改后再上线。</p>
         </div>
         <div className={PANEL_BODY}>
-          <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="文章生成发布模式">
+          <div
+            className={cn('grid gap-3 sm:grid-cols-2', isInvalid('article_publish_mode') && 'rounded-[3px] ring-1 ring-[var(--sf-danger)] ring-offset-2 ring-offset-[var(--sf-surface)]')}
+            role="radiogroup"
+            aria-label="文章生成发布模式"
+            aria-invalid={isInvalid('article_publish_mode') || undefined}
+          >
             {PUBLISH_MODES.map((mode) => (
               <RadioCard
                 key={mode.value}
@@ -324,6 +475,7 @@ export default function AiSettingsPanel() {
               />
             ))}
           </div>
+          <FieldErrorHint field="article_publish_mode" />
         </div>
       </section>
 
@@ -335,7 +487,12 @@ export default function AiSettingsPanel() {
         </div>
 
         <div className={PANEL_BODY}>
-          <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="评论管家模式">
+          <div
+            className={cn('grid gap-3 sm:grid-cols-2', isInvalid('comment_mode') && 'rounded-[3px] ring-1 ring-[var(--sf-danger)] ring-offset-2 ring-offset-[var(--sf-surface)]')}
+            role="radiogroup"
+            aria-label="评论管家模式"
+            aria-invalid={isInvalid('comment_mode') || undefined}
+          >
             {COMMENT_MODES.map((mode) => (
               <RadioCard
                 key={mode.value}
@@ -348,6 +505,7 @@ export default function AiSettingsPanel() {
               />
             ))}
           </div>
+          <FieldErrorHint field="comment_mode" />
 
           <div className="mt-5 space-y-4 border-t border-[var(--sf-line)] pt-4">
             <Toggle
@@ -364,8 +522,10 @@ export default function AiSettingsPanel() {
                 onChange={(event) => setBannedWordsText(event.target.value)}
                 rows={5}
                 placeholder={'加微信\n代开发票'}
-                className={cn(inputCls, 'font-mono')}
+                aria-invalid={isInvalid('banned_words') || undefined}
+                className={fieldCls('banned_words', 'font-mono')}
               />
+              <FieldErrorHint field="banned_words" />
               <p className="mt-1 text-xs text-[var(--sf-ink-3)]">当前 <span className="font-mono">{parseBannedWords(bannedWordsText).length}</span> 条；子串匹配且忽略大小写，命中时不向访客透露具体词。</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -377,8 +537,10 @@ export default function AiSettingsPanel() {
                   value={form.reply_name}
                   onChange={(event) => patch('reply_name', event.target.value)}
                   placeholder="AI 助手"
-                  className={inputCls}
+                  aria-invalid={isInvalid('reply_name') || undefined}
+                  className={fieldCls('reply_name')}
                 />
+                <FieldErrorHint field="reply_name" />
                 <p className="mt-1 text-xs text-[var(--sf-ink-3)]">AI 回复展示的评论者名称，留空则用默认「AI 助手」。</p>
               </div>
               <div className="sm:row-span-1">
@@ -389,8 +551,10 @@ export default function AiSettingsPanel() {
                   onChange={(event) => patch('reply_persona', event.target.value)}
                   rows={3}
                   placeholder="留空使用默认人设（友好、专业、简洁，与博客作者语气一致）"
-                  className={inputCls}
+                  aria-invalid={isInvalid('reply_persona') || undefined}
+                  className={fieldCls('reply_persona')}
                 />
+                <FieldErrorHint field="reply_persona" />
               </div>
             </div>
           </div>

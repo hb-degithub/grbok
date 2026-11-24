@@ -20,6 +20,12 @@ export function useAdminComments() {
   const [page, setPage] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  /**
+   * 全站待审总数（与当前筛选/分页无关）。
+   * 「AI 审核全部待审」按钮按它显示徽标并决定可用性：
+   * 筛选在 approved/spam 时当前列表没有待审行，但批量入口仍应可用。
+   */
+  const [pendingTotal, setPendingTotal] = useState(0);
 
   // 最近一次「请求过」的页码。加载失败时 page 仍停在最后一次成功页（界面上还是那批数据），
   // 但重试要重试用户真正想看的那一页，而不是跳回第 1 页。
@@ -83,6 +89,20 @@ export function useAdminComments() {
   useEffect(() => {
     void loadComments(filter, 1, query);
   }, [filter, query, loadComments]);
+
+  /** 拉取全站待审计数：独立请求，失败不影响列表（按钮退化为按当前列表判断）。 */
+  const refreshPendingCount = useCallback(async () => {
+    try {
+      setPendingTotal(await adminCommentService.getPendingCount());
+    } catch {
+      // 统计失败时保留上一次数字；列表与批量审核仍可继续工作
+    }
+  }, []);
+
+  // 列表更新（切筛选/翻页/审核后刷新）都可能改变待审计数，跟随 comments 重新统计。
+  useEffect(() => {
+    void refreshPendingCount();
+  }, [refreshPendingCount, comments]);
 
   /**
    * 切筛选：页码必须和筛选在同一次状态更新里归 1。
@@ -176,10 +196,12 @@ export function useAdminComments() {
     page,
     totalPages,
     totalItems,
+    pendingTotal,
     goToPage,
     loadComments,
     refresh,
     retry,
+    refreshPendingCount,
     updateStatus,
     deleteComment,
     batchUpdateStatus,

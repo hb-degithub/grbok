@@ -17,6 +17,7 @@ const service = vi.hoisted(() => ({
   batchUpdateStatus: vi.fn(),
   batchDelete: vi.fn(),
   deleteComment: vi.fn(),
+  getPendingCount: vi.fn(),
 }));
 
 vi.mock('../../../lib/services/adminCommentService', () => ({
@@ -83,6 +84,8 @@ beforeEach(() => {
   service.batchUpdateStatus.mockReset();
   service.batchDelete.mockReset();
   service.deleteComment.mockReset();
+  service.getPendingCount.mockReset();
+  service.getPendingCount.mockResolvedValue(0);
 });
 
 afterEach(cleanup);

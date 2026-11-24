@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   aiErrorCode,
+  describeAiConfigFieldError,
+  diagnoseAiSettings,
   getAiSettings,
   saveAiSettings,
   testAiConnection,
+  type AiConfigFieldError,
+  type AiDiagnostics,
   type AiSettings,
   type AiSettingsInput,
   type AiTestResult,
@@ -41,10 +45,15 @@ export function useAiSettings() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<AiTestResult | null>(null);
   const [error, setError] = useState('');
+  /** 保存失败时后端回传的字段（用于高亮输入框 + 定位文案） */
+  const [fieldError, setFieldError] = useState<AiConfigFieldError | null>(null);
+  const [diagnosing, setDiagnosing] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<AiDiagnostics | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
+    setFieldError(null);
     try {
       setSettings(await getAiSettings());
     } catch (err) {
@@ -62,14 +71,19 @@ export function useAiSettings() {
     setSaving(true);
     setSaved(false);
     setError('');
+    setFieldError(null);
     try {
       const view = await saveAiSettings(input);
       setSettings(view);
       setSaved(true);
+      // 配置已变更，之前的诊断结论不再代表当前状态
+      setDiagnostics(null);
       setTimeout(() => setSaved(false), 2000);
       return view;
     } catch (err) {
-      setError(describeAiError(err, '保存 AI 配置失败'));
+      const fieldIssue = describeAiConfigFieldError(err);
+      setFieldError(fieldIssue);
+      setError(fieldIssue ? fieldIssue.message : describeAiError(err, '保存 AI 配置失败'));
       throw err;
     } finally {
       setSaving(false);
@@ -93,6 +107,24 @@ export function useAiSettings() {
     }
   }, []);
 
+  /** 只读诊断：展示字段级 errors 与生效配置（白名单 / 密钥） */
+  const diagnose = useCallback(async () => {
+    setDiagnosing(true);
+    setError('');
+    // 先清掉旧结论：诊断失败时不能让上一次「通过」继续挂在面板上
+    setDiagnostics(null);
+    try {
+      const result = await diagnoseAiSettings();
+      setDiagnostics(result);
+      return result;
+    } catch (err) {
+      setError(describeAiError(err, '运行 AI 配置诊断失败'));
+      throw err;
+    } finally {
+      setDiagnosing(false);
+    }
+  }, []);
+
   return {
     settings,
     loading,
@@ -102,9 +134,18 @@ export function useAiSettings() {
     testResult,
     error,
     setError,
+    fieldError,
+    diagnosing,
+    diagnostics,
     load,
     save,
     test,
-    dismissMessages: useCallback(() => { setError(''); setSaved(false); setTestResult(null); }, []),
+    diagnose,
+    dismissMessages: useCallback(() => {
+      setError('');
+      setSaved(false);
+      setTestResult(null);
+      setFieldError(null);
+    }, []),
   };
 }

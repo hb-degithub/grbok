@@ -6,6 +6,7 @@ import { showToast } from '../ui/Toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { cn } from '../../lib/utils';
 import type { MediaAsset } from '../../lib/services/mediaService';
+import MediaScopeNote from './MediaScopeNote';
 
 interface MediaLibraryProps {
   onSelect?: (url: string) => void;
@@ -83,6 +84,9 @@ export default function MediaLibrary({ onSelect, onClose }: MediaLibraryProps) {
 
   return (
     <div className="min-w-0 space-y-3">
+      {/* 素材仓库与对外照片墙的边界说明；作为文章编辑器内的选择器时不展示 */}
+      {!isPicker && <MediaScopeNote kind="library" />}
+
       {/* 上传区域 */}
       <div className="rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)] p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">

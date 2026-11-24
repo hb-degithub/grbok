@@ -11,6 +11,8 @@ interface NavItem {
   section: string;
   requiredRole: AdminRole;
   hint: string;
+  /** 展开态第二行说明：用于区分容易混淆的入口（媒体库 vs 相册管理） */
+  description?: string;
 }
 
 const navItems: NavItem[] = [
@@ -21,8 +23,8 @@ const navItems: NavItem[] = [
   { href: '/admin/posts', label: '文章', icon: 'M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z', section: '内容', requiredRole: 'author', hint: '撰写' },
   { href: '/admin/comments', label: '评论', icon: 'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z', section: '内容', requiredRole: 'admin', hint: '审核' },
   { href: '/admin/tags', label: '标签', icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', section: '内容', requiredRole: 'author', hint: '分类' },
-  { href: '/admin/media', label: '媒体', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z', section: '内容', requiredRole: 'author', hint: '图片' },
-  { href: '/admin/gallery', label: '相册管理', icon: 'M7 3h11a2 2 0 012 2v11M4 7h11a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2zM5 16l3-3 2 2 3-3 2 2', section: '内容', requiredRole: 'author', hint: '相册' },
+  { href: '/admin/media', label: '媒体库', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z', section: '内容', requiredRole: 'author', hint: '素材', description: '素材仓库：文章封面、正文插图' },
+  { href: '/admin/gallery', label: '相册管理', icon: 'M7 3h11a2 2 0 012 2v11M4 7h11a2 2 0 012 2v9a2 2 0 01-2 2H4a2 2 0 01-2-2V9a2 2 0 012-2zM5 16l3-3 2 2 3-3 2 2', section: '内容', requiredRole: 'author', hint: '展示', description: '对外展示的照片墙' },
   { href: '/admin/friend-links', label: '友链', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1', section: '内容', requiredRole: 'super_admin', hint: '外链' },
   { href: '/admin/guestbook', label: '留言治理', icon: 'M7 4h10a2 2 0 012 2v14H9a2 2 0 01-2-2V4zM7 4v16M10 9h6M10 13h4', section: '内容', requiredRole: 'super_admin', hint: '留言' },
   { href: '/admin/users', label: '用户', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', section: '系统', requiredRole: 'super_admin', hint: '权限' },
@@ -143,7 +145,7 @@ export default function AdminSidebar() {
                   <a
                     key={item.href}
                     href={item.href}
-                    title={isCollapsed ? item.label : undefined}
+                    title={isCollapsed ? (item.description ? `${item.label} · ${item.description}` : item.label) : undefined}
                     onClick={onNavigate}
                     className={cn(
                       'group relative flex min-h-11 items-center gap-3 rounded-[3px] px-2.5 text-sm font-medium transition-colors',
@@ -156,8 +158,15 @@ export default function AdminSidebar() {
                     <svg className={cn('h-[18px] w-[18px] shrink-0', active ? 'text-[var(--sf-accent)]' : 'text-[var(--sf-ink-3)] group-hover:text-[var(--sf-ink-2)]')} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} /></svg>
                     {!isCollapsed && (
                       <>
-                        <span className="truncate">{item.label}</span>
-                        <span className={cn('ml-auto shrink-0 rounded-[2px] border px-1.5 py-0.5 font-mono text-[10px] leading-none tracking-wide', active ? 'border-[var(--sf-accent)] text-[var(--sf-accent)]' : 'border-[var(--sf-line)] text-[var(--sf-ink-3)]')}>{item.hint}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">{item.label}</span>
+                          {item.description && (
+                            <span className="mt-0.5 block truncate font-mono text-[10px] leading-tight tracking-[0.02em] text-[var(--sf-ink-3)]">
+                              {item.description}
+                            </span>
+                          )}
+                        </span>
+                        <span className={cn('shrink-0 rounded-[2px] border px-1.5 py-0.5 font-mono text-[10px] leading-none tracking-wide', active ? 'border-[var(--sf-accent)] text-[var(--sf-accent)]' : 'border-[var(--sf-line)] text-[var(--sf-ink-3)]')}>{item.hint}</span>
                       </>
                     )}
                   </a>

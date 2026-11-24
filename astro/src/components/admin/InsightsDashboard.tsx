@@ -7,20 +7,20 @@ import type { PostEngagement } from '../../lib/services/insightsService';
  *
  * 路由：/admin/insights/
  * 权限：admin+
- * 依赖文件：pb_hooks/stats_track.pb.js（/api/blog-stats 聚合接口）,
- *           reactions, comments, posts collections
+ * 依赖接口：/api/blog-stats（总览聚合）、/api/post-engagement（公开互动排行聚合）
  *
  * 资产保护：纯后台展示，不嵌入前端页面。
  * 数据来源：PocketBase /api/blog-stats 聚合接口（服务端 COUNT(DISTINCT)）+
- *           reactions/comments 聚合。
+ *           /api/post-engagement 公开互动聚合（不再由前端直读 reactions 集合）。
  *
  * ⚠️ 此看板数据仅后台展示，严禁在前端渲染（遵守展示层判定协议）。
  * 隐私：不读取 visitor_hash 原始值，uniqueVisitors 由服务端 SQL 聚合返回。
  *
  * 容错（2026-11 生产缺陷回归）：
  * reactions 集合匿名不可读（403 Only admins），旧实现让 `Promise.all` 整体 reject，
- * 页面永远停在「统计数据暂不可用」。现在统计接口与互动排行分别收敛：
- * - 互动数据降级 → 顶部一句 `部分互动数据不可用`，其余照常渲染；
+ * 页面永远停在「统计数据暂不可用」。现在互动排行改走公开聚合接口，
+ * 统计接口与互动排行分别收敛：
+ * - 互动数据降级 → 排行榜位置显示 `互动数据暂不可用`，统计照常渲染；
  * - 统计接口降级 → 仍然渲染互动排行，不给整页空白。
  *
  * 视觉：表面色 + 冷灰细线 + 3px 圆角；数字等宽 + tabular-nums；
@@ -93,7 +93,14 @@ function PartialNote({ text }: { text: string }) {
   );
 }
 
-function TopPostsList({ posts }: { posts: PostEngagement[] }) {
+function TopPostsList({ posts, available }: { posts: PostEngagement[]; available: boolean }) {
+  if (!available) {
+    return (
+      <p role="status" data-state="unavailable" className="px-3 py-3 text-sm text-[var(--sf-ink-3)]">
+        互动数据暂不可用
+      </p>
+    );
+  }
   if (posts.length === 0) return <EmptyNote text="暂无数据" />;
   return (
     <div>
@@ -175,8 +182,8 @@ export default function InsightsDashboard() {
       <div className="space-y-4" data-state="partial">
         <RangeSelector range={range} setRange={setRange} />
         <PartialNote text="统计数据接口暂不可用，以下仅展示文章互动排行。" />
-        <Section index="01" title="热门文章互动" hint={`${topPosts.length} 篇`} bodyClassName="px-0 py-0">
-          <TopPostsList posts={topPosts} />
+        <Section index="01" title="热门文章互动" hint={availability.posts ? `${topPosts.length} 篇` : '暂不可用'} bodyClassName="px-0 py-0">
+          <TopPostsList posts={topPosts} available={availability.posts} />
         </Section>
       </div>
     );
@@ -199,7 +206,8 @@ export default function InsightsDashboard() {
     : '';
 
   // 反应/评论计数不可读时只提示一次，且不声称「统计不可用」——其余数字是真的。
-  const interactionsDegraded = !availability.reactions || !availability.comments;
+  // 整个互动接口不可用时由列表内的「互动数据暂不可用」承担提示，这里不再重复。
+  const interactionsDegraded = availability.posts && (!availability.reactions || !availability.comments);
   const degradedParts = [
     !availability.reactions ? '反应' : '',
     !availability.comments ? '评论' : '',
@@ -243,8 +251,8 @@ export default function InsightsDashboard() {
       </Section>
 
       {/* 热门文章互动 */}
-      <Section index="02" title="热门文章互动" hint={`${topPosts.length} 篇`} bodyClassName="px-0 py-0">
-        <TopPostsList posts={topPosts} />
+      <Section index="02" title="热门文章互动" hint={availability.posts ? `${topPosts.length} 篇` : '暂不可用'} bodyClassName="px-0 py-0">
+        <TopPostsList posts={topPosts} available={availability.posts} />
       </Section>
 
       {/* 来源统计 */}

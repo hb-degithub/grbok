@@ -5,6 +5,7 @@ import { useGallery } from '../../hooks/domains/useGallery';
 import { GALLERY_LIST_THUMB } from '../../lib/services/galleryService';
 import { formatBytes } from '../../lib/image-compress';
 import type { GalleryItem } from '../../lib/services/galleryService';
+import MediaScopeNote from './MediaScopeNote';
 
 /* ===========================
    相册管理（后台）
@@ -121,6 +122,9 @@ export default function GalleryManager() {
         <h1 className="mt-1.5 break-words text-xl font-bold leading-tight tracking-tight text-[var(--sf-ink)]">相册管理</h1>
         <p className="mt-1.5 text-[13px] text-[var(--sf-ink-2)]">管理相册图片的显示与删除</p>
       </header>
+
+      {/* 对外照片墙与素材仓库的边界说明 + 互相跳转 */}
+      <MediaScopeNote kind="gallery" />
 
       {isAuthor && (
         <section className="min-w-0 rounded-[3px] border border-[var(--sf-line)] bg-[var(--sf-surface)]">

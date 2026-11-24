@@ -100,3 +100,16 @@ describe('GalleryManager · 上传进度', () => {
     expect(screen.queryByText(/正在上传/)).toBeNull();
   });
 });
+
+describe('GalleryManager · 页面顶部说明', () => {
+  it('说明这是对外照片墙，并链接去媒体库上传素材', () => {
+    galleryState.current = baseState();
+
+    render(<GalleryManager />);
+
+    expect(screen.getByText('相册管理：')).toBeTruthy();
+    expect(screen.getByText(/展示在 \/gallery 的对外照片墙/)).toBeTruthy();
+    const link = screen.getByRole('link', { name: /去媒体库上传/ });
+    expect(link.getAttribute('href')).toBe('/admin/media');
+  });
+});

@@ -92,12 +92,14 @@ export default function CommentModerator() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [savingContent, setSavingContent] = useState(false);
-  const { comments, loading, error, filter, setFilter, query, setQuery, page, goToPage, totalPages, updateStatus, refresh, retry, deleteComment, batchUpdateStatus, batchDelete } = useAdminComments();
+  const { comments, loading, error, filter, setFilter, query, setQuery, page, goToPage, totalPages, pendingTotal, updateStatus, refresh, retry, deleteComment, batchUpdateStatus, batchDelete } = useAdminComments();
 
   // AI 状态条（仅 super_admin 可见；非超管/未配置时静默隐藏）
   const { role } = useAdminAuth();
   const [aiSettings, setAiSettings] = useState<AiSettings | null>(null);
   const [aiBusy, setAiBusy] = useState<string | null>(null);
+  /** 一键 AI 审核进度：串行跑完当前列表里的待审评论，单条失败不中断。 */
+  const [aiBatch, setAiBatch] = useState<{ running: boolean; total: number; done: number; ok: number; spam: number; unsure: number; failed: number } | null>(null);
 
   useEffect(() => {
     if (role !== 'super_admin') return;
@@ -122,6 +124,67 @@ export default function CommentModerator() {
     } finally {
       setAiBusy(null);
     }
+  };
+
+  /** 当前列表中的待审条数（筛选待审时就是整页待审） */
+  const pendingInList = comments.filter((c) => c.status === 'pending').length;
+  /**
+   * 按钮徽标与可用性按「全站待审数」判断：
+   * 筛选切到 approved/spam 时当前列表没有待审行，但批量入口仍应可用。
+   */
+  const pendingCount = Math.max(pendingTotal, pendingInList);
+
+  /**
+   * 跨筛选取待审评论：当前列表没有待审行但仍有待审计数时使用。
+   * 服务端按页返回，最多翻 20 页（2000 条）防御性封顶，避免异常数据把循环拖死。
+   */
+  const fetchPendingTargets = async (): Promise<Comment[]> => {
+    const perPage = 100;
+    const collected: Comment[] = [];
+    for (let p = 1; p <= 20; p += 1) {
+      const result = await adminCommentService.getComments('pending', p, perPage);
+      collected.push(...result.items);
+      if (result.items.length < perPage || collected.length >= result.totalItems) break;
+    }
+    return collected;
+  };
+
+  /** 一键 AI 审核：串行处理所有待审评论（不限于当前筛选页），单条失败不中断。 */
+  const handleAiModerateAll = async () => {
+    if (aiBatch?.running) return;
+    let targets = comments.filter((c) => c.status === 'pending');
+    // 当前页只覆盖一部分待审（筛选不是 pending，或待审跨页）时，补齐全量待审再串行处理。
+    if (pendingCount > targets.length) {
+      try {
+        targets = await fetchPendingTargets();
+      } catch (err) {
+        showToast(describePbError(err, '待审评论加载失败'), 'error');
+        return;
+      }
+    }
+    if (targets.length === 0) {
+      showToast('当前没有待审核评论', 'info');
+      return;
+    }
+    setAiBatch({ running: true, total: targets.length, done: 0, ok: 0, spam: 0, unsure: 0, failed: 0 });
+    for (const c of targets) {
+      try {
+        const result = await moderateComment(c.id);
+        setAiBatch((prev) => prev ? {
+          ...prev,
+          done: prev.done + 1,
+          ok: prev.ok + (result.verdict === 'approve' ? 1 : 0),
+          spam: prev.spam + (result.verdict === 'spam' ? 1 : 0),
+          unsure: prev.unsure + (result.verdict === 'unsure' ? 1 : 0),
+          failed: prev.failed + (result.verdict === 'error' ? 1 : 0),
+        } : prev);
+      } catch {
+        setAiBatch((prev) => prev ? { ...prev, done: prev.done + 1, failed: prev.failed + 1 } : prev);
+      }
+    }
+    setAiBatch((prev) => prev ? { ...prev, running: false } : prev);
+    showToast('AI 批量审核完成', 'success');
+    void refresh();
   };
 
   /** 行内手动触发单条 AI 回复（approved 非 AI 评论；不受 worker 72h 守卫限制） */
@@ -244,8 +307,37 @@ export default function CommentModerator() {
             <svg className="pointer-events-none absolute inset-y-0 left-3 my-auto h-4 w-4 text-[var(--sf-ink-3)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-4.35-4.35M11 18a7 7 0 110-14 7 7 0 010 14z" /></svg>
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索作者、邮箱、内容、文章" className={`${FIELD_CLS} pl-9 pr-3`} />
           </label>
+          <button
+            type="button"
+            onClick={() => void handleAiModerateAll()}
+            disabled={Boolean(aiBatch?.running) || pendingCount === 0}
+            className={BTN_BASE + ' ' + BTN_ACCENT + ' min-h-10 px-3 text-[12px]'}
+            title="对所有待审评论逐条执行 AI 审核（不限于当前筛选页）"
+            aria-label={`AI 审核全部待审（${pendingCount} 条）`}
+          >
+            {aiBatch?.running ? (
+              `AI 审核中 ${aiBatch.done}/${aiBatch.total}`
+            ) : (
+              <>
+                AI 审核全部待审
+                <span
+                  data-testid="ai-pending-badge"
+                  className="inline-flex min-w-5 items-center justify-center rounded-[2px] border border-current px-1 py-0.5 font-mono text-[10px] leading-none tabular-nums"
+                >
+                  {pendingCount}
+                </span>
+              </>
+            )}
+          </button>
         </div>
       </section>
+
+      {/* 一键 AI 审核结果汇总：不打断列表操作 */}
+      {aiBatch && !aiBatch.running && (
+        <p role="status" className="font-mono text-[11px] tracking-[0.04em] text-[var(--sf-ink-2)]">
+          AI 批量审核完成：通过 {aiBatch.ok} / 驳回 {aiBatch.spam} / 存疑 {aiBatch.unsure} / 失败 {aiBatch.failed}
+        </p>
+      )}
 
       {/* 取数失败必须显式可见：列表为空时也不会被空态文案盖住，且提供「重试」。 */}
       {error && (

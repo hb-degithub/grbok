@@ -94,6 +94,23 @@ describe('InsightsDashboard · 部分数据不可用', () => {
     expect(await screen.findByText('统计数据暂不可用')).toBeTruthy();
   });
 
+  it('互动接口不可用时统计照常渲染，排行榜显示「互动数据暂不可用」', async () => {
+    snapshotMock.mockResolvedValue({
+      stats: STATS,
+      topPosts: [],
+      availability: { stats: true, posts: false, reactions: false, comments: false },
+      partial: true,
+    });
+
+    render(<InsightsDashboard />);
+
+    expect(await screen.findByText('1,234')).toBeTruthy();
+    expect(screen.getByText('互动数据暂不可用')).toBeTruthy();
+    // 不是整页空白，也不是把失败伪装成「暂无数据」
+    expect(screen.queryByText('暂无数据')).toBeNull();
+    expect(screen.queryByText('统计数据暂不可用')).toBeNull();
+  });
+
   it('全部可用时不出现任何降级提示', async () => {
     snapshotMock.mockResolvedValue({
       stats: STATS,
