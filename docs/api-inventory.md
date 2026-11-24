@@ -40,6 +40,7 @@
 | POST | `/api/track-view` | 公网；不保存原始 IP | 页面访问埋点 | `pb_hooks/stats_track.pb.js` |
 | GET | `/api/blog-stats?range=<range>` | 公网；`detail=1` 需 admin/super_admin | 博客统计聚合 | `pb_hooks/stats_track.pb.js` |
 | GET | `/api/friend-link-stats` | 公网 | 友链点击统计 | `pb_hooks/stats_track.pb.js` |
+| GET | `/api/post-engagement?limit=<n>` | 公网；`Cache-Control: public, max-age=30` | 已发布文章的浏览/反应/评论聚合（服务端 dao 统计，替代匿名直读 `reactions` 的 403） | `pb_hooks/post_engagement.pb.js` |
 
 ## 3. 管理端自定义 API
 
@@ -103,12 +104,16 @@
 | 方法 | 路径 | 访问要求 | 用途 | 限流 |
 |---|---|---|---|---|
 | GET | `/api/blog-admin/ai/settings` | super_admin | 读取 AI 配置（脱敏，绝不含 api_key 明文） | 无 |
-| PUT | `/api/blog-admin/ai/settings` | super_admin | 保存 AI 配置（api_key 加密存储，留空保留原值） | 无 |
+| GET | `/api/blog-admin/ai/diagnostics` | super_admin | 用当前表单输入（无输入则库内配置）跑字段级校验：`{ ok, errors:[{field,reason}], effective }`；只读不写库 | 无 |
+| PUT | `/api/blog-admin/ai/settings` | super_admin | 保存 AI 配置（api_key 加密存储，留空保留原值）；校验失败 400 + `data:{ code:'INVALID_AI_CONFIG', field, errors, effective }` | 无 |
 | POST | `/api/blog-admin/ai/test` | super_admin | 连通性测试（200 + ok/error 结构回传） | `ai_assist` |
 | POST | `/api/blog-admin/ai/article` | author/admin/super_admin | 一键成文（主题→HTML 全文，按 `article_publish_mode` 落库） | `ai_article`（5次/300s） |
 | POST | `/api/blog-admin/ai/assist` | author/admin/super_admin | 写作辅助（meta 元信息 / polish 润色 / continue 续写） | `ai_assist`（10次/60s） |
+| POST | `/api/blog-admin/ai/comments/moderate` | author/admin/super_admin | 单条评论立即 AI 审核 | `ai_assist` |
+| POST | `/api/blog-admin/ai/comments/reply` | author/admin/super_admin | 单条评论立即生成 AI 回复 | `ai_assist` |
+| POST | `/api/blog-admin/ai/guestbook/moderate` | author/admin/super_admin | 单条留言 AI 审核：`spam→hidden`、`approve→show`、`unsure/error` 保持原状态；回写 `ai_verdict/ai_reason/ai_moderated` 并写审计 | `ai_assist` |
 
-配套：`pb_hooks/ai_comment_worker.pb.js` 每分钟 cron 驱动评论审核/回复管线（`pb_hooks/lib/ai_comment_worker.js`）；违禁词拦截在 `pb_hooks/validate_comment.pb.js` 提交路径内联执行。限流策略默认值见 `pb_hooks/lib/security_policy_store.js`（`ai_assist`/`ai_article`）。
+配套：`pb_hooks/ai_comment_worker.pb.js` 每分钟 cron 驱动评论审核/回复管线（`pb_hooks/lib/ai_comment_worker.js`）；评论与留言的审核 prompt / 调用参数共用 `pb_hooks/lib/ai_moderation.js`；违禁词拦截在 `pb_hooks/validate_comment.pb.js` 提交路径内联执行。限流策略默认值见 `pb_hooks/lib/security_policy_store.js`（`ai_assist`/`ai_article`）。
 
 ## 4. PocketBase 原生 REST
 
