@@ -181,7 +181,7 @@ http://img.hlydwz.com {
     }
 
     # Astro 内置图片优化端点:前端未使用(图片走 PB 文件域名),
-    # 且当前 astro 6.4 受 GHSA-26w7-cxv4-gfx2(AVIF RCE)影响——在升级到 7.2.8+ 之前直接 404 封堵
+    # 且当前 astro 7.2.x（<7.2.8）受 GHSA-26w7-cxv4-gfx2(AVIF RCE)影响——在升级到 7.2.8+ 之前直接 404 封堵
     handle /_image* {
         respond "Not Found" 404
     }
@@ -365,7 +365,9 @@ http://img.hlydwz.com {
         header X-Robots-Tag "noindex, nofollow, noarchive"
         # SSR HTML 一律禁止 CDN 缓存：2026-09-18 发现 ESA 把旧版 HTML 缓存 15 天，
         # 重新部署后旧 HTML 引用已删除的带 hash 岛屿 chunk(404),搜索等交互全灭
-        header Cache-Control "no-cache, must-revalidate"
+        # 2026-11-26：ESA 忽略 no-cache（2026-11-16 已在通用 SSR 分支确认），
+        # 实测 /admin/insights 仍为 HIT + 30 天，故与通用分支一致升级为 no-store。
+        header Cache-Control "no-store"
         reverse_proxy 10.255.0.1:4321 {
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}
@@ -375,7 +377,8 @@ http://img.hlydwz.com {
 
     handle /login* {
         header X-Robots-Tag "noindex, nofollow, noarchive"
-        header Cache-Control "no-cache, must-revalidate"
+        # 同 /admin*：ESA 忽略 no-cache，登录页 HTML 必须 no-store。
+        header Cache-Control "no-store"
         reverse_proxy 10.255.0.1:4321 {
             header_up X-Real-IP {client_ip}
             header_up X-Forwarded-For {client_ip}

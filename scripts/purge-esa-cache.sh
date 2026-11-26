@@ -64,6 +64,7 @@ DEFAULT_URLS=(
   "https://hlydwz.com/admin/stats"
   "https://hlydwz.com/admin/audit"
   "https://hlydwz.com/admin/tags"
+  "https://hlydwz.com/admin/versions"
   "https://hlydwz.com/admin/announcements"
   "https://hlydwz.com/admin/friend-links"
 )
